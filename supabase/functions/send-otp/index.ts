@@ -115,7 +115,7 @@ serve(async (req) => {
 
     // Send email
     const emailResponse = await resend.emails.send({
-      from: "Home Hold'em Club <onboarding@resend.dev>",
+      from: "Home Hold'em Club <noreply@hello.homeholdem.com>",
       to: [email],
       subject: `Your verification code: ${code}`,
       html: otpEmailTemplate(code, name),

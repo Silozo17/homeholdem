@@ -143,7 +143,7 @@ serve(async (req) => {
 
     // Send the email
     const emailResponse = await resend.emails.send({
-      from: "Home Hold'em Club <onboarding@resend.dev>",
+      from: "Home Hold'em Club <noreply@hello.homeholdem.com>",
       to: [profile.email],
       subject: `🎉 You're off the waitlist for ${event.title}!`,
       html,
