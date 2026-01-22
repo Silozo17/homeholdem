@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { sendEmail } from '@/lib/email';
 import { eventCreatedTemplate } from '@/lib/email-templates';
+import { buildAppUrl } from '@/lib/app-url';
 
 const createEventSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters').max(100),
@@ -164,7 +165,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
       if (memberEmails.length === 0) return;
 
-      const eventUrl = `${window.location.origin}/events/${eventId}`;
+      const eventUrl = buildAppUrl(`/event/${eventId}`);
       const formattedDates = dateOptions.map((d) => format(d, "EEEE, MMMM d 'at' h:mm a"));
 
       const html = eventCreatedTemplate({

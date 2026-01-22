@@ -25,6 +25,7 @@ import { sendEmail } from '@/lib/email';
 import { clubInviteTemplate } from '@/lib/email-templates';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { buildAppUrl } from '@/lib/app-url';
 
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -69,7 +70,7 @@ export function InviteByEmailDialog({
         .single();
 
       const inviterName = profile?.display_name || 'A friend';
-      const joinUrl = `${window.location.origin}/dashboard?join=${inviteCode}`;
+      const joinUrl = buildAppUrl(`/dashboard?join=${inviteCode}`);
 
       const html = clubInviteTemplate({
         clubName,

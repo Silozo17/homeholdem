@@ -5,6 +5,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getAppUrl } from '@/lib/app-url';
 
 interface OTPVerificationProps {
   email: string;
@@ -51,7 +52,7 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: getAppUrl(),
           data: {
             display_name: displayName,
           },

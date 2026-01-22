@@ -9,6 +9,7 @@ import {
 import { Share2, MessageCircle, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { buildAppUrl } from '@/lib/app-url';
 
 interface ShareEventProps {
   eventTitle: string;
@@ -29,7 +30,7 @@ export function ShareEvent({
 }: ShareEventProps) {
   const [copied, setCopied] = useState(false);
 
-  const eventUrl = `${window.location.origin}/event/${eventId}`;
+  const eventUrl = buildAppUrl(`/event/${eventId}`);
   
   const formattedDate = eventDate 
     ? format(new Date(eventDate), "EEEE, MMM d 'at' h:mm a")

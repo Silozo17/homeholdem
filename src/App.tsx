@@ -15,6 +15,7 @@ import GameMode from "./pages/GameMode";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Stats from "./pages/Stats";
+import Rules from "./pages/Rules";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/stats" element={<Stats />} />
+                <Route path="/rules" element={<Rules />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

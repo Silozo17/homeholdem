@@ -39,6 +39,7 @@ import { ShareEvent } from '@/components/events/ShareEvent';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
+import { buildAppUrl } from '@/lib/app-url';
 
 interface Event {
   id: string;
@@ -306,7 +307,7 @@ export default function EventDetail() {
 
       if (!profile?.email) return;
 
-      const eventUrl = `${window.location.origin}/event/${event.id}`;
+      const eventUrl = buildAppUrl(`/event/${event.id}`);
       const eventDate = event.final_date 
         ? format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a")
         : undefined;
