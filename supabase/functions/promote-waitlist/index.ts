@@ -16,7 +16,7 @@ interface PromoteRequest {
   promoted_user_id: string;
 }
 
-// Premium email template - inline to avoid import issues
+// Premium email template - inline with casino green theme
 function waitlistPromotionEmail(data: {
   eventTitle: string;
   eventDate?: string;
@@ -33,31 +33,31 @@ function waitlistPromotionEmail(data: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>You're off the waitlist!</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <div style="padding: 24px 16px; background-color: #0a0a0a;">
-    <div style="background: linear-gradient(180deg, #141414 0%, #0f0f0f 100%); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden;">
-      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.1);">
+<body style="margin: 0; padding: 0; background-color: #0f1f1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <div style="padding: 24px 16px; background-color: #0f1f1a;">
+    <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(212, 175, 55, 0.1);">
+      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(180deg, rgba(212, 175, 55, 0.08) 0%, transparent 100%);">
         <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase;">♠ Home Hold'em Club ♠</p>
       </div>
       <div style="padding: 40px 28px; text-align: center;">
         <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🎉</div>
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">A spot opened up!</h1>
-        <p style="color: #888888; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
+        <p style="color: #7a9e90; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
           ${data.recipientName ? `Great news ${data.recipientName}! ` : ''}You've been promoted from the waitlist and your seat is now confirmed.
         </p>
-        <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left;">
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.06) 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left;">
           <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${data.eventTitle}</p>
-          ${data.clubName ? `<p style="margin: 8px 0 0; color: #888888; font-size: 13px;">🎴 ${data.clubName}</p>` : ''}
-          ${data.eventDate ? `<p style="margin: 8px 0 0; color: #cccccc; font-size: 14px;">📅 ${data.eventDate}</p>` : ''}
-          ${data.location ? `<p style="margin: 8px 0 0; color: #cccccc; font-size: 14px;">📍 ${data.location}</p>` : ''}
+          ${data.clubName ? `<p style="margin: 8px 0 0; color: #7a9e90; font-size: 13px;">🎴 ${data.clubName}</p>` : ''}
+          ${data.eventDate ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📅 ${data.eventDate}</p>` : ''}
+          ${data.location ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📍 ${data.location}</p>` : ''}
         </div>
-        <a href="${data.eventUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center;">
+        <a href="${data.eventUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);">
           View Event
         </a>
       </div>
-      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.1);">
-        <p style="color: #4a4a4a; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
-        <p style="color: #3a3a3a; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
+      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(0deg, rgba(212, 175, 55, 0.05) 0%, transparent 100%);">
+        <p style="color: #3d5e52; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
+        <p style="color: #2d4a40; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
       </div>
     </div>
   </div>

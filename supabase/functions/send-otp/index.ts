@@ -21,7 +21,7 @@ function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// OTP Email Template (inline to avoid import issues)
+// OTP Email Template with casino green theme
 function otpEmailTemplate(code: string, name?: string): string {
   return `
 <!DOCTYPE html>
@@ -31,28 +31,28 @@ function otpEmailTemplate(code: string, name?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verify your email</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <div style="padding: 24px 16px; background-color: #0a0a0a;">
-    <div style="background: linear-gradient(180deg, #141414 0%, #0f0f0f 100%); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden;">
-      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.1);">
+<body style="margin: 0; padding: 0; background-color: #0f1f1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <div style="padding: 24px 16px; background-color: #0f1f1a;">
+    <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(212, 175, 55, 0.1);">
+      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(180deg, rgba(212, 175, 55, 0.08) 0%, transparent 100%);">
         <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase;">♠ Home Hold'em Club ♠</p>
       </div>
       <div style="padding: 40px 28px; text-align: center;">
         <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🔐</div>
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">Verify your email</h1>
-        <p style="color: #888888; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
+        <p style="color: #7a9e90; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
           ${name ? `Hey ${name}, enter` : 'Enter'} this code to complete your signup
         </p>
-        <div style="background: #1a1a1a; border: 2px solid #d4af37; border-radius: 12px; padding: 24px 20px; margin: 0 auto 24px; max-width: 220px;">
+        <div style="background: linear-gradient(135deg, #1f3830 0%, #172a24 100%); border: 2px solid #d4af37; border-radius: 12px; padding: 24px 20px; margin: 0 auto 24px; max-width: 220px; box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);">
           <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #d4af37; font-family: 'SF Mono', Monaco, 'Courier New', monospace; margin: 0;">${code}</p>
         </div>
-        <p style="color: #666666; font-size: 12px; margin: 0;">
+        <p style="color: #5e8577; font-size: 12px; margin: 0;">
           This code expires in 10 minutes
         </p>
       </div>
-      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.1);">
-        <p style="color: #4a4a4a; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
-        <p style="color: #3a3a3a; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
+      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(0deg, rgba(212, 175, 55, 0.05) 0%, transparent 100%);">
+        <p style="color: #3d5e52; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
+        <p style="color: #2d4a40; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
       </div>
     </div>
   </div>
