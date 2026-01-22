@@ -9,27 +9,35 @@ export function useChipToCashRatio(clubId: string | null) {
       if (!clubId) return;
       
       try {
-        const { data: template } = await supabase
+        // Get active chip template
+        const templateResult = await supabase
           .from('chip_templates')
           .select('id')
           .eq('club_id', clubId)
           .eq('is_active', true)
           .maybeSingle();
 
-        if (template) {
-          // Fetch all denominations and take the first (smallest)
-          const denomResult = await supabase
-            .from('chip_denominations')
-            .select('denomination, cash_value')
-            .eq('chip_template_id', template.id);
+        const template = templateResult.data;
+        if (!template) return;
 
-          // Sort locally and get smallest
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const data = denomResult.data as any[];
+        // Use fetch API directly to avoid TypeScript chain type depth issues
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/chip_denominations?chip_template_id=eq.${template.id}&order=denomination.asc&limit=1`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
           if (data && data.length > 0) {
-            const sorted = data.sort((a, b) => a.denomination - b.denomination);
-            const first = sorted[0];
-            const ratio = Number(first.cash_value) / Number(first.denomination);
+            const ratio = Number(data[0].cash_value) / Number(data[0].denomination);
             if (!isNaN(ratio) && ratio > 0) {
               setChipToCashRatio(ratio);
             }
