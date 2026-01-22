@@ -16,6 +16,7 @@ interface GameSession {
   id: string;
   status: string;
   current_level: number;
+  display_blinds_as_currency?: boolean | null;
   level_started_at: string | null;
   time_remaining_seconds: number | null;
 }
@@ -125,6 +126,14 @@ export function DashboardMode({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatBlind = (chips: number) => {
+    if (session.display_blinds_as_currency) {
+      const value = chips / 100;
+      return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return chips.toLocaleString();
+  };
+
   const getTimerColor = () => {
     if (timeRemaining <= 10) return 'text-red-500 animate-pulse';
     if (timeRemaining <= 60) return 'text-amber-400';
@@ -171,11 +180,11 @@ export function DashboardMode({
         {/* Blinds */}
         {!currentLevel.is_break && (
           <div className="mt-6 flex items-baseline gap-4">
-            <span className="text-5xl font-bold text-blue-400">{currentLevel.small_blind.toLocaleString()}</span>
+            <span className="text-5xl font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</span>
             <span className="text-4xl text-white/30">/</span>
-            <span className="text-5xl font-bold text-amber-400">{currentLevel.big_blind.toLocaleString()}</span>
+            <span className="text-5xl font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</span>
             {currentLevel.ante > 0 && (
-              <span className="text-2xl text-rose-400 ml-4">(ante {currentLevel.ante})</span>
+              <span className="text-2xl text-rose-400 ml-4">(ante {formatBlind(currentLevel.ante)})</span>
             )}
           </div>
         )}
@@ -183,8 +192,8 @@ export function DashboardMode({
         {/* Next Level */}
         {nextLevel && (
           <div className="mt-6 text-lg text-white/60">
-            Next: {nextLevel.is_break ? '☕ Break' : `${nextLevel.small_blind}/${nextLevel.big_blind}`}
-            {nextLevel.ante > 0 && !nextLevel.is_break && ` (ante ${nextLevel.ante})`}
+            Next: {nextLevel.is_break ? '☕ Break' : `${formatBlind(nextLevel.small_blind)}/${formatBlind(nextLevel.big_blind)}`}
+            {nextLevel.ante > 0 && !nextLevel.is_break && ` (ante ${formatBlind(nextLevel.ante)})`}
           </div>
         )}
 

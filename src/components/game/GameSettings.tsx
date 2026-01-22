@@ -48,6 +48,7 @@ interface GameSession {
   allow_rebuys: boolean;
   allow_addons: boolean;
   rebuy_until_level: number | null;
+  display_blinds_as_currency: boolean | null;
 }
 
 interface GameSettingsProps {
@@ -84,6 +85,7 @@ export function GameSettings({
     allow_rebuys: session.allow_rebuys,
     allow_addons: session.allow_addons,
     rebuy_until_level: session.rebuy_until_level || 4,
+    display_blinds_as_currency: session.display_blinds_as_currency || false,
   });
 
   const [blinds, setBlinds] = useState<BlindLevel[]>(blindStructure);
@@ -102,6 +104,7 @@ export function GameSettings({
         allow_rebuys: settings.allow_rebuys,
         allow_addons: settings.allow_addons,
         rebuy_until_level: settings.rebuy_until_level,
+        display_blinds_as_currency: settings.display_blinds_as_currency,
       })
       .eq('id', session.id);
 
@@ -409,6 +412,20 @@ export function GameSettings({
           </TabsContent>
 
           <TabsContent value="blinds" className="space-y-4 mt-4">
+            {/* Display Mode Toggle */}
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div>
+                <Label>Display Blinds as Currency</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show {currencySymbol}0.10 / {currencySymbol}0.20 instead of 10 / 20
+                </p>
+              </div>
+              <Switch
+                checked={settings.display_blinds_as_currency}
+                onCheckedChange={(v) => setSettings(s => ({ ...s, display_blinds_as_currency: v }))}
+              />
+            </div>
+
             {/* Header with Tooltips */}
             <TooltipProvider>
               <div className="grid grid-cols-6 gap-1 px-2 text-xs text-muted-foreground font-medium">

@@ -19,6 +19,7 @@ interface GameSession {
   allow_rebuys: boolean;
   allow_addons: boolean;
   rebuy_until_level: number | null;
+  display_blinds_as_currency: boolean | null;
 }
 
 interface BlindLevel {
