@@ -209,10 +209,14 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
               <div className="text-sm text-muted-foreground font-medium text-center">
                 Table {tableNum}
               </div>
-              <div className="relative aspect-[2/1] w-full max-w-xs sm:max-w-sm mx-auto">
-                {/* Table felt */}
-                <div className="absolute inset-[8%] sm:inset-[10%] rounded-[50%] bg-emerald-800 border-2 sm:border-4 border-amber-900 shadow-lg" />
-                <div className="absolute inset-[10%] sm:inset-[12%] rounded-[50%] border border-emerald-600/30" />
+              <div className="relative aspect-[2.5/1] w-full max-w-md sm:max-w-lg mx-auto">
+                {/* Outer Rail - Pill Shape (same as TV display) */}
+                <div className="absolute inset-[6%] rounded-full bg-gradient-to-b from-amber-900 via-amber-800 to-amber-900 shadow-lg">
+                  {/* Inner Rail */}
+                  <div className="absolute inset-[4%] rounded-full bg-gradient-to-b from-amber-700 via-amber-600 to-amber-700" />
+                  {/* Felt Surface */}
+                  <div className="absolute inset-[8%] rounded-full bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-800 shadow-inner" />
+                </div>
                 
                 {/* Dealer button position indicator */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-background/80 border border-primary/50 flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary">
