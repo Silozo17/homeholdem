@@ -277,81 +277,84 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
               return (
                 <div
                   key={denom.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 flex-wrap"
+                  className="flex flex-col gap-2 p-3 rounded-lg bg-muted/50"
                 >
-                  {/* Casino-style chip indicator */}
-                  <div
-                    className="poker-chip w-8 h-8 shrink-0"
-                    style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
-                  >
-                    <span className="poker-chip-value text-xs">{denom.denomination}</span>
-                  </div>
-
                   {isAdmin ? (
                     <>
-                      {/* Color selector - compact */}
-                      <Select
-                        value={denom.color}
-                        onValueChange={(v) => handleDenominationChange(denom.id, 'color', v)}
-                      >
-                        <SelectTrigger className="w-20 h-8">
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-3 h-3 rounded-full shrink-0"
-                              style={{ backgroundColor: colorInfo.hex }}
-                            />
-                            <span className="text-xs truncate">{colorInfo.label}</span>
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CHIP_COLORS.map(color => (
-                            <SelectItem key={color.value} value={color.value}>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: color.hex }}
-                                />
-                                {color.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* Row 1: Chip + Colour */}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="poker-chip w-8 h-8 shrink-0"
+                          style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
+                        >
+                          <span className="poker-chip-value text-xs">{denom.denomination}</span>
+                        </div>
+                        <Select
+                          value={denom.color}
+                          onValueChange={(v) => handleDenominationChange(denom.id, 'color', v)}
+                        >
+                          <SelectTrigger className="w-28 h-9">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full shrink-0"
+                                style={{ backgroundColor: colorInfo.hex }}
+                              />
+                              <span className="text-sm">{colorInfo.label}</span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CHIP_COLORS.map(color => (
+                              <SelectItem key={color.value} value={color.value}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: color.hex }}
+                                  />
+                                  {color.label}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                      {/* Denomination input */}
-                      <Input
-                        type="number"
-                        value={denom.denomination}
-                        onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
-                        className="w-14 h-8 text-center"
-                        min={1}
-                      />
-
-                      <span className="text-muted-foreground text-sm">=</span>
-                      <span className="text-muted-foreground text-sm">{getCurrencySymbol()}</span>
-
-                      {/* Cash value input */}
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={denom.cash_value}
-                        onChange={(e) => handleDenominationChange(denom.id, 'cash_value', parseFloat(e.target.value) || 0)}
-                        className="w-16 h-8"
-                        min={0}
-                      />
-
-                      {/* Delete button */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveDenomination(denom.id)}
-                        className="shrink-0 text-destructive hover:text-destructive h-8 w-8 ml-auto"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {/* Row 2: Denomination = £ Value + Delete */}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={denom.denomination}
+                          onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
+                          className="w-16 h-9 text-center"
+                          min={1}
+                        />
+                        <span className="text-muted-foreground">=</span>
+                        <span className="text-muted-foreground">{getCurrencySymbol()}</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={denom.cash_value}
+                          onChange={(e) => handleDenominationChange(denom.id, 'cash_value', parseFloat(e.target.value) || 0)}
+                          className="w-20 h-9"
+                          min={0}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveDenomination(denom.id)}
+                          className="shrink-0 text-destructive hover:text-destructive h-9 w-9 ml-auto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </>
                   ) : (
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="poker-chip w-8 h-8 shrink-0"
+                        style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
+                      >
+                        <span className="poker-chip-value text-xs">{denom.denomination}</span>
+                      </div>
                       <span className="capitalize text-sm">{denom.color}</span>
                       <span className="text-muted-foreground text-sm">({denom.denomination})</span>
                       <span className="ml-auto font-medium text-sm">

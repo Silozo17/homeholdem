@@ -48,7 +48,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
           <div key={option.id} className="space-y-2">
             <div 
               className={cn(
-                "relative flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer",
+                "relative flex flex-col gap-3 p-4 rounded-lg border transition-all cursor-pointer",
                 option.user_voted 
                   ? "border-primary bg-primary/10" 
                   : "border-border/50 bg-secondary/30 hover:border-primary/50"
@@ -61,17 +61,18 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                 style={{ width: `${(option.vote_count / maxVotes) * 100}%` }}
               />
               
-              <div className="relative flex items-center gap-3">
+              {/* Row 1: Checkbox + Date/Time */}
+              <div className="relative flex items-start gap-3">
                 <div className={cn(
-                  "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                  "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-0.5 shrink-0",
                   option.user_voted 
                     ? "border-primary bg-primary" 
                     : "border-muted-foreground"
                 )}>
                   {option.user_voted && <Check className="h-3 w-3 text-primary-foreground" />}
                 </div>
-                <div>
-                  <p className="font-medium">
+                <div className="flex-1">
+                  <p className="font-medium text-base">
                     {format(new Date(option.proposed_date), "EEEE, MMM d")}
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -80,12 +81,12 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                 </div>
               </div>
               
-              <div className="relative flex items-center gap-2">
-                {/* Voter count - clickable to expand */}
+              {/* Row 2: Vote count + Finalize button */}
+              <div className="relative flex items-center justify-between pl-8">
                 <button
                   onClick={(e) => toggleVoterList(option.id, e)}
                   className={cn(
-                    "text-sm font-medium flex items-center gap-1 px-2 py-1 rounded transition-colors",
+                    "text-sm font-medium flex items-center gap-1.5 px-2 py-1.5 rounded-md transition-colors -ml-2",
                     option.voters && option.voters.length > 0 
                       ? "hover:bg-secondary/50 cursor-pointer" 
                       : "cursor-default"
@@ -94,21 +95,21 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                   {option.vote_count} {option.vote_count === 1 ? 'vote' : 'votes'}
                   {option.voters && option.voters.length > 0 && (
                     expandedOption === option.id 
-                      ? <ChevronUp className="h-3 w-3" />
-                      : <ChevronDown className="h-3 w-3" />
+                      ? <ChevronUp className="h-3.5 w-3.5" />
+                      : <ChevronDown className="h-3.5 w-3.5" />
                   )}
                 </button>
                 {onFinalize && option.vote_count > 0 && (
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-xs"
+                    className="h-8"
                     onClick={(e) => {
                       e.stopPropagation();
                       onFinalize(option.id);
                     }}
                   >
-                    <Crown className="h-3 w-3 mr-1" />
+                    <Crown className="h-3.5 w-3.5 mr-1.5" />
                     Finalize
                   </Button>
                 )}
@@ -117,13 +118,13 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
 
             {/* Expanded voter list */}
             {expandedOption === option.id && option.voters && option.voters.length > 0 && (
-              <div className="ml-8 p-3 bg-secondary/20 rounded-lg border border-border/30 space-y-2">
+              <div className="ml-4 p-3 bg-secondary/20 rounded-lg border border-border/30 space-y-2">
                 <p className="text-xs text-muted-foreground font-medium">Voters:</p>
                 <div className="flex flex-wrap gap-2">
                   {option.voters.map((voter) => (
                     <div 
                       key={voter.id}
-                      className="flex items-center gap-1.5 px-2 py-1 bg-background/50 rounded-full"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-background/50 rounded-full"
                     >
                       <UserAvatar 
                         name={voter.display_name} 
