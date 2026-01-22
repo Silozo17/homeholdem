@@ -13,6 +13,7 @@ import { PayoutCalculator } from '@/components/game/PayoutCalculator';
 import { GameSettings } from '@/components/game/GameSettings';
 import { ChipCounter } from '@/components/game/ChipCounter';
 import { useGameSession } from '@/hooks/useGameSession';
+import { useClubCurrency } from '@/hooks/useClubCurrency';
 
 export default function GameMode() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -28,11 +29,14 @@ export default function GameMode() {
     transactions,
     clubId,
     isAdmin,
+    eventSettings,
     loading: sessionLoading,
     createSession,
     updateSession,
     refetch
   } = useGameSession(eventId || '');
+
+  const { symbol: currencySymbol } = useClubCurrency(clubId || '');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -163,7 +167,7 @@ export default function GameMode() {
               </div>
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
                 <div className="text-xs text-muted-foreground">Prize Pool</div>
-                <div className="text-lg font-bold text-gold-gradient">${prizePool}</div>
+                <div className="text-lg font-bold text-gold-gradient">{currencySymbol}{prizePool}</div>
               </div>
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
                 <div className="text-xs text-muted-foreground">Avg Stack</div>
@@ -192,6 +196,8 @@ export default function GameMode() {
                 <PlayerList
                   players={players}
                   session={session}
+                  clubId={clubId || ''}
+                  maxTables={eventSettings.maxTables}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />
@@ -200,8 +206,8 @@ export default function GameMode() {
               <TabsContent value="seats">
                 <SeatMap
                   players={players}
-                  seatsPerTable={10}
-                  maxTables={2}
+                  seatsPerTable={eventSettings.seatsPerTable}
+                  maxTables={eventSettings.maxTables}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />
@@ -212,6 +218,7 @@ export default function GameMode() {
                   players={players}
                   transactions={transactions}
                   session={session}
+                  currencySymbol={currencySymbol}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />
@@ -239,6 +246,7 @@ export default function GameMode() {
                   session={session}
                   transactions={transactions}
                   clubId={clubId || ''}
+                  currencySymbol={currencySymbol}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />
@@ -253,6 +261,7 @@ export default function GameMode() {
         <GameSettings
           session={session}
           blindStructure={blindStructure}
+          currencySymbol={currencySymbol}
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           onUpdate={refetch}

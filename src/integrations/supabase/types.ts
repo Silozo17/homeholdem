@@ -495,9 +495,11 @@ export type Database = {
           created_at: string
           display_name: string
           eliminated_at: string | null
+          email: string | null
           finish_position: number | null
           game_session_id: string
           id: string
+          is_guest: boolean | null
           seat_number: number | null
           status: string
           table_number: number | null
@@ -508,9 +510,11 @@ export type Database = {
           created_at?: string
           display_name: string
           eliminated_at?: string | null
+          email?: string | null
           finish_position?: number | null
           game_session_id: string
           id?: string
+          is_guest?: boolean | null
           seat_number?: number | null
           status?: string
           table_number?: number | null
@@ -521,9 +525,11 @@ export type Database = {
           created_at?: string
           display_name?: string
           eliminated_at?: string | null
+          email?: string | null
           finish_position?: number | null
           game_session_id?: string
           id?: string
+          is_guest?: boolean | null
           seat_number?: number | null
           status?: string
           table_number?: number | null
@@ -549,6 +555,7 @@ export type Database = {
           buy_in_amount: number
           created_at: string
           current_level: number
+          display_blinds_as_currency: boolean | null
           event_id: string
           id: string
           level_started_at: string | null
@@ -568,6 +575,7 @@ export type Database = {
           buy_in_amount?: number
           created_at?: string
           current_level?: number
+          display_blinds_as_currency?: boolean | null
           event_id: string
           id?: string
           level_started_at?: string | null
@@ -587,6 +595,7 @@ export type Database = {
           buy_in_amount?: number
           created_at?: string
           current_level?: number
+          display_blinds_as_currency?: boolean | null
           event_id?: string
           id?: string
           level_started_at?: string | null

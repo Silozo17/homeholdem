@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, UserMinus, UserPlus, Trophy, RotateCcw } from 'lucide-react';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Users, UserMinus, UserPlus, Trophy, RotateCcw, Check, ChevronsUpDown, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -40,22 +54,74 @@ interface GameSession {
   max_tables?: number;
 }
 
+interface ClubMember {
+  user_id: string;
+  display_name: string;
+  email: string | null;
+  avatar_url: string | null;
+}
+
 interface PlayerListProps {
   players: GamePlayer[];
   session: GameSession;
+  clubId: string;
+  maxTables: number;
   isAdmin: boolean;
   onRefresh: () => void;
 }
 
-export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListProps) {
+export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRefresh }: PlayerListProps) {
   const { user } = useAuth();
   const [showAddPlayer, setShowAddPlayer] = useState(false);
-  const [newPlayerName, setNewPlayerName] = useState('');
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [selectedTable, setSelectedTable] = useState<string>('1');
+  const [clubMembers, setClubMembers] = useState<ClubMember[]>([]);
+  const [memberSearchOpen, setMemberSearchOpen] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const activePlayers = players.filter(p => p.status === 'active');
   const eliminatedPlayers = players.filter(p => p.status === 'eliminated')
     .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
+
+  // Fetch club members when dialog opens
+  useEffect(() => {
+    if (showAddPlayer && clubId) {
+      fetchClubMembers();
+    }
+  }, [showAddPlayer, clubId]);
+
+  const fetchClubMembers = async () => {
+    setLoadingMembers(true);
+    const { data: members } = await supabase
+      .from('club_members')
+      .select('user_id')
+      .eq('club_id', clubId);
+
+    if (members && members.length > 0) {
+      const userIds = members.map(m => m.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, email, avatar_url')
+        .in('id', userIds);
+
+      if (profiles) {
+        // Filter out players already in the game
+        const existingUserIds = new Set(players.map(p => p.user_id));
+        const availableMembers = profiles
+          .filter(p => !existingUserIds.has(p.id))
+          .map(p => ({
+            user_id: p.id,
+            display_name: p.display_name,
+            email: p.email,
+            avatar_url: p.avatar_url,
+          }));
+        setClubMembers(availableMembers);
+      }
+    }
+    setLoadingMembers(false);
+  };
 
   const handleEliminatePlayer = async (player: GamePlayer) => {
     const activeCount = activePlayers.length;
@@ -98,16 +164,15 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
     onRefresh();
   };
 
-  const handleAddPlayer = async () => {
-    if (!newPlayerName.trim() || !user) return;
-
+  const handleAddClubMember = async (member: ClubMember) => {
     const { error } = await supabase
       .from('game_players')
       .insert({
         game_session_id: session.id,
-        user_id: user.id, // Use current user as placeholder
-        display_name: newPlayerName.trim(),
+        user_id: member.user_id,
+        display_name: member.display_name,
         table_number: parseInt(selectedTable),
+        is_guest: false,
       });
 
     if (error) {
@@ -115,8 +180,35 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
       return;
     }
 
-    toast.success('Player added');
-    setNewPlayerName('');
+    toast.success(`${member.display_name} added`);
+    setMemberSearchOpen(false);
+    setShowAddPlayer(false);
+    onRefresh();
+  };
+
+  const handleAddGuest = async () => {
+    if (!guestName.trim() || !user) return;
+
+    const { error } = await supabase
+      .from('game_players')
+      .insert({
+        game_session_id: session.id,
+        user_id: user.id, // Use current user as placeholder for guest
+        display_name: guestName.trim(),
+        table_number: parseInt(selectedTable),
+        is_guest: true,
+        email: guestEmail.trim() || null,
+      });
+
+    if (error) {
+      toast.error('Failed to add guest');
+      return;
+    }
+
+    toast.success(`Guest "${guestName}" added`);
+    setGuestName('');
+    setGuestEmail('');
+    setShowGuestForm(false);
     setShowAddPlayer(false);
     onRefresh();
   };
@@ -144,6 +236,9 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
   // Group players by table
   const table1Players = activePlayers.filter(p => p.table_number === 1 || !p.table_number);
   const table2Players = activePlayers.filter(p => p.table_number === 2);
+
+  // Generate table options based on maxTables
+  const tableOptions = Array.from({ length: Math.max(maxTables, 1) }, (_, i) => i + 1);
 
   return (
     <>
@@ -178,6 +273,7 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
                   key={player.id}
                   player={player}
                   isAdmin={isAdmin}
+                  maxTables={maxTables}
                   onEliminate={() => handleEliminatePlayer(player)}
                   onAssignTable={(t) => handleAssignTable(player, t)}
                 />
@@ -188,8 +284,8 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
             </div>
           </div>
 
-          {/* Table 2 (if players exist) */}
-          {table2Players.length > 0 && (
+          {/* Table 2 (if exists or players there) */}
+          {(maxTables >= 2 || table2Players.length > 0) && (
             <div className="space-y-2">
               <div className="text-sm text-muted-foreground font-medium">
                 Table 2 ({table2Players.length})
@@ -200,10 +296,14 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
                     key={player.id}
                     player={player}
                     isAdmin={isAdmin}
+                    maxTables={maxTables}
                     onEliminate={() => handleEliminatePlayer(player)}
                     onAssignTable={(t) => handleAssignTable(player, t)}
                   />
                 ))}
+                {table2Players.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">No players at this table</p>
+                )}
               </div>
             </div>
           )}
@@ -245,42 +345,161 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
       </Card>
 
       {/* Add Player Dialog */}
-      <Dialog open={showAddPlayer} onOpenChange={setShowAddPlayer}>
+      <Dialog open={showAddPlayer} onOpenChange={(open) => {
+        setShowAddPlayer(open);
+        if (!open) {
+          setShowGuestForm(false);
+          setGuestName('');
+          setGuestEmail('');
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Player</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="playerName">Player Name</Label>
-              <Input
-                id="playerName"
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
-                placeholder="Enter player name"
-              />
+          
+          {!showGuestForm ? (
+            <div className="space-y-4 py-4">
+              {/* Club member search */}
+              <div className="space-y-2">
+                <Label>Select Club Member</Label>
+                <Popover open={memberSearchOpen} onOpenChange={setMemberSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={memberSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {loadingMembers ? 'Loading...' : 'Search club members...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search members..." />
+                      <CommandList>
+                        <CommandEmpty>No members found.</CommandEmpty>
+                        <CommandGroup heading="Club Members">
+                          {clubMembers.map((member) => (
+                            <CommandItem
+                              key={member.user_id}
+                              value={member.display_name}
+                              onSelect={() => handleAddClubMember(member)}
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                                  {member.avatar_url ? (
+                                    <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-sm font-medium text-primary">
+                                      {member.display_name.charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{member.display_name}</p>
+                                  {member.email && (
+                                    <p className="text-xs text-muted-foreground">{member.email}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandSeparator />
+                        <CommandGroup>
+                          <CommandItem
+                            onSelect={() => {
+                              setMemberSearchOpen(false);
+                              setShowGuestForm(true);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <UserCircle className="mr-2 h-4 w-4" />
+                            Add Guest Player
+                          </CommandItem>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Table selection */}
+              <div className="space-y-2">
+                <Label>Assign to Table</Label>
+                <Select value={selectedTable} onValueChange={setSelectedTable}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tableOptions.map((t) => (
+                      <SelectItem key={t} value={t.toString()}>Table {t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-t pt-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowGuestForm(true)}
+                >
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Add Guest Player
+                </Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Table</Label>
-              <Select value={selectedTable} onValueChange={setSelectedTable}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Table 1</SelectItem>
-                  <SelectItem value="2">Table 2</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="guestName">Guest Name *</Label>
+                <Input
+                  id="guestName"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Enter guest name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guestEmail">Email (optional)</Label>
+                <Input
+                  id="guestEmail"
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="To invite to club later"
+                />
+                <p className="text-xs text-muted-foreground">
+                  If provided, you can invite this guest to join the club later
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Table</Label>
+                <Select value={selectedTable} onValueChange={setSelectedTable}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tableOptions.map((t) => (
+                      <SelectItem key={t} value={t.toString()}>Table {t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowGuestForm(false)}>
+                  Back
+                </Button>
+                <Button onClick={handleAddGuest} disabled={!guestName.trim()}>
+                  Add Guest
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddPlayer(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddPlayer} disabled={!newPlayerName.trim()}>
-              Add Player
-            </Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -290,11 +509,14 @@ export function PlayerList({ players, session, isAdmin, onRefresh }: PlayerListP
 interface PlayerRowProps {
   player: GamePlayer;
   isAdmin: boolean;
+  maxTables: number;
   onEliminate: () => void;
   onAssignTable: (table: number) => void;
 }
 
-function PlayerRow({ player, isAdmin, onEliminate, onAssignTable }: PlayerRowProps) {
+function PlayerRow({ player, isAdmin, maxTables, onEliminate, onAssignTable }: PlayerRowProps) {
+  const tableOptions = Array.from({ length: Math.max(maxTables, 1) }, (_, i) => i + 1);
+  
   return (
     <div className="flex items-center justify-between py-2 px-3 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors">
       <div className="flex items-center gap-3">
@@ -315,8 +537,9 @@ function PlayerRow({ player, isAdmin, onEliminate, onAssignTable }: PlayerRowPro
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">T1</SelectItem>
-              <SelectItem value="2">T2</SelectItem>
+              {tableOptions.map((t) => (
+                <SelectItem key={t} value={t.toString()}>T{t}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button

@@ -18,8 +18,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Plus, MoreVertical, Coffee, Trash2 } from 'lucide-react';
+import { Plus, MoreVertical, Coffee, Trash2, HelpCircle } from 'lucide-react';
 
 interface BlindLevel {
   id: string;
@@ -47,14 +53,23 @@ interface GameSession {
 interface GameSettingsProps {
   session: GameSession;
   blindStructure: BlindLevel[];
+  currencySymbol: string;
   isOpen: boolean;
   onClose: () => void;
   onUpdate: () => void;
 }
 
+const BLIND_TOOLTIPS = {
+  sb: 'Small Blind - A forced bet by the player directly left of the dealer button, typically half the big blind.',
+  bb: 'Big Blind - A forced bet by the player two seats left of the dealer, setting the minimum bet for the round.',
+  ante: 'Ante - A small forced bet from ALL players before each hand, used to build the pot faster in later levels.',
+  mins: 'Minutes - Duration of this blind level before automatically advancing to the next level.',
+};
+
 export function GameSettings({ 
   session, 
   blindStructure, 
+  currencySymbol,
   isOpen, 
   onClose, 
   onUpdate 
@@ -280,7 +295,7 @@ export function GameSettings({
             {/* Buy-in Settings */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Buy-in ($)</Label>
+                <Label>Buy-in ({currencySymbol})</Label>
                 <Input
                   type="number"
                   value={settings.buy_in_amount}
@@ -318,7 +333,7 @@ export function GameSettings({
             {settings.allow_rebuys && (
               <div className="grid grid-cols-3 gap-4 pl-4">
                 <div className="space-y-2">
-                  <Label>Rebuy ($)</Label>
+                  <Label>Rebuy ({currencySymbol})</Label>
                   <Input
                     type="number"
                     value={settings.rebuy_amount}
@@ -368,7 +383,7 @@ export function GameSettings({
             {settings.allow_addons && (
               <div className="grid grid-cols-2 gap-4 pl-4">
                 <div className="space-y-2">
-                  <Label>Add-on ($)</Label>
+                  <Label>Add-on ({currencySymbol})</Label>
                   <Input
                     type="number"
                     value={settings.addon_amount}
@@ -394,15 +409,53 @@ export function GameSettings({
           </TabsContent>
 
           <TabsContent value="blinds" className="space-y-4 mt-4">
-            {/* Header */}
-            <div className="grid grid-cols-6 gap-1 px-2 text-xs text-muted-foreground font-medium">
-              <span>Level</span>
-              <span>SB</span>
-              <span>BB</span>
-              <span>Ante</span>
-              <span>Mins</span>
-              <span></span>
-            </div>
+            {/* Header with Tooltips */}
+            <TooltipProvider>
+              <div className="grid grid-cols-6 gap-1 px-2 text-xs text-muted-foreground font-medium">
+                <span>Level</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 cursor-help">
+                      SB <HelpCircle className="h-3 w-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{BLIND_TOOLTIPS.sb}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 cursor-help">
+                      BB <HelpCircle className="h-3 w-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{BLIND_TOOLTIPS.bb}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 cursor-help">
+                      Ante <HelpCircle className="h-3 w-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{BLIND_TOOLTIPS.ante}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 cursor-help">
+                      Mins <HelpCircle className="h-3 w-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{BLIND_TOOLTIPS.mins}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <span></span>
+              </div>
+            </TooltipProvider>
 
             {/* Blind levels list */}
             <div className="max-h-[300px] overflow-y-auto space-y-1">
