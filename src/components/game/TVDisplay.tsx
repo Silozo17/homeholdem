@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ClassicTimerMode } from './tv/ClassicTimerMode';
 import { DashboardMode } from './tv/DashboardMode';
 import { TableViewMode } from './tv/TableViewMode';
+import { CombinedMode } from './tv/CombinedMode';
 import { TVControlPanel } from './tv/TVControlPanel';
 
 interface BlindLevel {
@@ -56,7 +57,7 @@ interface PayoutStructure {
   amount: number | null;
 }
 
-type DisplayMode = 'classic' | 'dashboard' | 'table';
+type DisplayMode = 'classic' | 'dashboard' | 'table' | 'combined';
 
 interface TVDisplayProps {
   session: GameSession;
@@ -221,6 +222,20 @@ export function TVDisplay({
             playersRemaining={activePlayers.length}
             totalPlayers={players.length}
             onUpdateSession={onUpdateSession}
+            chipToCashRatio={chipToCashRatio}
+          />
+        )}
+
+        {displayMode === 'combined' && (
+          <CombinedMode
+            session={session}
+            blindStructure={blindStructure}
+            players={players}
+            transactions={transactions}
+            prizePool={prizePool}
+            currencySymbol={currencySymbol}
+            onUpdateSession={onUpdateSession}
+            payouts={payouts}
             chipToCashRatio={chipToCashRatio}
           />
         )}

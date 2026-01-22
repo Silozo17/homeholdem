@@ -163,7 +163,7 @@ export function DashboardMode({
   return (
     <div className="flex h-full bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950">
       {/* Left Side - Timer */}
-      <div className="flex-1 flex flex-col p-8">
+      <div className="flex-1 flex flex-col p-8 pt-16">
         {/* Level Badge */}
         <div className="mb-4">
           {currentLevel.is_break ? (
@@ -203,7 +203,7 @@ export function DashboardMode({
         )}
 
         {/* Tournament Progress */}
-        <div className="mt-auto">
+        <div className="mt-auto pb-6">
           <div className="flex items-center justify-between text-sm text-white/60 mb-2">
             <span>Tournament Progress</span>
             <span>Level {session.current_level} of {totalLevels}</span>
