@@ -9,14 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { LayoutGrid, User } from 'lucide-react';
+import { LayoutGrid, User, Shuffle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +34,7 @@ interface SeatMapProps {
 export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh }: SeatMapProps) {
   const [selectedSeat, setSelectedSeat] = useState<{ table: number; seat: number } | null>(null);
   const [showAssign, setShowAssign] = useState(false);
+  const [currentTables, setCurrentTables] = useState(maxTables);
 
   const activePlayers = players.filter(p => p.status === 'active');
   const unassignedPlayers = activePlayers.filter(p => !p.seat_number);
@@ -114,6 +108,45 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
     onRefresh();
   };
 
+  const handleAddTable = () => {
+    if (currentTables < 2) {
+      setCurrentTables(2);
+      toast.success('Table 2 added');
+    }
+  };
+
+  const handleRandomizeSeats = async () => {
+    const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
+    
+    let tableNum = 1;
+    let seatNum = 1;
+    
+    for (const player of shuffled) {
+      const { error } = await supabase
+        .from('game_players')
+        .update({ 
+          table_number: tableNum, 
+          seat_number: seatNum 
+        })
+        .eq('id', player.id);
+
+      if (error) {
+        toast.error('Failed to randomize seats');
+        return;
+      }
+      
+      seatNum++;
+      if (seatNum > seatsPerTable) {
+        seatNum = 1;
+        tableNum++;
+        if (tableNum > currentTables) break;
+      }
+    }
+    
+    toast.success('Seats randomized!');
+    onRefresh();
+  };
+
   // Calculate seat positions in an oval layout
   const getSeatPositions = (numSeats: number) => {
     const positions: { x: number; y: number; rotation: number }[] = [];
@@ -139,15 +172,28 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
               <LayoutGrid className="h-5 w-5 text-primary" />
               Seat Map
             </CardTitle>
-            {unassignedPlayers.length > 0 && (
-              <Badge variant="secondary">
-                {unassignedPlayers.length} unassigned
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {unassignedPlayers.length > 0 && (
+                <Badge variant="secondary">
+                  {unassignedPlayers.length} unassigned
+                </Badge>
+              )}
+              {isAdmin && activePlayers.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRandomizeSeats}
+                  title="Randomize all seats"
+                >
+                  <Shuffle className="h-4 w-4 mr-1" />
+                  Randomize
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {[1, 2].slice(0, maxTables).map((tableNum) => (
+          {Array.from({ length: currentTables }, (_, i) => i + 1).map((tableNum) => (
             <div key={tableNum} className="space-y-2">
               <div className="text-sm text-muted-foreground font-medium text-center">
                 Table {tableNum}
@@ -212,6 +258,20 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
               </div>
             </div>
           ))}
+
+          {/* Add Table 2 button */}
+          {isAdmin && currentTables < 2 && activePlayers.length > seatsPerTable && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={handleAddTable}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Table 2
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -71,6 +71,11 @@ const DEFAULT_BLINDS: Omit<BlindLevel, 'id' | 'game_session_id'>[] = [
   { level: 15, small_blind: 1500, big_blind: 3000, ante: 400, duration_minutes: 15, is_break: false },
 ];
 
+interface EventSettings {
+  maxTables: number;
+  seatsPerTable: number;
+}
+
 export function useGameSession(eventId: string) {
   const { user } = useAuth();
   const [session, setSession] = useState<GameSession | null>(null);
@@ -80,19 +85,25 @@ export function useGameSession(eventId: string) {
   const [clubId, setClubId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [eventSettings, setEventSettings] = useState<EventSettings>({ maxTables: 1, seatsPerTable: 10 });
 
   const fetchData = useCallback(async () => {
     if (!user || !eventId) return;
 
-    // Check if user is admin
+    // Get event data including table settings
     const { data: eventData } = await supabase
       .from('events')
-      .select('club_id')
+      .select('club_id, max_tables, seats_per_table')
       .eq('id', eventId)
       .single();
 
     if (eventData) {
       setClubId(eventData.club_id);
+      setEventSettings({
+        maxTables: eventData.max_tables || 1,
+        seatsPerTable: eventData.seats_per_table || 10,
+      });
+      
       const { data: memberData } = await supabase
         .from('club_members')
         .select('role')
@@ -262,6 +273,7 @@ export function useGameSession(eventId: string) {
     clubId,
     isAdmin,
     loading,
+    eventSettings,
     createSession,
     updateSession,
     refetch: fetchData,

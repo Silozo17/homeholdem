@@ -57,6 +57,7 @@ interface BuyInTrackerProps {
   players: GamePlayer[];
   transactions: GameTransaction[];
   session: GameSession;
+  currencySymbol: string;
   isAdmin: boolean;
   onRefresh: () => void;
 }
@@ -67,6 +68,7 @@ export function BuyInTracker({
   players, 
   transactions, 
   session, 
+  currencySymbol,
   isAdmin, 
   onRefresh 
 }: BuyInTrackerProps) {
@@ -174,15 +176,15 @@ export function BuyInTracker({
           <div className="grid grid-cols-3 gap-2 text-center pb-4 border-b border-border/30">
             <div>
               <div className="text-xs text-muted-foreground">Buy-ins</div>
-              <div className="font-bold text-primary">${totalBuyIns}</div>
+              <div className="font-bold text-primary">{currencySymbol}{totalBuyIns}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Rebuys</div>
-              <div className="font-bold">${totalRebuys}</div>
+              <div className="font-bold">{currencySymbol}{totalRebuys}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Add-ons</div>
-              <div className="font-bold">${totalAddons}</div>
+              <div className="font-bold">{currencySymbol}{totalAddons}</div>
             </div>
           </div>
 
@@ -213,7 +215,7 @@ export function BuyInTracker({
                   <div className="flex items-center gap-2">
                     {totals.buyins > 0 && (
                       <Badge variant="default" className="text-xs">
-                        ${totals.totalSpent}
+                        {currencySymbol}{totals.totalSpent}
                       </Badge>
                     )}
                     <div className="flex gap-1 text-xs text-muted-foreground">

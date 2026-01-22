@@ -37,6 +37,7 @@ interface PayoutCalculatorProps {
   session: GameSession;
   transactions: Transaction[];
   clubId: string;
+  currencySymbol: string;
   isAdmin: boolean;
   onRefresh: () => void;
 }
@@ -56,6 +57,7 @@ export function PayoutCalculator({
   session,
   transactions,
   clubId,
+  currencySymbol,
   isAdmin, 
   onRefresh 
 }: PayoutCalculatorProps) {
@@ -109,7 +111,7 @@ export function PayoutCalculator({
     });
 
     setMarkedPaid([...markedPaid, player.finish_position || 0]);
-    toast.success(`Paid ${player.display_name}: £${payout}`);
+    toast.success(`Paid ${player.display_name}: ${currencySymbol}${payout}`);
     onRefresh();
   };
 
@@ -252,7 +254,7 @@ export function PayoutCalculator({
               Payouts
             </CardTitle>
             <Badge variant="outline" className="text-gold-gradient font-bold">
-              Prize Pool: £{prizePool}
+              Prize Pool: {currencySymbol}{prizePool}
             </Badge>
           </div>
         </CardHeader>
@@ -305,7 +307,7 @@ export function PayoutCalculator({
                     className="flex-1"
                   />
                   <span className="text-sm text-muted-foreground w-12">
-                    £{Math.round((prizePool * payout) / 100)}
+                    {currencySymbol}{Math.round((prizePool * payout) / 100)}
                   </span>
                 </div>
               ))}
@@ -371,7 +373,7 @@ export function PayoutCalculator({
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gold-gradient">£{payout}</span>
+                      <span className="font-bold text-gold-gradient">{currencySymbol}{payout}</span>
                       {isAdmin && player && !isPaid && (
                         <Button
                           variant="ghost"
@@ -426,7 +428,7 @@ export function PayoutCalculator({
               Make a Deal
             </DialogTitle>
             <DialogDescription>
-              Split the remaining £{prizePool} prize pool between {activePlayers.length} players.
+              Split the remaining {currencySymbol}{prizePool} prize pool between {activePlayers.length} players.
             </DialogDescription>
           </DialogHeader>
 
@@ -437,7 +439,7 @@ export function PayoutCalculator({
                   <Label className="font-medium">{player.display_name}</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">£</span>
+                  <span className="text-muted-foreground">{currencySymbol}</span>
                   <Input
                     type="number"
                     value={chopAmounts[player.id] || 0}
@@ -455,7 +457,7 @@ export function PayoutCalculator({
                   "font-bold text-lg",
                   isChopValid ? "text-success" : "text-destructive"
                 )}>
-                  £{chopTotal} / £{prizePool}
+                  {currencySymbol}{chopTotal} / {currencySymbol}{prizePool}
                 </span>
               </div>
               {!isChopValid && (
