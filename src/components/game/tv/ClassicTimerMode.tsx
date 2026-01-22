@@ -129,8 +129,8 @@ export function ClassicTimerMode({
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950">
-      {/* Stats Bar */}
-      <div className="flex items-center justify-between px-8 py-4 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30">
+      {/* Stats Bar - with padding for overlay buttons */}
+      <div className="flex items-center justify-between pl-20 pr-20 py-4 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />

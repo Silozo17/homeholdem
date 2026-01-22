@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Home, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface HostVolunteerProps {
   volunteers: string[];
@@ -15,6 +16,7 @@ interface HostVolunteerProps {
 interface VolunteerProfile {
   id: string;
   display_name: string;
+  avatar_url: string | null;
 }
 
 export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfirm }: HostVolunteerProps) {
@@ -30,7 +32,7 @@ export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfir
   const fetchProfiles = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, avatar_url')
       .in('id', volunteers);
 
     if (data) {
@@ -74,11 +76,11 @@ export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfir
                 className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                    <span className="text-sm font-medium">
-                      {profile.display_name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                  <UserAvatar 
+                    name={profile.display_name} 
+                    avatarUrl={profile.avatar_url}
+                    size="sm"
+                  />
                   <span className="font-medium">{profile.display_name}</span>
                 </div>
                 {onConfirm && (

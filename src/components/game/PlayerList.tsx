@@ -37,6 +37,7 @@ import {
 import { Users, UserMinus, UserPlus, Trophy, RotateCcw, Check, ChevronsUpDown, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface GamePlayer {
   id: string;
@@ -47,6 +48,7 @@ interface GamePlayer {
   status: string;
   finish_position: number | null;
   eliminated_at: string | null;
+  avatar_url?: string | null;
 }
 
 interface GameSession {
@@ -389,15 +391,11 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
                               className="cursor-pointer"
                             >
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
-                                  {member.avatar_url ? (
-                                    <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <span className="text-sm font-medium text-primary">
-                                      {member.display_name.charAt(0).toUpperCase()}
-                                    </span>
-                                  )}
-                                </div>
+                                <UserAvatar 
+                                  name={member.display_name} 
+                                  avatarUrl={member.avatar_url}
+                                  size="sm"
+                                />
                                 <div>
                                   <p className="font-medium">{member.display_name}</p>
                                   {member.email && (
@@ -520,11 +518,11 @@ function PlayerRow({ player, isAdmin, maxTables, onEliminate, onAssignTable }: P
   return (
     <div className="flex items-center justify-between py-2 px-3 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-          <span className="text-sm font-medium text-primary">
-            {player.display_name.charAt(0).toUpperCase()}
-          </span>
-        </div>
+        <UserAvatar 
+          name={player.display_name} 
+          avatarUrl={player.avatar_url}
+          size="sm"
+        />
         <span className="font-medium">{player.display_name}</span>
       </div>
       {isAdmin && (

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock, HelpCircle } from 'lucide-react';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface Attendee {
   user_id: string;
@@ -48,11 +49,11 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
                   key={attendee.user_id}
                   className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/30 rounded-full"
                 >
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary">
-                      {attendee.profile.display_name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                  <UserAvatar 
+                    name={attendee.profile.display_name} 
+                    avatarUrl={attendee.profile.avatar_url}
+                    size="xs"
+                  />
                   <span className="text-sm font-medium">{attendee.profile.display_name}</span>
                 </div>
               ))}
@@ -94,6 +95,11 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
                   key={attendee.user_id}
                   className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border border-border/30 rounded-full"
                 >
+                  <UserAvatar 
+                    name={attendee.profile.display_name} 
+                    avatarUrl={attendee.profile.avatar_url}
+                    size="xs"
+                  />
                   <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
                 </div>
               ))}

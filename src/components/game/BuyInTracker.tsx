@@ -21,12 +21,14 @@ import {
 import { Label } from '@/components/ui/label';
 import { DollarSign, Plus, RefreshCcw, Gift } from 'lucide-react';
 import { toast } from 'sonner';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface GamePlayer {
   id: string;
   user_id: string;
   display_name: string;
   status: string;
+  avatar_url?: string | null;
 }
 
 interface GameTransaction {
@@ -205,11 +207,11 @@ export function BuyInTracker({
                   className="flex items-center justify-between py-2 px-3 bg-primary/5 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">
-                        {player.display_name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    <UserAvatar 
+                      name={player.display_name} 
+                      avatarUrl={player.avatar_url}
+                      size="sm"
+                    />
                     <span className="font-medium">{player.display_name}</span>
                   </div>
                   <div className="flex items-center gap-2">
