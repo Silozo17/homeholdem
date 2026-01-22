@@ -222,3 +222,42 @@ export function eventReminderTemplate({
     <a href="${eventUrl}" style="${buttonStyles}">View Event Details</a>
   `);
 }
+
+// Club invitation template
+export function clubInviteTemplate({
+  clubName,
+  inviterName,
+  inviteCode,
+  joinUrl,
+}: {
+  clubName: string;
+  inviterName: string;
+  inviteCode: string;
+  joinUrl: string;
+}): string {
+  return emailWrapper(`
+    <h1 style="${headingStyles}">🃏 You're Invited!</h1>
+    <p style="${textStyles}">
+      <span style="${highlightStyles}">${inviterName}</span> has invited you to join their poker club on Home Hold'em Club!
+    </p>
+    
+    <h2 style="${subHeadingStyles}">${clubName}</h2>
+    
+    <p style="${textStyles}">
+      Join us for regular poker nights, track your stats, and compete on the leaderboard.
+    </p>
+    
+    <h3 style="${subHeadingStyles}">Your Invite Code</h3>
+    <div style="background: #0a0a0a; border: 2px dashed #d4af37; border-radius: 8px; padding: 16px; text-align: center; margin: 16px 0;">
+      <span style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #d4af37; font-family: monospace;">
+        ${inviteCode}
+      </span>
+    </div>
+    
+    <p style="${textStyles}">
+      Click the button below to join, or enter the code after signing up.
+    </p>
+    
+    <a href="${joinUrl}" style="${buttonStyles}">Join Club</a>
+  `);
+}

@@ -20,7 +20,9 @@ import {
   MessageCircle,
   Trophy,
   ScrollText,
-  Coins
+  Coins,
+  Mail,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -35,9 +37,14 @@ import { PaymentLedger } from '@/components/clubs/PaymentLedger';
 import { SeasonLeaderboard } from '@/components/clubs/SeasonLeaderboard';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { ChipTemplateManager } from '@/components/clubs/ChipTemplateManager';
+import { MemberActions } from '@/components/clubs/MemberActions';
+import { ShareClub } from '@/components/clubs/ShareClub';
+import { InviteByEmailDialog } from '@/components/clubs/InviteByEmailDialog';
+import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 
 interface ClubMember {
   id: string;
+  user_id: string;
   role: 'owner' | 'admin' | 'member';
   joined_at: string;
   profile: {
@@ -78,6 +85,8 @@ export default function ClubDetail() {
   const [loadingData, setLoadingData] = useState(true);
   const [copied, setCopied] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [inviteEmailOpen, setInviteEmailOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -123,6 +132,7 @@ export default function ClubDetail() {
       const currentUserMember = membersData.find(m => m.user_id === user.id);
       if (currentUserMember) {
         setUserRole(currentUserMember.role as 'owner' | 'admin' | 'member');
+        setCurrentUserId(user.id);
       }
 
       // Fetch profiles for each member
@@ -137,6 +147,7 @@ export default function ClubDetail() {
       // Map the data correctly
       const mappedMembers = membersData.map(m => ({
         id: m.id,
+        user_id: m.user_id,
         role: m.role as 'owner' | 'admin' | 'member',
         joined_at: m.joined_at,
         profile: profileMap.get(m.user_id) || { display_name: 'Unknown', avatar_url: null },
@@ -247,14 +258,25 @@ export default function ClubDetail() {
                 {club.invite_code}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={copyInviteCode}
-              className="border-border/50"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={copyInviteCode}
+                className="border-border/50"
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setInviteEmailOpen(true)}
+                className="border-border/50"
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
+              <ShareClub clubName={club.name} inviteCode={club.invite_code} />
+            </div>
           </CardContent>
         </Card>
 
@@ -392,10 +414,47 @@ export default function ClubDetail() {
                         </p>
                       </div>
                     </div>
+                    {currentUserId && userRole && (
+                      <MemberActions
+                        memberId={member.id}
+                        memberUserId={member.user_id}
+                        memberName={member.profile.display_name}
+                        memberRole={member.role}
+                        currentUserRole={userRole}
+                        currentUserId={currentUserId}
+                        clubId={clubId!}
+                        onUpdate={() => {
+                          // If user left club, navigate away
+                          if (member.user_id === currentUserId && member.role !== 'owner') {
+                            navigate('/dashboard');
+                          } else {
+                            fetchClubData();
+                          }
+                        }}
+                      />
+                    )}
                   </div>
                 ))}
               </CardContent>
             </Card>
+
+            {/* Danger Zone - Owner Only */}
+            {userRole === 'owner' && (
+              <Card className="bg-card/50 border-destructive/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    Danger Zone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Deleting this club is permanent and cannot be undone.
+                  </p>
+                  <DeleteClubDialog clubId={clubId!} clubName={club.name} />
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </main>
@@ -408,6 +467,16 @@ export default function ClubDetail() {
           clubId={clubId || ''}
           clubName={club.name}
           onSuccess={fetchClubData}
+        />
+      )}
+
+      {/* Invite by Email Dialog */}
+      {club && (
+        <InviteByEmailDialog
+          open={inviteEmailOpen}
+          onOpenChange={setInviteEmailOpen}
+          clubName={club.name}
+          inviteCode={club.invite_code}
         />
       )}
     </div>
