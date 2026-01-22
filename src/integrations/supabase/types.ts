@@ -306,6 +306,33 @@ export type Database = {
         }
         Relationships: []
       }
+      email_verifications: {
+        Row: {
+          code: string
+          created_at: string | null
+          email: string
+          expires_at: string
+          id: string
+          verified_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          verified_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       event_date_options: {
         Row: {
           created_at: string
@@ -941,6 +968,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_verifications: { Args: never; Returns: undefined }
       generate_invite_code: { Args: never; Returns: string }
       has_club_role: {
         Args: {

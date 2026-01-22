@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -13,6 +14,55 @@ const corsHeaders = {
 interface PromoteRequest {
   event_id: string;
   promoted_user_id: string;
+}
+
+// Premium email template - inline to avoid import issues
+function waitlistPromotionEmail(data: {
+  eventTitle: string;
+  eventDate?: string;
+  location?: string;
+  clubName?: string;
+  eventUrl: string;
+  recipientName?: string;
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're off the waitlist!</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <div style="padding: 24px 16px; background-color: #0a0a0a;">
+    <div style="background: linear-gradient(180deg, #141414 0%, #0f0f0f 100%); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden;">
+      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.1);">
+        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase;">♠ Home Hold'em Club ♠</p>
+      </div>
+      <div style="padding: 40px 28px; text-align: center;">
+        <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🎉</div>
+        <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">A spot opened up!</h1>
+        <p style="color: #888888; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
+          ${data.recipientName ? `Great news ${data.recipientName}! ` : ''}You've been promoted from the waitlist and your seat is now confirmed.
+        </p>
+        <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left;">
+          <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${data.eventTitle}</p>
+          ${data.clubName ? `<p style="margin: 8px 0 0; color: #888888; font-size: 13px;">🎴 ${data.clubName}</p>` : ''}
+          ${data.eventDate ? `<p style="margin: 8px 0 0; color: #cccccc; font-size: 14px;">📅 ${data.eventDate}</p>` : ''}
+          ${data.location ? `<p style="margin: 8px 0 0; color: #cccccc; font-size: 14px;">📍 ${data.location}</p>` : ''}
+        </div>
+        <a href="${data.eventUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center;">
+          View Event
+        </a>
+      </div>
+      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.1);">
+        <p style="color: #4a4a4a; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
+        <p style="color: #3a3a3a; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 serve(async (req) => {
@@ -77,50 +127,29 @@ serve(async (req) => {
           hour: 'numeric',
           minute: '2-digit'
         })
-      : 'TBD';
+      : undefined;
 
-    const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 30px; text-align: center;">
-          <h1 style="color: #22c55e; margin: 0;">🎉 You're In!</h1>
-        </div>
-        <div style="background: #ffffff; padding: 30px; border: 1px solid #eee;">
-          <p style="font-size: 16px; color: #333;">Great news, ${profile.display_name || 'Poker Pro'}!</p>
-          <p style="font-size: 16px; color: #333;">A spot opened up and you've been <strong>promoted from the waitlist</strong> for:</p>
-          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #22c55e;">
-            <h2 style="margin: 0 0 10px; color: #1a1a2e;">${event.title}</h2>
-            <p style="margin: 5px 0; color: #666;"><strong>📅 When:</strong> ${eventDate}</p>
-            ${event.location ? `<p style="margin: 5px 0; color: #666;"><strong>📍 Where:</strong> ${event.location}</p>` : ''}
-            ${club?.name ? `<p style="margin: 5px 0; color: #666;"><strong>🎴 Club:</strong> ${club.name}</p>` : ''}
-          </div>
-          <p style="font-size: 16px; color: #333;">Your seat is now confirmed. See you at the table! 🃏</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #999; text-align: center;">
-            Home Hold'em Club - Your Private Poker Night Organizer
-          </p>
-        </div>
-      </div>
-    `;
+    // Build event URL
+    const eventUrl = `https://homeholdem.lovable.app/event/${event_id}`;
 
-    // Send the email
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "Home Hold'em Club <poker@resend.dev>",
-        to: [profile.email],
-        subject: `🎉 You're off the waitlist for ${event.title}!`,
-        html,
-      }),
+    const html = waitlistPromotionEmail({
+      eventTitle: event.title,
+      eventDate,
+      location: event.location,
+      clubName: club?.name,
+      eventUrl,
+      recipientName: profile.display_name,
     });
 
-    if (!res.ok) {
-      const errorData = await res.text();
-      throw new Error(`Failed to send email: ${errorData}`);
-    }
+    // Send the email
+    const emailResponse = await resend.emails.send({
+      from: "Home Hold'em Club <onboarding@resend.dev>",
+      to: [profile.email],
+      subject: `🎉 You're off the waitlist for ${event.title}!`,
+      html,
+    });
+
+    console.log("Waitlist promotion email sent:", emailResponse);
 
     return new Response(
       JSON.stringify({ success: true, message: "Waitlist promotion email sent" }),
