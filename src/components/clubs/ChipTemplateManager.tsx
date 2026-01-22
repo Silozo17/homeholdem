@@ -324,7 +324,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                           type="number"
                           value={denom.denomination}
                           onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
-                          className="w-16 h-9 text-center"
+                          className="w-24 h-9 text-center"
                           min={1}
                         />
                         <span className="text-muted-foreground">=</span>
