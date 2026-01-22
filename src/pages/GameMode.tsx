@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
 import { ArrowLeft, Tv, Settings, Coins } from 'lucide-react';
 import { TournamentClock } from '@/components/game/TournamentClock';
+import { TVDisplay } from '@/components/game/TVDisplay';
 import { PlayerList } from '@/components/game/PlayerList';
 import { SeatMap } from '@/components/game/SeatMap';
 import { BuyInTracker } from '@/components/game/BuyInTracker';
@@ -58,26 +59,7 @@ export default function GameMode() {
     );
   }
 
-  // TV Display Mode - fullscreen clock
-  if (tvMode && session) {
-    return (
-      <div 
-        className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-8"
-        onClick={() => setTvMode(false)}
-      >
-        <TournamentClock
-          session={session}
-          blindStructure={blindStructure}
-          isAdmin={isAdmin}
-          onUpdate={updateSession}
-          tvMode={true}
-        />
-        <p className="text-muted-foreground mt-8 text-sm">Tap anywhere to exit TV mode</p>
-      </div>
-    );
-  }
-
-  // Calculate stats
+  // Calculate stats (needed for TV mode)
   const totalBuyIns = transactions
     .filter(t => t.transaction_type === 'buyin')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -89,6 +71,20 @@ export default function GameMode() {
     .reduce((sum, t) => sum + t.amount, 0);
   const prizePool = totalBuyIns + totalRebuys + totalAddons;
   const activePlayers = players.filter(p => p.status === 'active').length;
+
+  // TV Display Mode - fullscreen with table visualization
+  if (tvMode && session) {
+    return (
+      <TVDisplay
+        session={session}
+        blindStructure={blindStructure}
+        players={players}
+        prizePool={prizePool}
+        currencySymbol={currencySymbol}
+        onExit={() => setTvMode(false)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
