@@ -29,15 +29,15 @@ interface ChipTemplateManagerProps {
 }
 
 const CHIP_COLORS = [
-  { value: 'white', label: 'White', hex: '#FFFFFF', border: true },
-  { value: 'red', label: 'Red', hex: '#EF4444' },
+  { value: 'white', label: 'White', hex: '#E5E7EB' },
+  { value: 'red', label: 'Red', hex: '#DC2626' },
   { value: 'orange', label: 'Orange', hex: '#F97316' },
   { value: 'yellow', label: 'Yellow', hex: '#EAB308' },
-  { value: 'green', label: 'Green', hex: '#22C55E' },
-  { value: 'blue', label: 'Blue', hex: '#3B82F6' },
-  { value: 'purple', label: 'Purple', hex: '#A855F7' },
+  { value: 'green', label: 'Green', hex: '#84CC16' },
+  { value: 'blue', label: 'Blue', hex: '#2563EB' },
+  { value: 'purple', label: 'Purple', hex: '#7C3AED' },
   { value: 'pink', label: 'Pink', hex: '#EC4899' },
-  { value: 'black', label: 'Black', hex: '#1F2937' },
+  { value: 'black', label: 'Black', hex: '#374151' },
   { value: 'grey', label: 'Grey', hex: '#6B7280' },
 ];
 
@@ -279,16 +279,12 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                   key={denom.id}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/50"
                 >
-                  {/* Color indicator */}
+                  {/* Casino-style chip indicator */}
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{
-                      backgroundColor: colorInfo.hex,
-                      color: ['white', 'yellow'].includes(denom.color) ? '#000' : '#fff',
-                      border: colorInfo.border ? '2px solid #E5E7EB' : 'none',
-                    }}
+                    className="poker-chip w-10 h-10 shrink-0"
+                    style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
                   >
-                    {denom.denomination}
+                    <span className="poker-chip-value">{denom.denomination}</span>
                   </div>
 
                   {isAdmin ? (
@@ -307,10 +303,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                               <div className="flex items-center gap-2">
                                 <div
                                   className="w-3 h-3 rounded-full"
-                                  style={{
-                                    backgroundColor: color.hex,
-                                    border: color.border ? '1px solid #E5E7EB' : 'none',
-                                  }}
+                                  style={{ backgroundColor: color.hex }}
                                 />
                                 {color.label}
                               </div>

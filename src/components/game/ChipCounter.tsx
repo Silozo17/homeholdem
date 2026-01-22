@@ -45,13 +45,13 @@ interface ChipCounterProps {
 }
 
 const CHIP_COLOR_MAP: Record<string, { hex: string; border?: boolean }> = {
-  white: { hex: '#FFFFFF', border: true },
-  red: { hex: '#EF4444' },
+  white: { hex: '#E5E7EB', border: true },
+  red: { hex: '#DC2626' },
   orange: { hex: '#F97316' },
   yellow: { hex: '#EAB308', border: true },
-  green: { hex: '#22C55E' },
-  blue: { hex: '#3B82F6' },
-  purple: { hex: '#A855F7' },
+  green: { hex: '#84CC16' },
+  blue: { hex: '#2563EB' },
+  purple: { hex: '#7C3AED' },
   pink: { hex: '#EC4899' },
   black: { hex: '#1F2937' },
   grey: { hex: '#6B7280' },
@@ -239,14 +239,10 @@ export function ChipCounter({
               return (
                 <div key={denom.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{
-                      backgroundColor: colorInfo.hex,
-                      color: ['white', 'yellow'].includes(denom.color) ? '#000' : '#fff',
-                      border: colorInfo.border ? '2px solid #E5E7EB' : 'none',
-                    }}
+                    className="poker-chip w-10 h-10 shrink-0"
+                    style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
                   >
-                    {denom.denomination}
+                    <span className="poker-chip-value">{denom.denomination}</span>
                   </div>
                   
                   <span className="text-sm text-muted-foreground w-20">
