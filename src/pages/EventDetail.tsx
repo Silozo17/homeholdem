@@ -55,11 +55,18 @@ interface Event {
   is_finalized: boolean;
 }
 
+interface Voter {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface DateOption {
   id: string;
   proposed_date: string;
   vote_count: number;
   user_voted: boolean;
+  voters: Voter[];
 }
 
 interface UserProfile {
@@ -117,20 +124,40 @@ export default function EventDetail() {
         event: '*',
         schema: 'public',
         table: 'event_date_votes'
-      }, (payload) => {
-        // Update vote counts without full refresh
-        if (payload.eventType === 'INSERT') {
-          const newVote = payload.new as { date_option_id: string; user_id: string };
+      }, async (payload) => {
+        // For vote changes, we need to refetch voters for the affected option
+        if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+          const optionId = payload.eventType === 'INSERT' 
+            ? (payload.new as { date_option_id: string }).date_option_id
+            : (payload.old as { date_option_id: string }).date_option_id;
+          const votingUserId = payload.eventType === 'INSERT'
+            ? (payload.new as { user_id: string }).user_id
+            : (payload.old as { user_id: string }).user_id;
+
+          // Fetch updated voter for this option
+          const { data: votesData } = await supabase
+            .from('event_date_votes')
+            .select('user_id')
+            .eq('date_option_id', optionId);
+
+          const voterIds = votesData?.map(v => v.user_id) || [];
+          let voters: Voter[] = [];
+          if (voterIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url')
+              .in('id', voterIds);
+            voters = profilesData || [];
+          }
+
           setDateOptions(prev => prev.map(o =>
-            o.id === newVote.date_option_id
-              ? { ...o, vote_count: o.vote_count + 1, user_voted: newVote.user_id === user?.id ? true : o.user_voted }
-              : o
-          ));
-        } else if (payload.eventType === 'DELETE') {
-          const oldVote = payload.old as { date_option_id: string; user_id: string };
-          setDateOptions(prev => prev.map(o =>
-            o.id === oldVote.date_option_id
-              ? { ...o, vote_count: Math.max(0, o.vote_count - 1), user_voted: oldVote.user_id === user?.id ? false : o.user_voted }
+            o.id === optionId
+              ? { 
+                  ...o, 
+                  vote_count: voterIds.length, 
+                  user_voted: voterIds.includes(user?.id || ''),
+                  voters 
+                }
               : o
           ));
         }
@@ -241,7 +268,7 @@ export default function EventDetail() {
       setUserRole(memberData.role as 'owner' | 'admin' | 'member');
     }
 
-    // Fetch date options with votes
+    // Fetch date options with votes and voters
     const { data: optionsData } = await supabase
       .from('event_date_options')
       .select('id, proposed_date')
@@ -251,22 +278,32 @@ export default function EventDetail() {
     if (optionsData) {
       const optionsWithVotes = await Promise.all(
         optionsData.map(async (option) => {
-          const { count } = await supabase
+          // Get all votes for this option with voter profiles
+          const { data: votesData } = await supabase
             .from('event_date_votes')
-            .select('*', { count: 'exact', head: true })
+            .select('user_id')
             .eq('date_option_id', option.id);
 
-          const { data: userVote } = await supabase
-            .from('event_date_votes')
-            .select('id')
-            .eq('date_option_id', option.id)
-            .eq('user_id', user.id)
-            .single();
+          const voterIds = votesData?.map(v => v.user_id) || [];
+          
+          // Fetch voter profiles
+          let voters: Voter[] = [];
+          if (voterIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url')
+              .in('id', voterIds);
+            voters = profilesData || [];
+          }
+
+          // Check if current user voted
+          const userVoted = voterIds.includes(user.id);
 
           return {
             ...option,
-            vote_count: count || 0,
-            user_voted: !!userVote,
+            vote_count: voterIds.length,
+            user_voted: userVoted,
+            voters,
           };
         })
       );
