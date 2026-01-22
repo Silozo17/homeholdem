@@ -79,7 +79,7 @@ export function AuthForm() {
       </CardHeader>
       <CardContent>
         {isSignUp ? (
-          <Form {...signUpForm}>
+          <Form {...signUpForm} key="signup-form">
             <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
               <FormField
                 control={signUpForm.control}
@@ -158,7 +158,7 @@ export function AuthForm() {
             </form>
           </Form>
         ) : (
-          <Form {...signInForm}>
+          <Form {...signInForm} key="signin-form">
             <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
               <FormField
                 control={signInForm.control}
