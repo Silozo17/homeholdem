@@ -12,8 +12,7 @@ import {
   Calendar,
   MapPin,
   Users,
-  Check,
-  X,
+  Play,
   HelpCircle,
   Home,
   Crown
@@ -402,6 +401,15 @@ export default function EventDetail() {
                 {event.max_tables} {event.max_tables === 1 ? 'table' : 'tables'} × {event.seats_per_table} seats = {totalCapacity} max
               </span>
             </div>
+{isAdmin && event.is_finalized && (
+              <Button 
+                className="w-full mt-4 glow-gold"
+                onClick={() => navigate(`/event/${eventId}/game`)}
+              >
+                <Play className="h-5 w-5 mr-2" />
+                Start Game Mode
+              </Button>
+            )}
           </CardContent>
         </Card>
 
