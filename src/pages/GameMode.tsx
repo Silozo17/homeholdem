@@ -79,9 +79,13 @@ export default function GameMode() {
         session={session}
         blindStructure={blindStructure}
         players={players}
+        transactions={transactions}
         prizePool={prizePool}
         currencySymbol={currencySymbol}
+        isAdmin={isAdmin}
         onExit={() => setTvMode(false)}
+        onUpdateSession={updateSession}
+        onRefresh={refetch}
       />
     );
   }
