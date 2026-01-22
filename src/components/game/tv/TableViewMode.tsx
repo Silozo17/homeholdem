@@ -15,6 +15,7 @@ interface GameSession {
   id: string;
   status: string;
   current_level: number;
+  display_blinds_as_currency?: boolean | null;
   level_started_at: string | null;
   time_remaining_seconds: number | null;
 }
@@ -110,6 +111,14 @@ export function TableViewMode({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatBlind = (chips: number) => {
+    if (session.display_blinds_as_currency) {
+      const value = chips / 100;
+      return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return chips.toLocaleString();
+  };
+
   const getTimerColor = () => {
     if (timeRemaining <= 10) return 'text-red-500 animate-pulse';
     if (timeRemaining <= 60) return 'text-amber-400';
@@ -172,19 +181,19 @@ export function TableViewMode({
           <div className="flex items-center gap-4">
             <div className="text-center">
               <div className="text-xs text-blue-400/80 uppercase">SB</div>
-              <div className="text-2xl font-bold text-blue-400">{currentLevel.small_blind.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</div>
             </div>
             <div className="text-2xl text-white/30">/</div>
             <div className="text-center">
               <div className="text-xs text-amber-400/80 uppercase">BB</div>
-              <div className="text-2xl font-bold text-amber-400">{currentLevel.big_blind.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</div>
             </div>
             {currentLevel.ante > 0 && (
               <>
                 <div className="text-2xl text-white/30">+</div>
                 <div className="text-center">
                   <div className="text-xs text-rose-400/80 uppercase">Ante</div>
-                  <div className="text-2xl font-bold text-rose-400">{currentLevel.ante}</div>
+                  <div className="text-2xl font-bold text-rose-400">{formatBlind(currentLevel.ante)}</div>
                 </div>
               </>
             )}
@@ -284,8 +293,8 @@ export function TableViewMode({
             <span className="text-blue-400 font-semibold">☕ {nextLevel.duration_minutes} min break</span>
           ) : (
             <span className="text-white font-semibold">
-              Level {nextLevel.level}: {nextLevel.small_blind}/{nextLevel.big_blind}
-              {nextLevel.ante > 0 && <span className="text-rose-400 ml-2">(ante {nextLevel.ante})</span>}
+              Level {nextLevel.level}: {formatBlind(nextLevel.small_blind)}/{formatBlind(nextLevel.big_blind)}
+              {nextLevel.ante > 0 && <span className="text-rose-400 ml-2">(ante {formatBlind(nextLevel.ante)})</span>}
             </span>
           )}
         </div>

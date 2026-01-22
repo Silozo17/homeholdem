@@ -312,16 +312,16 @@ export function BuyInTracker({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="buyin">
-                    Buy-in (${session.buy_in_amount} → {session.starting_chips.toLocaleString()} chips)
+                    Buy-in ({currencySymbol}{session.buy_in_amount} → {session.starting_chips.toLocaleString()} chips)
                   </SelectItem>
                   {session.allow_rebuys && canRebuy && (
                     <SelectItem value="rebuy">
-                      Rebuy (${session.rebuy_amount} → {session.rebuy_chips.toLocaleString()} chips)
+                      Rebuy ({currencySymbol}{session.rebuy_amount} → {session.rebuy_chips.toLocaleString()} chips)
                     </SelectItem>
                   )}
                   {session.allow_addons && (
                     <SelectItem value="addon">
-                      Add-on (${session.addon_amount} → {session.addon_chips.toLocaleString()} chips)
+                      Add-on ({currencySymbol}{session.addon_amount} → {session.addon_chips.toLocaleString()} chips)
                     </SelectItem>
                   )}
                 </SelectContent>

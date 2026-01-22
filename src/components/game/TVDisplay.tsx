@@ -30,6 +30,7 @@ interface GameSession {
   addon_chips: number;
   allow_rebuys: boolean;
   allow_addons: boolean;
+  display_blinds_as_currency: boolean | null;
 }
 
 interface GamePlayer {
@@ -46,6 +47,7 @@ interface GameTransaction {
   game_player_id: string;
   transaction_type: string;
   amount: number;
+  chips: number | null;
 }
 
 interface PayoutStructure {
@@ -85,16 +87,23 @@ export function TVDisplay({
 }: TVDisplayProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('classic');
   const [showControls, setShowControls] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [idleTime, setIdleTime] = useState(0);
 
   const activePlayers = players.filter(p => p.status === 'active');
+  const totalChipsInPlay = transactions
+    .filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+    .reduce((sum, t) => sum + (t.chips || 0), 0);
   const averageStack = activePlayers.length > 0 
-    ? Math.round((activePlayers.length * (session.starting_chips || 10000)) / activePlayers.length)
+    ? Math.round(totalChipsInPlay / activePlayers.length)
     : 0;
 
-  // Auto-hide controls after inactivity
+  // Auto-hide controls after inactivity (unless pinned)
   useEffect(() => {
-    if (!showControls) return;
+    if (!showControls || pinned) {
+      setIdleTime(0);
+      return;
+    }
 
     const timer = setInterval(() => {
       setIdleTime(prev => {
@@ -115,7 +124,7 @@ export function TVDisplay({
       window.removeEventListener('mousemove', resetIdle);
       window.removeEventListener('touchstart', resetIdle);
     };
-  }, [showControls]);
+  }, [showControls, pinned]);
 
   // Request fullscreen on mount
   useEffect(() => {
@@ -145,71 +154,74 @@ export function TVDisplay({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      {/* Exit Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleExit}
-        className="absolute top-4 right-4 z-50 text-white/50 hover:text-white hover:bg-white/10"
-      >
-        <X className="w-6 h-6" />
-      </Button>
-
-      {/* Admin Controls Toggle */}
-      {isAdmin && (
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex">
+      {/* Main TV Display Area */}
+      <div className="flex-1 relative">
+        {/* Exit Button */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setShowControls(true)}
-          className="absolute top-4 right-16 z-50 text-white/50 hover:text-white hover:bg-white/10"
+          onClick={handleExit}
+          className="absolute top-4 left-4 z-50 text-white/50 hover:text-white hover:bg-white/10"
         >
-          <Settings className="w-6 h-6" />
+          <X className="w-6 h-6" />
         </Button>
-      )}
 
-      {/* Display Modes */}
-      {displayMode === 'classic' && (
-        <ClassicTimerMode
-          session={session}
-          blindStructure={blindStructure}
-          prizePool={prizePool}
-          currencySymbol={currencySymbol}
-          playersRemaining={activePlayers.length}
-          totalPlayers={players.length}
-          averageStack={averageStack}
-          onUpdateSession={onUpdateSession}
-          isAdmin={isAdmin}
-        />
-      )}
+        {/* Admin Controls Toggle */}
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowControls(!showControls)}
+            className="absolute top-4 right-4 z-50 text-white/50 hover:text-white hover:bg-white/10"
+          >
+            <Settings className="w-6 h-6" />
+          </Button>
+        )}
 
-      {displayMode === 'dashboard' && (
-        <DashboardMode
-          session={session}
-          blindStructure={blindStructure}
-          players={players}
-          transactions={transactions}
-          prizePool={prizePool}
-          currencySymbol={currencySymbol}
-          onUpdateSession={onUpdateSession}
-          payouts={payouts}
-        />
-      )}
+        {/* Display Modes */}
+        {displayMode === 'classic' && (
+          <ClassicTimerMode
+            session={session}
+            blindStructure={blindStructure}
+            prizePool={prizePool}
+            currencySymbol={currencySymbol}
+            playersRemaining={activePlayers.length}
+            totalPlayers={players.length}
+            averageStack={averageStack}
+            onUpdateSession={onUpdateSession}
+            isAdmin={isAdmin}
+          />
+        )}
 
-      {displayMode === 'table' && (
-        <TableViewMode
-          session={session}
-          blindStructure={blindStructure}
-          players={players}
-          prizePool={prizePool}
-          currencySymbol={currencySymbol}
-          playersRemaining={activePlayers.length}
-          totalPlayers={players.length}
-          onUpdateSession={onUpdateSession}
-        />
-      )}
+        {displayMode === 'dashboard' && (
+          <DashboardMode
+            session={session}
+            blindStructure={blindStructure}
+            players={players}
+            transactions={transactions}
+            prizePool={prizePool}
+            currencySymbol={currencySymbol}
+            onUpdateSession={onUpdateSession}
+            payouts={payouts}
+          />
+        )}
 
-      {/* Control Panel */}
+        {displayMode === 'table' && (
+          <TableViewMode
+            session={session}
+            blindStructure={blindStructure}
+            players={players}
+            prizePool={prizePool}
+            currencySymbol={currencySymbol}
+            playersRemaining={activePlayers.length}
+            totalPlayers={players.length}
+            onUpdateSession={onUpdateSession}
+          />
+        )}
+      </div>
+
+      {/* Right Sidebar Control Panel */}
       {showControls && isAdmin && (
         <TVControlPanel
           session={session}
@@ -221,6 +233,8 @@ export function TVDisplay({
           onUpdateSession={onUpdateSession}
           onClose={() => setShowControls(false)}
           onRefresh={onRefresh}
+          pinned={pinned}
+          onPinnedChange={setPinned}
         />
       )}
     </div>

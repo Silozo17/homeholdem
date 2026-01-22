@@ -15,6 +15,7 @@ interface GameSession {
   id: string;
   status: string;
   current_level: number;
+  display_blinds_as_currency?: boolean | null;
   level_started_at: string | null;
   time_remaining_seconds: number | null;
 }
@@ -99,6 +100,15 @@ export function ClassicTimerMode({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatBlind = (chips: number) => {
+    if (session.display_blinds_as_currency) {
+      // Convert chips to currency (assuming 100 chips = 1 currency unit for standard display)
+      const value = chips / 100;
+      return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return chips.toLocaleString();
+  };
+
   const getTimerColor = () => {
     if (timeRemaining <= 10) return 'text-red-500 animate-pulse';
     if (timeRemaining <= 60) return 'text-amber-400';
@@ -171,21 +181,21 @@ export function ClassicTimerMode({
               <div className="text-center">
                 <div className="text-lg text-blue-400 uppercase tracking-wider mb-1">Small Blind</div>
                 <div className="text-6xl font-bold text-blue-400">
-                  {currentLevel.small_blind.toLocaleString()}
+                  {formatBlind(currentLevel.small_blind)}
                 </div>
               </div>
               <div className="text-5xl text-white/30 font-light">/</div>
               <div className="text-center">
                 <div className="text-lg text-amber-400 uppercase tracking-wider mb-1">Big Blind</div>
                 <div className="text-6xl font-bold text-amber-400">
-                  {currentLevel.big_blind.toLocaleString()}
+                  {formatBlind(currentLevel.big_blind)}
                 </div>
               </div>
             </div>
             {currentLevel.ante > 0 && (
               <div className="text-center mt-2">
                 <span className="text-xl text-rose-400">
-                  Ante: <span className="font-bold">{currentLevel.ante.toLocaleString()}</span>
+                  Ante: <span className="font-bold">{formatBlind(currentLevel.ante)}</span>
                 </span>
               </div>
             )}
@@ -202,9 +212,9 @@ export function ClassicTimerMode({
               <div className="text-xl text-blue-400">☕ {nextLevel.duration_minutes} minute break</div>
             ) : (
               <div className="text-xl text-white/80">
-                {nextLevel.small_blind.toLocaleString()} / {nextLevel.big_blind.toLocaleString()}
+                {formatBlind(nextLevel.small_blind)} / {formatBlind(nextLevel.big_blind)}
                 {nextLevel.ante > 0 && (
-                  <span className="text-rose-400 ml-2">(ante {nextLevel.ante})</span>
+                  <span className="text-rose-400 ml-2">(ante {formatBlind(nextLevel.ante)})</span>
                 )}
               </div>
             )}
