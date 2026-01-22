@@ -185,7 +185,7 @@ export default function Stats() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center h-16 px-4">
+        <div className="container flex items-center justify-center h-16 px-4">
           <Logo size="sm" />
         </div>
       </header>

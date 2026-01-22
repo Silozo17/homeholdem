@@ -31,6 +31,9 @@ interface TournamentClockProps {
   tvMode?: boolean;
   playersRemaining?: number;
   isFinalTable?: boolean;
+  currencySymbol?: string;
+  chipToCashRatio?: number;
+  displayBlindsAsCurrency?: boolean;
 }
 
 export function TournamentClock({ 
@@ -40,7 +43,10 @@ export function TournamentClock({
   onUpdate,
   tvMode = false,
   playersRemaining,
-  isFinalTable = false
+  isFinalTable = false,
+  currencySymbol = '£',
+  chipToCashRatio = 0.01,
+  displayBlindsAsCurrency = false
 }: TournamentClockProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,6 +107,12 @@ export function TournamentClock({
     if (session.status === 'active') {
       intervalRef.current = setInterval(() => {
         setTimeRemaining(prev => {
+          // Five minute warning
+          if (prev === 301 && !announcedRef.current['five_minutes']) {
+            announcedRef.current['five_minutes'] = true;
+            playAnnouncement('five_minutes');
+          }
+          
           // One minute warning
           if (prev === 61 && !announcedRef.current['one_minute']) {
             announcedRef.current['one_minute'] = true;
@@ -196,6 +208,17 @@ export function TournamentClock({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatBlind = (chips: number) => {
+    if (displayBlindsAsCurrency && chipToCashRatio > 0) {
+      const value = chips * chipToCashRatio;
+      if (value < 1) {
+        return `${currencySymbol}${value.toFixed(2)}`;
+      }
+      return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return chips.toLocaleString();
+  };
+
   const isLowTime = timeRemaining <= 60;
   const isVeryLowTime = timeRemaining <= 10;
 
@@ -242,14 +265,14 @@ export function TournamentClock({
                 "text-3xl font-bold text-gold-gradient",
                 tvMode && "text-7xl"
               )}>
-                {currentLevel.small_blind.toLocaleString()} / {currentLevel.big_blind.toLocaleString()}
+                {formatBlind(currentLevel.small_blind)} / {formatBlind(currentLevel.big_blind)}
               </div>
               {currentLevel.ante > 0 && (
                 <div className={cn(
                   "text-lg text-muted-foreground mt-1",
                   tvMode && "text-3xl mt-2"
                 )}>
-                  Ante: {currentLevel.ante.toLocaleString()}
+                  Ante: {formatBlind(currentLevel.ante)}
                 </div>
               )}
             </div>
@@ -281,8 +304,8 @@ export function TournamentClock({
                 <span>Break</span>
               ) : (
                 <span>
-                  {nextLevel.small_blind.toLocaleString()} / {nextLevel.big_blind.toLocaleString()}
-                  {nextLevel.ante > 0 && ` (ante ${nextLevel.ante.toLocaleString()})`}
+                  {formatBlind(nextLevel.small_blind)} / {formatBlind(nextLevel.big_blind)}
+                  {nextLevel.ante > 0 && ` (ante ${formatBlind(nextLevel.ante)})`}
                 </span>
               )}
             </div>

@@ -220,11 +220,12 @@ export default function ClubDetail() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center h-16 px-4 gap-4">
+        <div className="container relative flex items-center justify-center h-16 px-4">
           <Button 
             variant="ghost" 
             size="icon"
             onClick={() => navigate('/dashboard')}
+            className="absolute left-4"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>

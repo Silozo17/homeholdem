@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, PlusCircle, Trophy, User } from 'lucide-react';
+import { Home, Calendar, Plus, Trophy, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { QuickCreateDialog } from './QuickCreateDialog';
@@ -7,7 +7,7 @@ import { QuickCreateDialog } from './QuickCreateDialog';
 const navItems = [
   { icon: Home, label: 'Home', path: '/dashboard' },
   { icon: Calendar, label: 'Events', path: '/events' },
-  { icon: PlusCircle, label: 'Create', path: null }, // Opens modal
+  { icon: Plus, label: 'Create', path: null }, // Opens modal
   { icon: Trophy, label: 'Stats', path: '/stats' },
   { icon: User, label: 'Profile', path: '/profile' },
 ];
@@ -53,8 +53,59 @@ export function BottomNav() {
                 )}
               >
                 {isCreateButton ? (
-                  <div className="flex items-center justify-center w-12 h-12 -mt-4 rounded-full bg-primary text-primary-foreground shadow-lg glow-gold">
-                    <Icon className="h-6 w-6" />
+                  <div className="relative -mt-6">
+                    {/* Poker chip design */}
+                    <div className="relative w-14 h-14">
+                      {/* Outer ring with notches */}
+                      <svg 
+                        viewBox="0 0 56 56" 
+                        className="absolute inset-0 w-full h-full"
+                      >
+                        {/* Background circle */}
+                        <circle 
+                          cx="28" cy="28" r="26" 
+                          className="fill-primary"
+                        />
+                        {/* Notches around the edge */}
+                        {Array.from({ length: 12 }).map((_, i) => {
+                          const angle = (i * 30) * (Math.PI / 180);
+                          const x1 = 28 + 26 * Math.cos(angle);
+                          const y1 = 28 + 26 * Math.sin(angle);
+                          const x2 = 28 + 21 * Math.cos(angle);
+                          const y2 = 28 + 21 * Math.sin(angle);
+                          return (
+                            <line
+                              key={i}
+                              x1={x1}
+                              y1={y1}
+                              x2={x2}
+                              y2={y2}
+                              stroke="hsl(var(--background))"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                            />
+                          );
+                        })}
+                        {/* Inner ring */}
+                        <circle 
+                          cx="28" cy="28" r="18" 
+                          fill="none"
+                          className="stroke-background"
+                          strokeWidth="2"
+                        />
+                        {/* Center circle */}
+                        <circle 
+                          cx="28" cy="28" r="15" 
+                          className="fill-background"
+                        />
+                      </svg>
+                      {/* Plus icon in center */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Plus className="h-6 w-6 text-primary" strokeWidth={3} />
+                      </div>
+                    </div>
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 w-14 h-14 rounded-full bg-primary/20 blur-md -z-10" />
                   </div>
                 ) : (
                   <>

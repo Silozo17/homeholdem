@@ -428,18 +428,17 @@ export default function EventDetail() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => navigate(`/club/${event.club_id}`)}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Logo size="sm" />
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="container relative flex items-center justify-center h-16 px-4">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigate(`/club/${event.club_id}`)}
+            className="absolute left-4"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Logo size="sm" />
+          <div className="absolute right-4 flex items-center gap-2">
             {isAdmin && (
               <Button
                 variant="ghost"

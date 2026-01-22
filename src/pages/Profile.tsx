@@ -161,13 +161,13 @@ export default function Profile() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center justify-between h-16 px-4">
+        <div className="container relative flex items-center justify-center h-16 px-4">
           <Logo size="sm" />
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/settings')}
-            className="text-muted-foreground hover:text-foreground"
+            className="absolute right-4 text-muted-foreground hover:text-foreground"
           >
             <Settings className="h-5 w-5" />
           </Button>

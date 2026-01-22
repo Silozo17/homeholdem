@@ -108,6 +108,7 @@ export function CombinedMode({
 
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
+        if (prev === 301) playAnnouncement('five_minutes');
         if (prev === 61) playAnnouncement('one_minute');
         if (prev === 11) playAnnouncement('ten_seconds');
         if (prev <= 1) {
