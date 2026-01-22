@@ -9,6 +9,7 @@ import { ArrowLeft, Tv, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { TournamentClock } from '@/components/game/TournamentClock';
 import { PlayerList } from '@/components/game/PlayerList';
+import { SeatMap } from '@/components/game/SeatMap';
 import { BuyInTracker } from '@/components/game/BuyInTracker';
 import { PayoutCalculator } from '@/components/game/PayoutCalculator';
 import { GameSettings } from '@/components/game/GameSettings';
@@ -175,10 +176,10 @@ export default function GameMode() {
               </div>
             </div>
 
-            {/* Tabs */}
             <Tabs defaultValue="players" className="space-y-4">
-              <TabsList className="w-full grid grid-cols-3">
+              <TabsList className="w-full grid grid-cols-4">
                 <TabsTrigger value="players">Players</TabsTrigger>
+                <TabsTrigger value="seats">Seats</TabsTrigger>
                 <TabsTrigger value="buyins">Buy-ins</TabsTrigger>
                 <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
@@ -187,6 +188,16 @@ export default function GameMode() {
                 <PlayerList
                   players={players}
                   session={session}
+                  isAdmin={isAdmin}
+                  onRefresh={refetch}
+                />
+              </TabsContent>
+
+              <TabsContent value="seats">
+                <SeatMap
+                  players={players}
+                  seatsPerTable={10}
+                  maxTables={2}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />

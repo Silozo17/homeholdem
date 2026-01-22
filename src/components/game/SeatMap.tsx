@@ -1,0 +1,272 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { LayoutGrid, User } from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+interface GamePlayer {
+  id: string;
+  user_id: string;
+  display_name: string;
+  table_number: number | null;
+  seat_number: number | null;
+  status: string;
+  finish_position: number | null;
+}
+
+interface SeatMapProps {
+  players: GamePlayer[];
+  seatsPerTable: number;
+  maxTables: number;
+  isAdmin: boolean;
+  onRefresh: () => void;
+}
+
+export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh }: SeatMapProps) {
+  const [selectedSeat, setSelectedSeat] = useState<{ table: number; seat: number } | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
+
+  const activePlayers = players.filter(p => p.status === 'active');
+  const unassignedPlayers = activePlayers.filter(p => !p.seat_number);
+
+  const getPlayerAtSeat = (tableNum: number, seatNum: number) => {
+    return activePlayers.find(
+      p => p.table_number === tableNum && p.seat_number === seatNum
+    );
+  };
+
+  const handleSeatClick = (tableNum: number, seatNum: number) => {
+    if (!isAdmin) return;
+    setSelectedSeat({ table: tableNum, seat: seatNum });
+    setShowAssign(true);
+  };
+
+  const handleAssignPlayer = async (playerId: string) => {
+    if (!selectedSeat) return;
+
+    // First, clear any existing player from this seat
+    const existingPlayer = getPlayerAtSeat(selectedSeat.table, selectedSeat.seat);
+    if (existingPlayer && existingPlayer.id !== playerId) {
+      await supabase
+        .from('game_players')
+        .update({ seat_number: null })
+        .eq('id', existingPlayer.id);
+    }
+
+    // Assign the new player
+    const { error } = await supabase
+      .from('game_players')
+      .update({ 
+        table_number: selectedSeat.table,
+        seat_number: selectedSeat.seat 
+      })
+      .eq('id', playerId);
+
+    if (error) {
+      toast.error('Failed to assign seat');
+      return;
+    }
+
+    toast.success('Seat assigned');
+    setShowAssign(false);
+    setSelectedSeat(null);
+    onRefresh();
+  };
+
+  const handleClearSeat = async () => {
+    if (!selectedSeat) return;
+
+    const player = getPlayerAtSeat(selectedSeat.table, selectedSeat.seat);
+    if (!player) {
+      setShowAssign(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('game_players')
+      .update({ seat_number: null })
+      .eq('id', player.id);
+
+    if (error) {
+      toast.error('Failed to clear seat');
+      return;
+    }
+
+    toast.success('Seat cleared');
+    setShowAssign(false);
+    setSelectedSeat(null);
+    onRefresh();
+  };
+
+  // Calculate seat positions in an oval layout
+  const getSeatPositions = (numSeats: number) => {
+    const positions: { x: number; y: number; rotation: number }[] = [];
+    for (let i = 0; i < numSeats; i++) {
+      // Distribute seats around an oval
+      const angle = (i / numSeats) * 2 * Math.PI - Math.PI / 2;
+      const x = 50 + 40 * Math.cos(angle);
+      const y = 50 + 35 * Math.sin(angle);
+      const rotation = (angle * 180) / Math.PI + 90;
+      positions.push({ x, y, rotation });
+    }
+    return positions;
+  };
+
+  const seatPositions = getSeatPositions(seatsPerTable);
+
+  return (
+    <>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5 text-primary" />
+              Seat Map
+            </CardTitle>
+            {unassignedPlayers.length > 0 && (
+              <Badge variant="secondary">
+                {unassignedPlayers.length} unassigned
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {[1, 2].slice(0, maxTables).map((tableNum) => (
+            <div key={tableNum} className="space-y-2">
+              <div className="text-sm text-muted-foreground font-medium text-center">
+                Table {tableNum}
+              </div>
+              <div className="relative aspect-[2/1] max-w-sm mx-auto">
+                {/* Table felt */}
+                <div className="absolute inset-[10%] rounded-[50%] bg-emerald-800 border-4 border-amber-900 shadow-lg" />
+                <div className="absolute inset-[12%] rounded-[50%] border border-emerald-600/30" />
+                
+                {/* Dealer button position indicator */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 border border-primary/50 flex items-center justify-center text-xs font-bold text-primary">
+                  D
+                </div>
+
+                {/* Seats */}
+                {seatPositions.map((pos, idx) => {
+                  const seatNum = idx + 1;
+                  const player = getPlayerAtSeat(tableNum, seatNum);
+                  const isOccupied = !!player;
+
+                  return (
+                    <button
+                      key={seatNum}
+                      onClick={() => handleSeatClick(tableNum, seatNum)}
+                      disabled={!isAdmin}
+                      className={cn(
+                        "absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center transition-all",
+                        "border-2 text-xs font-medium",
+                        isOccupied
+                          ? "bg-primary border-primary text-primary-foreground shadow-md"
+                          : "bg-muted/50 border-border/50 text-muted-foreground hover:border-primary/50",
+                        isAdmin && "cursor-pointer hover:scale-110"
+                      )}
+                      style={{
+                        left: `${pos.x}%`,
+                        top: `${pos.y}%`,
+                      }}
+                      title={player ? player.display_name : `Seat ${seatNum}`}
+                    >
+                      {isOccupied ? (
+                        <span className="truncate px-1">
+                          {player.display_name.charAt(0).toUpperCase()}
+                        </span>
+                      ) : (
+                        <span className="opacity-50">{seatNum}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend for this table */}
+              <div className="flex flex-wrap gap-1 justify-center text-xs">
+                {activePlayers
+                  .filter(p => p.table_number === tableNum && p.seat_number)
+                  .sort((a, b) => (a.seat_number || 0) - (b.seat_number || 0))
+                  .map(p => (
+                    <Badge key={p.id} variant="outline" className="font-normal">
+                      S{p.seat_number}: {p.display_name}
+                    </Badge>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Assign Seat Dialog */}
+      <Dialog open={showAssign} onOpenChange={setShowAssign}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Table {selectedSeat?.table}, Seat {selectedSeat?.seat}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {getPlayerAtSeat(selectedSeat?.table || 0, selectedSeat?.seat || 0) && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">Currently seated:</p>
+                <p className="font-medium">
+                  {getPlayerAtSeat(selectedSeat?.table || 0, selectedSeat?.seat || 0)?.display_name}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={handleClearSeat}
+                >
+                  Clear Seat
+                </Button>
+              </div>
+            )}
+
+            {activePlayers.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Assign player:</p>
+                <div className="grid gap-2 max-h-60 overflow-y-auto">
+                  {activePlayers.map(player => (
+                    <Button
+                      key={player.id}
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleAssignPlayer(player.id)}
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      {player.display_name}
+                      {player.seat_number && (
+                        <Badge variant="secondary" className="ml-auto">
+                          T{player.table_number}S{player.seat_number}
+                        </Badge>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
