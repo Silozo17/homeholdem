@@ -167,23 +167,24 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
     <>
       <Card className="bg-card/50 border-border/50">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <LayoutGrid className="h-5 w-5 text-primary" />
               Seat Map
-            </CardTitle>
-            <div className="flex items-center gap-2">
               {unassignedPlayers.length > 0 && (
-                <Badge variant="secondary">
+                <Badge variant="secondary" className="text-xs">
                   {unassignedPlayers.length} unassigned
                 </Badge>
               )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
               {isAdmin && activePlayers.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRandomizeSeats}
                   title="Randomize all seats"
+                  className="w-full sm:w-auto"
                 >
                   <Shuffle className="h-4 w-4 mr-1" />
                   Randomize
@@ -198,13 +199,13 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
               <div className="text-sm text-muted-foreground font-medium text-center">
                 Table {tableNum}
               </div>
-              <div className="relative aspect-[2/1] max-w-sm mx-auto">
+              <div className="relative aspect-[2/1] w-full max-w-xs sm:max-w-sm mx-auto">
                 {/* Table felt */}
-                <div className="absolute inset-[10%] rounded-[50%] bg-emerald-800 border-4 border-amber-900 shadow-lg" />
-                <div className="absolute inset-[12%] rounded-[50%] border border-emerald-600/30" />
+                <div className="absolute inset-[8%] sm:inset-[10%] rounded-[50%] bg-emerald-800 border-2 sm:border-4 border-amber-900 shadow-lg" />
+                <div className="absolute inset-[10%] sm:inset-[12%] rounded-[50%] border border-emerald-600/30" />
                 
                 {/* Dealer button position indicator */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80 border border-primary/50 flex items-center justify-center text-xs font-bold text-primary">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-background/80 border border-primary/50 flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary">
                   D
                 </div>
 
@@ -220,8 +221,8 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
                       onClick={() => handleSeatClick(tableNum, seatNum)}
                       disabled={!isAdmin}
                       className={cn(
-                        "absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center transition-all",
-                        "border-2 text-xs font-medium",
+                        "absolute w-7 h-7 sm:w-10 sm:h-10 -ml-3.5 sm:-ml-5 -mt-3.5 sm:-mt-5 rounded-full flex items-center justify-center transition-all",
+                        "border sm:border-2 text-[10px] sm:text-xs font-medium",
                         isOccupied
                           ? "bg-primary border-primary text-primary-foreground shadow-md"
                           : "bg-muted/50 border-border/50 text-muted-foreground hover:border-primary/50",
