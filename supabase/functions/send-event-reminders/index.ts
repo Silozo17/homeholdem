@@ -123,7 +123,7 @@ serve(async (req) => {
               Authorization: `Bearer ${RESEND_API_KEY}`,
             },
             body: JSON.stringify({
-              from: "Home Hold'em Club <poker@resend.dev>",
+              from: "Home Hold'em Club <noreply@hello.homeholdem.com>",
               to: [profile.email],
               subject: `🃏 Reminder: ${event.title} is tomorrow!`,
               html,

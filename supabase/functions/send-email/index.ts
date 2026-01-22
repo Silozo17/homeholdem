@@ -36,7 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: from || "Home Hold'em Club <onboarding@resend.dev>",
+      from: from || "Home Hold'em Club <noreply@hello.homeholdem.com>",
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
