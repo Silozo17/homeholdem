@@ -149,21 +149,29 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
     onRefresh();
   };
 
-  // Calculate seat positions in an oval layout
-  const getSeatPositions = (numSeats: number) => {
-    const positions: { x: number; y: number; rotation: number }[] = [];
-    for (let i = 0; i < numSeats; i++) {
-      // Distribute seats around an oval
-      const angle = (i / numSeats) * 2 * Math.PI - Math.PI / 2;
-      const x = 50 + 40 * Math.cos(angle);
-      const y = 50 + 35 * Math.sin(angle);
-      const rotation = (angle * 180) / Math.PI + 90;
-      positions.push({ x, y, rotation });
-    }
-    return positions;
+  // Fixed seat positions: 2 on each end, 3 on top, 3 on bottom (same as TV display)
+  const seatPositionsBySeat: Record<number, { x: number; y: number }> = {
+    // Bottom row (3 seats)
+    1:  { x: 30, y: 95 },
+    10: { x: 50, y: 95 },
+    9:  { x: 70, y: 95 },
+    // Left end (2 seats stacked)
+    2:  { x: 5, y: 65 },
+    3:  { x: 5, y: 35 },
+    // Top row (3 seats)
+    4:  { x: 30, y: 5 },
+    5:  { x: 50, y: 5 },
+    6:  { x: 70, y: 5 },
+    // Right end (2 seats stacked)
+    7:  { x: 95, y: 35 },
+    8:  { x: 95, y: 65 },
   };
 
-  const seatPositions = getSeatPositions(seatsPerTable);
+  const seatPositions = Array.from({ length: seatsPerTable }, (_, i) => {
+    const seatNum = i + 1;
+    const pos = seatPositionsBySeat[seatNum] || { x: 50, y: 50 };
+    return { x: pos.x, y: pos.y, seatNum };
+  });
 
   return (
     <>
@@ -212,8 +220,8 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
                 </div>
 
                 {/* Seats */}
-                {seatPositions.map((pos, idx) => {
-                  const seatNum = idx + 1;
+                {seatPositions.map((pos) => {
+                  const seatNum = pos.seatNum;
                   const player = getPlayerAtSeat(tableNum, seatNum);
                   const isOccupied = !!player;
 
@@ -223,7 +231,7 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
                       onClick={() => handleSeatClick(tableNum, seatNum)}
                       disabled={!isAdmin}
                       className={cn(
-                        "absolute w-7 h-7 sm:w-10 sm:h-10 -ml-3.5 sm:-ml-5 -mt-3.5 sm:-mt-5 rounded-full flex items-center justify-center transition-all",
+                        "absolute w-7 h-7 sm:w-10 sm:h-10 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center transition-all",
                         "border sm:border-2 text-[10px] sm:text-xs font-medium",
                         isOccupied
                           ? "bg-primary border-primary text-primary-foreground shadow-md"
