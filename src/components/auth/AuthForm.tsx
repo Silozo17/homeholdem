@@ -91,7 +91,11 @@ export function AuthForm() {
                       <Input 
                         placeholder="Your poker nickname" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -109,7 +113,11 @@ export function AuthForm() {
                         type="email" 
                         placeholder="you@example.com" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -127,7 +135,11 @@ export function AuthForm() {
                         type="password" 
                         placeholder="••••••••" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -145,7 +157,11 @@ export function AuthForm() {
                         type="password" 
                         placeholder="••••••••" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -179,7 +195,11 @@ export function AuthForm() {
                         type="email" 
                         placeholder="you@example.com" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -197,7 +217,11 @@ export function AuthForm() {
                         type="password" 
                         placeholder="••••••••" 
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
