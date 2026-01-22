@@ -655,6 +655,66 @@ export type Database = {
         }
         Relationships: []
       }
+      settlements: {
+        Row: {
+          amount: number
+          club_id: string
+          created_at: string
+          from_user_id: string
+          game_session_id: string | null
+          id: string
+          is_settled: boolean
+          notes: string | null
+          settled_at: string | null
+          settled_by: string | null
+          to_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          club_id: string
+          created_at?: string
+          from_user_id: string
+          game_session_id?: string | null
+          id?: string
+          is_settled?: boolean
+          notes?: string | null
+          settled_at?: string | null
+          settled_by?: string | null
+          to_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          club_id?: string
+          created_at?: string
+          from_user_id?: string
+          game_session_id?: string | null
+          id?: string
+          is_settled?: boolean
+          notes?: string | null
+          settled_at?: string | null
+          settled_by?: string | null
+          to_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

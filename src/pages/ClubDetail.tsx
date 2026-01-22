@@ -31,6 +31,7 @@ import { HouseRules } from '@/components/clubs/HouseRules';
 import { PokerHandRankings } from '@/components/clubs/PokerHandRankings';
 import { HostRotation } from '@/components/clubs/HostRotation';
 import { GameHistory } from '@/components/clubs/GameHistory';
+import { PaymentLedger } from '@/components/clubs/PaymentLedger';
 
 interface ClubMember {
   id: string;
@@ -331,6 +332,7 @@ export default function ClubDetail() {
             <Leaderboard clubId={clubId!} clubName={club.name} />
             <GameHistory clubId={clubId!} clubName={club.name} />
             <HostRotation clubId={clubId!} />
+            <PaymentLedger clubId={clubId!} isAdmin={isAdmin} />
           </TabsContent>
 
           {/* Rules Tab */}

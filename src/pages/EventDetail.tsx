@@ -23,6 +23,7 @@ import { DateVoting } from '@/components/events/DateVoting';
 import { RsvpButtons } from '@/components/events/RsvpButtons';
 import { HostVolunteer } from '@/components/events/HostVolunteer';
 import { AttendeesList } from '@/components/events/AttendeesList';
+import { ShareEvent } from '@/components/events/ShareEvent';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
@@ -390,15 +391,25 @@ export default function EventDetail() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center h-16 px-4 gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => navigate(`/club/${event.club_id}`)}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <Logo size="sm" />
+        <div className="container flex items-center justify-between h-16 px-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate(`/club/${event.club_id}`)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Logo size="sm" />
+          </div>
+          <ShareEvent
+            eventId={event.id}
+            eventTitle={event.title}
+            eventDate={event.final_date}
+            location={event.location}
+            goingCount={goingList.length}
+            capacity={totalCapacity}
+          />
         </div>
       </header>
 
