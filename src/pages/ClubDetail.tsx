@@ -333,6 +333,7 @@ export default function ClubDetail() {
         open={createEventOpen}
         onOpenChange={setCreateEventOpen}
         clubId={clubId || ''}
+        clubName={club?.name || ''}
         onSuccess={fetchClubData}
       />
     </div>

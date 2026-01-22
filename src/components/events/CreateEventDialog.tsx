@@ -29,6 +29,8 @@ import {
 import { Loader2, CalendarIcon, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { sendEmail } from '@/lib/email';
+import { eventCreatedTemplate } from '@/lib/email-templates';
 
 const createEventSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters').max(100),
@@ -44,10 +46,11 @@ interface CreateEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clubId: string;
+  clubName: string;
   onSuccess: () => void;
 }
 
-export function CreateEventDialog({ open, onOpenChange, clubId, onSuccess }: CreateEventDialogProps) {
+export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSuccess }: CreateEventDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [dateOptions, setDateOptions] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -127,18 +130,60 @@ export function CreateEventDialog({ open, onOpenChange, clubId, onSuccess }: Cre
         }))
       );
 
-    setIsLoading(false);
-
     if (dateError) {
+      setIsLoading(false);
       toast.error('Event created but failed to add date options');
       return;
     }
 
+    // Send email notifications to club members (fire and forget)
+    sendEventNotifications(event.id, data.title, data.description || undefined);
+
+    setIsLoading(false);
     toast.success('Event created! Members can now vote on dates.');
     form.reset();
     setDateOptions([]);
     onOpenChange(false);
     onSuccess();
+  };
+
+  const sendEventNotifications = async (eventId: string, eventTitle: string, description?: string) => {
+    try {
+      // Fetch club members with their emails (excluding the creator)
+      const { data: members } = await supabase
+        .from('club_members')
+        .select('user_id, profiles(email)')
+        .eq('club_id', clubId)
+        .neq('user_id', user!.id);
+
+      if (!members || members.length === 0) return;
+
+      const memberEmails = members
+        .map((m) => (m.profiles as any)?.email)
+        .filter((email): email is string => !!email);
+
+      if (memberEmails.length === 0) return;
+
+      const eventUrl = `${window.location.origin}/events/${eventId}`;
+      const formattedDates = dateOptions.map((d) => format(d, "EEEE, MMMM d 'at' h:mm a"));
+
+      const html = eventCreatedTemplate({
+        eventTitle,
+        clubName,
+        description,
+        dateOptions: formattedDates,
+        eventUrl,
+      });
+
+      await sendEmail({
+        to: memberEmails,
+        subject: `🃏 New Event: ${eventTitle}`,
+        html,
+      });
+    } catch (error) {
+      console.error('Failed to send event notifications:', error);
+      // Don't show error to user - event was created successfully
+    }
   };
 
   const timeOptions = [];

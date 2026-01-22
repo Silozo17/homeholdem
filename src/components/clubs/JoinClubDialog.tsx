@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { sendEmail } from '@/lib/email';
+import { welcomeToClubTemplate } from '@/lib/email-templates';
 
 const joinClubSchema = z.object({
   inviteCode: z.string().length(6, 'Invite code must be 6 characters').toUpperCase(),
@@ -93,10 +95,51 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
       return;
     }
 
+    // Send welcome email (fire and forget)
+    sendWelcomeEmail(club.id, club.name, (club as any).invite_code);
+
     toast.success(`Welcome to ${club.name}!`);
     form.reset();
     onOpenChange(false);
     onSuccess();
+  };
+
+  const sendWelcomeEmail = async (clubId: string, clubName: string, inviteCode: string) => {
+    if (!user) return;
+
+    try {
+      // Get user's email
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.email) return;
+
+      // Get member count
+      const { count } = await supabase
+        .from('club_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', clubId);
+
+      const clubUrl = `${window.location.origin}/club/${clubId}`;
+
+      const html = welcomeToClubTemplate({
+        clubName,
+        inviteCode,
+        memberCount: count || 1,
+        clubUrl,
+      });
+
+      await sendEmail({
+        to: profile.email,
+        subject: `🎉 Welcome to ${clubName}!`,
+        html,
+      });
+    } catch (error) {
+      console.error('Failed to send welcome email:', error);
+    }
   };
 
   return (
