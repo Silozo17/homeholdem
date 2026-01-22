@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Settings, Trophy, TrendingUp, Users, Calendar, Crown, Medal, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -132,13 +132,10 @@ export default function Profile() {
     setLoadingData(false);
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+  const handleAvatarUpdate = (newUrl: string) => {
+    if (profile) {
+      setProfile({ ...profile, avatar_url: newUrl });
+    }
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -182,12 +179,12 @@ export default function Profile() {
         <Card className="bg-card/50 border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 border-2 border-primary">
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                  {profile ? getInitials(profile.display_name) : '??'}
-                </AvatarFallback>
-              </Avatar>
+              <AvatarUpload
+                userId={user?.id || ''}
+                currentAvatarUrl={profile?.avatar_url || null}
+                displayName={profile?.display_name || ''}
+                onUploadComplete={handleAvatarUpdate}
+              />
               <div className="flex-1">
                 <h1 className="text-2xl font-bold text-gold-gradient">
                   {profile?.display_name}
