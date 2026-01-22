@@ -2,27 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Home Hold&#39;em Club</title>
     <meta name="description" content="Organise and run private Texas Hold&#39;em poker nights with your friends">
     <meta name="author" content="Home Hold'em Club" />
+    
+    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#f59e0b" />
+    
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hold'em Club">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    
+    <!-- Prevent phone number detection -->
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- Microsoft/Windows -->
+    <meta name="msapplication-TileColor" content="#f59e0b">
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png">
+    <meta name="msapplication-tap-highlight" content="no">
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:title" content="Home Hold&#39;em Club">
+    <meta property="og:description" content="Organise and run private Texas Hold&#39;em poker nights with your friends">
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
+    
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:title" content="Home Hold&#39;em Club">
+    <meta name="twitter:description" content="Organise and run private Texas Hold&#39;em poker nights with your friends">
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <meta property="og:title" content="Home Hold&#39;em Club">
-  <meta name="twitter:title" content="Home Hold&#39;em Club">
-  <meta property="og:description" content="Organise and run private Texas Hold&#39;em poker nights with your friends">
-  <meta name="twitter:description" content="Organise and run private Texas Hold&#39;em poker nights with your friends">
-</head>
+  </head>
 
   <body>
     <div id="root"></div>
