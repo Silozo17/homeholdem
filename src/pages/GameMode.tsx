@@ -1,18 +1,17 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
-import { ArrowLeft, Tv, Settings } from 'lucide-react';
-import { toast } from 'sonner';
+import { ArrowLeft, Tv, Settings, Coins } from 'lucide-react';
 import { TournamentClock } from '@/components/game/TournamentClock';
 import { PlayerList } from '@/components/game/PlayerList';
 import { SeatMap } from '@/components/game/SeatMap';
 import { BuyInTracker } from '@/components/game/BuyInTracker';
 import { PayoutCalculator } from '@/components/game/PayoutCalculator';
 import { GameSettings } from '@/components/game/GameSettings';
+import { ChipCounter } from '@/components/game/ChipCounter';
 import { useGameSession } from '@/hooks/useGameSession';
 
 export default function GameMode() {
@@ -178,10 +177,14 @@ export default function GameMode() {
             </div>
 
             <Tabs defaultValue="players" className="space-y-4">
-              <TabsList className="w-full grid grid-cols-4">
+              <TabsList className="w-full grid grid-cols-5">
                 <TabsTrigger value="players">Players</TabsTrigger>
                 <TabsTrigger value="seats">Seats</TabsTrigger>
                 <TabsTrigger value="buyins">Buy-ins</TabsTrigger>
+                <TabsTrigger value="cashout" className="flex items-center gap-1">
+                  <Coins className="h-3 w-3" />
+                  Cash Out
+                </TabsTrigger>
                 <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
 
@@ -211,6 +214,21 @@ export default function GameMode() {
                   session={session}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
+                />
+              </TabsContent>
+
+              <TabsContent value="cashout">
+                <ChipCounter
+                  clubId={clubId || ''}
+                  sessionId={session.id}
+                  players={players}
+                  transactions={transactions}
+                  isAdmin={isAdmin}
+                  onComplete={(totals) => {
+                    console.log('Cash out complete:', totals);
+                    // Totals will be used for settlement calculations
+                    refetch();
+                  }}
                 />
               </TabsContent>
 

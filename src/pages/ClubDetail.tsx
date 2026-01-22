@@ -20,8 +20,7 @@ import {
   MessageCircle,
   Trophy,
   ScrollText,
-  History,
-  Settings
+  Coins
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -35,6 +34,7 @@ import { GameHistory } from '@/components/clubs/GameHistory';
 import { PaymentLedger } from '@/components/clubs/PaymentLedger';
 import { SeasonLeaderboard } from '@/components/clubs/SeasonLeaderboard';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
+import { ChipTemplateManager } from '@/components/clubs/ChipTemplateManager';
 
 interface ClubMember {
   id: string;
@@ -260,7 +260,7 @@ export default function ClubDetail() {
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="events" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="events" className="flex flex-col items-center gap-1 py-2">
               <Calendar className="h-4 w-4" />
               <span className="text-xs">Events</span>
@@ -272,6 +272,10 @@ export default function ClubDetail() {
             <TabsTrigger value="leaderboard" className="flex flex-col items-center gap-1 py-2">
               <Trophy className="h-4 w-4" />
               <span className="text-xs">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="chips" className="flex flex-col items-center gap-1 py-2">
+              <Coins className="h-4 w-4" />
+              <span className="text-xs">Chips</span>
             </TabsTrigger>
             <TabsTrigger value="rules" className="flex flex-col items-center gap-1 py-2">
               <ScrollText className="h-4 w-4" />
@@ -337,6 +341,11 @@ export default function ClubDetail() {
             <GameHistory clubId={clubId!} clubName={club.name} />
             <HostRotation clubId={clubId!} />
             <PaymentLedger clubId={clubId!} isAdmin={isAdmin} />
+          </TabsContent>
+
+          {/* Chips Tab */}
+          <TabsContent value="chips" className="mt-4 space-y-4">
+            <ChipTemplateManager clubId={clubId!} isAdmin={isAdmin} />
           </TabsContent>
 
           {/* Rules Tab */}
