@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
 import { 
   ArrowLeft, 
@@ -15,11 +16,18 @@ import {
   Shield,
   User,
   Calendar,
-  Plus
+  Plus,
+  MessageCircle,
+  Trophy,
+  ScrollText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
 import { EventCard } from '@/components/events/EventCard';
+import { ChatWindow } from '@/components/chat/ChatWindow';
+import { Leaderboard } from '@/components/clubs/Leaderboard';
+import { HouseRules } from '@/components/clubs/HouseRules';
+import { PokerHandRankings } from '@/components/clubs/PokerHandRankings';
 
 interface ClubMember {
   id: string;
@@ -243,99 +251,144 @@ export default function ClubDetail() {
           </CardContent>
         </Card>
 
-        {/* Events Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Events
-            </h2>
-            {isAdmin && (
-              <Button 
-                size="sm"
-                onClick={() => setCreateEventOpen(true)}
-                className="glow-gold"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Event
-              </Button>
-            )}
-          </div>
+        {/* Tabs for different sections */}
+        <Tabs defaultValue="events" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 h-auto">
+            <TabsTrigger value="events" className="flex flex-col items-center gap-1 py-2">
+              <Calendar className="h-4 w-4" />
+              <span className="text-xs">Events</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex flex-col items-center gap-1 py-2">
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-xs">Chat</span>
+            </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="flex flex-col items-center gap-1 py-2">
+              <Trophy className="h-4 w-4" />
+              <span className="text-xs">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="rules" className="flex flex-col items-center gap-1 py-2">
+              <ScrollText className="h-4 w-4" />
+              <span className="text-xs">Rules</span>
+            </TabsTrigger>
+            <TabsTrigger value="members" className="flex flex-col items-center gap-1 py-2">
+              <Users className="h-4 w-4" />
+              <span className="text-xs">Members</span>
+            </TabsTrigger>
+          </TabsList>
 
-          {events.length === 0 ? (
-            <Card className="bg-card/50 border-border/50 border-dashed">
-              <CardContent className="py-8 text-center">
-                <div className="text-3xl mb-3 opacity-30">📅</div>
-                <p className="text-muted-foreground">
-                  {isAdmin 
-                    ? "No events yet. Create the first one!" 
-                    : "No events scheduled. Check back soon!"}
-                </p>
+          {/* Events Tab */}
+          <TabsContent value="events" className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Upcoming Events</h2>
+              {isAdmin && (
+                <Button 
+                  size="sm"
+                  onClick={() => setCreateEventOpen(true)}
+                  className="glow-gold"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Event
+                </Button>
+              )}
+            </div>
+
+            {events.length === 0 ? (
+              <Card className="bg-card/50 border-border/50 border-dashed">
+                <CardContent className="py-8 text-center">
+                  <div className="text-3xl mb-3 opacity-30">📅</div>
+                  <p className="text-muted-foreground">
+                    {isAdmin 
+                      ? "No events yet. Create the first one!" 
+                      : "No events scheduled. Check back soon!"}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {events.map((event) => (
+                  <EventCard 
+                    key={event.id}
+                    event={event}
+                    onClick={() => navigate(`/event/${event.id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Chat Tab */}
+          <TabsContent value="chat" className="mt-4">
+            <Card className="bg-card/50 border-border/50 h-[60vh]">
+              <ChatWindow clubId={clubId!} />
+            </Card>
+          </TabsContent>
+
+          {/* Leaderboard Tab */}
+          <TabsContent value="leaderboard" className="mt-4">
+            <Leaderboard clubId={clubId!} clubName={club.name} />
+          </TabsContent>
+
+          {/* Rules Tab */}
+          <TabsContent value="rules" className="mt-4 space-y-4">
+            <HouseRules clubId={clubId!} isAdmin={isAdmin} />
+            <PokerHandRankings />
+          </TabsContent>
+
+          {/* Members Tab */}
+          <TabsContent value="members" className="mt-4">
+            <Card className="bg-card/50 border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Members ({members.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {members.map((member) => (
+                  <div 
+                    key={member.id}
+                    className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                        {member.profile.avatar_url ? (
+                          <img 
+                            src={member.profile.avatar_url} 
+                            alt={member.profile.display_name}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-lg font-semibold text-muted-foreground">
+                            {member.profile.display_name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{member.profile.display_name}</p>
+                        <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                          {getRoleIcon(member.role)}
+                          {member.role}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
-          ) : (
-            <div className="space-y-3">
-              {events.map((event) => (
-                <EventCard 
-                  key={event.id}
-                  event={event}
-                  onClick={() => navigate(`/event/${event.id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Members Section */}
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Members ({members.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {members.map((member) => (
-              <div 
-                key={member.id}
-                className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                    {member.profile.avatar_url ? (
-                      <img 
-                        src={member.profile.avatar_url} 
-                        alt={member.profile.display_name}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-lg font-semibold text-muted-foreground">
-                        {member.profile.display_name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium">{member.profile.display_name}</p>
-                    <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
-                      {getRoleIcon(member.role)}
-                      {member.role}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Create Event Dialog */}
-      <CreateEventDialog
-        open={createEventOpen}
-        onOpenChange={setCreateEventOpen}
-        clubId={clubId || ''}
-        clubName={club?.name || ''}
-        onSuccess={fetchClubData}
-      />
+      {club && (
+        <CreateEventDialog
+          open={createEventOpen}
+          onOpenChange={setCreateEventOpen}
+          clubId={clubId || ''}
+          clubName={club.name}
+          onSuccess={fetchClubData}
+        />
+      )}
     </div>
   );
 }
