@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/layout/Logo';
-import { Plus, Users, LogOut } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
@@ -85,10 +85,7 @@ export default function Dashboard() {
     setLoadingClubs(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
+  // Removed handleSignOut - now in Settings page
 
   if (loading) {
     return (
@@ -101,17 +98,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center justify-between h-16 px-4">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="container flex items-center h-16 px-4">
           <Logo size="sm" />
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleSignOut}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
         </div>
       </header>
 
