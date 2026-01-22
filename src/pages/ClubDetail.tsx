@@ -20,7 +20,8 @@ import {
   MessageCircle,
   Trophy,
   ScrollText,
-  History
+  History,
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -33,6 +34,7 @@ import { HostRotation } from '@/components/clubs/HostRotation';
 import { GameHistory } from '@/components/clubs/GameHistory';
 import { PaymentLedger } from '@/components/clubs/PaymentLedger';
 import { SeasonLeaderboard } from '@/components/clubs/SeasonLeaderboard';
+import { NotificationSettings } from '@/components/settings/NotificationSettings';
 
 interface ClubMember {
   id: string;
@@ -344,7 +346,8 @@ export default function ClubDetail() {
           </TabsContent>
 
           {/* Members Tab */}
-          <TabsContent value="members" className="mt-4">
+          <TabsContent value="members" className="mt-4 space-y-4">
+            <NotificationSettings />
             <Card className="bg-card/50 border-border/50">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">

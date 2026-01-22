@@ -1,0 +1,17 @@
+{
+  "name": "Home Hold'em Club",
+  "short_name": "Hold'em Club",
+  "description": "Organize and run private Texas Hold'em poker nights",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
