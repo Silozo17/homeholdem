@@ -133,6 +133,82 @@ export type Database = {
           },
         ]
       }
+      chip_denominations: {
+        Row: {
+          cash_value: number
+          color: string
+          created_at: string
+          denomination: number
+          display_order: number
+          id: string
+          template_id: string
+        }
+        Insert: {
+          cash_value: number
+          color: string
+          created_at?: string
+          denomination: number
+          display_order?: number
+          id?: string
+          template_id: string
+        }
+        Update: {
+          cash_value?: number
+          color?: string
+          created_at?: string
+          denomination?: number
+          display_order?: number
+          id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chip_denominations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chip_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chip_templates: {
+        Row: {
+          club_id: string
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chip_templates_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_members: {
         Row: {
           club_id: string
