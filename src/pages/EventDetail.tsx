@@ -671,16 +671,6 @@ export default function EventDetail() {
           </Button>
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-2">
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            )}
             <ShareEvent
               eventId={event.id}
               eventTitle={event.title}
@@ -730,11 +720,21 @@ export default function EventDetail() {
         {/* Event Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-gold-gradient">{event.title}</h1>
+            <h1 className="text-2xl font-bold text-gold-gradient flex-1">{event.title}</h1>
             {event.is_finalized ? (
               <Badge variant="default">Confirmed</Badge>
             ) : (
               <Badge variant="secondary">Voting Open</Badge>
+            )}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteDialogOpen(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
             )}
           </div>
           {event.description && (
