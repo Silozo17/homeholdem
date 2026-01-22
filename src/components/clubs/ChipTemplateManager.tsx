@@ -269,7 +269,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
         </div>
 
         {/* Denominations list */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {denominations
             .sort((a, b) => a.display_order - b.display_order)
             .map((denom) => {
@@ -277,25 +277,31 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
               return (
                 <div
                   key={denom.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/50"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 flex-wrap"
                 >
                   {/* Casino-style chip indicator */}
                   <div
-                    className="poker-chip w-10 h-10 shrink-0"
+                    className="poker-chip w-8 h-8 shrink-0"
                     style={{ '--chip-color': colorInfo.hex } as React.CSSProperties}
                   >
-                    <span className="poker-chip-value">{denom.denomination}</span>
+                    <span className="poker-chip-value text-xs">{denom.denomination}</span>
                   </div>
 
                   {isAdmin ? (
-                    <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                      {/* Color selector */}
+                    <>
+                      {/* Color selector - compact */}
                       <Select
                         value={denom.color}
                         onValueChange={(v) => handleDenominationChange(denom.id, 'color', v)}
                       >
-                        <SelectTrigger className="w-full sm:w-24">
-                          <SelectValue />
+                        <SelectTrigger className="w-20 h-8">
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: colorInfo.hex }}
+                            />
+                            <span className="text-xs truncate">{colorInfo.label}</span>
+                          </div>
                         </SelectTrigger>
                         <SelectContent>
                           {CHIP_COLORS.map(color => (
@@ -312,44 +318,43 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                         </SelectContent>
                       </Select>
 
-                      {/* Denomination and value row */}
-                      <div className="flex items-center gap-2 flex-1">
-                        <Input
-                          type="number"
-                          value={denom.denomination}
-                          onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
-                          className="w-16 sm:w-20"
-                          min={1}
-                        />
+                      {/* Denomination input */}
+                      <Input
+                        type="number"
+                        value={denom.denomination}
+                        onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
+                        className="w-14 h-8 text-center"
+                        min={1}
+                      />
 
-                        <span className="text-muted-foreground">=</span>
+                      <span className="text-muted-foreground text-sm">=</span>
+                      <span className="text-muted-foreground text-sm">{getCurrencySymbol()}</span>
 
-                        <span className="text-muted-foreground">{getCurrencySymbol()}</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={denom.cash_value}
-                          onChange={(e) => handleDenominationChange(denom.id, 'cash_value', parseFloat(e.target.value) || 0)}
-                          className="w-20 sm:w-24"
-                          min={0}
-                        />
+                      {/* Cash value input */}
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={denom.cash_value}
+                        onChange={(e) => handleDenominationChange(denom.id, 'cash_value', parseFloat(e.target.value) || 0)}
+                        className="w-16 h-8"
+                        min={0}
+                      />
 
-                        {/* Delete button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDenomination(denom.id)}
-                          className="shrink-0 text-destructive hover:text-destructive ml-auto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
+                      {/* Delete button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveDenomination(denom.id)}
+                        className="shrink-0 text-destructive hover:text-destructive h-8 w-8 ml-auto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
                   ) : (
                     <div className="flex items-center gap-2 flex-1">
-                      <span className="capitalize">{denom.color}</span>
-                      <span className="text-muted-foreground">({denom.denomination})</span>
-                      <span className="ml-auto font-medium">
+                      <span className="capitalize text-sm">{denom.color}</span>
+                      <span className="text-muted-foreground text-sm">({denom.denomination})</span>
+                      <span className="ml-auto font-medium text-sm">
                         {getCurrencySymbol()}{denom.cash_value.toFixed(2)}
                       </span>
                     </div>
