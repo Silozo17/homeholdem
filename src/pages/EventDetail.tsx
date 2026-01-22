@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
 import {
   AlertDialog,
@@ -61,6 +62,12 @@ interface DateOption {
   user_voted: boolean;
 }
 
+interface UserProfile {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface Rsvp {
   user_id: string;
   status: 'going' | 'maybe' | 'not_going';
@@ -83,6 +90,7 @@ export default function EventDetail() {
   const [hostVolunteers, setHostVolunteers] = useState<string[]>([]);
   const [hostProfile, setHostProfile] = useState<{ display_name: string } | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -98,6 +106,97 @@ export default function EventDetail() {
       fetchEventData();
     }
   }, [user, eventId]);
+
+  // Realtime subscription for live updates
+  useEffect(() => {
+    if (!eventId || dateOptions.length === 0) return;
+
+    const channel = supabase
+      .channel(`event-${eventId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'event_date_votes'
+      }, (payload) => {
+        // Update vote counts without full refresh
+        if (payload.eventType === 'INSERT') {
+          const newVote = payload.new as { date_option_id: string; user_id: string };
+          setDateOptions(prev => prev.map(o =>
+            o.id === newVote.date_option_id
+              ? { ...o, vote_count: o.vote_count + 1, user_voted: newVote.user_id === user?.id ? true : o.user_voted }
+              : o
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          const oldVote = payload.old as { date_option_id: string; user_id: string };
+          setDateOptions(prev => prev.map(o =>
+            o.id === oldVote.date_option_id
+              ? { ...o, vote_count: Math.max(0, o.vote_count - 1), user_voted: oldVote.user_id === user?.id ? false : o.user_voted }
+              : o
+          ));
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'event_rsvps',
+        filter: `event_id=eq.${eventId}`
+      }, () => {
+        // Fetch fresh RSVP data for complex updates
+        fetchRsvps();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'event_host_volunteers',
+        filter: `event_id=eq.${eventId}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newVol = payload.new as { user_id: string };
+          setHostVolunteers(prev => [...prev, newVol.user_id]);
+        } else if (payload.eventType === 'DELETE') {
+          const oldVol = payload.old as { user_id: string };
+          setHostVolunteers(prev => prev.filter(id => id !== oldVol.user_id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [eventId, dateOptions.length, user?.id]);
+
+  const fetchRsvps = async () => {
+    if (!eventId) return;
+
+    const { data: rsvpData } = await supabase
+      .from('event_rsvps')
+      .select('user_id, status, is_waitlisted, waitlist_position')
+      .eq('event_id', eventId);
+
+    if (rsvpData) {
+      const userIds = rsvpData.map(r => r.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      const rsvpsWithProfiles = rsvpData.map(r => ({
+        ...r,
+        status: r.status as 'going' | 'maybe' | 'not_going',
+        profile: profileMap.get(r.user_id) || { display_name: 'Unknown', avatar_url: null },
+      }));
+
+      setRsvps(rsvpsWithProfiles);
+
+      // Update user's RSVP
+      const myRsvp = rsvpData.find(r => r.user_id === user?.id);
+      if (myRsvp) {
+        setUserRsvp(myRsvp.status as 'going' | 'maybe' | 'not_going');
+      }
+    }
+  };
 
   const fetchEventData = async () => {
     if (!user || !eventId) return;
@@ -118,6 +217,17 @@ export default function EventDetail() {
     }
 
     setEvent(eventData);
+
+    // Fetch user's profile for optimistic updates
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('id', user.id)
+      .single();
+    
+    if (profileData) {
+      setUserProfile(profileData);
+    }
 
     // Check user role
     const { data: memberData } = await supabase
@@ -163,35 +273,8 @@ export default function EventDetail() {
       setDateOptions(optionsWithVotes);
     }
 
-    // Fetch RSVPs
-    const { data: rsvpData } = await supabase
-      .from('event_rsvps')
-      .select('user_id, status, is_waitlisted, waitlist_position')
-      .eq('event_id', eventId);
-
-    if (rsvpData) {
-      const userIds = rsvpData.map(r => r.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-      const rsvpsWithProfiles = rsvpData.map(r => ({
-        ...r,
-        status: r.status as 'going' | 'maybe' | 'not_going',
-        profile: profileMap.get(r.user_id) || { display_name: 'Unknown', avatar_url: null },
-      }));
-
-      setRsvps(rsvpsWithProfiles);
-
-      // Find user's RSVP
-      const myRsvp = rsvpData.find(r => r.user_id === user.id);
-      if (myRsvp) {
-        setUserRsvp(myRsvp.status as 'going' | 'maybe' | 'not_going');
-      }
-    }
+    // Fetch RSVPs with profiles
+    await fetchRsvps();
 
     // Fetch host volunteers
     const { data: volunteerData } = await supabase
@@ -219,48 +302,102 @@ export default function EventDetail() {
     setLoadingData(false);
   };
 
-  const handleVote = async (optionId: string) => {
+  // Optimistic vote handler - no loading, instant UI update
+  const handleVote = useCallback(async (optionId: string) => {
     if (!user) return;
 
     const option = dateOptions.find(o => o.id === optionId);
     if (!option) return;
 
-    if (option.user_voted) {
-      // Remove vote
-      await supabase
+    // Optimistic update - instant UI feedback
+    const wasVoted = option.user_voted;
+    setDateOptions(prev => prev.map(o => {
+      if (o.id === optionId) {
+        return {
+          ...o,
+          user_voted: !wasVoted,
+          vote_count: wasVoted ? o.vote_count - 1 : o.vote_count + 1
+        };
+      }
+      return o;
+    }));
+
+    // Perform database operation
+    if (wasVoted) {
+      const { error } = await supabase
         .from('event_date_votes')
         .delete()
         .eq('date_option_id', optionId)
         .eq('user_id', user.id);
+
+      if (error) {
+        // Revert on error
+        setDateOptions(prev => prev.map(o => {
+          if (o.id === optionId) {
+            return { ...o, user_voted: true, vote_count: o.vote_count + 1 };
+          }
+          return o;
+        }));
+        toast.error('Failed to remove vote');
+      }
     } else {
-      // Add vote
-      await supabase
+      const { error } = await supabase
         .from('event_date_votes')
         .insert({ date_option_id: optionId, user_id: user.id });
+
+      if (error) {
+        // Revert on error
+        setDateOptions(prev => prev.map(o => {
+          if (o.id === optionId) {
+            return { ...o, user_voted: false, vote_count: o.vote_count - 1 };
+          }
+          return o;
+        }));
+        toast.error('Failed to add vote');
+      }
     }
+  }, [user, dateOptions]);
 
-    fetchEventData();
-  };
-
-  const handleRsvp = async (status: 'going' | 'maybe' | 'not_going') => {
-    if (!user || !event) return;
+  // Optimistic RSVP handler
+  const handleRsvp = useCallback(async (status: 'going' | 'maybe' | 'not_going') => {
+    if (!user || !event || !userProfile) return;
 
     const totalCapacity = event.max_tables * event.seats_per_table;
-    const goingCount = rsvps.filter(r => r.status === 'going' && !r.is_waitlisted).length;
+    const currentGoingCount = rsvps.filter(r => r.status === 'going' && !r.is_waitlisted && r.user_id !== user.id).length;
 
     // Check capacity for 'going' status
     let isWaitlisted = false;
     let waitlistPosition: number | null = null;
 
-    if (status === 'going' && goingCount >= totalCapacity && userRsvp !== 'going') {
+    if (status === 'going' && currentGoingCount >= totalCapacity && userRsvp !== 'going') {
       isWaitlisted = true;
       const currentWaitlist = rsvps.filter(r => r.is_waitlisted);
       waitlistPosition = currentWaitlist.length + 1;
     }
 
-    if (userRsvp) {
-      // Update existing RSVP
-      await supabase
+    // Optimistic update
+    const previousRsvp = userRsvp;
+    const previousRsvps = [...rsvps];
+    
+    setUserRsvp(status);
+    setRsvps(prev => {
+      const filtered = prev.filter(r => r.user_id !== user.id);
+      return [...filtered, {
+        user_id: user.id,
+        status,
+        is_waitlisted: isWaitlisted,
+        waitlist_position: waitlistPosition,
+        profile: {
+          display_name: userProfile.display_name,
+          avatar_url: userProfile.avatar_url
+        }
+      }];
+    });
+
+    // Perform DB operation
+    let error;
+    if (previousRsvp) {
+      const result = await supabase
         .from('event_rsvps')
         .update({ 
           status, 
@@ -269,9 +406,9 @@ export default function EventDetail() {
         })
         .eq('event_id', event.id)
         .eq('user_id', user.id);
+      error = result.error;
     } else {
-      // Create new RSVP
-      await supabase
+      const result = await supabase
         .from('event_rsvps')
         .insert({ 
           event_id: event.id, 
@@ -280,25 +417,31 @@ export default function EventDetail() {
           is_waitlisted: isWaitlisted,
           waitlist_position: waitlistPosition
         });
+      error = result.error;
+    }
+
+    if (error) {
+      // Revert on error
+      setUserRsvp(previousRsvp);
+      setRsvps(previousRsvps);
+      toast.error('Failed to update RSVP');
+      return;
     }
 
     if (isWaitlisted) {
       toast.info(`You're on the waitlist (position ${waitlistPosition})`);
     } else {
-      toast.success('RSVP updated!');
+      toast.success('RSVP updated');
     }
 
     // Send confirmation email (fire and forget)
     sendRsvpConfirmation(status);
-
-    fetchEventData();
-  };
+  }, [user, event, userProfile, rsvps, userRsvp]);
 
   const sendRsvpConfirmation = async (status: 'going' | 'maybe' | 'not_going') => {
     if (!user || !event) return;
 
     try {
-      // Get user's email
       const { data: profile } = await supabase
         .from('profiles')
         .select('email')
@@ -330,31 +473,49 @@ export default function EventDetail() {
         html,
       });
     } catch (error) {
-      console.error('Failed to send RSVP confirmation:', error);
+      // Silently fail - email is optional
     }
   };
 
-  const handleHostVolunteer = async () => {
+  // Optimistic host volunteer handler
+  const handleHostVolunteer = useCallback(async () => {
     if (!user || !event) return;
 
     const isVolunteering = hostVolunteers.includes(user.id);
+    
+    // Optimistic update
+    setHostVolunteers(prev => 
+      isVolunteering 
+        ? prev.filter(id => id !== user.id)
+        : [...prev, user.id]
+    );
 
     if (isVolunteering) {
-      await supabase
+      const { error } = await supabase
         .from('event_host_volunteers')
         .delete()
         .eq('event_id', event.id)
         .eq('user_id', user.id);
-      toast.success('Removed from host volunteers');
+      
+      if (error) {
+        setHostVolunteers(prev => [...prev, user.id]);
+        toast.error('Failed to remove volunteer');
+      } else {
+        toast.success('Removed from host volunteers');
+      }
     } else {
-      await supabase
+      const { error } = await supabase
         .from('event_host_volunteers')
         .insert({ event_id: event.id, user_id: user.id });
-      toast.success('Added to host volunteers!');
+      
+      if (error) {
+        setHostVolunteers(prev => prev.filter(id => id !== user.id));
+        toast.error('Failed to volunteer');
+      } else {
+        toast.success('Added to host volunteers');
+      }
     }
-
-    fetchEventData();
-  };
+  }, [user, event, hostVolunteers]);
 
   const handleFinalizeDate = async (optionId: string) => {
     if (!event) return;
@@ -362,7 +523,10 @@ export default function EventDetail() {
     const option = dateOptions.find(o => o.id === optionId);
     if (!option) return;
 
-    await supabase
+    // Optimistic update
+    setEvent(prev => prev ? { ...prev, final_date: option.proposed_date, is_finalized: true } : null);
+
+    const { error } = await supabase
       .from('events')
       .update({ 
         final_date: option.proposed_date,
@@ -370,20 +534,28 @@ export default function EventDetail() {
       })
       .eq('id', event.id);
 
-    toast.success('Date finalized!');
-    fetchEventData();
+    if (error) {
+      setEvent(prev => prev ? { ...prev, final_date: null, is_finalized: false } : null);
+      toast.error('Failed to finalize date');
+    } else {
+      toast.success('Date finalized!');
+    }
   };
 
   const handleConfirmHost = async (hostUserId: string) => {
     if (!event) return;
 
-    await supabase
+    const { error } = await supabase
       .from('events')
       .update({ host_user_id: hostUserId })
       .eq('id', event.id);
 
-    toast.success('Host confirmed!');
-    fetchEventData();
+    if (error) {
+      toast.error('Failed to confirm host');
+    } else {
+      toast.success('Host confirmed!');
+      fetchEventData();
+    }
   };
 
   const handleDeleteEvent = async () => {
@@ -402,28 +574,50 @@ export default function EventDetail() {
       toast.success('Event deleted');
       navigate(`/club/${event.club_id}`);
     } catch (error) {
-      console.error('Failed to delete event:', error);
       toast.error('Failed to delete event');
     } finally {
       setDeleting(false);
     }
   };
 
+  // Memoized computed values
+  const { goingList, waitlist, maybeList, totalCapacity, isAdmin } = useMemo(() => ({
+    goingList: rsvps.filter(r => r.status === 'going' && !r.is_waitlisted),
+    waitlist: rsvps.filter(r => r.is_waitlisted).sort((a, b) => 
+      (a.waitlist_position || 0) - (b.waitlist_position || 0)),
+    maybeList: rsvps.filter(r => r.status === 'maybe'),
+    totalCapacity: event ? event.max_tables * event.seats_per_table : 0,
+    isAdmin: userRole === 'owner' || userRole === 'admin'
+  }), [rsvps, event, userRole]);
+
   if (loading || loadingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+          <div className="container relative flex items-center justify-center h-16 px-4">
+            <Skeleton className="h-8 w-8 absolute left-4" />
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-8 absolute right-4" />
+          </div>
+        </header>
+        <main className="container px-4 py-6 space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </main>
       </div>
     );
   }
 
   if (!event) return null;
-
-  const totalCapacity = event.max_tables * event.seats_per_table;
-  const goingList = rsvps.filter(r => r.status === 'going' && !r.is_waitlisted);
-  const waitlist = rsvps.filter(r => r.is_waitlisted).sort((a, b) => (a.waitlist_position || 0) - (b.waitlist_position || 0));
-  const maybeList = rsvps.filter(r => r.status === 'maybe');
-  const isAdmin = userRole === 'owner' || userRole === 'admin';
 
   return (
     <div className="min-h-screen bg-background card-suit-pattern">

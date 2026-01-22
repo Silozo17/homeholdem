@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,12 +78,13 @@ export function BuyInTracker({
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [transactionType, setTransactionType] = useState<TransactionType>('buyin');
+  const [pendingQuickAdd, setPendingQuickAdd] = useState<string | null>(null);
 
-  const getPlayerTransactions = (playerId: string) => {
+  const getPlayerTransactions = useCallback((playerId: string) => {
     return transactions.filter(t => t.game_player_id === playerId);
-  };
+  }, [transactions]);
 
-  const getPlayerTotals = (playerId: string) => {
+  const getPlayerTotals = useCallback((playerId: string) => {
     const playerTxns = getPlayerTransactions(playerId);
     return {
       buyins: playerTxns.filter(t => t.transaction_type === 'buyin').length,
@@ -91,7 +92,7 @@ export function BuyInTracker({
       addons: playerTxns.filter(t => t.transaction_type === 'addon').length,
       totalSpent: playerTxns.reduce((sum, t) => sum + t.amount, 0),
     };
-  };
+  }, [getPlayerTransactions]);
 
   const handleAddTransaction = async () => {
     if (!selectedPlayer || !user) return;
@@ -134,6 +135,32 @@ export function BuyInTracker({
     toast.success(`${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} added for ${player?.display_name}`);
     setShowAddTransaction(false);
     setSelectedPlayer('');
+    onRefresh();
+  };
+
+  const handleQuickBuyIn = async (player: GamePlayer) => {
+    if (!user) return;
+    
+    // Set pending state for visual feedback
+    setPendingQuickAdd(player.id);
+
+    const { error } = await supabase.from('game_transactions').insert({
+      game_session_id: session.id,
+      game_player_id: player.id,
+      transaction_type: 'buyin',
+      amount: session.buy_in_amount,
+      chips: session.starting_chips,
+      created_by: user.id,
+    });
+
+    setPendingQuickAdd(null);
+
+    if (error) {
+      toast.error('Failed to add buy-in');
+      return;
+    }
+
+    toast.success(`Buy-in added for ${player.display_name}`);
     onRefresh();
   };
 
@@ -255,18 +282,9 @@ export function BuyInTracker({
                         key={player.id}
                         variant="outline"
                         size="sm"
-                        onClick={async () => {
-                          await supabase.from('game_transactions').insert({
-                            game_session_id: session.id,
-                            game_player_id: player.id,
-                            transaction_type: 'buyin',
-                            amount: session.buy_in_amount,
-                            chips: session.starting_chips,
-                            created_by: user?.id,
-                          });
-                          toast.success(`Buy-in added for ${player.display_name}`);
-                          onRefresh();
-                        }}
+                        disabled={pendingQuickAdd === player.id}
+                        onClick={() => handleQuickBuyIn(player)}
+                        className="transition-all"
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         {player.display_name.split(' ')[0]}

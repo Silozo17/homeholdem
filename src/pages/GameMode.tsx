@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
 import { ArrowLeft, Tv, Settings, Coins } from 'lucide-react';
 import { TournamentClock } from '@/components/game/TournamentClock';
@@ -55,8 +56,24 @@ export default function GameMode() {
 
   if (loading || sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+          <div className="container relative flex items-center justify-center h-14 px-4">
+            <Skeleton className="h-8 w-8 absolute left-4" />
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-8 absolute right-4" />
+          </div>
+        </header>
+        <main className="container px-4 py-4 space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-3 gap-2">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </main>
       </div>
     );
   }
@@ -237,7 +254,6 @@ export default function GameMode() {
                   transactions={transactions}
                   isAdmin={isAdmin}
                   onComplete={(totals) => {
-                    console.log('Cash out complete:', totals);
                     // Totals will be used for settlement calculations
                     refetch();
                   }}
