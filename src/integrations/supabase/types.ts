@@ -73,6 +73,190 @@ export type Database = {
         }
         Relationships: []
       }
+      event_date_options: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          proposed_date: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          proposed_date: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          proposed_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_date_options_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_date_votes: {
+        Row: {
+          created_at: string
+          date_option_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_option_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_option_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_date_votes_date_option_id_fkey"
+            columns: ["date_option_id"]
+            isOneToOne: false
+            referencedRelation: "event_date_options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_host_volunteers: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_host_volunteers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_rsvps: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          is_waitlisted: boolean
+          status: Database["public"]["Enums"]["rsvp_status"]
+          updated_at: string
+          user_id: string
+          waitlist_position: number | null
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          is_waitlisted?: boolean
+          status?: Database["public"]["Enums"]["rsvp_status"]
+          updated_at?: string
+          user_id: string
+          waitlist_position?: number | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          is_waitlisted?: boolean
+          status?: Database["public"]["Enums"]["rsvp_status"]
+          updated_at?: string
+          user_id?: string
+          waitlist_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_rsvps_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          final_date: string | null
+          host_user_id: string | null
+          id: string
+          is_finalized: boolean
+          location: string | null
+          max_tables: number
+          seats_per_table: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          final_date?: string | null
+          host_user_id?: string | null
+          id?: string
+          is_finalized?: boolean
+          location?: string | null
+          max_tables?: number
+          seats_per_table?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          final_date?: string | null
+          host_user_id?: string | null
+          id?: string
+          is_finalized?: boolean
+          location?: string | null
+          max_tables?: number
+          seats_per_table?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -119,9 +303,18 @@ export type Database = {
         Args: { _club_id: string; _user_id: string }
         Returns: boolean
       }
+      is_event_club_admin: {
+        Args: { _event_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_event_club_member: {
+        Args: { _event_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       club_role: "owner" | "admin" | "member"
+      rsvp_status: "going" | "maybe" | "not_going"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -250,6 +443,7 @@ export const Constants = {
   public: {
     Enums: {
       club_role: ["owner", "admin", "member"],
+      rsvp_status: ["going", "maybe", "not_going"],
     },
   },
 } as const
