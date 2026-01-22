@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      blind_structures: {
+        Row: {
+          ante: number
+          big_blind: number
+          created_at: string
+          duration_minutes: number
+          game_session_id: string
+          id: string
+          is_break: boolean
+          level: number
+          small_blind: number
+        }
+        Insert: {
+          ante?: number
+          big_blind: number
+          created_at?: string
+          duration_minutes?: number
+          game_session_id: string
+          id?: string
+          is_break?: boolean
+          level: number
+          small_blind: number
+        }
+        Update: {
+          ante?: number
+          big_blind?: number
+          created_at?: string
+          duration_minutes?: number
+          game_session_id?: string
+          id?: string
+          is_break?: boolean
+          level?: number
+          small_blind?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blind_structures_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_members: {
         Row: {
           club_id: string
@@ -257,6 +301,220 @@ export type Database = {
           },
         ]
       }
+      game_players: {
+        Row: {
+          created_at: string
+          display_name: string
+          eliminated_at: string | null
+          finish_position: number | null
+          game_session_id: string
+          id: string
+          seat_number: number | null
+          status: string
+          table_number: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          eliminated_at?: string | null
+          finish_position?: number | null
+          game_session_id: string
+          id?: string
+          seat_number?: number | null
+          status?: string
+          table_number?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          eliminated_at?: string | null
+          finish_position?: number | null
+          game_session_id?: string
+          id?: string
+          seat_number?: number | null
+          status?: string
+          table_number?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_players_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_sessions: {
+        Row: {
+          addon_amount: number
+          addon_chips: number
+          allow_addons: boolean
+          allow_rebuys: boolean
+          buy_in_amount: number
+          created_at: string
+          current_level: number
+          event_id: string
+          id: string
+          level_started_at: string | null
+          rebuy_amount: number
+          rebuy_chips: number
+          rebuy_until_level: number | null
+          starting_chips: number
+          status: string
+          time_remaining_seconds: number | null
+          updated_at: string
+        }
+        Insert: {
+          addon_amount?: number
+          addon_chips?: number
+          allow_addons?: boolean
+          allow_rebuys?: boolean
+          buy_in_amount?: number
+          created_at?: string
+          current_level?: number
+          event_id: string
+          id?: string
+          level_started_at?: string | null
+          rebuy_amount?: number
+          rebuy_chips?: number
+          rebuy_until_level?: number | null
+          starting_chips?: number
+          status?: string
+          time_remaining_seconds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          addon_amount?: number
+          addon_chips?: number
+          allow_addons?: boolean
+          allow_rebuys?: boolean
+          buy_in_amount?: number
+          created_at?: string
+          current_level?: number
+          event_id?: string
+          id?: string
+          level_started_at?: string | null
+          rebuy_amount?: number
+          rebuy_chips?: number
+          rebuy_until_level?: number | null
+          starting_chips?: number
+          status?: string
+          time_remaining_seconds?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_transactions: {
+        Row: {
+          amount: number
+          chips: number | null
+          created_at: string
+          created_by: string
+          game_player_id: string
+          game_session_id: string
+          id: string
+          notes: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          chips?: number | null
+          created_at?: string
+          created_by: string
+          game_player_id: string
+          game_session_id: string
+          id?: string
+          notes?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          chips?: number | null
+          created_at?: string
+          created_by?: string
+          game_player_id?: string
+          game_session_id?: string
+          id?: string
+          notes?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_transactions_game_player_id_fkey"
+            columns: ["game_player_id"]
+            isOneToOne: false
+            referencedRelation: "game_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_transactions_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_structures: {
+        Row: {
+          amount: number | null
+          created_at: string
+          game_session_id: string
+          id: string
+          percentage: number
+          player_id: string | null
+          position: number
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          game_session_id: string
+          id?: string
+          percentage: number
+          player_id?: string | null
+          position: number
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          game_session_id?: string
+          id?: string
+          percentage?: number
+          player_id?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_structures_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_structures_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "game_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -309,6 +567,14 @@ export type Database = {
       }
       is_event_club_member: {
         Args: { _event_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_game_session_club_admin: {
+        Args: { _game_session_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_game_session_club_member: {
+        Args: { _game_session_id: string; _user_id: string }
         Returns: boolean
       }
     }
