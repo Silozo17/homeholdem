@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -9,10 +10,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface VerifyOTPRequest {
-  email: string;
-  code: string;
-}
+// Input validation schema
+const VerifyOTPSchema = z.object({
+  email: z.string().email().max(255).transform(val => val.toLowerCase()),
+  code: z.string().regex(/^\d{6}$/, "Code must be exactly 6 digits"),
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,14 +22,21 @@ serve(async (req) => {
   }
 
   try {
-    const { email, code }: VerifyOTPRequest = await req.json();
+    // Parse and validate input
+    const rawBody = await req.json();
+    const parseResult = VerifyOTPSchema.safeParse(rawBody);
 
-    if (!email || !code) {
+    if (!parseResult.success) {
       return new Response(
-        JSON.stringify({ error: "Email and code are required" }),
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: parseResult.error.flatten().fieldErrors 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { email, code } = parseResult.data;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -35,7 +44,7 @@ serve(async (req) => {
     const { data: verification, error: fetchError } = await supabase
       .from("email_verifications")
       .select("*")
-      .eq("email", email.toLowerCase())
+      .eq("email", email)
       .eq("code", code)
       .is("verified_at", null)
       .gte("expires_at", new Date().toISOString())
@@ -68,7 +77,7 @@ serve(async (req) => {
     await supabase
       .from("email_verifications")
       .delete()
-      .eq("email", email.toLowerCase())
+      .eq("email", email)
       .neq("id", verification.id);
 
     return new Response(

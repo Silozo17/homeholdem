@@ -91,17 +91,17 @@ export default function Dashboard() {
     setProcessingInvite(true);
 
     try {
-      // Find club by invite code
-      const { data: club, error: clubError } = await supabase
-        .from('clubs')
-        .select('id, name')
-        .eq('invite_code', inviteCode)
+      // Use secure RPC function to lookup club by invite code
+      const { data: clubData, error: clubError } = await supabase
+        .rpc('lookup_club_by_invite_code', { _invite_code: inviteCode })
         .single();
 
-      if (clubError || !club) {
+      if (clubError || !clubData) {
         toast.error('Invalid invite code');
         return;
       }
+
+      const club = clubData as { id: string; name: string };
 
       // Check if already a member
       const { data: existingMember } = await supabase

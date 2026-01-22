@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -11,9 +12,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface PromoteRequest {
-  event_id: string;
-  promoted_user_id: string;
+// Input validation schema
+const PromoteSchema = z.object({
+  event_id: z.string().uuid(),
+  promoted_user_id: z.string().uuid(),
+});
+
+// HTML escape function to prevent XSS
+function escapeHtml(str: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return str.replace(/[&<>"']/g, (c) => htmlEscapeMap[c] || c);
 }
 
 // Premium email template - inline with casino green theme
@@ -25,6 +39,13 @@ function waitlistPromotionEmail(data: {
   eventUrl: string;
   recipientName?: string;
 }): string {
+  const safeTitle = escapeHtml(data.eventTitle);
+  const safeName = data.recipientName ? escapeHtml(data.recipientName) : undefined;
+  const safeClubName = data.clubName ? escapeHtml(data.clubName) : undefined;
+  const safeLocation = data.location ? escapeHtml(data.location) : undefined;
+  const safeDate = data.eventDate ? escapeHtml(data.eventDate) : undefined;
+  const safeUrl = encodeURI(data.eventUrl);
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,15 +64,15 @@ function waitlistPromotionEmail(data: {
         <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🎉</div>
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">A spot opened up!</h1>
         <p style="color: #7a9e90; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
-          ${data.recipientName ? `Great news ${data.recipientName}! ` : ''}You've been promoted from the waitlist and your seat is now confirmed.
+          ${safeName ? `Great news ${safeName}! ` : ''}You've been promoted from the waitlist and your seat is now confirmed.
         </p>
         <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.06) 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left;">
-          <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${data.eventTitle}</p>
-          ${data.clubName ? `<p style="margin: 8px 0 0; color: #7a9e90; font-size: 13px;">🎴 ${data.clubName}</p>` : ''}
-          ${data.eventDate ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📅 ${data.eventDate}</p>` : ''}
-          ${data.location ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📍 ${data.location}</p>` : ''}
+          <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${safeTitle}</p>
+          ${safeClubName ? `<p style="margin: 8px 0 0; color: #7a9e90; font-size: 13px;">🎴 ${safeClubName}</p>` : ''}
+          ${safeDate ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📅 ${safeDate}</p>` : ''}
+          ${safeLocation ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📍 ${safeLocation}</p>` : ''}
         </div>
-        <a href="${data.eventUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);">
+        <a href="${safeUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);">
           View Event
         </a>
       </div>
@@ -71,14 +92,21 @@ serve(async (req) => {
   }
 
   try {
-    const { event_id, promoted_user_id }: PromoteRequest = await req.json();
+    // Parse and validate input
+    const rawBody = await req.json();
+    const parseResult = PromoteSchema.safeParse(rawBody);
 
-    if (!event_id || !promoted_user_id) {
+    if (!parseResult.success) {
       return new Response(
-        JSON.stringify({ error: "Missing event_id or promoted_user_id" }),
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: parseResult.error.flatten().fieldErrors 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { event_id, promoted_user_id } = parseResult.data;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
