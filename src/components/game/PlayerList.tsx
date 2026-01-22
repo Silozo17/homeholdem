@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,9 +34,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Users, UserMinus, UserPlus, Trophy, RotateCcw, Check, ChevronsUpDown, UserCircle } from 'lucide-react';
+import { Users, UserMinus, UserPlus, Trophy, RotateCcw, ChevronsUpDown, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface GamePlayer {
@@ -74,6 +73,7 @@ interface PlayerListProps {
 
 export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRefresh }: PlayerListProps) {
   const { user } = useAuth();
+  const [localPlayers, setLocalPlayers] = useState<GamePlayer[]>(players);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [guestName, setGuestName] = useState('');
@@ -83,8 +83,13 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
   const [memberSearchOpen, setMemberSearchOpen] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
-  const activePlayers = players.filter(p => p.status === 'active');
-  const eliminatedPlayers = players.filter(p => p.status === 'eliminated')
+  // Sync local state with props
+  useEffect(() => {
+    setLocalPlayers(players);
+  }, [players]);
+
+  const activePlayers = localPlayers.filter(p => p.status === 'active');
+  const eliminatedPlayers = localPlayers.filter(p => p.status === 'eliminated')
     .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
 
   // Fetch club members when dialog opens
@@ -110,7 +115,7 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
 
       if (profiles) {
         // Filter out players already in the game
-        const existingUserIds = new Set(players.map(p => p.user_id));
+        const existingUserIds = new Set(localPlayers.map(p => p.user_id));
         const availableMembers = profiles
           .filter(p => !existingUserIds.has(p.id))
           .map(p => ({
@@ -125,9 +130,17 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
     setLoadingMembers(false);
   };
 
-  const handleEliminatePlayer = async (player: GamePlayer) => {
+  // Optimistic eliminate with instant UI update
+  const handleEliminatePlayer = useCallback(async (player: GamePlayer) => {
     const activeCount = activePlayers.length;
     const finishPosition = activeCount;
+
+    // Optimistic update
+    setLocalPlayers(prev => prev.map(p => 
+      p.id === player.id 
+        ? { ...p, status: 'eliminated', finish_position: finishPosition, eliminated_at: new Date().toISOString() }
+        : p
+    ));
 
     const { error } = await supabase
       .from('game_players')
@@ -139,15 +152,30 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
       .eq('id', player.id);
 
     if (error) {
+      // Revert on error
+      setLocalPlayers(prev => prev.map(p => 
+        p.id === player.id 
+          ? { ...p, status: 'active', finish_position: null, eliminated_at: null }
+          : p
+      ));
       toast.error('Failed to eliminate player');
       return;
     }
 
     toast.success(`${player.display_name} finished in ${finishPosition}${getOrdinalSuffix(finishPosition)} place`);
-    onRefresh();
-  };
+  }, [activePlayers.length]);
 
-  const handleReinstate = async (player: GamePlayer) => {
+  // Optimistic reinstate
+  const handleReinstate = useCallback(async (player: GamePlayer) => {
+    const previousState = { ...player };
+
+    // Optimistic update
+    setLocalPlayers(prev => prev.map(p => 
+      p.id === player.id 
+        ? { ...p, status: 'active', finish_position: null, eliminated_at: null }
+        : p
+    ));
+
     const { error } = await supabase
       .from('game_players')
       .update({
@@ -158,13 +186,16 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
       .eq('id', player.id);
 
     if (error) {
+      // Revert on error
+      setLocalPlayers(prev => prev.map(p => 
+        p.id === player.id ? previousState : p
+      ));
       toast.error('Failed to reinstate player');
       return;
     }
 
     toast.success(`${player.display_name} reinstated`);
-    onRefresh();
-  };
+  }, []);
 
   const handleAddClubMember = async (member: ClubMember) => {
     const { error } = await supabase
@@ -215,19 +246,28 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
     onRefresh();
   };
 
-  const handleAssignTable = async (player: GamePlayer, tableNum: number) => {
+  // Optimistic table assignment
+  const handleAssignTable = useCallback(async (player: GamePlayer, tableNum: number) => {
+    const previousTable = player.table_number;
+
+    // Optimistic update
+    setLocalPlayers(prev => prev.map(p => 
+      p.id === player.id ? { ...p, table_number: tableNum } : p
+    ));
+
     const { error } = await supabase
       .from('game_players')
       .update({ table_number: tableNum })
       .eq('id', player.id);
 
     if (error) {
+      // Revert on error
+      setLocalPlayers(prev => prev.map(p => 
+        p.id === player.id ? { ...p, table_number: previousTable } : p
+      ));
       toast.error('Failed to assign table');
-      return;
     }
-
-    onRefresh();
-  };
+  }, []);
 
   const getOrdinalSuffix = (n: number) => {
     const s = ['th', 'st', 'nd', 'rd'];

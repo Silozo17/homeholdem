@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
 import { Plus, Users } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
 interface ClubWithRole {
   id: string;
@@ -20,7 +22,7 @@ interface ClubWithRole {
 }
 
 export default function Dashboard() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [clubs, setClubs] = useState<ClubWithRole[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
@@ -33,13 +35,7 @@ export default function Dashboard() {
     }
   }, [user, loading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchClubs();
-    }
-  }, [user]);
-
-  const fetchClubs = async () => {
+  const fetchClubs = useCallback(async () => {
     if (!user) return;
     
     setLoadingClubs(true);
@@ -83,14 +79,36 @@ export default function Dashboard() {
 
     setClubs(clubsWithCounts);
     setLoadingClubs(false);
-  };
+  }, [user]);
 
-  // Removed handleSignOut - now in Settings page
+  useEffect(() => {
+    if (user) {
+      fetchClubs();
+    }
+  }, [user, fetchClubs]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+          <div className="container flex items-center justify-center h-16 px-4">
+            <Skeleton className="h-10 w-40" />
+          </div>
+        </header>
+        <main className="container px-4 py-6 space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 flex-1" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </main>
       </div>
     );
   }
@@ -103,6 +121,9 @@ export default function Dashboard() {
           <Logo size="sm" />
         </div>
       </header>
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
 
       {/* Main Content */}
       <main className="container px-4 py-6 space-y-6">
@@ -135,11 +156,15 @@ export default function Dashboard() {
         {loadingClubs ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
-              <Card key={i} className="bg-card/50 border-border/50 animate-pulse">
-                <CardHeader>
-                  <div className="h-6 bg-muted rounded w-1/3" />
-                  <div className="h-4 bg-muted rounded w-1/2 mt-2" />
-                </CardHeader>
+              <Card key={i} className="bg-card/50 border-border/50">
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-6 w-1/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                </div>
               </Card>
             ))}
           </div>
