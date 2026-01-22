@@ -12,6 +12,7 @@ import {
 import { LayoutGrid, User, Shuffle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface GamePlayer {
   id: string;
@@ -21,6 +22,7 @@ interface GamePlayer {
   seat_number: number | null;
   status: string;
   finish_position: number | null;
+  avatar_url?: string | null;
 }
 
 interface SeatMapProps {
@@ -235,9 +237,12 @@ export function SeatMap({ players, seatsPerTable, maxTables, isAdmin, onRefresh 
                       title={player ? player.display_name : `Seat ${seatNum}`}
                     >
                       {isOccupied ? (
-                        <span className="truncate px-1">
-                          {player.display_name.charAt(0).toUpperCase()}
-                        </span>
+                        <UserAvatar 
+                          name={player.display_name} 
+                          avatarUrl={player.avatar_url}
+                          size="xs"
+                          className="w-full h-full"
+                        />
                       ) : (
                         <span className="opacity-50">{seatNum}</span>
                       )}

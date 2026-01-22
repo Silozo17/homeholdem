@@ -159,25 +159,25 @@ export function TVDisplay({
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex">
       {/* Main TV Display Area */}
       <div className="flex-1 relative">
-        {/* Exit Button - positioned lower to avoid header overlap */}
+        {/* Exit Button - positioned in header bar area */}
         <Button
           variant="ghost"
           size="icon"
           onClick={handleExit}
-          className="absolute top-6 left-6 z-50 text-white/50 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/30"
+          className="absolute top-3 left-3 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </Button>
 
-        {/* Admin Controls Toggle - positioned lower */}
+        {/* Admin Controls Toggle - positioned in header bar area */}
         {isAdmin && !showControls && (
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowControls(true)}
-            className="absolute top-6 right-6 z-50 text-white/50 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/30"
+            className="absolute top-3 right-3 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
           >
-            <Settings className="w-6 h-6" />
+            <Settings className="w-5 h-5" />
           </Button>
         )}
 

@@ -131,19 +131,19 @@ export function TableViewMode({
     return 'text-white';
   };
 
-  // Seat positions around pill-shaped table (10 seats - racetrack layout)
-  const seatPositions = [
-    { top: '92%', left: '50%', transform: 'translate(-50%, -50%)' },   // 1 - bottom center
-    { top: '80%', left: '15%', transform: 'translate(-50%, -50%)' },   // 2 - bottom left curve
-    { top: '50%', left: '2%', transform: 'translate(-50%, -50%)' },    // 3 - left center
-    { top: '20%', left: '15%', transform: 'translate(-50%, -50%)' },   // 4 - top left curve
-    { top: '8%', left: '35%', transform: 'translate(-50%, -50%)' },    // 5 - top left-center
-    { top: '8%', left: '65%', transform: 'translate(-50%, -50%)' },    // 6 - top right-center
-    { top: '20%', left: '85%', transform: 'translate(-50%, -50%)' },   // 7 - top right curve
-    { top: '50%', left: '98%', transform: 'translate(-50%, -50%)' },   // 8 - right center
-    { top: '80%', left: '85%', transform: 'translate(-50%, -50%)' },   // 9 - bottom right curve
-    { top: '92%', left: '50%', transform: 'translate(-50%, -50%)' },   // 10 - alternate bottom (shifted)
-  ];
+  // Seat positions around pill-shaped table (10 unique seats - racetrack layout)
+  const seatPositionsBySeat: Record<number, { top: string; left: string; transform: string }> = {
+    1:  { top: '92%', left: '35%', transform: 'translate(-50%, -50%)' },   // bottom left-center
+    2:  { top: '80%', left: '12%', transform: 'translate(-50%, -50%)' },   // bottom left curve
+    3:  { top: '50%', left: '2%', transform: 'translate(-50%, -50%)' },    // left center
+    4:  { top: '20%', left: '12%', transform: 'translate(-50%, -50%)' },   // top left curve
+    5:  { top: '8%', left: '35%', transform: 'translate(-50%, -50%)' },    // top left-center
+    6:  { top: '8%', left: '65%', transform: 'translate(-50%, -50%)' },    // top right-center
+    7:  { top: '20%', left: '88%', transform: 'translate(-50%, -50%)' },   // top right curve
+    8:  { top: '50%', left: '98%', transform: 'translate(-50%, -50%)' },   // right center
+    9:  { top: '80%', left: '88%', transform: 'translate(-50%, -50%)' },   // bottom right curve
+    10: { top: '92%', left: '65%', transform: 'translate(-50%, -50%)' },   // bottom right-center
+  };
 
   const getPlayerAtSeat = (seatNum: number) => {
     return activePlayers.find(p => p.seat_number === seatNum);
@@ -166,8 +166,8 @@ export function TableViewMode({
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 overflow-hidden">
-      {/* Top Stats Bar */}
-      <div className="flex items-center justify-between px-8 py-4 bg-black/50 backdrop-blur-sm border-b border-emerald-900/30">
+      {/* Top Stats Bar - with padding for overlay buttons */}
+      <div className="flex items-center justify-between pl-20 pr-20 py-4 bg-black/50 backdrop-blur-sm border-b border-emerald-900/30">
         {/* Timer */}
         <div className="flex items-center gap-6">
           <div>
@@ -250,10 +250,10 @@ export function TableViewMode({
           </div>
 
           {/* Seats */}
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seatNum, index) => {
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seatNum) => {
             const player = getPlayerAtSeat(seatNum);
             const badge = getSeatBadge(seatNum);
-            const position = seatPositions[index];
+            const position = seatPositionsBySeat[seatNum];
 
             return (
               <div
