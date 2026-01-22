@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { OTPVerification } from './OTPVerification';
 
 const signInSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -29,7 +31,9 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 export function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [showOTP, setShowOTP] = useState(false);
+  const [pendingSignUp, setPendingSignUp] = useState<{ email: string; password: string; displayName: string } | null>(null);
+  const { signIn } = useAuth();
 
   const signInForm = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -55,15 +59,60 @@ export function AuthForm() {
 
   const handleSignUp = async (data: SignUpFormData) => {
     setIsLoading(true);
-    const { error } = await signUp(data.email, data.password, data.displayName);
-    setIsLoading(false);
     
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Account created! Welcome to Home Hold\'em Club.');
+    try {
+      // Send OTP email instead of creating account directly
+      const { data: otpResponse, error } = await supabase.functions.invoke('send-otp', {
+        body: { email: data.email, name: data.displayName },
+      });
+
+      if (error || !otpResponse?.success) {
+        toast.error(otpResponse?.error || 'Failed to send verification code');
+        setIsLoading(false);
+        return;
+      }
+
+      // Store pending signup data and show OTP screen
+      setPendingSignUp({
+        email: data.email,
+        password: data.password,
+        displayName: data.displayName,
+      });
+      setShowOTP(true);
+      toast.success('Verification code sent to your email!');
+    } catch (err) {
+      console.error('Signup error:', err);
+      toast.error('Something went wrong. Please try again.');
     }
+    
+    setIsLoading(false);
   };
+
+  const handleOTPSuccess = () => {
+    setPendingSignUp(null);
+    setShowOTP(false);
+    // User is now signed in automatically after account creation
+  };
+
+  const handleOTPBack = () => {
+    setShowOTP(false);
+    setPendingSignUp(null);
+  };
+
+  // Show OTP verification screen
+  if (showOTP && pendingSignUp) {
+    return (
+      <div className="w-full max-w-md relative">
+        <OTPVerification
+          email={pendingSignUp.email}
+          password={pendingSignUp.password}
+          displayName={pendingSignUp.displayName}
+          onSuccess={handleOTPSuccess}
+          onBack={handleOTPBack}
+        />
+      </div>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md border-border/50 bg-card/80 backdrop-blur-sm">
@@ -150,7 +199,7 @@ export function AuthForm() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating Account...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Code...</>
                 ) : (
                   'Create Account'
                 )}
