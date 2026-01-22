@@ -30,6 +30,7 @@ interface ClassicTimerModeProps {
   averageStack: number;
   onUpdateSession: (updates: Partial<GameSession>) => void;
   isAdmin: boolean;
+  chipToCashRatio?: number;
 }
 
 export function ClassicTimerMode({
@@ -41,7 +42,8 @@ export function ClassicTimerMode({
   totalPlayers,
   averageStack,
   onUpdateSession,
-  isAdmin
+  isAdmin,
+  chipToCashRatio = 0.01
 }: ClassicTimerModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -101,9 +103,11 @@ export function ClassicTimerMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency) {
-      // Convert chips to currency (assuming 100 chips = 1 currency unit for standard display)
-      const value = chips / 100;
+    if (session.display_blinds_as_currency && chipToCashRatio > 0) {
+      const value = chips * chipToCashRatio;
+      if (value < 1) {
+        return `${currencySymbol}${value.toFixed(2)}`;
+      }
       return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
     }
     return chips.toLocaleString();
