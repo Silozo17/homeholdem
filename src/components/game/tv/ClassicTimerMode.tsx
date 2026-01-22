@@ -128,9 +128,9 @@ export function ClassicTimerMode({
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 p-4 pb-6">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950">
       {/* Stats Bar - with padding for overlay buttons */}
-      <div className="flex items-center justify-between pl-14 pr-14 py-3 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30 rounded-t-lg">
+      <div className="flex items-center justify-between pl-16 pr-16 py-3 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
@@ -227,7 +227,7 @@ export function ClassicTimerMode({
       </div>
 
       {/* Progress Bar */}
-      <div className="mt-4 mx-4">
+      <div className="mt-auto px-4 pb-6">
         <div className="flex justify-between text-xs text-white/50 mb-1">
           <span>Tournament Progress</span>
           <span>Level {currentLevel.level} of {blindStructure.length}</span>

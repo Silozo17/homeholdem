@@ -41,7 +41,7 @@ interface GamePlayer {
   finish_position: number | null;
 }
 
-type DisplayMode = 'classic' | 'dashboard' | 'table';
+type DisplayMode = 'classic' | 'dashboard' | 'table' | 'combined';
 
 interface TVControlPanelProps {
   session: GameSession;
@@ -207,11 +207,10 @@ export function TVControlPanel({
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-5">
-          {/* Display Mode Selector - AT TOP for visibility */}
           <div>
             <h3 className="text-xs font-medium text-white/60 uppercase tracking-wider mb-2">Display Mode</h3>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(['classic', 'dashboard', 'table'] as DisplayMode[]).map(mode => (
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['classic', 'dashboard', 'table', 'combined'] as DisplayMode[]).map(mode => (
                 <Button
                   key={mode}
                   variant={displayMode === mode ? 'default' : 'outline'}
@@ -219,7 +218,7 @@ export function TVControlPanel({
                   onClick={() => onDisplayModeChange(mode)}
                   className="text-xs px-2"
                 >
-                  {mode === 'classic' ? 'Timer' : mode === 'dashboard' ? 'Stats' : 'Table'}
+                  {mode === 'classic' ? 'Timer' : mode === 'dashboard' ? 'Stats' : mode === 'table' ? 'Table' : 'Full'}
                 </Button>
               ))}
             </div>
