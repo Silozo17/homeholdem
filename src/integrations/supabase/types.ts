@@ -655,6 +655,112 @@ export type Database = {
         }
         Relationships: []
       }
+      season_standings: {
+        Row: {
+          created_at: string
+          games_played: number
+          id: string
+          season_id: string
+          second_places: number
+          third_places: number
+          total_points: number
+          total_winnings: number
+          updated_at: string
+          user_id: string
+          wins: number
+        }
+        Insert: {
+          created_at?: string
+          games_played?: number
+          id?: string
+          season_id: string
+          second_places?: number
+          third_places?: number
+          total_points?: number
+          total_winnings?: number
+          updated_at?: string
+          user_id: string
+          wins?: number
+        }
+        Update: {
+          created_at?: string
+          games_played?: number
+          id?: string
+          season_id?: string
+          second_places?: number
+          third_places?: number
+          total_points?: number
+          total_winnings?: number
+          updated_at?: string
+          user_id?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_standings_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seasons: {
+        Row: {
+          club_id: string
+          created_at: string
+          end_date: string
+          id: string
+          is_active: boolean
+          name: string
+          points_for_fourth: number
+          points_for_second: number
+          points_for_third: number
+          points_for_win: number
+          points_per_participation: number
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          name: string
+          points_for_fourth?: number
+          points_for_second?: number
+          points_for_third?: number
+          points_for_win?: number
+          points_per_participation?: number
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          points_for_fourth?: number
+          points_for_second?: number
+          points_for_third?: number
+          points_for_win?: number
+          points_per_participation?: number
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasons_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settlements: {
         Row: {
           amount: number
