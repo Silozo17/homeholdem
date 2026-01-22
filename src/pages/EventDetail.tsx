@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/layout/Logo';
 import { 
@@ -13,15 +13,15 @@ import {
   MapPin,
   Users,
   Play,
-  HelpCircle,
-  Home,
-  Crown
+  Home
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DateVoting } from '@/components/events/DateVoting';
 import { RsvpButtons } from '@/components/events/RsvpButtons';
 import { HostVolunteer } from '@/components/events/HostVolunteer';
 import { AttendeesList } from '@/components/events/AttendeesList';
+import { sendEmail } from '@/lib/email';
+import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 
 interface Event {
   id: string;
@@ -268,7 +268,50 @@ export default function EventDetail() {
       toast.success('RSVP updated!');
     }
 
+    // Send confirmation email (fire and forget)
+    sendRsvpConfirmation(status);
+
     fetchEventData();
+  };
+
+  const sendRsvpConfirmation = async (status: 'going' | 'maybe' | 'not_going') => {
+    if (!user || !event) return;
+
+    try {
+      // Get user's email
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.email) return;
+
+      const eventUrl = `${window.location.origin}/event/${event.id}`;
+      const eventDate = event.final_date 
+        ? format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a")
+        : undefined;
+
+      const html = rsvpConfirmationTemplate({
+        eventTitle: event.title,
+        status,
+        eventDate,
+        location: event.location || undefined,
+        eventUrl,
+      });
+
+      await sendEmail({
+        to: profile.email,
+        subject: status === 'going' 
+          ? `✅ You're in for ${event.title}!`
+          : status === 'maybe'
+          ? `🤔 RSVP Noted for ${event.title}`
+          : `❌ RSVP Updated for ${event.title}`,
+        html,
+      });
+    } catch (error) {
+      console.error('Failed to send RSVP confirmation:', error);
+    }
   };
 
   const handleHostVolunteer = async () => {
