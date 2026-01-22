@@ -34,10 +34,13 @@ interface Season {
   points_for_third: number;
   points_for_fourth: number;
   points_per_participation: number;
+  // Computed status based on date
+  computed_status?: 'active' | 'closed' | 'upcoming';
 }
 
 interface Standing {
-  user_id: string;
+  user_id: string | null;
+  placeholder_player_id: string | null;
   display_name: string;
   total_points: number;
   games_played: number;
@@ -80,9 +83,18 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       .order('start_date', { ascending: false });
 
     if (data && data.length > 0) {
-      setSeasons(data);
-      // Select active season or most recent
-      const activeSeason = data.find(s => s.is_active) || data[0];
+      // Compute status based on current date
+      const today = new Date().toISOString().split('T')[0];
+      const seasonsWithStatus = data.map(s => ({
+        ...s,
+        computed_status: 
+          today >= s.start_date && today <= s.end_date ? 'active' as const :
+          today > s.end_date ? 'closed' as const : 'upcoming' as const
+      }));
+      
+      setSeasons(seasonsWithStatus);
+      // Select currently active season (by date) or most recent
+      const activeSeason = seasonsWithStatus.find(s => s.computed_status === 'active') || seasonsWithStatus[0];
       setSelectedSeasonId(activeSeason.id);
     }
     setLoading(false);
@@ -96,18 +108,35 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       .order('total_points', { ascending: false });
 
     if (standingsData) {
-      // Get profiles
-      const userIds = standingsData.map(s => s.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', userIds);
+      // Get registered user profiles
+      const userIds = standingsData.filter(s => s.user_id).map(s => s.user_id) as string[];
+      const { data: profiles } = userIds.length > 0 
+        ? await supabase.from('profiles').select('id, display_name').in('id', userIds)
+        : { data: [] };
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p.display_name]) || []);
+      // Get placeholder player names
+      const placeholderIds = standingsData.filter(s => s.placeholder_player_id).map(s => s.placeholder_player_id) as string[];
+      const { data: placeholders } = placeholderIds.length > 0
+        ? await supabase.from('placeholder_players').select('id, display_name').in('id', placeholderIds)
+        : { data: [] };
+
+      const profileMap = new Map<string, string>();
+      profiles?.forEach(p => profileMap.set(p.id, p.display_name));
+      const placeholderMap = new Map<string, string>();
+      placeholders?.forEach(p => placeholderMap.set(p.id, p.display_name));
 
       setStandings(standingsData.map(s => ({
-        ...s,
-        display_name: profileMap.get(s.user_id) || 'Unknown',
+        user_id: s.user_id,
+        placeholder_player_id: s.placeholder_player_id,
+        total_points: s.total_points,
+        games_played: s.games_played,
+        wins: s.wins,
+        second_places: s.second_places,
+        third_places: s.third_places,
+        total_winnings: s.total_winnings,
+        display_name: s.user_id 
+          ? profileMap.get(s.user_id) || 'Unknown'
+          : placeholderMap.get(s.placeholder_player_id!) || 'Unknown',
       })));
     }
   };
@@ -207,10 +236,10 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select season" />
                   </SelectTrigger>
-                  <SelectContent>
+                <SelectContent>
                     {seasons.map(season => (
                       <SelectItem key={season.id} value={season.id}>
-                        {season.name} {season.is_active && '(Active)'}
+                        {season.name} {season.computed_status === 'active' ? '(Active)' : season.computed_status === 'closed' ? '(Closed)' : '(Upcoming)'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -219,10 +248,16 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
 
               {/* Season Info */}
               {selectedSeason && (
-                <div className="text-xs text-muted-foreground text-center">
-                  {format(new Date(selectedSeason.start_date), 'MMM d, yyyy')} - {format(new Date(selectedSeason.end_date), 'MMM d, yyyy')}
-                  {selectedSeason.is_active && (
-                    <Badge variant="default" className="ml-2">Active</Badge>
+                <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2 flex-wrap">
+                  <span>{format(new Date(selectedSeason.start_date), 'MMM d, yyyy')} - {format(new Date(selectedSeason.end_date), 'MMM d, yyyy')}</span>
+                  {selectedSeason.computed_status === 'active' && (
+                    <Badge variant="default" className="bg-green-600">Active</Badge>
+                  )}
+                  {selectedSeason.computed_status === 'closed' && (
+                    <Badge variant="secondary">Closed</Badge>
+                  )}
+                  {selectedSeason.computed_status === 'upcoming' && (
+                    <Badge variant="outline" className="border-blue-500 text-blue-500">Upcoming</Badge>
                   )}
                 </div>
               )}
@@ -238,7 +273,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                 <div className="space-y-2">
                   {standings.map((player, index) => (
                     <div 
-                      key={player.user_id}
+                      key={player.user_id || player.placeholder_player_id}
                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
                         index < 3 ? 'bg-primary/10 border border-primary/20' : 'bg-secondary/30'
                       }`}
@@ -248,16 +283,21 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                           {getPositionIcon(index)}
                         </div>
                         <div>
-                          <p className="font-medium">{player.display_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{player.display_name}</p>
+                            {player.placeholder_player_id && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">Unlinked</Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
-                            {player.games_played} games • {player.wins}W
+                            {player.games_played} games • {player.wins}W • {player.second_places}×2nd
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-primary">{player.total_points} pts</p>
                         <p className="text-xs text-muted-foreground">
-                          ${player.total_winnings} won
+                          £{player.total_winnings} won
                         </p>
                       </div>
                     </div>

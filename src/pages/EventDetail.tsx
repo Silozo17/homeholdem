@@ -595,6 +595,23 @@ export default function EventDetail() {
     }
   };
 
+  const handleClearHost = async () => {
+    if (!event) return;
+
+    const { error } = await supabase
+      .from('events')
+      .update({ host_user_id: null })
+      .eq('id', event.id);
+
+    if (error) {
+      toast.error('Failed to clear host');
+    } else {
+      toast.success('Host cleared');
+      setEvent(prev => prev ? { ...prev, host_user_id: null } : null);
+      setHostProfile(null);
+    }
+  };
+
   const handleDeleteEvent = async () => {
     if (!event) return;
 
@@ -785,9 +802,16 @@ export default function EventDetail() {
                   </div>
                 )}
                 {hostProfile && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Home className="h-5 w-5" />
-                    <span>Hosted by <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Home className="h-5 w-5" />
+                      <span>Hosted by <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
+                    </div>
+                    {isAdmin && (
+                      <Button variant="ghost" size="sm" onClick={handleClearHost} className="text-xs">
+                        Change
+                      </Button>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -817,13 +841,14 @@ export default function EventDetail() {
               />
             )}
 
-            {/* Host Volunteer */}
-            {!event.host_user_id && (
+            {/* Host Volunteer - show when no host OR when admin wants to change */}
+            {(!event.host_user_id || isAdmin) && (
               <HostVolunteer
                 volunteers={hostVolunteers}
                 currentUserId={user?.id || ''}
                 onVolunteer={handleHostVolunteer}
                 onConfirm={isAdmin ? handleConfirmHost : undefined}
+                showVolunteerSection={!event.host_user_id}
               />
             )}
           </TabsContent>

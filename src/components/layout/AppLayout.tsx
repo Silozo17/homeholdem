@@ -25,7 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const showBottomNav = shouldShowNav && !isGameTVMode;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen safe-area-top">
       <div className={showBottomNav ? 'pb-20' : ''}>
         {children}
       </div>
