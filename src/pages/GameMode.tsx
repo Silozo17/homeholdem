@@ -97,18 +97,17 @@ export default function GameMode() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => navigate(`/event/${eventId}`)}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Logo size="sm" />
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="container relative flex items-center justify-center h-14 px-4">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigate(`/event/${eventId}`)}
+            className="absolute left-4"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Logo size="sm" />
+          <div className="absolute right-4 flex items-center gap-2">
             {session && (
               <Button
                 variant="ghost"
@@ -160,6 +159,9 @@ export default function GameMode() {
               blindStructure={blindStructure}
               isAdmin={isAdmin}
               onUpdate={updateSession}
+              currencySymbol={currencySymbol}
+              chipToCashRatio={chipToCashRatio}
+              displayBlindsAsCurrency={session.display_blinds_as_currency || false}
             />
 
             {/* Stats Bar */}

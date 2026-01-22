@@ -86,6 +86,7 @@ export function ClassicTimerMode({
         }
 
         // Time warnings
+        if (prev === 301) playAnnouncement('five_minutes');
         if (prev === 61) playAnnouncement('one_minute');
         if (prev === 11) playAnnouncement('ten_seconds');
 

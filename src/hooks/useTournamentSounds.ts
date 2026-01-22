@@ -88,13 +88,14 @@ const createAlertSequence = (): () => void => {
   };
 };
 
-export type AnnouncementType = 'blinds_up' | 'break_start' | 'break_end' | 'final_table' | 'one_minute' | 'ten_seconds';
+export type AnnouncementType = 'blinds_up' | 'break_start' | 'break_end' | 'final_table' | 'five_minutes' | 'one_minute' | 'ten_seconds';
 
 const ANNOUNCEMENT_MESSAGES: Record<AnnouncementType, string> = {
   blinds_up: 'Blinds up!',
   break_start: 'Break time. Players, enjoy your break.',
   break_end: 'Break is over. Please return to your seats.',
   final_table: 'Congratulations! We are now at the final table.',
+  five_minutes: 'Five minutes remaining in this level.',
   one_minute: 'One minute remaining in this level.',
   ten_seconds: 'Ten seconds.',
 };
@@ -137,7 +138,7 @@ export function useTournamentSounds(options: UseTournamentSoundsOptions = {}) {
       playChime();
     } else if (type === 'ten_seconds') {
       playAlert();
-    } else if (type === 'one_minute') {
+    } else if (type === 'one_minute' || type === 'five_minutes') {
       playBeep();
     }
     
