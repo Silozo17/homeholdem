@@ -52,6 +52,7 @@ interface DashboardModeProps {
   currencySymbol: string;
   onUpdateSession: (updates: Partial<GameSession>) => void;
   payouts?: PayoutStructure[];
+  chipToCashRatio?: number;
 }
 
 export function DashboardMode({
@@ -62,7 +63,8 @@ export function DashboardMode({
   prizePool,
   currencySymbol,
   onUpdateSession,
-  payouts = []
+  payouts = [],
+  chipToCashRatio = 0.01
 }: DashboardModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -127,8 +129,11 @@ export function DashboardMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency) {
-      const value = chips / 100;
+    if (session.display_blinds_as_currency && chipToCashRatio > 0) {
+      const value = chips * chipToCashRatio;
+      if (value < 1) {
+        return `${currencySymbol}${value.toFixed(2)}`;
+      }
       return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
     }
     return chips.toLocaleString();

@@ -15,6 +15,7 @@ import { GameSettings } from '@/components/game/GameSettings';
 import { ChipCounter } from '@/components/game/ChipCounter';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useClubCurrency } from '@/hooks/useClubCurrency';
+import { useChipToCashRatio } from '@/hooks/useChipToCashRatio';
 
 export default function GameMode() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -38,6 +39,7 @@ export default function GameMode() {
   } = useGameSession(eventId || '');
 
   const { symbol: currencySymbol } = useClubCurrency(clubId || '');
+  const chipToCashRatio = useChipToCashRatio(clubId);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -86,6 +88,7 @@ export default function GameMode() {
         onExit={() => setTvMode(false)}
         onUpdateSession={updateSession}
         onRefresh={refetch}
+        chipToCashRatio={chipToCashRatio}
       />
     );
   }

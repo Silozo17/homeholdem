@@ -70,6 +70,7 @@ interface TVDisplayProps {
   onExit: () => void;
   onUpdateSession: (updates: Partial<GameSession>) => void;
   onRefresh: () => void;
+  chipToCashRatio?: number;
 }
 
 export function TVDisplay({
@@ -83,7 +84,8 @@ export function TVDisplay({
   payouts = [],
   onExit,
   onUpdateSession,
-  onRefresh
+  onRefresh,
+  chipToCashRatio = 0.01
 }: TVDisplayProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('classic');
   const [showControls, setShowControls] = useState(false);
@@ -157,23 +159,23 @@ export function TVDisplay({
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex">
       {/* Main TV Display Area */}
       <div className="flex-1 relative">
-        {/* Exit Button */}
+        {/* Exit Button - positioned lower to avoid header overlap */}
         <Button
           variant="ghost"
           size="icon"
           onClick={handleExit}
-          className="absolute top-4 left-4 z-50 text-white/50 hover:text-white hover:bg-white/10"
+          className="absolute top-6 left-6 z-50 text-white/50 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/30"
         >
           <X className="w-6 h-6" />
         </Button>
 
-        {/* Admin Controls Toggle */}
-        {isAdmin && (
+        {/* Admin Controls Toggle - positioned lower */}
+        {isAdmin && !showControls && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowControls(!showControls)}
-            className="absolute top-4 right-4 z-50 text-white/50 hover:text-white hover:bg-white/10"
+            onClick={() => setShowControls(true)}
+            className="absolute top-6 right-6 z-50 text-white/50 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/30"
           >
             <Settings className="w-6 h-6" />
           </Button>
@@ -191,6 +193,7 @@ export function TVDisplay({
             averageStack={averageStack}
             onUpdateSession={onUpdateSession}
             isAdmin={isAdmin}
+            chipToCashRatio={chipToCashRatio}
           />
         )}
 
@@ -204,6 +207,7 @@ export function TVDisplay({
             currencySymbol={currencySymbol}
             onUpdateSession={onUpdateSession}
             payouts={payouts}
+            chipToCashRatio={chipToCashRatio}
           />
         )}
 
@@ -217,6 +221,7 @@ export function TVDisplay({
             playersRemaining={activePlayers.length}
             totalPlayers={players.length}
             onUpdateSession={onUpdateSession}
+            chipToCashRatio={chipToCashRatio}
           />
         )}
       </div>

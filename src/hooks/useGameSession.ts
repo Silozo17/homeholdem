@@ -41,6 +41,7 @@ interface GamePlayer {
   status: string;
   finish_position: number | null;
   eliminated_at: string | null;
+  avatar_url?: string | null;
 }
 
 interface GameTransaction {
@@ -138,7 +139,7 @@ export function useGameSession(eventId: string) {
         setBlindStructure(blindsData as BlindLevel[]);
       }
 
-      // Fetch players
+      // Fetch players with avatar from profiles
       const { data: playersData } = await supabase
         .from('game_players')
         .select('*')
@@ -146,7 +147,21 @@ export function useGameSession(eventId: string) {
         .order('created_at');
 
       if (playersData) {
-        setPlayers(playersData as GamePlayer[]);
+        // Fetch avatars for all players
+        const userIds = playersData.map(p => p.user_id).filter(Boolean);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', userIds);
+
+        const avatarMap = new Map(profiles?.map(p => [p.id, p.avatar_url]) || []);
+        
+        const playersWithAvatars = playersData.map(p => ({
+          ...p,
+          avatar_url: avatarMap.get(p.user_id) || null
+        }));
+        
+        setPlayers(playersWithAvatars as GamePlayer[]);
       }
 
       // Fetch transactions
