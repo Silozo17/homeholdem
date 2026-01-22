@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
 import { 
   ArrowLeft, 
@@ -13,13 +14,16 @@ import {
   MapPin,
   Users,
   Play,
-  Home
+  Home,
+  MessageCircle,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DateVoting } from '@/components/events/DateVoting';
 import { RsvpButtons } from '@/components/events/RsvpButtons';
 import { HostVolunteer } from '@/components/events/HostVolunteer';
 import { AttendeesList } from '@/components/events/AttendeesList';
+import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 
@@ -415,79 +419,109 @@ export default function EventDetail() {
           )}
         </div>
 
-        {/* Event Info */}
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="py-4 space-y-3">
-            {event.final_date && (
-              <div className="flex items-center gap-2 text-foreground">
-                <Calendar className="h-5 w-5 text-primary" />
-                <span className="font-medium">
-                  {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a")}
-                </span>
-              </div>
-            )}
-            {event.location && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-5 w-5" />
-                <span>{event.location}</span>
-              </div>
-            )}
-            {hostProfile && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Home className="h-5 w-5" />
-                <span>Hosted by <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-5 w-5" />
-              <span>
-                {event.max_tables} {event.max_tables === 1 ? 'table' : 'tables'} × {event.seats_per_table} seats = {totalCapacity} max
-              </span>
-            </div>
-{isAdmin && event.is_finalized && (
-              <Button 
-                className="w-full mt-4 glow-gold"
-                onClick={() => navigate(`/event/${eventId}/game`)}
-              >
-                <Play className="h-5 w-5 mr-2" />
-                Start Game Mode
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
         {/* RSVP Buttons */}
         <RsvpButtons 
           currentStatus={userRsvp}
           onRsvp={handleRsvp}
         />
 
-        {/* Date Voting (if not finalized) */}
-        {!event.is_finalized && (
-          <DateVoting 
-            options={dateOptions}
-            onVote={handleVote}
-            onFinalize={isAdmin ? handleFinalizeDate : undefined}
-          />
-        )}
+        {/* Tabs for different sections */}
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="details" className="flex flex-col items-center gap-1 py-2">
+              <Info className="h-4 w-4" />
+              <span className="text-xs">Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="attendees" className="flex flex-col items-center gap-1 py-2">
+              <Users className="h-4 w-4" />
+              <span className="text-xs">Attendees</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex flex-col items-center gap-1 py-2">
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-xs">Chat</span>
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Host Volunteer */}
-        {!event.host_user_id && (
-          <HostVolunteer
-            volunteers={hostVolunteers}
-            currentUserId={user?.id || ''}
-            onVolunteer={handleHostVolunteer}
-            onConfirm={isAdmin ? handleConfirmHost : undefined}
-          />
-        )}
+          {/* Details Tab */}
+          <TabsContent value="details" className="mt-4 space-y-4">
+            {/* Event Info Card */}
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="py-4 space-y-3">
+                {event.final_date && (
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    <span className="font-medium">
+                      {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a")}
+                    </span>
+                  </div>
+                )}
+                {event.location && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-5 w-5" />
+                    <span>{event.location}</span>
+                  </div>
+                )}
+                {hostProfile && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Home className="h-5 w-5" />
+                    <span>Hosted by <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Users className="h-5 w-5" />
+                  <span>
+                    {event.max_tables} {event.max_tables === 1 ? 'table' : 'tables'} × {event.seats_per_table} seats = {totalCapacity} max
+                  </span>
+                </div>
+                {isAdmin && event.is_finalized && (
+                  <Button 
+                    className="w-full mt-4 glow-gold"
+                    onClick={() => navigate(`/event/${eventId}/game`)}
+                  >
+                    <Play className="h-5 w-5 mr-2" />
+                    Start Game Mode
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Attendees List */}
-        <AttendeesList 
-          going={goingList}
-          waitlist={waitlist}
-          maybe={maybeList}
-          capacity={totalCapacity}
-        />
+            {/* Date Voting (if not finalized) */}
+            {!event.is_finalized && (
+              <DateVoting 
+                options={dateOptions}
+                onVote={handleVote}
+                onFinalize={isAdmin ? handleFinalizeDate : undefined}
+              />
+            )}
+
+            {/* Host Volunteer */}
+            {!event.host_user_id && (
+              <HostVolunteer
+                volunteers={hostVolunteers}
+                currentUserId={user?.id || ''}
+                onVolunteer={handleHostVolunteer}
+                onConfirm={isAdmin ? handleConfirmHost : undefined}
+              />
+            )}
+          </TabsContent>
+
+          {/* Attendees Tab */}
+          <TabsContent value="attendees" className="mt-4">
+            <AttendeesList 
+              going={goingList}
+              waitlist={waitlist}
+              maybe={maybeList}
+              capacity={totalCapacity}
+            />
+          </TabsContent>
+
+          {/* Chat Tab */}
+          <TabsContent value="chat" className="mt-4">
+            <Card className="bg-card/50 border-border/50 h-[60vh]">
+              <ChatWindow clubId={event.club_id} eventId={event.id} />
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
