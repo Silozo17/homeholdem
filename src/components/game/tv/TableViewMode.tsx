@@ -131,18 +131,22 @@ export function TableViewMode({
     return 'text-white';
   };
 
-  // Seat positions around pill-shaped table (10 unique seats - racetrack layout)
+  // Seat positions: 2 on each end, 3 on top, 3 on bottom (classic 10-player layout)
   const seatPositionsBySeat: Record<number, { top: string; left: string; transform: string }> = {
-    1:  { top: '92%', left: '35%', transform: 'translate(-50%, -50%)' },   // bottom left-center
-    2:  { top: '80%', left: '12%', transform: 'translate(-50%, -50%)' },   // bottom left curve
-    3:  { top: '50%', left: '2%', transform: 'translate(-50%, -50%)' },    // left center
-    4:  { top: '20%', left: '12%', transform: 'translate(-50%, -50%)' },   // top left curve
-    5:  { top: '8%', left: '35%', transform: 'translate(-50%, -50%)' },    // top left-center
-    6:  { top: '8%', left: '65%', transform: 'translate(-50%, -50%)' },    // top right-center
-    7:  { top: '20%', left: '88%', transform: 'translate(-50%, -50%)' },   // top right curve
-    8:  { top: '50%', left: '98%', transform: 'translate(-50%, -50%)' },   // right center
-    9:  { top: '80%', left: '88%', transform: 'translate(-50%, -50%)' },   // bottom right curve
-    10: { top: '92%', left: '65%', transform: 'translate(-50%, -50%)' },   // bottom right-center
+    // Bottom row (3 seats)
+    1:  { top: '95%', left: '30%', transform: 'translate(-50%, -50%)' },
+    10: { top: '95%', left: '50%', transform: 'translate(-50%, -50%)' },
+    9:  { top: '95%', left: '70%', transform: 'translate(-50%, -50%)' },
+    // Left end (2 seats stacked)
+    2:  { top: '65%', left: '2%', transform: 'translate(-50%, -50%)' },
+    3:  { top: '35%', left: '2%', transform: 'translate(-50%, -50%)' },
+    // Top row (3 seats)
+    4:  { top: '5%', left: '30%', transform: 'translate(-50%, -50%)' },
+    5:  { top: '5%', left: '50%', transform: 'translate(-50%, -50%)' },
+    6:  { top: '5%', left: '70%', transform: 'translate(-50%, -50%)' },
+    // Right end (2 seats stacked)
+    7:  { top: '35%', left: '98%', transform: 'translate(-50%, -50%)' },
+    8:  { top: '65%', left: '98%', transform: 'translate(-50%, -50%)' },
   };
 
   const getPlayerAtSeat = (seatNum: number) => {
@@ -238,13 +242,51 @@ export function TableViewMode({
                    }} 
               />
               
-              {/* Center Logo/Info */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-2xl md:text-4xl font-bold text-white/15 tracking-[0.2em]">HOME HOLD'EM</div>
-                <div className="mt-2 md:mt-4 text-4xl md:text-6xl font-bold bg-gradient-to-r from-amber-300/40 via-yellow-400/40 to-amber-300/40 bg-clip-text text-transparent">
+              {/* Club name - small at top */}
+              <div className="absolute top-3 md:top-6 left-1/2 -translate-x-1/2 text-base md:text-xl font-bold text-white/15 tracking-[0.2em]">
+                HOME HOLD'EM
+              </div>
+              
+              {/* Betting Area / Community Cards Zone */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex flex-col items-center">
+                  {/* Top text (upside down for far players) */}
+                  <div className="text-[10px] md:text-sm text-amber-400/30 tracking-[0.25em] font-semibold rotate-180 mb-2 md:mb-4">
+                    NO LIMIT TEXAS HOLD'EM
+                  </div>
+                  
+                  {/* Card outlines with hearts */}
+                  <div className="flex items-center gap-2 md:gap-4">
+                    {/* Left heart */}
+                    <span className="text-red-500/40 text-xl md:text-3xl">♥</span>
+                    
+                    {/* 5 Card placeholders */}
+                    <div className="flex gap-1 md:gap-2">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div 
+                          key={i}
+                          className="w-6 h-9 md:w-10 md:h-14 rounded border-2 border-dashed border-white/20 bg-black/10"
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Right heart */}
+                    <span className="text-red-500/40 text-xl md:text-3xl">♥</span>
+                  </div>
+                  
+                  {/* Bottom text */}
+                  <div className="text-[10px] md:text-sm text-amber-400/30 tracking-[0.25em] font-semibold mt-2 md:mt-4">
+                    NO LIMIT TEXAS HOLD'EM
+                  </div>
+                </div>
+              </div>
+              
+              {/* Prize pool - positioned below betting area */}
+              <div className="absolute bottom-2 md:bottom-6 left-1/2 -translate-x-1/2 text-center">
+                <div className="text-lg md:text-3xl font-bold bg-gradient-to-r from-amber-300/50 via-yellow-400/50 to-amber-300/50 bg-clip-text text-transparent">
                   {currencySymbol}{prizePool.toLocaleString()}
                 </div>
-                <div className="text-sm md:text-xl text-white/25 mt-1 md:mt-2 tracking-wider">PRIZE POOL</div>
+                <div className="text-[10px] md:text-xs text-white/25 tracking-wider">PRIZE POOL</div>
               </div>
             </div>
           </div>
