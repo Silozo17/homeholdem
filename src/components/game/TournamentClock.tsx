@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTournamentSounds, AnnouncementType } from '@/hooks/useTournamentSounds';
 
 interface BlindLevel {
   id: string;
@@ -28,6 +29,8 @@ interface TournamentClockProps {
   isAdmin: boolean;
   onUpdate: (updates: Partial<GameSession>) => void;
   tvMode?: boolean;
+  playersRemaining?: number;
+  isFinalTable?: boolean;
 }
 
 export function TournamentClock({ 
@@ -35,12 +38,22 @@ export function TournamentClock({
   blindStructure, 
   isAdmin, 
   onUpdate,
-  tvMode = false 
+  tvMode = false,
+  playersRemaining,
+  isFinalTable = false
 }: TournamentClockProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const announcedRef = useRef<Record<string, boolean>>({});
+  const prevLevelRef = useRef<number>(session.current_level);
+  const wasFinalTableRef = useRef<boolean>(false);
+
+  const {
+    soundEnabled,
+    toggleSound,
+    playAnnouncement,
+    playLevelUp,
+  } = useTournamentSounds({ enabled: true });
 
   const currentLevel = blindStructure.find(b => b.level === session.current_level);
   const nextLevel = blindStructure.find(b => b.level === session.current_level + 1);
@@ -54,11 +67,52 @@ export function TournamentClock({
     }
   }, [session.current_level, session.time_remaining_seconds, currentLevel]);
 
-  // Timer countdown
+  // Handle level changes and announcements
+  useEffect(() => {
+    if (prevLevelRef.current !== session.current_level) {
+      const prevLevel = blindStructure.find(b => b.level === prevLevelRef.current);
+      
+      // Reset announced flags for new level
+      announcedRef.current = {};
+      
+      // Determine announcement type
+      if (currentLevel?.is_break) {
+        playAnnouncement('break_start');
+      } else if (prevLevel?.is_break && !currentLevel?.is_break) {
+        playAnnouncement('break_end');
+      } else {
+        playAnnouncement('blinds_up');
+      }
+      
+      prevLevelRef.current = session.current_level;
+    }
+  }, [session.current_level, blindStructure, currentLevel, playAnnouncement]);
+
+  // Handle final table announcement
+  useEffect(() => {
+    if (isFinalTable && !wasFinalTableRef.current) {
+      playAnnouncement('final_table');
+      wasFinalTableRef.current = true;
+    }
+  }, [isFinalTable, playAnnouncement]);
+
+  // Timer countdown with time-based announcements
   useEffect(() => {
     if (session.status === 'active') {
       intervalRef.current = setInterval(() => {
         setTimeRemaining(prev => {
+          // One minute warning
+          if (prev === 61 && !announcedRef.current['one_minute']) {
+            announcedRef.current['one_minute'] = true;
+            playAnnouncement('one_minute');
+          }
+          
+          // Ten seconds warning
+          if (prev === 11 && !announcedRef.current['ten_seconds']) {
+            announcedRef.current['ten_seconds'] = true;
+            playAnnouncement('ten_seconds');
+          }
+          
           if (prev <= 1) {
             // Level complete
             handleLevelComplete();
@@ -78,7 +132,7 @@ export function TournamentClock({
         clearInterval(intervalRef.current);
       }
     };
-  }, [session.status]);
+  }, [session.status, playAnnouncement]);
 
   // Sync time to server periodically
   useEffect(() => {
@@ -92,10 +146,6 @@ export function TournamentClock({
   }, [session.status, isAdmin, timeRemaining, onUpdate]);
 
   const handleLevelComplete = useCallback(() => {
-    if (soundEnabled) {
-      playSound();
-    }
-    
     if (nextLevel && isAdmin) {
       onUpdate({
         current_level: nextLevel.level,
@@ -103,14 +153,7 @@ export function TournamentClock({
         level_started_at: new Date().toISOString(),
       });
     }
-  }, [soundEnabled, nextLevel, isAdmin, onUpdate]);
-
-  const playSound = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    }
-  };
+  }, [nextLevel, isAdmin, onUpdate]);
 
   const handlePlayPause = () => {
     if (session.status === 'active') {
@@ -167,33 +210,27 @@ export function TournamentClock({
   }
 
   return (
-    <>
-      {/* Hidden audio element for alerts */}
-      <audio ref={audioRef} preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2AgIB9d3B9g4OHiYeFfXZydoGGhoaHhH96dn2Eg4SGhoaEf3x4fYGChIWFhYSBfnt8gIGChISEhIOAfnx8gIGCg4OEg4KAfnx8gIGCg4OEg4KAfnx8gIGCg4OEg4J/fXx8gIGCg4ODg4F/fXt8gIGCg4ODg4F/fXt8gIGCg4ODgoF/fXt8" type="audio/wav" />
-      </audio>
-
-      <Card className={cn(
-        "border-border/50 overflow-hidden transition-colors",
-        currentLevel.is_break ? "bg-yellow-900/20" : "bg-card/50",
-        tvMode && "bg-transparent border-0"
+    <Card className={cn(
+      "border-border/50 overflow-hidden transition-colors",
+      currentLevel.is_break ? "bg-yellow-900/20" : "bg-card/50",
+      tvMode && "bg-transparent border-0"
+    )}>
+      <CardContent className={cn(
+        "py-6",
+        tvMode && "py-12"
       )}>
-        <CardContent className={cn(
-          "py-6",
-          tvMode && "py-12"
+        {/* Level indicator */}
+        <div className={cn(
+          "text-center mb-4",
+          tvMode && "mb-8"
         )}>
-          {/* Level indicator */}
           <div className={cn(
-            "text-center mb-4",
-            tvMode && "mb-8"
+            "text-sm text-muted-foreground uppercase tracking-wide",
+            tvMode && "text-xl"
           )}>
-            <div className={cn(
-              "text-sm text-muted-foreground uppercase tracking-wide",
-              tvMode && "text-xl"
-            )}>
-              {currentLevel.is_break ? 'Break' : `Level ${currentLevel.level}`}
-            </div>
+            {currentLevel.is_break ? 'Break' : `Level ${currentLevel.level}`}
           </div>
+        </div>
 
           {/* Blinds display */}
           {!currentLevel.is_break && (
@@ -257,7 +294,8 @@ export function TournamentClock({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSoundEnabled(!soundEnabled)}
+                onClick={toggleSound}
+                className={cn(!soundEnabled && "text-muted-foreground")}
               >
                 {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
               </Button>
@@ -295,6 +333,5 @@ export function TournamentClock({
           )}
         </CardContent>
       </Card>
-    </>
   );
 }
