@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -11,9 +12,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface SendOTPRequest {
-  email: string;
-  name?: string;
+// Input validation schema
+const SendOTPSchema = z.object({
+  email: z.string().email().max(255).transform(val => val.toLowerCase()),
+  name: z.string().max(100).optional(),
+});
+
+// HTML escape function to prevent XSS
+function escapeHtml(str: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return str.replace(/[&<>"']/g, (c) => htmlEscapeMap[c] || c);
 }
 
 // Generate 6-digit OTP
@@ -23,6 +37,7 @@ function generateOTP(): string {
 
 // OTP Email Template with casino green theme
 function otpEmailTemplate(code: string, name?: string): string {
+  const safeName = name ? escapeHtml(name) : undefined;
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -41,7 +56,7 @@ function otpEmailTemplate(code: string, name?: string): string {
         <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🔐</div>
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">Verify your email</h1>
         <p style="color: #7a9e90; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
-          ${name ? `Hey ${name}, enter` : 'Enter'} this code to complete your signup
+          ${safeName ? `Hey ${safeName}, enter` : 'Enter'} this code to complete your signup
         </p>
         <div style="background: linear-gradient(135deg, #1f3830 0%, #172a24 100%); border: 2px solid #d4af37; border-radius: 12px; padding: 24px 20px; margin: 0 auto 24px; max-width: 220px; box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);">
           <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #d4af37; font-family: 'SF Mono', Monaco, 'Courier New', monospace; margin: 0;">${code}</p>
@@ -66,14 +81,21 @@ serve(async (req) => {
   }
 
   try {
-    const { email, name }: SendOTPRequest = await req.json();
+    // Parse and validate input
+    const rawBody = await req.json();
+    const parseResult = SendOTPSchema.safeParse(rawBody);
 
-    if (!email) {
+    if (!parseResult.success) {
       return new Response(
-        JSON.stringify({ error: "Email is required" }),
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: parseResult.error.flatten().fieldErrors 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { email, name } = parseResult.data;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -82,7 +104,7 @@ serve(async (req) => {
     const { count } = await supabase
       .from("email_verifications")
       .select("*", { count: "exact", head: true })
-      .eq("email", email.toLowerCase())
+      .eq("email", email)
       .gte("created_at", oneHourAgo);
 
     if (count && count >= 3) {
@@ -100,7 +122,7 @@ serve(async (req) => {
     const { error: insertError } = await supabase
       .from("email_verifications")
       .insert({
-        email: email.toLowerCase(),
+        email,
         code,
         expires_at: expiresAt,
       });

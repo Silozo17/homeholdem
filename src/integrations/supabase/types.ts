@@ -970,6 +970,15 @@ export type Database = {
     Functions: {
       cleanup_expired_verifications: { Args: never; Returns: undefined }
       generate_invite_code: { Args: never; Returns: string }
+      get_club_member_profiles: {
+        Args: { _club_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          email: string
+          id: string
+        }[]
+      }
       has_club_role: {
         Args: {
           _club_id: string
@@ -1001,6 +1010,13 @@ export type Database = {
       is_game_session_club_member: {
         Args: { _game_session_id: string; _user_id: string }
         Returns: boolean
+      }
+      lookup_club_by_invite_code: {
+        Args: { _invite_code: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
       }
     }
     Enums: {

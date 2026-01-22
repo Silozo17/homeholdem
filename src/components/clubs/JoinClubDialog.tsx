@@ -53,18 +53,18 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     
     setIsLoading(true);
     
-    // Find club by invite code
-    const { data: club, error: clubError } = await supabase
-      .from('clubs')
-      .select('id, name')
-      .eq('invite_code', data.inviteCode.toUpperCase())
+    // Use secure RPC function to lookup club by invite code
+    const { data: clubData, error: clubError } = await supabase
+      .rpc('lookup_club_by_invite_code', { _invite_code: data.inviteCode })
       .single();
 
-    if (clubError || !club) {
+    if (clubError || !clubData) {
       setIsLoading(false);
       toast.error('Invalid invite code. Please check and try again.');
       return;
     }
+
+    const club = clubData as { id: string; name: string };
 
     // Check if already a member
     const { data: existingMember } = await supabase
@@ -97,7 +97,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     }
 
     // Send welcome email (fire and forget)
-    sendWelcomeEmail(club.id, club.name, (club as any).invite_code);
+    sendWelcomeEmail(club.id, club.name, data.inviteCode.toUpperCase());
 
     toast.success(`Welcome to ${club.name}!`);
     form.reset();
