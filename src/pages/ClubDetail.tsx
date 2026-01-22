@@ -19,7 +19,8 @@ import {
   Plus,
   MessageCircle,
   Trophy,
-  ScrollText
+  ScrollText,
+  History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -28,6 +29,8 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { Leaderboard } from '@/components/clubs/Leaderboard';
 import { HouseRules } from '@/components/clubs/HouseRules';
 import { PokerHandRankings } from '@/components/clubs/PokerHandRankings';
+import { HostRotation } from '@/components/clubs/HostRotation';
+import { GameHistory } from '@/components/clubs/GameHistory';
 
 interface ClubMember {
   id: string;
@@ -324,8 +327,10 @@ export default function ClubDetail() {
           </TabsContent>
 
           {/* Leaderboard Tab */}
-          <TabsContent value="leaderboard" className="mt-4">
+          <TabsContent value="leaderboard" className="mt-4 space-y-4">
             <Leaderboard clubId={clubId!} clubName={club.name} />
+            <GameHistory clubId={clubId!} clubName={club.name} />
+            <HostRotation clubId={clubId!} />
           </TabsContent>
 
           {/* Rules Tab */}
