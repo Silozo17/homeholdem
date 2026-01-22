@@ -25,6 +25,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendEmail } from '@/lib/email';
 import { welcomeToClubTemplate } from '@/lib/email-templates';
+import { buildAppUrl } from '@/lib/app-url';
 
 const joinClubSchema = z.object({
   inviteCode: z.string().length(6, 'Invite code must be 6 characters').toUpperCase(),
@@ -123,7 +124,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
         .select('*', { count: 'exact', head: true })
         .eq('club_id', clubId);
 
-      const clubUrl = `${window.location.origin}/club/${clubId}`;
+      const clubUrl = buildAppUrl(`/club/${clubId}`);
 
       const html = welcomeToClubTemplate({
         clubName,

@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { buildAppUrl } from '@/lib/app-url';
 
 interface ShareClubProps {
   clubName: string;
@@ -17,7 +18,7 @@ interface ShareClubProps {
 export function ShareClub({ clubName, inviteCode }: ShareClubProps) {
   const [copied, setCopied] = useState(false);
 
-  const joinUrl = `${window.location.origin}/dashboard?join=${inviteCode}`;
+  const joinUrl = buildAppUrl(`/dashboard?join=${inviteCode}`);
 
   const shareMessage = `🃏 Join our poker club: ${clubName}!\n\nUse code: ${inviteCode}\nOr join directly: ${joinUrl}`;
 

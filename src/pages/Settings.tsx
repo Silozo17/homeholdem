@@ -7,6 +7,7 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
+import { getAppUrl } from '@/lib/app-url';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -24,7 +25,7 @@ export default function Settings() {
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/`,
+      redirectTo: getAppUrl(),
     });
 
     if (error) {
