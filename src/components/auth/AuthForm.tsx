@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -87,17 +87,11 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Display Name</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Your poker nickname" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      placeholder="Your poker nickname" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -108,18 +102,12 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="email" 
-                        placeholder="you@example.com" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      type="email" 
+                      placeholder="you@example.com" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -130,18 +118,12 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -152,18 +134,12 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -190,18 +166,12 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="email" 
-                        placeholder="you@example.com" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      type="email" 
+                      placeholder="you@example.com" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -212,18 +182,12 @@ export function AuthForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        className="bg-input/50 border-border/50 focus:border-primary"
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                      {...field}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
