@@ -12,7 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { Plus, MoreVertical, Coffee, Trash2 } from 'lucide-react';
 
 interface BlindLevel {
   id: string;
@@ -64,7 +71,8 @@ export function GameSettings({
     rebuy_until_level: session.rebuy_until_level || 4,
   });
 
-  const [blinds, setBlinds] = useState(blindStructure);
+  const [blinds, setBlinds] = useState<BlindLevel[]>(blindStructure);
+  const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
 
   const handleSaveSettings = async () => {
     const { error } = await supabase
@@ -93,6 +101,18 @@ export function GameSettings({
   };
 
   const handleUpdateBlind = async (blindId: string, field: string, value: number | boolean) => {
+    // Update local state immediately
+    setBlinds(prev => prev.map(b => 
+      b.id === blindId ? { ...b, [field]: value } : b
+    ));
+
+    // If it's a new level (not in DB yet), just track locally
+    if (blindId.startsWith('new-')) {
+      setPendingChanges(prev => new Set(prev).add(blindId));
+      return;
+    }
+
+    // Persist existing levels immediately
     const { error } = await supabase
       .from('blind_structures')
       .update({ [field]: value })
@@ -100,17 +120,152 @@ export function GameSettings({
 
     if (error) {
       toast.error('Failed to update blind level');
+    }
+  };
+
+  const handleAddLevel = async () => {
+    const lastLevel = blinds.filter(b => !b.is_break).pop();
+    const maxLevel = Math.max(...blinds.filter(b => !b.is_break).map(b => b.level), 0);
+    
+    const newBlind: BlindLevel = {
+      id: `new-${Date.now()}`,
+      level: maxLevel + 1,
+      small_blind: lastLevel ? lastLevel.small_blind * 2 : 25,
+      big_blind: lastLevel ? lastLevel.big_blind * 2 : 50,
+      ante: lastLevel ? lastLevel.ante * 2 : 0,
+      duration_minutes: lastLevel?.duration_minutes || 15,
+      is_break: false,
+    };
+
+    // Insert into database
+    const { data, error } = await supabase
+      .from('blind_structures')
+      .insert({
+        game_session_id: session.id,
+        level: newBlind.level,
+        small_blind: newBlind.small_blind,
+        big_blind: newBlind.big_blind,
+        ante: newBlind.ante,
+        duration_minutes: newBlind.duration_minutes,
+        is_break: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error('Failed to add level');
+      return;
+    }
+
+    setBlinds(prev => [...prev, { ...newBlind, id: data.id }]);
+    toast.success('Level added');
+  };
+
+  const handleAddBreak = async () => {
+    const maxLevel = Math.max(...blinds.map(b => b.level), 0);
+    
+    const newBreak: BlindLevel = {
+      id: `new-${Date.now()}`,
+      level: maxLevel + 1,
+      small_blind: 0,
+      big_blind: 0,
+      ante: 0,
+      duration_minutes: 10,
+      is_break: true,
+    };
+
+    // Insert into database
+    const { data, error } = await supabase
+      .from('blind_structures')
+      .insert({
+        game_session_id: session.id,
+        level: newBreak.level,
+        small_blind: 0,
+        big_blind: 0,
+        ante: 0,
+        duration_minutes: newBreak.duration_minutes,
+        is_break: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error('Failed to add break');
+      return;
+    }
+
+    setBlinds(prev => [...prev, { ...newBreak, id: data.id }]);
+    toast.success('Break added');
+  };
+
+  const handleDeleteLevel = async (blindId: string) => {
+    if (blindId.startsWith('new-')) {
+      setBlinds(prev => prev.filter(b => b.id !== blindId));
+      return;
+    }
+
+    const { error } = await supabase
+      .from('blind_structures')
+      .delete()
+      .eq('id', blindId);
+
+    if (error) {
+      toast.error('Failed to delete level');
+      return;
+    }
+
+    setBlinds(prev => prev.filter(b => b.id !== blindId));
+    toast.success('Level deleted');
+  };
+
+  const handleToggleBreak = async (blindId: string, currentIsBreak: boolean) => {
+    const newIsBreak = !currentIsBreak;
+    
+    if (blindId.startsWith('new-')) {
+      setBlinds(prev => prev.map(b => 
+        b.id === blindId ? { 
+          ...b, 
+          is_break: newIsBreak,
+          small_blind: newIsBreak ? 0 : 25,
+          big_blind: newIsBreak ? 0 : 50,
+          ante: 0,
+        } : b
+      ));
+      return;
+    }
+
+    const { error } = await supabase
+      .from('blind_structures')
+      .update({ 
+        is_break: newIsBreak,
+        small_blind: newIsBreak ? 0 : 25,
+        big_blind: newIsBreak ? 0 : 50,
+        ante: 0,
+      })
+      .eq('id', blindId);
+
+    if (error) {
+      toast.error('Failed to update level');
       return;
     }
 
     setBlinds(prev => prev.map(b => 
-      b.id === blindId ? { ...b, [field]: value } : b
+      b.id === blindId ? { 
+        ...b, 
+        is_break: newIsBreak,
+        small_blind: newIsBreak ? 0 : 25,
+        big_blind: newIsBreak ? 0 : 50,
+        ante: 0,
+      } : b
     ));
   };
 
+  // Sort blinds by level
+  const sortedBlinds = [...blinds].sort((a, b) => a.level - b.level);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tournament Settings</DialogTitle>
         </DialogHeader>
@@ -239,59 +394,114 @@ export function GameSettings({
           </TabsContent>
 
           <TabsContent value="blinds" className="space-y-4 mt-4">
-            <div className="text-xs text-muted-foreground mb-2">
-              Tap any value to edit. Changes save automatically.
-            </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-1">
-              {blinds.map((blind) => (
-                <div 
-                  key={blind.id}
-                  className={`grid grid-cols-5 gap-2 p-2 rounded text-sm ${
-                    blind.is_break ? 'bg-yellow-500/10' : 'bg-muted/20'
-                  }`}
-                >
-                  <div className="font-medium">
-                    {blind.is_break ? 'Break' : `L${blind.level}`}
-                  </div>
-                  {!blind.is_break ? (
-                    <>
-                      <Input
-                        type="number"
-                        className="h-7 text-xs"
-                        value={blind.small_blind}
-                        onChange={(e) => handleUpdateBlind(blind.id, 'small_blind', parseInt(e.target.value) || 0)}
-                      />
-                      <Input
-                        type="number"
-                        className="h-7 text-xs"
-                        value={blind.big_blind}
-                        onChange={(e) => handleUpdateBlind(blind.id, 'big_blind', parseInt(e.target.value) || 0)}
-                      />
-                      <Input
-                        type="number"
-                        className="h-7 text-xs"
-                        value={blind.ante}
-                        onChange={(e) => handleUpdateBlind(blind.id, 'ante', parseInt(e.target.value) || 0)}
-                      />
-                    </>
-                  ) : (
-                    <div className="col-span-3 text-muted-foreground">—</div>
-                  )}
-                  <Input
-                    type="number"
-                    className="h-7 text-xs"
-                    value={blind.duration_minutes}
-                    onChange={(e) => handleUpdateBlind(blind.id, 'duration_minutes', parseInt(e.target.value) || 1)}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="text-xs text-muted-foreground grid grid-cols-5 gap-2 px-2">
+            {/* Header */}
+            <div className="grid grid-cols-6 gap-1 px-2 text-xs text-muted-foreground font-medium">
               <span>Level</span>
               <span>SB</span>
               <span>BB</span>
               <span>Ante</span>
               <span>Mins</span>
+              <span></span>
+            </div>
+
+            {/* Blind levels list */}
+            <div className="max-h-[300px] overflow-y-auto space-y-1">
+              {sortedBlinds.map((blind) => (
+                <div 
+                  key={blind.id}
+                  className={`grid grid-cols-6 gap-1 p-2 rounded text-sm items-center ${
+                    blind.is_break 
+                      ? 'bg-primary/10 border border-primary/20' 
+                      : 'bg-muted/20'
+                  }`}
+                >
+                  <div className="font-medium flex items-center gap-1">
+                    {blind.is_break ? (
+                      <>
+                        <Coffee className="h-3 w-3 text-primary" />
+                        <span className="text-primary">Break</span>
+                      </>
+                    ) : (
+                      `L${blind.level}`
+                    )}
+                  </div>
+                  
+                  {!blind.is_break ? (
+                    <>
+                      <Input
+                        type="number"
+                        className="h-8 text-xs px-2"
+                        value={blind.small_blind}
+                        onChange={(e) => handleUpdateBlind(blind.id, 'small_blind', parseInt(e.target.value) || 0)}
+                      />
+                      <Input
+                        type="number"
+                        className="h-8 text-xs px-2"
+                        value={blind.big_blind}
+                        onChange={(e) => handleUpdateBlind(blind.id, 'big_blind', parseInt(e.target.value) || 0)}
+                      />
+                      <Input
+                        type="number"
+                        className="h-8 text-xs px-2"
+                        value={blind.ante}
+                        onChange={(e) => handleUpdateBlind(blind.id, 'ante', parseInt(e.target.value) || 0)}
+                      />
+                    </>
+                  ) : (
+                    <div className="col-span-3 text-muted-foreground text-center">—</div>
+                  )}
+                  
+                  <Input
+                    type="number"
+                    className="h-8 text-xs px-2"
+                    value={blind.duration_minutes}
+                    onChange={(e) => handleUpdateBlind(blind.id, 'duration_minutes', parseInt(e.target.value) || 1)}
+                  />
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleToggleBreak(blind.id, blind.is_break)}>
+                        <Coffee className="mr-2 h-4 w-4" />
+                        {blind.is_break ? 'Convert to Level' : 'Convert to Break'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteLevel(blind.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+
+            {/* Add buttons */}
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddLevel}
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" />
+                Add Level
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddBreak}
+                className="gap-1"
+              >
+                <Coffee className="h-4 w-4" />
+                Add Break
+              </Button>
             </div>
           </TabsContent>
         </Tabs>
