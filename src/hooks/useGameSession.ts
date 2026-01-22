@@ -77,6 +77,7 @@ export function useGameSession(eventId: string) {
   const [blindStructure, setBlindStructure] = useState<BlindLevel[]>([]);
   const [players, setPlayers] = useState<GamePlayer[]>([]);
   const [transactions, setTransactions] = useState<GameTransaction[]>([]);
+  const [clubId, setClubId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -91,6 +92,7 @@ export function useGameSession(eventId: string) {
       .single();
 
     if (eventData) {
+      setClubId(eventData.club_id);
       const { data: memberData } = await supabase
         .from('club_members')
         .select('role')
@@ -257,6 +259,7 @@ export function useGameSession(eventId: string) {
     blindStructure,
     players,
     transactions,
+    clubId,
     isAdmin,
     loading,
     createSession,

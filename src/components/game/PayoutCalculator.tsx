@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trophy, Calculator, Check, DollarSign } from 'lucide-react';
+import { Trophy, Calculator, Check, DollarSign, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { finalizeGame } from '@/lib/game-finalization';
 
 interface GamePlayer {
   id: string;
@@ -20,12 +21,21 @@ interface GamePlayer {
 
 interface GameSession {
   id: string;
+  status?: string;
+}
+
+interface Transaction {
+  game_player_id: string;
+  transaction_type: string;
+  amount: number;
 }
 
 interface PayoutCalculatorProps {
   players: GamePlayer[];
   prizePool: number;
   session: GameSession;
+  transactions: Transaction[];
+  clubId: string;
   isAdmin: boolean;
   onRefresh: () => void;
 }
@@ -42,6 +52,8 @@ export function PayoutCalculator({
   players, 
   prizePool, 
   session,
+  transactions,
+  clubId,
   isAdmin, 
   onRefresh 
 }: PayoutCalculatorProps) {
@@ -49,6 +61,7 @@ export function PayoutCalculator({
   const [customPayouts, setCustomPayouts] = useState<number[]>([50, 30, 20]);
   const [useCustom, setUseCustom] = useState(false);
   const [paidPositions, setPaidPositions] = useState<number[]>([]);
+  const [finalizing, setFinalizing] = useState(false);
 
   // Get finished players sorted by position
   const finishedPlayers = players
@@ -94,6 +107,45 @@ export function PayoutCalculator({
     setPaidPositions([...paidPositions, player.finish_position || 0]);
     toast.success(`Paid ${player.display_name}: $${payout}`);
     onRefresh();
+  };
+
+  const handleFinalizeGame = async () => {
+    const activePlayers = players.filter(p => p.status === 'active');
+    if (activePlayers.length > 1) {
+      toast.error('Cannot finalize: more than 1 player still active');
+      return;
+    }
+
+    setFinalizing(true);
+    
+    // Build payouts data
+    const payoutsData = currentPayouts.map((percentage, index) => {
+      const position = index + 1;
+      const player = finishedPlayers.find(p => p.finish_position === position);
+      return {
+        position,
+        percentage,
+        amount: calculatePayout(position),
+        playerId: player?.id || null,
+      };
+    });
+
+    const result = await finalizeGame(
+      session.id,
+      clubId,
+      players,
+      transactions,
+      payoutsData
+    );
+
+    setFinalizing(false);
+
+    if (result.success) {
+      toast.success('Game finalized! Settlements created and season points updated.');
+      onRefresh();
+    } else {
+      toast.error(result.error || 'Failed to finalize game');
+    }
   };
 
   const totalPercentage = currentPayouts.reduce((sum, p) => sum + p, 0);
@@ -249,11 +301,27 @@ export function PayoutCalculator({
         </div>
 
         {/* Remaining players notice */}
-        {players.filter(p => p.status === 'active').length > 0 && (
+        {players.filter(p => p.status === 'active').length > 0 ? (
           <p className="text-sm text-muted-foreground text-center py-2">
             {players.filter(p => p.status === 'active').length} player(s) still in the game
           </p>
-        )}
+        ) : session.status !== 'completed' && isAdmin ? (
+          <Button 
+            className="w-full glow-gold mt-4" 
+            onClick={handleFinalizeGame}
+            disabled={finalizing}
+          >
+            <Flag className="h-4 w-4 mr-2" />
+            {finalizing ? 'Finalizing...' : 'Finalize Game & Create Settlements'}
+          </Button>
+        ) : session.status === 'completed' ? (
+          <div className="text-center py-4">
+            <Badge variant="default" className="bg-green-600">
+              <Check className="h-3 w-3 mr-1" />
+              Game Completed
+            </Badge>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

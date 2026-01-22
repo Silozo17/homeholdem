@@ -27,6 +27,7 @@ export default function GameMode() {
     blindStructure,
     players,
     transactions,
+    clubId,
     isAdmin,
     loading: sessionLoading,
     createSession,
@@ -218,6 +219,8 @@ export default function GameMode() {
                   players={players}
                   prizePool={prizePool}
                   session={session}
+                  transactions={transactions}
+                  clubId={clubId || ''}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
                 />
