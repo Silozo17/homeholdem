@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
+import { toast } from 'sonner';
 
 interface ClubWithRole {
   id: string;
@@ -24,10 +25,12 @@ interface ClubWithRole {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [clubs, setClubs] = useState<ClubWithRole[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [processingInvite, setProcessingInvite] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,11 +84,81 @@ export default function Dashboard() {
     setLoadingClubs(false);
   }, [user]);
 
+  // Auto-join club from invite link
+  const processInviteCode = useCallback(async (inviteCode: string) => {
+    if (!user || processingInvite) return;
+    
+    setProcessingInvite(true);
+
+    try {
+      // Find club by invite code
+      const { data: club, error: clubError } = await supabase
+        .from('clubs')
+        .select('id, name')
+        .eq('invite_code', inviteCode)
+        .single();
+
+      if (clubError || !club) {
+        toast.error('Invalid invite code');
+        return;
+      }
+
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from('club_members')
+        .select('id')
+        .eq('club_id', club.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingMember) {
+        toast.info(`You're already a member of ${club.name}`);
+        navigate(`/club/${club.id}`);
+        return;
+      }
+
+      // Join the club
+      const { error: joinError } = await supabase
+        .from('club_members')
+        .insert({
+          club_id: club.id,
+          user_id: user.id,
+          role: 'member',
+        });
+
+      if (joinError) {
+        toast.error('Failed to join club');
+        return;
+      }
+
+      toast.success(`Welcome to ${club.name}!`);
+      navigate(`/club/${club.id}`);
+    } finally {
+      setProcessingInvite(false);
+      // Clear the stored invite code
+      localStorage.removeItem('pendingInviteCode');
+      // Clear URL params if present
+      if (searchParams.get('join')) {
+        searchParams.delete('join');
+        setSearchParams(searchParams);
+      }
+    }
+  }, [user, processingInvite, navigate, searchParams, setSearchParams]);
+
   useEffect(() => {
     if (user) {
       fetchClubs();
+      
+      // Check for pending invite code (from URL or localStorage)
+      const urlInviteCode = searchParams.get('join');
+      const storedInviteCode = localStorage.getItem('pendingInviteCode');
+      const inviteCode = urlInviteCode || storedInviteCode;
+      
+      if (inviteCode) {
+        processInviteCode(inviteCode.toUpperCase());
+      }
     }
-  }, [user, fetchClubs]);
+  }, [user, fetchClubs, searchParams, processInviteCode]);
 
   if (loading) {
     return (

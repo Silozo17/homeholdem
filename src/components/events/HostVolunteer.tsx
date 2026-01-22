@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Home, Check } from 'lucide-react';
+import { Home, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/common/UserAvatar';
 
@@ -50,14 +50,19 @@ export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfir
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
-          variant={isVolunteering ? 'default' : 'outline'}
-          className={cn("w-full", isVolunteering && "glow-gold")}
+          variant={isVolunteering ? 'outline' : 'outline'}
+          className={cn(
+            "w-full",
+            isVolunteering 
+              ? "border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+              : "hover:border-primary/50"
+          )}
           onClick={onVolunteer}
         >
           {isVolunteering ? (
             <>
-              <Check className="mr-2 h-4 w-4" />
-              I Can Host!
+              <X className="mr-2 h-4 w-4" />
+              Withdraw Offer
             </>
           ) : (
             <>
