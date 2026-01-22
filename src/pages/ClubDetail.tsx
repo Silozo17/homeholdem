@@ -14,9 +14,12 @@ import {
   Crown,
   Shield,
   User,
-  Calendar
+  Calendar,
+  Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateEventDialog } from '@/components/events/CreateEventDialog';
+import { EventCard } from '@/components/events/EventCard';
 
 interface ClubMember {
   id: string;
@@ -36,15 +39,30 @@ interface Club {
   created_at: string;
 }
 
+interface EventWithCounts {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  final_date: string | null;
+  is_finalized: boolean;
+  max_tables: number;
+  seats_per_table: number;
+  going_count: number;
+  maybe_count: number;
+}
+
 export default function ClubDetail() {
   const { clubId } = useParams<{ clubId: string }>();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
+  const [events, setEvents] = useState<EventWithCounts[]>([]);
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -112,6 +130,35 @@ export default function ClubDetail() {
       setMembers(mappedMembers);
     }
 
+    // Fetch events with RSVP counts
+    const { data: eventsData } = await supabase
+      .from('events')
+      .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table')
+      .eq('club_id', clubId)
+      .order('created_at', { ascending: false });
+
+    if (eventsData) {
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const { data: rsvps } = await supabase
+            .from('event_rsvps')
+            .select('status, is_waitlisted')
+            .eq('event_id', event.id);
+
+          const going = rsvps?.filter(r => r.status === 'going' && !r.is_waitlisted).length || 0;
+          const maybe = rsvps?.filter(r => r.status === 'maybe').length || 0;
+
+          return {
+            ...event,
+            going_count: going,
+            maybe_count: maybe,
+          };
+        })
+      );
+
+      setEvents(eventsWithCounts);
+    }
+
     setLoadingData(false);
   };
 
@@ -140,6 +187,8 @@ export default function ClubDetail() {
   }
 
   if (!club) return null;
+
+  const isAdmin = userRole === 'owner' || userRole === 'admin';
 
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
@@ -194,13 +243,48 @@ export default function ClubDetail() {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        {(userRole === 'owner' || userRole === 'admin') && (
-          <Button className="w-full glow-gold">
-            <Calendar className="mr-2 h-4 w-4" />
-            Create Event
-          </Button>
-        )}
+        {/* Events Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Events
+            </h2>
+            {isAdmin && (
+              <Button 
+                size="sm"
+                onClick={() => setCreateEventOpen(true)}
+                className="glow-gold"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Event
+              </Button>
+            )}
+          </div>
+
+          {events.length === 0 ? (
+            <Card className="bg-card/50 border-border/50 border-dashed">
+              <CardContent className="py-8 text-center">
+                <div className="text-3xl mb-3 opacity-30">📅</div>
+                <p className="text-muted-foreground">
+                  {isAdmin 
+                    ? "No events yet. Create the first one!" 
+                    : "No events scheduled. Check back soon!"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event) => (
+                <EventCard 
+                  key={event.id}
+                  event={event}
+                  onClick={() => navigate(`/event/${event.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Members Section */}
         <Card className="bg-card/50 border-border/50">
@@ -242,17 +326,15 @@ export default function ClubDetail() {
             ))}
           </CardContent>
         </Card>
-
-        {/* Placeholder for upcoming features */}
-        <Card className="bg-card/50 border-border/50 border-dashed">
-          <CardContent className="py-8 text-center">
-            <div className="text-3xl mb-3 opacity-30">🎰</div>
-            <p className="text-muted-foreground">
-              Events and game sessions coming soon!
-            </p>
-          </CardContent>
-        </Card>
       </main>
+
+      {/* Create Event Dialog */}
+      <CreateEventDialog
+        open={createEventOpen}
+        onOpenChange={setCreateEventOpen}
+        clubId={clubId || ''}
+        onSuccess={fetchClubData}
+      />
     </div>
   );
 }
