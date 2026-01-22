@@ -8,6 +8,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   ArrowLeft, 
   Calendar,
@@ -16,7 +26,9 @@ import {
   Play,
   Home,
   MessageCircle,
-  Info
+  Info,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DateVoting } from '@/components/events/DateVoting';
@@ -71,6 +83,8 @@ export default function EventDetail() {
   const [hostProfile, setHostProfile] = useState<{ display_name: string } | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -371,6 +385,29 @@ export default function EventDetail() {
     fetchEventData();
   };
 
+  const handleDeleteEvent = async () => {
+    if (!event) return;
+
+    setDeleting(true);
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', event.id);
+
+      if (error) throw error;
+
+      toast.success('Event deleted');
+      navigate(`/club/${event.club_id}`);
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      toast.error('Failed to delete event');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -402,16 +439,60 @@ export default function EventDetail() {
             </Button>
             <Logo size="sm" />
           </div>
-          <ShareEvent
-            eventId={event.id}
-            eventTitle={event.title}
-            eventDate={event.final_date}
-            location={event.location}
-            goingCount={goingList.length}
-            capacity={totalCapacity}
-          />
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteDialogOpen(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            )}
+            <ShareEvent
+              eventId={event.id}
+              eventTitle={event.title}
+              eventDate={event.final_date}
+              location={event.location}
+              goingCount={goingList.length}
+              capacity={totalCapacity}
+            />
+          </div>
         </div>
       </header>
+
+      {/* Delete Event Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{event.title}" and all associated RSVPs, votes, and chat messages. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEvent}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Event
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Main Content */}
       <main className="container px-4 py-6 space-y-6">
