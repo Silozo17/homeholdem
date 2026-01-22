@@ -740,6 +740,38 @@ export type Database = {
           },
         ]
       }
+      placeholder_players: {
+        Row: {
+          club_id: string
+          created_at: string
+          display_name: string
+          id: string
+          linked_user_id: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          display_name: string
+          id?: string
+          linked_user_id?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          linked_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "placeholder_players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -802,42 +834,52 @@ export type Database = {
           created_at: string
           games_played: number
           id: string
+          placeholder_player_id: string | null
           season_id: string
           second_places: number
           third_places: number
           total_points: number
           total_winnings: number
           updated_at: string
-          user_id: string
+          user_id: string | null
           wins: number
         }
         Insert: {
           created_at?: string
           games_played?: number
           id?: string
+          placeholder_player_id?: string | null
           season_id: string
           second_places?: number
           third_places?: number
           total_points?: number
           total_winnings?: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           wins?: number
         }
         Update: {
           created_at?: string
           games_played?: number
           id?: string
+          placeholder_player_id?: string | null
           season_id?: string
           second_places?: number
           third_places?: number
           total_points?: number
           total_winnings?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           wins?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "season_standings_placeholder_player_id_fkey"
+            columns: ["placeholder_player_id"]
+            isOneToOne: false
+            referencedRelation: "placeholder_players"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "season_standings_season_id_fkey"
             columns: ["season_id"]

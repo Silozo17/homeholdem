@@ -11,6 +11,7 @@ interface HostVolunteerProps {
   currentUserId: string;
   onVolunteer: () => void;
   onConfirm?: (userId: string) => void;
+  showVolunteerSection?: boolean;
 }
 
 interface VolunteerProfile {
@@ -19,9 +20,14 @@ interface VolunteerProfile {
   avatar_url: string | null;
 }
 
-export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfirm }: HostVolunteerProps) {
+export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfirm, showVolunteerSection = true }: HostVolunteerProps) {
   const [profiles, setProfiles] = useState<VolunteerProfile[]>([]);
   const isVolunteering = volunteers.includes(currentUserId);
+
+  // If not showing volunteer section (host already selected but admin can change), just show the list
+  if (!showVolunteerSection && profiles.length === 0 && volunteers.length > 0) {
+    // Fetch profiles on mount even when not showing volunteer button
+  }
 
   useEffect(() => {
     if (volunteers.length > 0) {
@@ -40,37 +46,44 @@ export function HostVolunteer({ volunteers, currentUserId, onVolunteer, onConfir
     }
   };
 
+  // Don't render at all if admin is just viewing with no volunteers
+  if (!showVolunteerSection && volunteers.length === 0) {
+    return null;
+  }
+
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Home className="h-5 w-5 text-primary" />
-          Host Needed
+          {showVolunteerSection ? 'Host Needed' : 'Select New Host'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Button
-          variant={isVolunteering ? 'outline' : 'outline'}
-          className={cn(
-            "w-full",
-            isVolunteering 
-              ? "border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" 
-              : "hover:border-primary/50"
-          )}
-          onClick={onVolunteer}
-        >
-          {isVolunteering ? (
-            <>
-              <X className="mr-2 h-4 w-4" />
-              Withdraw Offer
-            </>
-          ) : (
-            <>
-              <Home className="mr-2 h-4 w-4" />
-              I Can Host
-            </>
-          )}
-        </Button>
+        {showVolunteerSection && (
+          <Button
+            variant={isVolunteering ? 'outline' : 'outline'}
+            className={cn(
+              "w-full",
+              isVolunteering 
+                ? "border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                : "hover:border-primary/50"
+            )}
+            onClick={onVolunteer}
+          >
+            {isVolunteering ? (
+              <>
+                <X className="mr-2 h-4 w-4" />
+                Withdraw Offer
+              </>
+            ) : (
+              <>
+                <Home className="mr-2 h-4 w-4" />
+                I Can Host
+              </>
+            )}
+          </Button>
+        )}
 
         {profiles.length > 0 && (
           <div className="space-y-2 pt-2">
