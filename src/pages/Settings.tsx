@@ -1,10 +1,9 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, User, Bell, Palette, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-react';
+import { ArrowLeft, User, Bell, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-react';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
-import { AppearanceSettings } from '@/components/settings/AppearanceSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
@@ -106,20 +105,6 @@ export default function Settings() {
           </CardHeader>
           <CardContent>
             <NotificationSettings />
-          </CardContent>
-        </Card>
-
-        {/* Appearance */}
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5 text-primary" />
-              Appearance
-            </CardTitle>
-            <CardDescription>Customize the app's look</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AppearanceSettings />
           </CardContent>
         </Card>
 

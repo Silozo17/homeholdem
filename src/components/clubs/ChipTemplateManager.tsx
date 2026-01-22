@@ -269,7 +269,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
         </div>
 
         {/* Denominations list */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {denominations
             .sort((a, b) => a.display_order - b.display_order)
             .map((denom) => {
@@ -277,11 +277,11 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
               return (
                 <div
                   key={denom.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/50"
                 >
                   {/* Color indicator */}
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                     style={{
                       backgroundColor: colorInfo.hex,
                       color: ['white', 'yellow'].includes(denom.color) ? '#000' : '#fff',
@@ -292,13 +292,13 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                   </div>
 
                   {isAdmin ? (
-                    <>
+                    <div className="flex flex-col sm:flex-row gap-2 flex-1">
                       {/* Color selector */}
                       <Select
                         value={denom.color}
                         onValueChange={(v) => handleDenominationChange(denom.id, 'color', v)}
                       >
-                        <SelectTrigger className="w-24">
+                        <SelectTrigger className="w-full sm:w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -319,40 +319,39 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                         </SelectContent>
                       </Select>
 
-                      {/* Denomination input */}
-                      <Input
-                        type="number"
-                        value={denom.denomination}
-                        onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
-                        className="w-20"
-                        min={1}
-                      />
+                      {/* Denomination and value row */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          type="number"
+                          value={denom.denomination}
+                          onChange={(e) => handleDenominationChange(denom.id, 'denomination', parseInt(e.target.value) || 0)}
+                          className="w-16 sm:w-20"
+                          min={1}
+                        />
 
-                      <span className="text-muted-foreground">=</span>
+                        <span className="text-muted-foreground">=</span>
 
-                      {/* Cash value input */}
-                      <div className="flex items-center gap-1">
                         <span className="text-muted-foreground">{getCurrencySymbol()}</span>
                         <Input
                           type="number"
                           step="0.01"
                           value={denom.cash_value}
                           onChange={(e) => handleDenominationChange(denom.id, 'cash_value', parseFloat(e.target.value) || 0)}
-                          className="w-20"
+                          className="w-20 sm:w-24"
                           min={0}
                         />
-                      </div>
 
-                      {/* Delete button */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveDenomination(denom.id)}
-                        className="shrink-0 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
+                        {/* Delete button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveDenomination(denom.id)}
+                          className="shrink-0 text-destructive hover:text-destructive ml-auto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-1">
                       <span className="capitalize">{denom.color}</span>
