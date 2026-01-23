@@ -1057,6 +1057,7 @@ export type Database = {
           email_rsvp_confirmation: boolean | null
           email_waitlist_promotion: boolean | null
           id: string
+          language: string | null
           push_blinds_up: boolean | null
           push_chat_messages: boolean | null
           push_date_finalized: boolean | null
@@ -1075,6 +1076,7 @@ export type Database = {
           email_rsvp_confirmation?: boolean | null
           email_waitlist_promotion?: boolean | null
           id?: string
+          language?: string | null
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
@@ -1093,6 +1095,7 @@ export type Database = {
           email_rsvp_confirmation?: boolean | null
           email_waitlist_promotion?: boolean | null
           id?: string
+          language?: string | null
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
