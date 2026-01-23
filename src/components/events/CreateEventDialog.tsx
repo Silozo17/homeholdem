@@ -1,15 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addDays, isSameDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -26,7 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Loader2, CalendarIcon, Plus, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { sendEmail } from '@/lib/email';
@@ -54,8 +53,9 @@ interface CreateEventDialogProps {
 export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSuccess }: CreateEventDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [dateOptions, setDateOptions] = useState<Date[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedTime, setSelectedTime] = useState('19:00');
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const { user } = useAuth();
 
   const form = useForm<CreateEventFormData>({
@@ -69,25 +69,53 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
     },
   });
 
-  const addDateOption = () => {
-    if (!selectedDate) return;
-    
-    const [hours, minutes] = selectedTime.split(':').map(Number);
-    const dateWithTime = new Date(selectedDate);
-    dateWithTime.setHours(hours, minutes, 0, 0);
-    
-    // Check for duplicates
-    if (dateOptions.some(d => d.getTime() === dateWithTime.getTime())) {
-      toast.error('This date/time is already added');
+  // Combine selected dates with time whenever either changes
+  useEffect(() => {
+    if (selectedDates.length === 0) {
+      setDateOptions([]);
       return;
     }
-    
-    setDateOptions([...dateOptions, dateWithTime].sort((a, b) => a.getTime() - b.getTime()));
-    setSelectedDate(undefined);
+
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const combined = selectedDates.map(date => {
+      const d = new Date(date);
+      d.setHours(hours, minutes, 0, 0);
+      return d;
+    }).sort((a, b) => a.getTime() - b.getTime());
+
+    setDateOptions(combined);
+  }, [selectedDates, selectedTime]);
+
+  const removeDateOption = (dateToRemove: Date) => {
+    setSelectedDates(prev => prev.filter(d => !isSameDay(d, dateToRemove)));
   };
 
-  const removeDateOption = (index: number) => {
-    setDateOptions(dateOptions.filter((_, i) => i !== index));
+  const selectWeekdayInMonth = (dayOfWeek: number) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const start = startOfMonth(calendarMonth);
+    const end = endOfMonth(calendarMonth);
+    const daysToAdd: Date[] = [];
+    
+    let current = start;
+    while (current <= end) {
+      if (current.getDay() === dayOfWeek && current >= today) {
+        // Check if not already selected
+        if (!selectedDates.some(d => isSameDay(d, current))) {
+          daysToAdd.push(new Date(current));
+        }
+      }
+      current = addDays(current, 1);
+    }
+    
+    if (daysToAdd.length > 0) {
+      setSelectedDates(prev => [...prev, ...daysToAdd]);
+    }
+  };
+
+  const clearAllDates = () => {
+    setSelectedDates([]);
   };
 
   const onSubmit = async (data: CreateEventFormData) => {
@@ -144,6 +172,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
     toast.success('Event created! Members can now vote on dates.');
     form.reset();
     setDateOptions([]);
+    setSelectedDates([]);
     onOpenChange(false);
     onSuccess();
   };
@@ -309,37 +338,68 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
               />
             </div>
 
-            {/* Date Options Section */}
+            {/* Date Options Section - Persistent Multi-Select Calendar */}
             <div className="space-y-3">
               <FormLabel>Date Options for Voting</FormLabel>
+              <p className="text-xs text-muted-foreground">
+                Click dates to select/deselect. All dates will use the same start time.
+              </p>
               
-              <div className="flex gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "flex-1 justify-start text-left font-normal bg-input/50 border-border/50",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+              {/* Persistent Calendar */}
+              <div className="rounded-md border border-border/50 bg-input/30 overflow-hidden">
+                <Calendar
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={(dates) => setSelectedDates(dates || [])}
+                  onMonthChange={setCalendarMonth}
+                  month={calendarMonth}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </div>
 
+              {/* Quick Select Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectWeekdayInMonth(5)} // Friday
+                  className="text-xs"
+                >
+                  + All Fridays
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectWeekdayInMonth(6)} // Saturday
+                  className="text-xs"
+                >
+                  + All Saturdays
+                </Button>
+                {selectedDates.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllDates}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+
+              {/* Time Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Start time:</span>
                 <Select value={selectedTime} onValueChange={setSelectedTime}>
-                  <SelectTrigger className="w-24 bg-input/50 border-border/50">
+                  <SelectTrigger className="w-28 bg-input/50 border-border/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -348,45 +408,42 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                     ))}
                   </SelectContent>
                 </Select>
-
-                <Button 
-                  type="button" 
-                  size="icon" 
-                  onClick={addDateOption}
-                  disabled={!selectedDate}
-                  className="shrink-0"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <span className="text-xs text-muted-foreground">(applies to all dates)</span>
               </div>
 
+              {/* Selected Dates List */}
               {dateOptions.length > 0 && (
                 <div className="space-y-2">
-                  {dateOptions.map((date, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center justify-between p-2 bg-secondary/50 rounded-md"
-                    >
-                      <span className="text-sm">
-                        {format(date, "EEE, MMM d 'at' h:mm a")}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => removeDateOption(index)}
+                  <div className="text-sm font-medium text-muted-foreground">
+                    {dateOptions.length} date{dateOptions.length !== 1 ? 's' : ''} selected
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {dateOptions.map((date, index) => (
+                      <div 
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-secondary/50 rounded-md"
                       >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
+                        <span className="text-sm">
+                          {format(date, "EEE, MMM d 'at' h:mm a")}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => removeDateOption(date)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {dateOptions.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Add at least one date option for members to vote on.
+                  Select at least one date for members to vote on.
                 </p>
               )}
             </div>
