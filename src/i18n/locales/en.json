@@ -119,6 +119,8 @@
     "next_game": "Next Game"
   },
   "club": {
+    "create": "Create Club",
+    "join": "Join Club",
     "invite_code": "Invite Code",
     "copy_code": "Copy Code",
     "code_copied": "Invite code copied!",
@@ -135,6 +137,7 @@
     "chips": "Chips",
     "rules": "Rules",
     "members_tab": "Members",
+    "members_count": "{{count}} members",
     "upcoming_events": "Upcoming Events",
     "new_event": "New Event",
     "no_events": "No upcoming events",
@@ -158,6 +161,9 @@
     "joining": "Joining...",
     "invalid_code": "Invalid invite code",
     "joined_success": "Successfully joined the club!",
+    "already_member": "You're already a member of {{name}}",
+    "join_failed": "Failed to join club",
+    "welcome": "Welcome to {{name}}!",
     "leaderboard": "Leaderboard",
     "game_history": "Game History",
     "host_rotation": "Host Rotation",
@@ -195,6 +201,11 @@
     "remove_member": "Remove from Club",
     "transfer_ownership": "Transfer Ownership",
     "currency": "Currency"
+  },
+  "roles": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "member": "Member"
   },
   "event": {
     "create_event": "Create Event",
@@ -489,9 +500,11 @@
   "stats": {
     "your_stats": "Your Stats",
     "performance": "Performance",
+    "performance_all_clubs": "Your performance across all clubs",
     "games_played": "Games Played",
     "total_wins": "Total Wins",
     "in_the_money": "In the Money",
+    "itm": "In the Money",
     "best_finish": "Best Finish",
     "performance_rates": "Performance Rates",
     "win_rate": "Win Rate",
@@ -501,12 +514,17 @@
     "total_buyins": "Total Buy-ins",
     "total_winnings": "Total Winnings",
     "net_profit_loss": "Net Profit/Loss",
+    "net_profit": "Net Profit",
     "stats_by_club": "Stats by Club",
     "games": "Games",
     "wins": "Wins",
     "cashes": "Cashes",
+    "n_games": "{{count}} games",
+    "n_wins": "{{count}} wins",
+    "n_cashes": "{{count}} cashes",
     "play_first_game": "Play your first game to see stats!",
-    "no_stats": "No stats yet"
+    "no_stats": "No stats yet",
+    "no_games": "Play your first game to see your stats!"
   },
   "events": {
     "title": "Events",

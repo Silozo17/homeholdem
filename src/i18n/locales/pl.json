@@ -119,6 +119,8 @@
     "next_game": "Następna gra"
   },
   "club": {
+    "create": "Utwórz Klub",
+    "join": "Dołącz do Klubu",
     "invite_code": "Kod zaproszenia",
     "copy_code": "Kopiuj kod",
     "code_copied": "Kod zaproszenia skopiowany!",
@@ -135,6 +137,7 @@
     "chips": "Żetony",
     "rules": "Zasady",
     "members_tab": "Członkowie",
+    "members_count": "{{count}} członków",
     "upcoming_events": "Nadchodzące wydarzenia",
     "new_event": "Nowe wydarzenie",
     "no_events": "Brak nadchodzących wydarzeń",
@@ -158,6 +161,9 @@
     "joining": "Dołączanie...",
     "invalid_code": "Nieprawidłowy kod zaproszenia",
     "joined_success": "Pomyślnie dołączono do klubu!",
+    "already_member": "Jesteś już członkiem {{name}}",
+    "join_failed": "Nie udało się dołączyć do klubu",
+    "welcome": "Witaj w {{name}}!",
     "leaderboard": "Tabela liderów",
     "game_history": "Historia gier",
     "host_rotation": "Rotacja gospodarzy",
@@ -195,6 +201,11 @@
     "remove_member": "Usuń z klubu",
     "transfer_ownership": "Przekaż własność",
     "currency": "Waluta"
+  },
+  "roles": {
+    "owner": "Właściciel",
+    "admin": "Administrator",
+    "member": "Członek"
   },
   "event": {
     "create_event": "Utwórz wydarzenie",
@@ -489,9 +500,11 @@
   "stats": {
     "your_stats": "Twoje statystyki",
     "performance": "Wyniki",
+    "performance_all_clubs": "Twoje wyniki we wszystkich klubach",
     "games_played": "Rozegrane gry",
     "total_wins": "Suma wygranych",
     "in_the_money": "W kasie",
+    "itm": "W kasie",
     "best_finish": "Najlepszy wynik",
     "performance_rates": "Wskaźniki wydajności",
     "win_rate": "Procent wygranych",
@@ -501,12 +514,17 @@
     "total_buyins": "Suma wpisowych",
     "total_winnings": "Suma wygranych",
     "net_profit_loss": "Zysk/Strata netto",
+    "net_profit": "Zysk netto",
     "stats_by_club": "Statystyki wg klubu",
     "games": "Gry",
     "wins": "Wygrane",
     "cashes": "Kasy",
+    "n_games": "{{count}} gier",
+    "n_wins": "{{count}} wygranych",
+    "n_cashes": "{{count}} kas",
     "play_first_game": "Zagraj pierwszą grę, aby zobaczyć statystyki!",
-    "no_stats": "Brak statystyk"
+    "no_stats": "Brak statystyk",
+    "no_games": "Zagraj pierwszą grę, aby zobaczyć swoje statystyki!"
   },
   "events": {
     "title": "Wydarzenia",
