@@ -117,7 +117,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
       .eq('id', template.id);
 
     if (error) {
-      toast.error(t('chips.currency_update_failed'));
+      toast.error(t('chips.failed_update'));
       return;
     }
 
@@ -209,7 +209,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
       fetchChipTemplate(); // Refresh to get new IDs
     } catch (error) {
       console.error('Error saving:', error);
-      toast.error(t('chips.save_failed'));
+      toast.error(t('chips.failed_save'));
     } finally {
       setSaving(false);
     }

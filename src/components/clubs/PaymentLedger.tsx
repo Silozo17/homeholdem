@@ -101,7 +101,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
 
   const handleAddSettlement = async () => {
     if (!fromUserId || !toUserId || !amount || fromUserId === toUserId) {
-      toast.error(t('settlements.fill_fields_error'));
+      toast.error(t('settlements_section.fill_fields'));
       return;
     }
 
@@ -116,11 +116,11 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
       });
 
     if (error) {
-      toast.error(t('settlements.add_failed'));
+      toast.error(t('settlements_section.failed_add'));
       return;
     }
 
-    toast.success(t('settlements.added'));
+    toast.success(t('settlements_section.added'));
     setShowAdd(false);
     setFromUserId('');
     setToUserId('');
@@ -140,11 +140,11 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
       .eq('id', settlementId);
 
     if (error) {
-      toast.error(t('settlements.mark_settled_failed'));
+      toast.error(t('settlements_section.failed_mark_settled'));
       return;
     }
 
-    toast.success(t('settlements.marked_paid'));
+    toast.success(t('settlements_section.marked_paid'));
     fetchData();
   };
 
@@ -155,11 +155,11 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
       .eq('id', settlementId);
 
     if (error) {
-      toast.error(t('settlements.delete_failed'));
+      toast.error(t('settlements_section.failed_delete'));
       return;
     }
 
-    toast.success(t('settlements.deleted'));
+    toast.success(t('settlements_section.deleted'));
     fetchData();
   };
 
