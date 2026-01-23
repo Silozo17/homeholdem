@@ -1,4 +1,5 @@
 import { Bell, BellOff, Check, X, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { PushNotificationPreferences } from '@/components/settings/PushNotificat
 import { toast } from 'sonner';
 
 export function NotificationSettings() {
+  const { t } = useTranslation();
   const {
     isSupported,
     isSubscribed,
@@ -21,18 +23,18 @@ export function NotificationSettings() {
     if (isSubscribed) {
       const success = await unsubscribe();
       if (success) {
-        toast.success('Push notifications disabled');
+        toast.success(t('settings.disable_notifications'));
       } else {
-        toast.error('Failed to disable notifications');
+        toast.error(t('common.error'));
       }
     } else {
       const success = await subscribe();
       if (success) {
-        toast.success('Push notifications enabled!');
+        toast.success(t('settings.notifications_enabled'));
       } else if (permission === 'denied') {
-        toast.error('Please enable notifications in your browser settings');
+        toast.error(t('settings.notifications_blocked'));
       } else {
-        toast.error('Failed to enable notifications');
+        toast.error(t('common.error'));
       }
     }
   };
@@ -43,10 +45,10 @@ export function NotificationSettings() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <BellOff className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">Push Notifications</CardTitle>
+            <CardTitle className="text-lg">{t('settings.push_notifications')}</CardTitle>
           </div>
           <CardDescription>
-            Push notifications are not supported in this browser.
+            {t('settings.notifications_not_supported')}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -59,30 +61,30 @@ export function NotificationSettings() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Push Notifications</CardTitle>
+            <CardTitle className="text-lg">{t('settings.push_notifications')}</CardTitle>
           </div>
           <Badge variant={isSubscribed ? 'default' : 'secondary'}>
             {isSubscribed ? (
-              <><Check className="h-3 w-3 mr-1" /> Enabled</>
+              <><Check className="h-3 w-3 mr-1" /> {t('settings.notifications_enabled').split(' ')[0]}</>
             ) : (
-              <><X className="h-3 w-3 mr-1" /> Disabled</>
+              <><X className="h-3 w-3 mr-1" /> {t('settings.notifications_disabled').split(' ')[0]}</>
             )}
           </Badge>
         </div>
         <CardDescription>
-          Get instant alerts for RSVPs, chat messages, and game updates.
+          {t('settings.notifications_supported')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
           <div className="space-y-1">
             <p className="text-sm font-medium">
-              {isSubscribed ? 'Notifications are active' : 'Enable notifications'}
+              {isSubscribed ? t('settings.notifications_enabled') : t('settings.enable_notifications')}
             </p>
             <p className="text-xs text-muted-foreground">
               {isSubscribed 
-                ? "You'll receive alerts even when the app is closed" 
-                : 'Stay updated on poker night activity'}
+                ? t('settings.notifications_supported')
+                : t('settings.notifications_supported')}
             </p>
           </div>
           <Button
@@ -95,11 +97,11 @@ export function NotificationSettings() {
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : isSubscribed ? (
               <>
-                <BellOff className="h-4 w-4 mr-1" /> Disable
+                <BellOff className="h-4 w-4 mr-1" /> {t('settings.disable_notifications').split(' ')[0]}
               </>
             ) : (
               <>
-                <Bell className="h-4 w-4 mr-1" /> Enable
+                <Bell className="h-4 w-4 mr-1" /> {t('settings.enable_notifications').split(' ')[0]}
               </>
             )}
           </Button>
@@ -108,7 +110,7 @@ export function NotificationSettings() {
         {permission === 'denied' && (
           <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
             <p className="text-sm text-destructive">
-              Notifications are blocked. Please enable them in your browser settings.
+              {t('settings.notifications_blocked')}
             </p>
           </div>
         )}
@@ -122,13 +124,13 @@ export function NotificationSettings() {
 
         {!isSubscribed && (
           <div className="text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">You'll be notified when:</p>
+            <p className="font-medium">{t('settings.notification_types')}:</p>
             <ul className="list-disc list-inside space-y-0.5 ml-2">
-              <li>Someone RSVPs to your event</li>
-              <li>A date poll is finalized</li>
-              <li>You're promoted from the waitlist</li>
-              <li>New chat messages arrive</li>
-              <li>Tournament blinds increase</li>
+              <li>{t('settings.rsvp_description')}</li>
+              <li>{t('settings.date_description')}</li>
+              <li>{t('settings.waitlist_description')}</li>
+              <li>{t('settings.chat_description')}</li>
+              <li>{t('settings.blinds_description')}</li>
             </ul>
           </div>
         )}

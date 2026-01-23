@@ -23,6 +23,7 @@ interface Event {
   };
   rsvp_count: number;
   user_rsvp: string | null;
+  earliest_option_date?: string | null;
 }
 
 export default function Events() {
@@ -80,6 +81,27 @@ export default function Events() {
       .order('final_date', { ascending: false, nullsFirst: false });
 
     if (eventsData) {
+      // Fetch earliest date option for pending events (those without final_date)
+      const pendingEventIds = eventsData.filter(e => !e.final_date).map(e => e.id);
+      let dateOptionsMap: Record<string, string> = {};
+      
+      if (pendingEventIds.length > 0) {
+        const { data: dateOptions } = await supabase
+          .from('event_date_options')
+          .select('event_id, proposed_date')
+          .in('event_id', pendingEventIds)
+          .order('proposed_date', { ascending: true });
+        
+        if (dateOptions) {
+          // Get earliest date for each event
+          dateOptions.forEach(opt => {
+            if (!dateOptionsMap[opt.event_id]) {
+              dateOptionsMap[opt.event_id] = opt.proposed_date;
+            }
+          });
+        }
+      }
+
       // Get RSVP counts and user's RSVP status
       const eventsWithRsvps = await Promise.all(
         eventsData.map(async (event) => {
@@ -101,6 +123,7 @@ export default function Events() {
             clubs: event.clubs as { name: string },
             rsvp_count: count || 0,
             user_rsvp: userRsvp?.status || null,
+            earliest_option_date: dateOptionsMap[event.id] || null,
           };
         })
       );
@@ -115,7 +138,15 @@ export default function Events() {
     .filter(e => e.final_date && (isFuture(new Date(e.final_date)) || isToday(new Date(e.final_date))))
     .sort((a, b) => new Date(a.final_date!).getTime() - new Date(b.final_date!).getTime());
   
-  const pendingEvents = events.filter(e => !e.final_date);
+  const pendingEvents = events
+    .filter(e => !e.final_date)
+    .sort((a, b) => {
+      // Sort by earliest proposed date option (nearest first)
+      if (!a.earliest_option_date && !b.earliest_option_date) return 0;
+      if (!a.earliest_option_date) return 1;
+      if (!b.earliest_option_date) return -1;
+      return new Date(a.earliest_option_date).getTime() - new Date(b.earliest_option_date).getTime();
+    });
   
   const pastEvents = events
     .filter(e => e.final_date && isPast(new Date(e.final_date)) && !isToday(new Date(e.final_date)))

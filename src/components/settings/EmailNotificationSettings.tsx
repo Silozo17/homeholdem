@@ -1,4 +1,5 @@
 import { Mail, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -34,14 +35,15 @@ function SettingRow({ id, label, description, checked, onCheckedChange, disabled
 }
 
 export function EmailNotificationSettings() {
+  const { t } = useTranslation();
   const { preferences, loading, updatePreference } = useUserPreferences();
 
   const handleToggle = async (key: keyof typeof preferences & string, value: boolean) => {
     const success = await updatePreference(key as any, value);
     if (success) {
-      toast.success(value ? 'Email notification enabled' : 'Email notification disabled');
+      toast.success(value ? t('common.success') : t('common.success'));
     } else {
-      toast.error('Failed to update preference');
+      toast.error(t('common.error'));
     }
   };
 
@@ -51,7 +53,7 @@ export function EmailNotificationSettings() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Email Notifications</CardTitle>
+            <CardTitle className="text-lg">{t('settings.email_notifications')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-8">
@@ -70,52 +72,52 @@ export function EmailNotificationSettings() {
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Mail className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">Email Notifications</CardTitle>
+          <CardTitle className="text-lg">{t('settings.email_notifications')}</CardTitle>
         </div>
         <CardDescription>
-          Choose which emails you'd like to receive.
+          {t('settings.email_description')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
         <SettingRow
           id="email_event_created"
-          label="New events"
-          description="When a new poker night is scheduled in your clubs"
+          label={t('settings.new_events')}
+          description={t('settings.new_events_description')}
           checked={preferences.email_event_created}
           onCheckedChange={(v) => handleToggle('email_event_created', v)}
         />
         <SettingRow
           id="email_event_reminder"
-          label="Event reminders"
-          description="24 hour reminder before events you're attending"
+          label={t('settings.event_reminders')}
+          description={t('settings.reminders_description')}
           checked={preferences.email_event_reminder}
           onCheckedChange={(v) => handleToggle('email_event_reminder', v)}
         />
         <SettingRow
           id="email_rsvp_confirmation"
-          label="RSVP confirmations"
-          description="Confirmation when you RSVP to an event"
+          label={t('settings.rsvp_confirmations')}
+          description={t('settings.rsvp_confirm_description')}
           checked={preferences.email_rsvp_confirmation}
           onCheckedChange={(v) => handleToggle('email_rsvp_confirmation', v)}
         />
         <SettingRow
           id="email_waitlist_promotion"
-          label="Waitlist promotions"
-          description="When you get off the waitlist for an event"
+          label={t('settings.waitlist_promotions')}
+          description={t('settings.waitlist_description')}
           checked={preferences.email_waitlist_promotion}
           onCheckedChange={(v) => handleToggle('email_waitlist_promotion', v)}
         />
         <SettingRow
           id="email_game_results"
-          label="Game results"
-          description="Summary of game results after each poker night"
+          label={t('settings.game_results')}
+          description={t('settings.results_description')}
           checked={preferences.email_game_results}
           onCheckedChange={(v) => handleToggle('email_game_results', v)}
         />
         <SettingRow
           id="email_club_invites"
-          label="Club invitations"
-          description="When you're invited to join a new club"
+          label={t('settings.club_invites')}
+          description={t('settings.invites_description')}
           checked={preferences.email_club_invites}
           onCheckedChange={(v) => handleToggle('email_club_invites', v)}
         />
