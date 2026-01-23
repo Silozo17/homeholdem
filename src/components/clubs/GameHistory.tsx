@@ -154,7 +154,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-80 overflow-y-auto">
             {sessions.map((session) => (
               <div 
                 key={session.id}
