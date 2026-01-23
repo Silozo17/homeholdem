@@ -116,17 +116,19 @@ export default function GameMode() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container relative flex items-center justify-center h-14 px-4">
+        <div className="container flex items-center justify-between h-14 px-4">
           <Button 
             variant="ghost" 
             size="icon"
             onClick={() => navigate(`/event/${eventId}`)}
-            className="absolute left-4"
+            className="shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <Logo size="sm" />
-          <div className="absolute right-4 flex items-center gap-2">
+          <div className="flex-1 flex justify-center px-2 min-w-0">
+            <Logo size="sm" />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             {session && (
               <Button
                 variant="ghost"
@@ -205,16 +207,18 @@ export default function GameMode() {
             </div>
 
             <Tabs defaultValue="players" className="space-y-4">
-              <TabsList className="w-full grid grid-cols-5">
-                <TabsTrigger value="players">{t('game.players')}</TabsTrigger>
-                <TabsTrigger value="seats">{t('game.seats')}</TabsTrigger>
-                <TabsTrigger value="buyins">{t('game.buyins')}</TabsTrigger>
-                <TabsTrigger value="cashout" className="flex items-center gap-1">
-                  <Coins className="h-3 w-3" />
-                  {t('game.cash_out')}
-                </TabsTrigger>
-                <TabsTrigger value="payouts">{t('game.payouts')}</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-4 px-4">
+                <TabsList className="inline-flex w-auto min-w-full">
+                  <TabsTrigger value="players" className="flex-1 min-w-[70px]">{t('game.players')}</TabsTrigger>
+                  <TabsTrigger value="seats" className="flex-1 min-w-[60px]">{t('game.seats')}</TabsTrigger>
+                  <TabsTrigger value="buyins" className="flex-1 min-w-[70px]">{t('game.buyins')}</TabsTrigger>
+                  <TabsTrigger value="cashout" className="flex-1 min-w-[85px] flex items-center justify-center gap-1">
+                    <Coins className="h-3 w-3" />
+                    {t('game.cash_out')}
+                  </TabsTrigger>
+                  <TabsTrigger value="payouts" className="flex-1 min-w-[70px]">{t('game.payouts')}</TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="players">
                 <PlayerList
