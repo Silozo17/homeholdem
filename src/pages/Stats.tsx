@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +33,7 @@ interface OverallStats {
 }
 
 export default function Stats() {
+  const { t } = useTranslation();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [overallStats, setOverallStats] = useState<OverallStats>({
@@ -242,7 +244,7 @@ export default function Stats() {
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+        <div className="animate-pulse text-primary">{t('common.loading')}</div>
       </div>
     );
   }
@@ -260,10 +262,10 @@ export default function Stats() {
         <div className="space-y-1">
           <h2 className="text-2xl font-bold text-gold-gradient flex items-center gap-2">
             <Trophy className="h-6 w-6" />
-            Your Stats
+            {t('stats.your_stats')}
           </h2>
           <p className="text-muted-foreground">
-            Performance across all clubs
+            {t('stats.performance_all_clubs')}
           </p>
         </div>
 
@@ -272,7 +274,7 @@ export default function Stats() {
             <CardContent className="py-12 text-center">
               <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <p className="text-muted-foreground">
-                Play your first game to see stats here!
+                {t('stats.no_games')}
               </p>
             </CardContent>
           </Card>
@@ -284,7 +286,7 @@ export default function Stats() {
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Calendar className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Games Played</span>
+                    <span className="text-xs text-muted-foreground">{t('stats.games_played')}</span>
                   </div>
                   <div className="text-3xl font-bold">{overallStats.totalGames}</div>
                 </CardContent>
@@ -294,7 +296,7 @@ export default function Stats() {
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Crown className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Total Wins</span>
+                    <span className="text-xs text-muted-foreground">{t('stats.total_wins')}</span>
                   </div>
                   <div className="text-3xl font-bold text-gold-gradient">{overallStats.totalWins}</div>
                 </CardContent>
@@ -304,7 +306,7 @@ export default function Stats() {
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Medal className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">In The Money</span>
+                    <span className="text-xs text-muted-foreground">{t('stats.itm')}</span>
                   </div>
                   <div className="text-3xl font-bold">{overallStats.totalCashes}</div>
                 </CardContent>
@@ -314,7 +316,7 @@ export default function Stats() {
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Target className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Best Finish</span>
+                    <span className="text-xs text-muted-foreground">{t('stats.best_finish')}</span>
                   </div>
                   <div className="text-3xl font-bold">
                     {overallStats.bestFinish > 0 ? `#${overallStats.bestFinish}` : '-'}
@@ -328,26 +330,26 @@ export default function Stats() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Percent className="h-5 w-5 text-primary" />
-                  Performance Rates
+                  {t('stats.performance_rates')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Win Rate</span>
+                    <span className="text-sm text-muted-foreground">{t('stats.win_rate')}</span>
                     <span className="font-medium">{overallStats.winRate}%</span>
                   </div>
                   <Progress value={overallStats.winRate} className="h-2" />
                 </div>
                 <div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Cash Rate (Top 3)</span>
+                    <span className="text-sm text-muted-foreground">{t('stats.cash_rate')}</span>
                     <span className="font-medium">{overallStats.cashRate}%</span>
                   </div>
                   <Progress value={overallStats.cashRate} className="h-2" />
                 </div>
                 <div className="flex justify-between pt-2 border-t border-border">
-                  <span className="text-sm text-muted-foreground">Avg Finish Position</span>
+                  <span className="text-sm text-muted-foreground">{t('stats.avg_finish')}</span>
                   <span className="font-medium">{overallStats.avgFinishPosition || '-'}</span>
                 </div>
               </CardContent>
@@ -358,20 +360,20 @@ export default function Stats() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-primary" />
-                  Financial Summary
+                  {t('stats.financial_summary')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Buy-ins</span>
+                  <span className="text-muted-foreground">{t('stats.total_buyins')}</span>
                   <span className="font-medium">£{overallStats.totalBuyIns.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Winnings</span>
+                  <span className="text-muted-foreground">{t('stats.total_winnings')}</span>
                   <span className="font-medium text-success">£{overallStats.totalWinnings.toFixed(2)}</span>
                 </div>
                 <div className="border-t border-border pt-3 flex justify-between items-center">
-                  <span className="font-medium">Net Profit/Loss</span>
+                  <span className="font-medium">{t('stats.net_profit')}</span>
                   <div className="flex items-center gap-2">
                     {overallStats.netProfit >= 0 ? (
                       <TrendingUp className="h-4 w-4 text-success" />
@@ -392,7 +394,7 @@ export default function Stats() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
-                    Stats by Club
+                    {t('stats.stats_by_club')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -409,9 +411,9 @@ export default function Stats() {
                         </span>
                       </div>
                       <div className="flex gap-4 text-xs text-muted-foreground">
-                        <span>{club.gamesPlayed} games</span>
-                        <span>{club.wins} wins</span>
-                        <span>{club.cashes} cashes</span>
+                        <span>{t('stats.n_games', { count: club.gamesPlayed })}</span>
+                        <span>{t('stats.n_wins', { count: club.wins })}</span>
+                        <span>{t('stats.n_cashes', { count: club.cashes })}</span>
                       </div>
                     </button>
                   ))}

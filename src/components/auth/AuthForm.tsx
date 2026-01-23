@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,28 +13,29 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { OTPVerification } from './OTPVerification';
 
-const signInSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-const signUpSchema = signInSchema.extend({
-  displayName: z.string().min(2, 'Display name must be at least 2 characters').max(50),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
-
-type SignInFormData = z.infer<typeof signInSchema>;
-type SignUpFormData = z.infer<typeof signUpSchema>;
-
 export function AuthForm() {
+  const { t } = useTranslation();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [pendingSignUp, setPendingSignUp] = useState<{ email: string; password: string; displayName: string } | null>(null);
   const { signIn } = useAuth();
+
+  const signInSchema = z.object({
+    email: z.string().email(t('validation.email_invalid')),
+    password: z.string().min(6, t('validation.password_min')),
+  });
+
+  const signUpSchema = signInSchema.extend({
+    displayName: z.string().min(2, t('validation.display_name_min')).max(50),
+    confirmPassword: z.string(),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t('validation.passwords_no_match'),
+    path: ['confirmPassword'],
+  });
+
+  type SignInFormData = z.infer<typeof signInSchema>;
+  type SignUpFormData = z.infer<typeof signUpSchema>;
 
   const signInForm = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -53,7 +55,7 @@ export function AuthForm() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Welcome back!');
+      toast.success(t('auth.welcome_back'));
     }
   };
 
@@ -67,7 +69,7 @@ export function AuthForm() {
       });
 
       if (error || !otpResponse?.success) {
-        toast.error(otpResponse?.error || 'Failed to send verification code');
+        toast.error(otpResponse?.error || t('auth.otp_send_failed'));
         setIsLoading(false);
         return;
       }
@@ -79,10 +81,10 @@ export function AuthForm() {
         displayName: data.displayName,
       });
       setShowOTP(true);
-      toast.success('Verification code sent to your email!');
+      toast.success(t('auth.otp_sent'));
     } catch (err) {
       console.error('Signup error:', err);
-      toast.error('Something went wrong. Please try again.');
+      toast.error(t('common.error'));
     }
     
     setIsLoading(false);
@@ -118,12 +120,12 @@ export function AuthForm() {
     <Card className="w-full max-w-md border-border/50 bg-card/80 backdrop-blur-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl text-gold-gradient">
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
+          {isSignUp ? t('auth.create_account') : t('auth.welcome_back')}
         </CardTitle>
         <CardDescription className="text-muted-foreground">
           {isSignUp 
-            ? 'Join the club and start hosting poker nights' 
-            : 'Sign in to access your poker clubs'}
+            ? t('auth.signup_description')
+            : t('auth.signin_description')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -135,9 +137,9 @@ export function AuthForm() {
                 name="displayName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Display Name</FormLabel>
+                    <FormLabel>{t('auth.display_name')}</FormLabel>
                     <Input 
-                      placeholder="Your poker nickname" 
+                      placeholder={t('auth.display_name_placeholder')}
                       className="bg-input/50 border-border/50 focus:border-primary"
                       {...field}
                     />
@@ -150,10 +152,10 @@ export function AuthForm() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('auth.email')}</FormLabel>
                     <Input 
                       type="email" 
-                      placeholder="you@example.com" 
+                      placeholder={t('auth.email_placeholder')}
                       className="bg-input/50 border-border/50 focus:border-primary"
                       {...field}
                     />
@@ -166,7 +168,7 @@ export function AuthForm() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('auth.password')}</FormLabel>
                     <Input 
                       type="password" 
                       placeholder="••••••••" 
@@ -182,7 +184,7 @@ export function AuthForm() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel>{t('auth.confirm_password')}</FormLabel>
                     <Input 
                       type="password" 
                       placeholder="••••••••" 
@@ -199,9 +201,9 @@ export function AuthForm() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Code...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('auth.sending_code')}</>
                 ) : (
-                  'Create Account'
+                  t('auth.create_account')
                 )}
               </Button>
             </form>
@@ -214,10 +216,10 @@ export function AuthForm() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('auth.email')}</FormLabel>
                     <Input 
                       type="email" 
-                      placeholder="you@example.com" 
+                      placeholder={t('auth.email_placeholder')}
                       className="bg-input/50 border-border/50 focus:border-primary"
                       {...field}
                     />
@@ -230,7 +232,7 @@ export function AuthForm() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('auth.password')}</FormLabel>
                     <Input 
                       type="password" 
                       placeholder="••••••••" 
@@ -247,9 +249,9 @@ export function AuthForm() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing In...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('auth.signing_in')}</>
                 ) : (
-                  'Sign In'
+                  t('auth.sign_in')
                 )}
               </Button>
             </form>
@@ -263,8 +265,8 @@ export function AuthForm() {
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {isSignUp 
-              ? 'Already have an account? Sign in' 
-              : "Don't have an account? Sign up"}
+              ? t('auth.have_account')
+              : t('auth.no_account')}
           </button>
         </div>
       </CardContent>

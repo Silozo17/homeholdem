@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface ClubWithRole {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -97,7 +99,7 @@ export default function Dashboard() {
         .single();
 
       if (clubError || !clubData) {
-        toast.error('Invalid invite code');
+        toast.error(t('club.invalid_code'));
         return;
       }
 
@@ -112,7 +114,7 @@ export default function Dashboard() {
         .single();
 
       if (existingMember) {
-        toast.info(`You're already a member of ${club.name}`);
+        toast.info(t('club.already_member', { name: club.name }));
         navigate(`/club/${club.id}`);
         return;
       }
@@ -127,11 +129,11 @@ export default function Dashboard() {
         });
 
       if (joinError) {
-        toast.error('Failed to join club');
+        toast.error(t('club.join_failed'));
         return;
       }
 
-      toast.success(`Welcome to ${club.name}!`);
+      toast.success(t('club.welcome', { name: club.name }));
       navigate(`/club/${club.id}`);
     } finally {
       setProcessingInvite(false);
@@ -143,7 +145,7 @@ export default function Dashboard() {
         setSearchParams(searchParams);
       }
     }
-  }, [user, processingInvite, navigate, searchParams, setSearchParams]);
+  }, [user, processingInvite, navigate, searchParams, setSearchParams, t]);
 
   useEffect(() => {
     if (user) {
@@ -202,9 +204,9 @@ export default function Dashboard() {
       <main className="container px-4 py-6 space-y-6">
         {/* Welcome Section */}
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold text-gold-gradient">Your Clubs</h2>
+          <h2 className="text-2xl font-bold text-gold-gradient">{t('dashboard.your_clubs')}</h2>
           <p className="text-muted-foreground">
-            Manage your poker clubs and upcoming events
+            {t('dashboard.manage_clubs')}
           </p>
         </div>
 
@@ -214,14 +216,14 @@ export default function Dashboard() {
             onClick={() => setCreateDialogOpen(true)}
             className="flex-1 glow-gold"
           >
-            <Plus className="mr-2 h-4 w-4" /> Create Club
+            <Plus className="mr-2 h-4 w-4" /> {t('club.create')}
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setJoinDialogOpen(true)}
             className="flex-1 border-border/50 hover:bg-secondary"
           >
-            <Users className="mr-2 h-4 w-4" /> Join Club
+            <Users className="mr-2 h-4 w-4" /> {t('club.join')}
           </Button>
         </div>
 
@@ -245,9 +247,9 @@ export default function Dashboard() {
           <Card className="bg-card/50 border-border/50 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="text-4xl mb-4 opacity-30">♠ ♥ ♦ ♣</div>
-              <CardTitle className="text-lg mb-2">No clubs yet</CardTitle>
+              <CardTitle className="text-lg mb-2">{t('dashboard.no_clubs')}</CardTitle>
               <CardDescription>
-                Create your first club or join an existing one with an invite code.
+                {t('dashboard.no_clubs_description')}
               </CardDescription>
             </CardContent>
           </Card>

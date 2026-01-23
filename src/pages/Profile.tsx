@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
-import { Settings, Trophy, TrendingUp, Users, Calendar, Crown, Medal, DollarSign } from 'lucide-react';
+import { Settings, TrendingUp, Users, Calendar, Crown, Medal, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
+import { enUS, pl } from 'date-fns/locale';
 
 interface ProfileData {
   id: string;
@@ -37,6 +39,7 @@ interface PlayerStats {
 }
 
 export default function Profile() {
+  const { t, i18n } = useTranslation();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -50,6 +53,8 @@ export default function Profile() {
     netProfit: 0,
   });
   const [loadingData, setLoadingData] = useState(true);
+
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -171,7 +176,7 @@ export default function Profile() {
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+        <div className="animate-pulse text-primary">{t('common.loading')}</div>
       </div>
     );
   }
@@ -210,7 +215,7 @@ export default function Profile() {
                 </h1>
                 <p className="text-sm text-muted-foreground">{profile?.email}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Member since {profile?.created_at ? format(new Date(profile.created_at), 'MMM yyyy') : ''}
+                  {t('profile.member_since')} {profile?.created_at ? format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) : ''}
                 </p>
               </div>
             </div>
@@ -223,7 +228,7 @@ export default function Profile() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Games</span>
+                <span className="text-xs text-muted-foreground">{t('stats.games')}</span>
               </div>
               <div className="text-2xl font-bold">{stats.totalGames}</div>
             </CardContent>
@@ -233,7 +238,7 @@ export default function Profile() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-1">
                 <Crown className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Wins</span>
+                <span className="text-xs text-muted-foreground">{t('stats.wins')}</span>
               </div>
               <div className="text-2xl font-bold">{stats.totalWins}</div>
             </CardContent>
@@ -243,7 +248,7 @@ export default function Profile() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-1">
                 <Medal className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Cashes</span>
+                <span className="text-xs text-muted-foreground">{t('stats.cashes')}</span>
               </div>
               <div className="text-2xl font-bold">{stats.totalCashes}</div>
             </CardContent>
@@ -253,7 +258,7 @@ export default function Profile() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Win Rate</span>
+                <span className="text-xs text-muted-foreground">{t('stats.win_rate')}</span>
               </div>
               <div className="text-2xl font-bold">
                 {stats.totalGames > 0 
@@ -269,20 +274,20 @@ export default function Profile() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              Financial Summary
+              {t('stats.financial_summary')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Buy-ins</span>
+              <span className="text-muted-foreground">{t('stats.total_buyins')}</span>
               <span className="font-medium">£{stats.totalBuyIns.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Winnings</span>
+              <span className="text-muted-foreground">{t('stats.total_winnings')}</span>
               <span className="font-medium text-success">£{stats.totalPrizeMoney.toFixed(2)}</span>
             </div>
             <div className="border-t border-border pt-3 flex justify-between">
-              <span className="font-medium">Net Profit/Loss</span>
+              <span className="font-medium">{t('stats.net_profit')}</span>
               <span className={`font-bold ${stats.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {stats.netProfit >= 0 ? '+' : ''}£{stats.netProfit.toFixed(2)}
               </span>
@@ -295,13 +300,13 @@ export default function Profile() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              My Clubs
+              {t('profile.my_clubs')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {clubs.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                You haven't joined any clubs yet.
+                {t('profile.no_clubs')}
               </p>
             ) : (
               <div className="space-y-2">
@@ -313,7 +318,7 @@ export default function Profile() {
                   >
                     <span className="font-medium">{membership.club.name}</span>
                     <Badge variant={getRoleBadgeVariant(membership.role)}>
-                      {membership.role}
+                      {t(`roles.${membership.role}`)}
                     </Badge>
                   </button>
                 ))}

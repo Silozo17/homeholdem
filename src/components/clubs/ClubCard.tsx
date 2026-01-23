@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, ChevronRight, Crown, Shield } from 'lucide-react';
@@ -14,6 +15,8 @@ interface ClubCardProps {
 }
 
 export function ClubCard({ club, onClick }: ClubCardProps) {
+  const { t } = useTranslation();
+
   const roleIcon = {
     owner: <Crown className="h-3 w-3" />,
     admin: <Shield className="h-3 w-3" />,
@@ -50,11 +53,11 @@ export function ClubCard({ club, onClick }: ClubCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
-            <span>{club.member_count} {club.member_count === 1 ? 'member' : 'members'}</span>
+            <span>{t('club.members_count', { count: club.member_count })}</span>
           </div>
           <Badge variant={roleBadgeVariant[club.role]} className="capitalize">
             {roleIcon[club.role]}
-            <span className={roleIcon[club.role] ? 'ml-1' : ''}>{club.role}</span>
+            <span className={roleIcon[club.role] ? 'ml-1' : ''}>{t(`roles.${club.role}`)}</span>
           </Badge>
         </div>
       </CardContent>
