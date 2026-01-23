@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { PushNotificationPreferences } from '@/components/settings/PushNotificationPreferences';
 import { toast } from 'sonner';
 
 export function NotificationSettings() {
@@ -116,16 +117,21 @@ export function NotificationSettings() {
           <p className="text-xs text-muted-foreground text-center">{error}</p>
         )}
 
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p className="font-medium">You'll be notified when:</p>
-          <ul className="list-disc list-inside space-y-0.5 ml-2">
-            <li>Someone RSVPs to your event</li>
-            <li>A date poll is finalized</li>
-            <li>You're promoted from the waitlist</li>
-            <li>New chat messages arrive</li>
-            <li>Tournament blinds increase</li>
-          </ul>
-        </div>
+        {/* Granular push notification preferences */}
+        <PushNotificationPreferences isEnabled={isSubscribed} />
+
+        {!isSubscribed && (
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">You'll be notified when:</p>
+            <ul className="list-disc list-inside space-y-0.5 ml-2">
+              <li>Someone RSVPs to your event</li>
+              <li>A date poll is finalized</li>
+              <li>You're promoted from the waitlist</li>
+              <li>New chat messages arrive</li>
+              <li>Tournament blinds increase</li>
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

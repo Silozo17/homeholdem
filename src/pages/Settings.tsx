@@ -2,8 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, User, Bell, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-react';
+import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-react';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
+import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
+import { PrivacySettings } from '@/components/settings/PrivacySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
@@ -95,19 +97,14 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Notifications */}
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              Notifications
-            </CardTitle>
-            <CardDescription>Configure push notifications</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <NotificationSettings />
-          </CardContent>
-        </Card>
+        {/* Push Notifications */}
+        <NotificationSettings />
+
+        {/* Email Notifications */}
+        <EmailNotificationSettings />
+
+        {/* Privacy */}
+        <PrivacySettings />
 
         {/* About */}
         <Card className="bg-card/50 border-border/50">

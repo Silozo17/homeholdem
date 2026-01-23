@@ -7,6 +7,7 @@ interface SendPushParams {
   icon?: string;
   url?: string;
   tag?: string;
+  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up';
 }
 
 export async function sendPushNotification({
@@ -16,6 +17,7 @@ export async function sendPushNotification({
   icon,
   url,
   tag,
+  notificationType,
 }: SendPushParams) {
   const { data, error } = await supabase.functions.invoke("send-push-notification", {
     body: {
@@ -25,6 +27,7 @@ export async function sendPushNotification({
       icon,
       url,
       tag,
+      notification_type: notificationType,
     },
   });
 
@@ -49,6 +52,7 @@ export async function notifyEventRsvp(
     body: `${playerName} is joining ${eventTitle}`,
     url: `/event/${eventId}`,
     tag: `rsvp-${eventId}`,
+    notificationType: 'rsvp_updates',
   });
 }
 
@@ -63,6 +67,7 @@ export async function notifyWaitlistPromotion(
     body: `A spot opened up for ${eventTitle}`,
     url: `/event/${eventId}`,
     tag: `waitlist-${eventId}`,
+    notificationType: 'waitlist_promotion',
   });
 }
 
@@ -78,6 +83,7 @@ export async function notifyDateFinalized(
     body: `${eventTitle} is set for ${formattedDate}`,
     url: `/event/${eventId}`,
     tag: `date-${eventId}`,
+    notificationType: 'date_finalized',
   });
 }
 
@@ -93,6 +99,7 @@ export async function notifyNewChatMessage(
     body: "New message in poker chat",
     url: eventId ? `/event/${eventId}` : `/club/${clubId}`,
     tag: `chat-${eventId || clubId}`,
+    notificationType: 'chat_messages',
   });
 }
 
@@ -107,5 +114,6 @@ export async function notifyBlindsUp(
     title: "Blinds Up! ⏰",
     body: `${smallBlind}/${bigBlind}${ante ? ` (ante ${ante})` : ""}`,
     tag: "blinds-up",
+    notificationType: 'blinds_up',
   });
 }
