@@ -89,6 +89,7 @@ interface Rsvp {
 }
 
 export default function EventDetail() {
+  const { t, i18n } = useTranslation();
   const { eventId } = useParams<{ eventId: string }>();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -103,6 +104,8 @@ export default function EventDetail() {
   const [loadingData, setLoadingData] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -706,13 +709,13 @@ export default function EventDetail() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Event?</AlertDialogTitle>
+            <AlertDialogTitle>{t('event.delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{event.title}" and all associated RSVPs, votes, and chat messages. This cannot be undone.
+              {t('event.delete_description', { title: event.title })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteEvent}
               disabled={deleting}
@@ -721,12 +724,12 @@ export default function EventDetail() {
               {deleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  {t('event.deleting')}
                 </>
               ) : (
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Event
+                  {t('event.delete_event')}
                 </>
               )}
             </AlertDialogAction>
@@ -741,9 +744,9 @@ export default function EventDetail() {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold text-gold-gradient flex-1">{event.title}</h1>
             {event.is_finalized ? (
-              <Badge variant="default">Confirmed</Badge>
+              <Badge variant="default">{t('event.confirmed')}</Badge>
             ) : (
-              <Badge variant="secondary">Voting Open</Badge>
+              <Badge variant="secondary">{t('event.voting')}</Badge>
             )}
             {isAdmin && (
               <Button
@@ -772,15 +775,15 @@ export default function EventDetail() {
           <TabsList className="grid w-full grid-cols-3 h-auto">
             <TabsTrigger value="details" className="flex flex-col items-center gap-1 py-2">
               <Info className="h-4 w-4" />
-              <span className="text-xs">Details</span>
+              <span className="text-xs">{t('event.details')}</span>
             </TabsTrigger>
             <TabsTrigger value="attendees" className="flex flex-col items-center gap-1 py-2">
               <Users className="h-4 w-4" />
-              <span className="text-xs">Attendees</span>
+              <span className="text-xs">{t('event.attendees')}</span>
             </TabsTrigger>
             <TabsTrigger value="chat" className="flex flex-col items-center gap-1 py-2">
               <MessageCircle className="h-4 w-4" />
-              <span className="text-xs">Chat</span>
+              <span className="text-xs">{t('club.chat')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -793,7 +796,7 @@ export default function EventDetail() {
                   <div className="flex items-center gap-2 text-foreground">
                     <Calendar className="h-5 w-5 text-primary" />
                     <span className="font-medium">
-                      {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a")}
+                      {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a", { locale: dateLocale })}
                     </span>
                   </div>
                 )}
@@ -807,11 +810,11 @@ export default function EventDetail() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Home className="h-5 w-5" />
-                      <span>Hosted by <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
+                      <span>{t('event.hosted_by')} <span className="text-foreground font-medium">{hostProfile.display_name}</span></span>
                     </div>
                     {isAdmin && (
                       <Button variant="ghost" size="sm" onClick={handleClearHost} className="text-xs">
-                        Change
+                        {t('common.change')}
                       </Button>
                     )}
                   </div>
@@ -819,7 +822,7 @@ export default function EventDetail() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Users className="h-5 w-5" />
                   <span>
-                    {event.max_tables} {event.max_tables === 1 ? 'table' : 'tables'} × {event.seats_per_table} seats = {totalCapacity} max
+                    {event.max_tables} {event.max_tables === 1 ? t('event.table') : t('event.tables')} × {event.seats_per_table} {t('event.seats')} = {totalCapacity} {t('event.max')}
                   </span>
                 </div>
                 {isAdmin && event.is_finalized && (
@@ -828,7 +831,7 @@ export default function EventDetail() {
                     onClick={() => navigate(`/event/${eventId}/game`)}
                   >
                     <Play className="h-5 w-5 mr-2" />
-                    Start Game Mode
+                    {t('game.start_game_mode')}
                   </Button>
                 )}
               </CardContent>
