@@ -283,6 +283,19 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          default_addon_amount: number | null
+          default_addon_chips: number | null
+          default_allow_addons: boolean | null
+          default_allow_rebuys: boolean | null
+          default_buy_in_amount: number | null
+          default_event_time: string | null
+          default_level_duration: number | null
+          default_max_tables: number | null
+          default_rebuy_amount: number | null
+          default_rebuy_chips: number | null
+          default_rebuy_until_level: number | null
+          default_seats_per_table: number | null
+          default_starting_chips: number | null
           description: string | null
           id: string
           invite_code: string
@@ -292,6 +305,19 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string
+          default_addon_amount?: number | null
+          default_addon_chips?: number | null
+          default_allow_addons?: boolean | null
+          default_allow_rebuys?: boolean | null
+          default_buy_in_amount?: number | null
+          default_event_time?: string | null
+          default_level_duration?: number | null
+          default_max_tables?: number | null
+          default_rebuy_amount?: number | null
+          default_rebuy_chips?: number | null
+          default_rebuy_until_level?: number | null
+          default_seats_per_table?: number | null
+          default_starting_chips?: number | null
           description?: string | null
           id?: string
           invite_code: string
@@ -301,6 +327,19 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          default_addon_amount?: number | null
+          default_addon_chips?: number | null
+          default_allow_addons?: boolean | null
+          default_allow_rebuys?: boolean | null
+          default_buy_in_amount?: number | null
+          default_event_time?: string | null
+          default_level_duration?: number | null
+          default_max_tables?: number | null
+          default_rebuy_amount?: number | null
+          default_rebuy_chips?: number | null
+          default_rebuy_until_level?: number | null
+          default_seats_per_table?: number | null
+          default_starting_chips?: number | null
           description?: string | null
           id?: string
           invite_code?: string

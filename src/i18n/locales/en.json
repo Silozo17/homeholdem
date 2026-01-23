@@ -61,7 +61,9 @@
     "today": "Today",
     "tomorrow": "Tomorrow",
     "yesterday": "Yesterday",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "saving": "Saving...",
+    "minutes": "minutes"
   },
   "auth": {
     "welcome_back": "Welcome Back",
@@ -214,7 +216,14 @@
     "description_placeholder": "Describe your club...",
     "name_required": "Club name is required",
     "settings_saved": "Club settings saved",
-    "currency_description": "Currency used for all financial displays in this club"
+    "currency_description": "Currency used for all financial displays in this club",
+    "event_defaults": "Event Defaults",
+    "event_defaults_description": "Default settings for new events",
+    "default_start_time": "Default Start Time",
+    "tournament_defaults": "Tournament Defaults",
+    "tournament_defaults_description": "Default settings for game sessions",
+    "level_duration": "Blind Level Duration",
+    "level_duration_description": "Default duration for each blind level"
   },
   "roles": {
     "owner": "Owner",
