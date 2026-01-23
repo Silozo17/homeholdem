@@ -215,7 +215,7 @@ export default function Profile() {
                 </h1>
                 <p className="text-sm text-muted-foreground">{profile?.email}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t('profile.member_since')} {profile?.created_at ? format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) : ''}
+                  {profile?.created_at ? t('profile.member_since', { date: format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) }) : ''}
                 </p>
               </div>
             </div>
