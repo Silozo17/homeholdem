@@ -20,6 +20,7 @@ export interface UserPreferences {
   push_blinds_up: boolean;
   // Other preferences
   show_stats_publicly: boolean;
+  language: string;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +38,7 @@ const defaultPreferences: Omit<UserPreferences, 'id' | 'user_id' | 'created_at' 
   push_chat_messages: true,
   push_blinds_up: true,
   show_stats_publicly: true,
+  language: 'en',
 };
 
 export function useUserPreferences() {

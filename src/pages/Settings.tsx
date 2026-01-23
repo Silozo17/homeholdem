@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,12 +7,14 @@ import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-reac
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
 import { PrivacySettings } from '@/components/settings/PrivacySettings';
+import { LanguageSettings } from '@/components/settings/LanguageSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { getAppUrl } from '@/lib/app-url';
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -22,7 +25,7 @@ export default function Settings() {
 
   const handleResetPassword = async () => {
     if (!user?.email) {
-      toast.error('No email found');
+      toast.error(t('settings.failed_reset'));
       return;
     }
 
@@ -31,15 +34,14 @@ export default function Settings() {
     });
 
     if (error) {
-      toast.error('Failed to send reset email');
+      toast.error(t('settings.failed_reset'));
     } else {
-      toast.success('Password reset email sent!');
+      toast.success(t('settings.password_reset_sent'));
     }
   };
 
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
         <div className="container flex items-center h-16 px-4">
           <Button
@@ -50,26 +52,25 @@ export default function Settings() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-bold text-gold-gradient">Settings</h1>
+          <h1 className="text-xl font-bold text-gold-gradient">{t('settings.title')}</h1>
         </div>
       </header>
 
       <main className="container px-4 py-6 space-y-6">
-        {/* Account Settings */}
         <Card className="bg-card/50 border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              Account
+              {t('settings.account')}
             </CardTitle>
-            <CardDescription>Manage your account settings</CardDescription>
+            <CardDescription>{t('settings.manage_account')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm font-medium">{t('settings.email')}</p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
@@ -83,7 +84,7 @@ export default function Settings() {
               onClick={handleResetPassword}
             >
               <Lock className="mr-2 h-4 w-4" />
-              Change Password
+              {t('settings.change_password')}
             </Button>
 
             <Button
@@ -92,31 +93,29 @@ export default function Settings() {
               onClick={() => navigate('/profile')}
             >
               <User className="mr-2 h-4 w-4" />
-              Edit Profile
+              {t('settings.edit_profile')}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Push Notifications */}
+        <LanguageSettings />
+
         <NotificationSettings />
 
-        {/* Email Notifications */}
         <EmailNotificationSettings />
 
-        {/* Privacy */}
         <PrivacySettings />
 
-        {/* About */}
         <Card className="bg-card/50 border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
-              About
+              {t('settings.about')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm">App Version</span>
+              <span className="text-sm">{t('settings.app_version')}</span>
               <span className="text-sm text-muted-foreground">1.0.0</span>
             </div>
 
@@ -126,19 +125,18 @@ export default function Settings() {
               onClick={() => navigate('/rules')}
             >
               <BookOpen className="mr-2 h-4 w-4" />
-              Texas Hold'em Rules
+              {t('settings.texas_holdem_rules')}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Sign Out */}
         <Button
           variant="destructive"
           className="w-full"
           onClick={handleSignOut}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
+          {t('settings.sign_out')}
         </Button>
       </main>
     </div>
