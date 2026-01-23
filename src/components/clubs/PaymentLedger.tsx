@@ -288,7 +288,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
 
           {settlements.length === 0 && (
             <div className="text-center py-6">
-              <div className="text-3xl mb-2 opacity-30">💰</div>
+              <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
               <p className="text-sm text-muted-foreground">
                 {t('settlements_section.no_settlements')}
               </p>

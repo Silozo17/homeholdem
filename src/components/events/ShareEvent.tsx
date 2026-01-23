@@ -45,14 +45,14 @@ export function ShareEvent({
     ? t('event.spots_left', { count: spotsLeft })
     : t('event.waitlist');
 
-  // Build the share message
+  // Build the share message (clean, no emojis for premium feel)
   const shareMessage = [
-    `🃏 *${eventTitle}*`,
+    `*${eventTitle}*`,
     '',
-    `📅 ${formattedDate}`,
-    location ? `📍 ${location}` : null,
+    `Date: ${formattedDate}`,
+    location ? `Location: ${location}` : null,
     '',
-    `👥 ${goingCount}/${capacity} ${t('event.confirmed').toLowerCase()} • ${spotsText}`,
+    `${goingCount}/${capacity} confirmed - ${spotsText}`,
     '',
     `RSVP: ${eventUrl}`,
   ].filter(Boolean).join('\n');

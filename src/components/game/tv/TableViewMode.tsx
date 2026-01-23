@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTournamentSounds } from '@/hooks/useTournamentSounds';
+import { CardSuit } from '@/components/common/CardSuits';
 
 interface BlindLevel {
   id: string;
@@ -256,10 +257,10 @@ export function TableViewMode({
                     NO LIMIT TEXAS HOLD'EM
                   </div>
                   
-                  {/* Card outlines with hearts */}
+                  {/* Card outlines with heart icons */}
                   <div className="flex items-center gap-2 md:gap-4">
-                    {/* Left heart */}
-                    <span className="text-red-500/40 text-xl md:text-3xl">♥</span>
+                    {/* Left heart - SVG component */}
+                    <CardSuit suit="heart" size="lg" className="opacity-40" />
                     
                     {/* 5 Card placeholders */}
                     <div className="flex gap-1 md:gap-2">
@@ -271,8 +272,8 @@ export function TableViewMode({
                       ))}
                     </div>
                     
-                    {/* Right heart */}
-                    <span className="text-red-500/40 text-xl md:text-3xl">♥</span>
+                    {/* Right heart - SVG component */}
+                    <CardSuit suit="heart" size="lg" className="opacity-40" />
                   </div>
                   
                   {/* Bottom text */}

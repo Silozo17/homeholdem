@@ -40,6 +40,8 @@ export async function sendPushNotification({
 }
 
 // Convenience functions for common notification types
+// NOTE: All titles are clean text (no emojis) for a premium feel
+
 export async function notifyEventRsvp(
   hostUserId: string,
   eventTitle: string,
@@ -48,7 +50,7 @@ export async function notifyEventRsvp(
 ) {
   return sendPushNotification({
     userIds: [hostUserId],
-    title: "New RSVP! 🃏",
+    title: "New RSVP",
     body: `${playerName} is joining ${eventTitle}`,
     url: `/event/${eventId}`,
     tag: `rsvp-${eventId}`,
@@ -63,7 +65,7 @@ export async function notifyWaitlistPromotion(
 ) {
   return sendPushNotification({
     userIds: [userId],
-    title: "You're In! 🎉",
+    title: "You're In!",
     body: `A spot opened up for ${eventTitle}`,
     url: `/event/${eventId}`,
     tag: `waitlist-${eventId}`,
@@ -79,7 +81,7 @@ export async function notifyDateFinalized(
 ) {
   return sendPushNotification({
     userIds,
-    title: "Date Confirmed! 📅",
+    title: "Date Confirmed",
     body: `${eventTitle} is set for ${formattedDate}`,
     url: `/event/${eventId}`,
     tag: `date-${eventId}`,
@@ -95,7 +97,7 @@ export async function notifyNewChatMessage(
 ) {
   return sendPushNotification({
     userIds,
-    title: `${senderName} 💬`,
+    title: senderName,
     body: "New message in poker chat",
     url: eventId ? `/event/${eventId}` : `/club/${clubId}`,
     tag: `chat-${eventId || clubId}`,
@@ -111,7 +113,7 @@ export async function notifyBlindsUp(
 ) {
   return sendPushNotification({
     userIds,
-    title: "Blinds Up! ⏰",
+    title: "Blinds Up",
     body: `${smallBlind}/${bigBlind}${ante ? ` (ante ${ante})` : ""}`,
     tag: "blinds-up",
     notificationType: 'blinds_up',

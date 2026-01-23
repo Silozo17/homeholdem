@@ -8,8 +8,9 @@ import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { History, ChevronRight, Download } from 'lucide-react';
+import { History, ChevronRight, Download, Trophy } from 'lucide-react';
 import { exportGameHistoryToCSV } from '@/lib/csv-export';
+import { CardSuit } from '@/components/common/CardSuits';
 
 interface GameSession {
   id: string;
@@ -168,7 +169,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
       <CardContent>
         {sessions.length === 0 ? (
           <div className="text-center py-6">
-            <div className="text-3xl mb-2 opacity-30">🃏</div>
+            <CardSuit suit="spade" size="xl" className="mx-auto mb-2 opacity-30" />
             <p className="text-sm text-muted-foreground">
               {t('stats_section.no_history')}
             </p>
@@ -201,8 +202,8 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
                     <span>{symbol}{session.prize_pool} {t('stats_section.pool')}</span>
                   </div>
                   {session.winner_name && (
-                    <p className="text-xs text-primary mt-1">
-                      🏆 {t('stats_section.winner')}: {session.winner_name}
+                    <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                      <Trophy className="h-3 w-3" /> {t('stats_section.winner')}: {session.winner_name}
                     </p>
                   )}
                 </div>

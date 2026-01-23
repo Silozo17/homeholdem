@@ -277,7 +277,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       <CardContent>
         {stats.length === 0 ? (
           <div className="text-center py-6">
-            <div className="text-3xl mb-2 opacity-30">🏆</div>
+            <Trophy className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
             <p className="text-sm text-muted-foreground">
               {t('stats_section.no_games')}
             </p>
@@ -310,11 +310,11 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{player.games_played} {t('stats_section.games_suffix')}</span>
                     <span>•</span>
-                    <span>{player.wins} 🥇</span>
+                    <span className="flex items-center gap-0.5">{player.wins} <Trophy className="h-3 w-3 text-yellow-500" /></span>
                     {player.second_places > 0 && (
                       <>
                         <span>•</span>
-                        <span>{player.second_places} 🥈</span>
+                        <span className="flex items-center gap-0.5">{player.second_places} <Medal className="h-3 w-3 text-gray-400" /></span>
                       </>
                     )}
                   </div>
