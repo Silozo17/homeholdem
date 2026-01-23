@@ -527,11 +527,12 @@ export type Database = {
           game_session_id: string
           id: string
           is_guest: boolean | null
+          placeholder_player_id: string | null
           seat_number: number | null
           status: string
           table_number: number | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -542,11 +543,12 @@ export type Database = {
           game_session_id: string
           id?: string
           is_guest?: boolean | null
+          placeholder_player_id?: string | null
           seat_number?: number | null
           status?: string
           table_number?: number | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -557,11 +559,12 @@ export type Database = {
           game_session_id?: string
           id?: string
           is_guest?: boolean | null
+          placeholder_player_id?: string | null
           seat_number?: number | null
           status?: string
           table_number?: number | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -569,6 +572,13 @@ export type Database = {
             columns: ["game_session_id"]
             isOneToOne: false
             referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_players_placeholder_player_id_fkey"
+            columns: ["placeholder_player_id"]
+            isOneToOne: false
+            referencedRelation: "placeholder_players"
             referencedColumns: ["id"]
           },
         ]
