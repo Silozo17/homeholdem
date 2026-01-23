@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { pl, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +59,8 @@ interface SeasonLeaderboardProps {
 }
 
 export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
+  const { t, i18n } = useTranslation();
+  const { symbol } = useClubCurrency(clubId);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -64,6 +69,8 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
   const [newSeasonName, setNewSeasonName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   useEffect(() => {
     fetchSeasons();
@@ -143,7 +150,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
 
   const handleCreateSeason = async () => {
     if (!newSeasonName || !startDate || !endDate) {
-      toast.error('Please fill in all fields');
+      toast.error(t('season.fill_all_fields'));
       return;
     }
 
@@ -167,11 +174,11 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       .single();
 
     if (error) {
-      toast.error('Failed to create season');
+      toast.error(t('season.create_failed'));
       return;
     }
 
-    toast.success('Season created!');
+    toast.success(t('season.created'));
     setShowCreate(false);
     setNewSeasonName('');
     setStartDate('');
@@ -197,7 +204,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">Loading seasons...</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('season.loading')}</div>
         </CardContent>
       </Card>
     );
@@ -210,12 +217,12 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              Season Standings
+              {t('season.title')}
             </CardTitle>
             {isAdmin && (
               <Button size="sm" variant="outline" onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-1" />
-                New Season
+                {t('season.new_season')}
               </Button>
             )}
           </div>
@@ -225,7 +232,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
             <div className="text-center py-6">
               <div className="text-3xl mb-2 opacity-30">🏆</div>
               <p className="text-sm text-muted-foreground">
-                No seasons yet. Create one to start tracking points!
+                {t('season.no_seasons')}
               </p>
             </div>
           ) : (
@@ -234,12 +241,12 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               <div className="flex items-center gap-2">
                 <Select value={selectedSeasonId || ''} onValueChange={setSelectedSeasonId}>
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select season" />
+                    <SelectValue placeholder={t('season.select_season')} />
                   </SelectTrigger>
                 <SelectContent>
                     {seasons.map(season => (
                       <SelectItem key={season.id} value={season.id}>
-                        {season.name} {season.computed_status === 'active' ? '(Active)' : season.computed_status === 'closed' ? '(Closed)' : '(Upcoming)'}
+                        {season.name} ({season.computed_status === 'active' ? t('season.active') : season.computed_status === 'closed' ? t('season.closed') : t('season.upcoming')})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -249,15 +256,15 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               {/* Season Info */}
               {selectedSeason && (
                 <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2 flex-wrap">
-                  <span>{format(new Date(selectedSeason.start_date), 'MMM d, yyyy')} - {format(new Date(selectedSeason.end_date), 'MMM d, yyyy')}</span>
+                  <span>{format(new Date(selectedSeason.start_date), 'MMM d, yyyy', { locale: dateLocale })} - {format(new Date(selectedSeason.end_date), 'MMM d, yyyy', { locale: dateLocale })}</span>
                   {selectedSeason.computed_status === 'active' && (
-                    <Badge variant="default" className="bg-green-600">Active</Badge>
+                    <Badge variant="default" className="bg-green-600">{t('season.active')}</Badge>
                   )}
                   {selectedSeason.computed_status === 'closed' && (
-                    <Badge variant="secondary">Closed</Badge>
+                    <Badge variant="secondary">{t('season.closed')}</Badge>
                   )}
                   {selectedSeason.computed_status === 'upcoming' && (
-                    <Badge variant="outline" className="border-blue-500 text-blue-500">Upcoming</Badge>
+                    <Badge variant="outline" className="border-blue-500 text-blue-500">{t('season.upcoming')}</Badge>
                   )}
                 </div>
               )}
@@ -266,7 +273,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               {standings.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">
-                    No standings yet. Complete a game to see points!
+                    {t('season.no_standings')}
                   </p>
                 </div>
               ) : (
@@ -286,18 +293,18 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{player.display_name}</p>
                             {player.placeholder_player_id && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">Unlinked</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">{t('season.unlinked')}</Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {player.games_played} games • {player.wins}W • {player.second_places}×2nd
+                            {player.games_played} {t('season.games')} • {player.wins}{t('season.wins_short')} • {player.second_places}×{t('season.second_short')}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-primary">{player.total_points} pts</p>
+                        <p className="font-bold text-primary">{player.total_points} {t('season.pts')}</p>
                         <p className="text-xs text-muted-foreground">
-                          £{player.total_winnings} won
+                          {symbol}{player.total_winnings} {t('season.won')}
                         </p>
                       </div>
                     </div>
@@ -313,20 +320,20 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Season</DialogTitle>
+            <DialogTitle>{t('season.create_new_season')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Season Name</Label>
+              <Label>{t('season.season_name')}</Label>
               <Input
                 value={newSeasonName}
                 onChange={(e) => setNewSeasonName(e.target.value)}
-                placeholder="e.g., 2026 Spring Season"
+                placeholder={t('season.name_placeholder')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>{t('season.start_date')}</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -334,7 +341,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label>{t('season.end_date')}</Label>
                 <Input
                   type="date"
                   value={endDate}
@@ -343,13 +350,13 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               </div>
             </div>
             <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
-              <p className="font-medium mb-1">Default Points:</p>
-              <p>1st: 10 pts • 2nd: 7 pts • 3rd: 5 pts • 4th: 3 pts • Participation: 1 pt</p>
+              <p className="font-medium mb-1">{t('season.default_points')}:</p>
+              <p>{t('season.points_breakdown')}</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={handleCreateSeason}>Create Season</Button>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleCreateSeason}>{t('season.create_season')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

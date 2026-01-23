@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -28,31 +29,33 @@ interface ChipTemplateManagerProps {
   isAdmin: boolean;
 }
 
-const CHIP_COLORS = [
-  { value: 'white', label: 'White', hex: '#E5E7EB' },
-  { value: 'red', label: 'Red', hex: '#DC2626' },
-  { value: 'orange', label: 'Orange', hex: '#F97316' },
-  { value: 'yellow', label: 'Yellow', hex: '#EAB308' },
-  { value: 'green', label: 'Green', hex: '#84CC16' },
-  { value: 'blue', label: 'Blue', hex: '#2563EB' },
-  { value: 'purple', label: 'Purple', hex: '#7C3AED' },
-  { value: 'pink', label: 'Pink', hex: '#EC4899' },
-  { value: 'black', label: 'Black', hex: '#374151' },
-  { value: 'grey', label: 'Grey', hex: '#6B7280' },
-];
-
 const CURRENCIES = [
   { value: 'GBP', label: '£ GBP', symbol: '£' },
   { value: 'USD', label: '$ USD', symbol: '$' },
   { value: 'EUR', label: '€ EUR', symbol: '€' },
+  { value: 'PLN', label: 'zł PLN', symbol: 'zł' },
 ];
 
 export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProps) {
+  const { t } = useTranslation();
   const [template, setTemplate] = useState<ChipTemplate | null>(null);
   const [denominations, setDenominations] = useState<ChipDenomination[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  const CHIP_COLORS = [
+    { value: 'white', label: t('chips.colors.white'), hex: '#E5E7EB' },
+    { value: 'red', label: t('chips.colors.red'), hex: '#DC2626' },
+    { value: 'orange', label: t('chips.colors.orange'), hex: '#F97316' },
+    { value: 'yellow', label: t('chips.colors.yellow'), hex: '#EAB308' },
+    { value: 'green', label: t('chips.colors.green'), hex: '#84CC16' },
+    { value: 'blue', label: t('chips.colors.blue'), hex: '#2563EB' },
+    { value: 'purple', label: t('chips.colors.purple'), hex: '#7C3AED' },
+    { value: 'pink', label: t('chips.colors.pink'), hex: '#EC4899' },
+    { value: 'black', label: t('chips.colors.black'), hex: '#374151' },
+    { value: 'grey', label: t('chips.colors.grey'), hex: '#6B7280' },
+  ];
 
   useEffect(() => {
     fetchChipTemplate();
@@ -114,12 +117,12 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
       .eq('id', template.id);
 
     if (error) {
-      toast.error('Failed to update currency');
+      toast.error(t('chips.currency_update_failed'));
       return;
     }
 
     setTemplate({ ...template, currency: newCurrency });
-    toast.success('Currency updated');
+    toast.success(t('chips.currency_updated'));
   };
 
   const handleDenominationChange = (id: string, field: keyof ChipDenomination, value: string | number) => {
@@ -201,12 +204,12 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
         }
       }
 
-      toast.success('Chip values saved');
+      toast.success(t('chips.values_saved'));
       setHasChanges(false);
       fetchChipTemplate(); // Refresh to get new IDs
     } catch (error) {
       console.error('Error saving:', error);
-      toast.error('Failed to save chip values');
+      toast.error(t('chips.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -229,7 +232,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
       <Card>
         <CardContent className="p-6">
           <p className="text-muted-foreground text-center py-4">
-            No chip template found for this club.
+            {t('chips.no_template')}
           </p>
         </CardContent>
       </Card>
@@ -241,13 +244,13 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Coins className="h-5 w-5" />
-          Chip Values
+          {t('chips.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Currency selector */}
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">Currency:</span>
+          <span className="text-sm text-muted-foreground">{t('chips.currency')}:</span>
           {isAdmin ? (
             <Select value={template.currency} onValueChange={handleCurrencyChange}>
               <SelectTrigger className="w-32">
@@ -355,7 +358,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                       >
                         <span className="poker-chip-value text-xs">{denom.denomination}</span>
                       </div>
-                      <span className="capitalize text-sm">{denom.color}</span>
+                      <span className="capitalize text-sm">{colorInfo.label}</span>
                       <span className="text-muted-foreground text-sm">({denom.denomination})</span>
                       <span className="ml-auto font-medium text-sm">
                         {getCurrencySymbol()}{denom.cash_value.toFixed(2)}
@@ -377,7 +380,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
               className="gap-1"
             >
               <Plus className="h-4 w-4" />
-              Add Chip
+              {t('chips.add_chip')}
             </Button>
             
             {hasChanges && (
@@ -388,7 +391,7 @@ export function ChipTemplateManager({ clubId, isAdmin }: ChipTemplateManagerProp
                 className="gap-1 ml-auto"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? t('chips.saving') : t('chips.save_changes')}
               </Button>
             )}
           </div>

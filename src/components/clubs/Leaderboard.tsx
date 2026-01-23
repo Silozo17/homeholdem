@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,7 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<PlayerStats[]>([]);
   const [loading, setLoading] = useState(true);
   const { symbol } = useClubCurrency(clubId);
@@ -223,7 +225,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">Loading stats...</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('leaderboard.loading')}</div>
         </CardContent>
       </Card>
     );
@@ -235,12 +237,12 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Trophy className="h-5 w-5 text-primary" />
-            All-Time Leaderboard
+            {t('leaderboard.all_time')}
           </CardTitle>
           {stats.length > 0 && (
             <Button size="sm" variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" />
-              Export
+              {t('common.export')}
             </Button>
           )}
         </div>
@@ -250,7 +252,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
           <div className="text-center py-6">
             <div className="text-3xl mb-2 opacity-30">🏆</div>
             <p className="text-sm text-muted-foreground">
-              No games played yet. Complete a game to see stats!
+              {t('leaderboard.no_games')}
             </p>
           </div>
         ) : (
@@ -279,7 +281,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{player.display_name}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{player.games_played} games</span>
+                    <span>{player.games_played} {t('leaderboard.games')}</span>
                     <span>•</span>
                     <span>{player.wins} 🥇</span>
                     {player.second_places > 0 && (

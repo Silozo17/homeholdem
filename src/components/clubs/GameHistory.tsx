@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { pl, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,10 +28,13 @@ interface GameHistoryProps {
 }
 
 export function GameHistory({ clubId, clubName }: GameHistoryProps) {
+  const { t, i18n } = useTranslation();
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { symbol } = useClubCurrency(clubId);
+
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   useEffect(() => {
     fetchSessions();
@@ -119,11 +124,18 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
     exportGameHistoryToCSV(historyData, clubName);
   };
 
+  const getStatusLabel = (status: string) => {
+    if (status === 'completed') return t('history.completed');
+    if (status === 'active') return t('history.active');
+    if (status === 'paused') return t('history.paused');
+    return status;
+  };
+
   if (loading) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">Loading history...</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('history.loading')}</div>
         </CardContent>
       </Card>
     );
@@ -135,12 +147,12 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            Game History
+            {t('history.title')}
           </CardTitle>
           {sessions.length > 0 && (
             <Button size="sm" variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" />
-              Export
+              {t('common.export')}
             </Button>
           )}
         </div>
@@ -150,7 +162,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
           <div className="text-center py-6">
             <div className="text-3xl mb-2 opacity-30">🃏</div>
             <p className="text-sm text-muted-foreground">
-              No games played yet. Start your first tournament!
+              {t('history.no_games')}
             </p>
           </div>
         ) : (
@@ -168,21 +180,21 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
                       variant={session.status === 'completed' ? 'default' : 'secondary'}
                       className="text-xs"
                     >
-                      {session.status}
+                      {getStatusLabel(session.status)}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     {session.final_date && (
-                      <span>{format(new Date(session.final_date), 'MMM d, yyyy')}</span>
+                      <span>{format(new Date(session.final_date), 'MMM d, yyyy', { locale: dateLocale })}</span>
                     )}
                     <span>•</span>
-                    <span>{session.player_count} players</span>
+                    <span>{session.player_count} {t('history.players')}</span>
                     <span>•</span>
-                    <span>{symbol}{session.prize_pool} pool</span>
+                    <span>{symbol}{session.prize_pool} {t('history.pool')}</span>
                   </div>
                   {session.winner_name && (
                     <p className="text-xs text-primary mt-1">
-                      🏆 Winner: {session.winner_name}
+                      🏆 {t('history.winner')}: {session.winner_name}
                     </p>
                   )}
                 </div>
