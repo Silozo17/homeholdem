@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
-import { Settings, TrendingUp, Users, Calendar, Crown, Medal, DollarSign } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame } from 'lucide-react';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 
@@ -29,13 +29,18 @@ interface ClubMembership {
   };
 }
 
-interface PlayerStats {
+interface QuickStats {
   totalGames: number;
   totalWins: number;
-  totalCashes: number;
-  totalPrizeMoney: number;
-  totalBuyIns: number;
-  netProfit: number;
+  clubCount: number;
+}
+
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  unlocked: boolean;
 }
 
 export default function Profile() {
@@ -44,14 +49,12 @@ export default function Profile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [clubs, setClubs] = useState<ClubMembership[]>([]);
-  const [stats, setStats] = useState<PlayerStats>({
+  const [quickStats, setQuickStats] = useState<QuickStats>({
     totalGames: 0,
     totalWins: 0,
-    totalCashes: 0,
-    totalPrizeMoney: 0,
-    totalBuyIns: 0,
-    netProfit: 0,
+    clubCount: 0,
   });
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
@@ -105,67 +108,60 @@ export default function Profile() {
 
     const placeholderIds = linkedPlaceholders?.map(p => p.id) || [];
 
-    // Fetch game statistics - include both direct user_id AND linked placeholder_player_id
+    // Fetch quick game statistics
     let gamePlayersQuery = supabase
       .from('game_players')
-      .select('id, finish_position, game_session_id, user_id, placeholder_player_id');
+      .select('id, finish_position');
 
     if (placeholderIds.length > 0) {
-      // Query for direct user_id OR any linked placeholder_player_id
       gamePlayersQuery = gamePlayersQuery.or(
         `user_id.eq.${user.id},placeholder_player_id.in.(${placeholderIds.join(',')})`
       );
     } else {
-      // No linked placeholders, just query by user_id
       gamePlayersQuery = gamePlayersQuery.eq('user_id', user.id);
     }
 
     const { data: gamePlayersData } = await gamePlayersQuery;
 
-    const gamePlayerIds = gamePlayersData?.map(p => p.id) || [];
+    const totalGames = gamePlayersData?.length || 0;
+    const totalWins = gamePlayersData?.filter(p => p.finish_position === 1).length || 0;
+    const clubCount = memberships?.length || 0;
 
-    // Fetch transactions for buy-ins
-    const { data: transactionsData } = await supabase
-      .from('game_transactions')
-      .select('amount, transaction_type, game_player_id')
-      .in('game_player_id', gamePlayerIds);
+    setQuickStats({ totalGames, totalWins, clubCount });
 
-    // Fetch payouts from payout_structures (where historical data lives)
-    const { data: payoutData } = await supabase
-      .from('payout_structures')
-      .select('player_id, amount')
-      .in('player_id', gamePlayerIds);
+    // Calculate achievements
+    const achievementsList: Achievement[] = [
+      {
+        id: 'first_game',
+        name: t('profile.achievements.first_game'),
+        description: t('profile.achievements.first_game_desc'),
+        icon: <Target className="h-5 w-5" />,
+        unlocked: totalGames >= 1,
+      },
+      {
+        id: 'first_win',
+        name: t('profile.achievements.first_win'),
+        description: t('profile.achievements.first_win_desc'),
+        icon: <Trophy className="h-5 w-5" />,
+        unlocked: totalWins >= 1,
+      },
+      {
+        id: 'five_games',
+        name: t('profile.achievements.five_games'),
+        description: t('profile.achievements.five_games_desc'),
+        icon: <Flame className="h-5 w-5" />,
+        unlocked: totalGames >= 5,
+      },
+      {
+        id: 'three_wins',
+        name: t('profile.achievements.three_wins'),
+        description: t('profile.achievements.three_wins_desc'),
+        icon: <Trophy className="h-5 w-5 text-primary" />,
+        unlocked: totalWins >= 3,
+      },
+    ];
 
-    if (gamePlayersData) {
-      const totalGames = gamePlayersData.length;
-      const totalWins = gamePlayersData.filter(p => p.finish_position === 1).length;
-      const totalCashes = gamePlayersData.filter(p => p.finish_position && p.finish_position <= 3).length;
-      
-      let totalBuyIns = 0;
-      let totalPrizeMoney = 0;
-      
-      // Sum buy-ins from transactions
-      transactionsData?.forEach(t => {
-        if (['buy_in', 'rebuy', 'addon'].includes(t.transaction_type)) {
-          totalBuyIns += t.amount;
-        }
-      });
-
-      // Sum prize money from payout_structures
-      payoutData?.forEach(p => {
-        totalPrizeMoney += p.amount || 0;
-      });
-
-      setStats({
-        totalGames,
-        totalWins,
-        totalCashes,
-        totalPrizeMoney,
-        totalBuyIns,
-        netProfit: totalPrizeMoney - totalBuyIns,
-      });
-    }
-
+    setAchievements(achievementsList);
     setLoadingData(false);
   };
 
@@ -235,75 +231,60 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="bg-card/50 border-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">{t('stats.games')}</span>
-              </div>
-              <div className="text-2xl font-bold">{stats.totalGames}</div>
-            </CardContent>
-          </Card>
+        {/* Quick Summary */}
+        <Card className="bg-card/50 border-border/50">
+          <CardContent className="py-4">
+            <p className="text-center text-muted-foreground">
+              {t('profile.quick_summary', {
+                games: quickStats.totalGames,
+                wins: quickStats.totalWins,
+                clubs: quickStats.clubCount,
+              })}
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="bg-card/50 border-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Crown className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">{t('stats.wins')}</span>
-              </div>
-              <div className="text-2xl font-bold">{stats.totalWins}</div>
-            </CardContent>
-          </Card>
+        {/* View Full Stats Button */}
+        <Button
+          variant="outline"
+          className="w-full justify-between"
+          onClick={() => navigate('/stats')}
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <span>{t('profile.view_full_stats')}</span>
+          </div>
+          <ChevronRight className="h-5 w-5" />
+        </Button>
 
-          <Card className="bg-card/50 border-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Medal className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">{t('stats.cashes')}</span>
-              </div>
-              <div className="text-2xl font-bold">{stats.totalCashes}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 border-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">{t('stats.win_rate')}</span>
-              </div>
-              <div className="text-2xl font-bold">
-                {stats.totalGames > 0 
-                  ? Math.round((stats.totalWins / stats.totalGames) * 100) 
-                  : 0}%
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Financial Summary */}
+        {/* Achievements */}
         <Card className="bg-card/50 border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              {t('stats.financial_summary')}
+              <Trophy className="h-5 w-5 text-primary" />
+              {t('profile.achievements.title')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('stats.total_buyins')}</span>
-              <span className="font-medium">£{stats.totalBuyIns.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('stats.total_winnings')}</span>
-              <span className="font-medium text-success">£{stats.totalPrizeMoney.toFixed(2)}</span>
-            </div>
-            <div className="border-t border-border pt-3 flex justify-between">
-              <span className="font-medium">{t('stats.net_profit')}</span>
-              <span className={`font-bold ${stats.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {stats.netProfit >= 0 ? '+' : ''}£{stats.netProfit.toFixed(2)}
-              </span>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {achievements.map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className={`p-3 rounded-lg border ${
+                    achievement.unlocked
+                      ? 'bg-primary/10 border-primary/30'
+                      : 'bg-muted/30 border-border/50 opacity-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={achievement.unlocked ? 'text-primary' : 'text-muted-foreground'}>
+                      {achievement.icon}
+                    </div>
+                    <span className="text-sm font-medium">{achievement.name}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

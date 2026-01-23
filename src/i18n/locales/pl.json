@@ -497,7 +497,20 @@
     "change_avatar": "Zmień awatar",
     "remove_avatar": "Usuń awatar",
     "crop_image": "Przytnij zdjęcie",
-    "save_avatar": "Zapisz awatar"
+    "save_avatar": "Zapisz awatar",
+    "quick_summary": "Zagrałeś {{games}} gier i wygrałeś {{wins}} razy w {{clubs}} klubach",
+    "view_full_stats": "Zobacz pełne statystyki",
+    "achievements": {
+      "title": "Osiągnięcia",
+      "first_game": "Pierwsza gra",
+      "first_game_desc": "Zagrałeś pierwszą noc pokerową",
+      "first_win": "Mistrz",
+      "first_win_desc": "Wygrałeś pierwszy turniej",
+      "five_games": "Bywalec",
+      "five_games_desc": "Zagrałeś 5 gier",
+      "three_wins": "Hat Trick",
+      "three_wins_desc": "Wygrałeś 3 turnieje"
+    }
   },
   "stats": {
     "your_stats": "Twoje statystyki",
