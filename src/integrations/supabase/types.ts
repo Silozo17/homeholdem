@@ -420,6 +420,38 @@ export type Database = {
           },
         ]
       }
+      event_host_votes: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          volunteer_user_id: string
+          voter_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          volunteer_user_id: string
+          voter_user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          volunteer_user_id?: string
+          voter_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_host_votes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_rsvps: {
         Row: {
           created_at: string
