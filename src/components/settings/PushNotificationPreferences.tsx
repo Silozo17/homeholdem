@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -37,14 +38,15 @@ interface PushNotificationPreferencesProps {
 }
 
 export function PushNotificationPreferences({ isEnabled }: PushNotificationPreferencesProps) {
+  const { t } = useTranslation();
   const { preferences, loading, updatePreference } = useUserPreferences();
 
   const handleToggle = async (key: keyof typeof preferences & string, value: boolean) => {
     const success = await updatePreference(key as any, value);
     if (success) {
-      toast.success(value ? 'Notification enabled' : 'Notification disabled');
+      toast.success(t('common.success'));
     } else {
-      toast.error('Failed to update preference');
+      toast.error(t('common.error'));
     }
   };
 
@@ -63,40 +65,40 @@ export function PushNotificationPreferences({ isEnabled }: PushNotificationPrefe
   return (
     <div className="space-y-1 pt-2 border-t border-border/30">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 pb-1">
-        Notification Types
+        {t('settings.notification_types')}
       </p>
       <SettingRow
         id="push_rsvp_updates"
-        label="RSVP updates"
-        description="When players RSVP to your events"
+        label={t('settings.rsvp_updates')}
+        description={t('settings.rsvp_description')}
         checked={preferences.push_rsvp_updates}
         onCheckedChange={(v) => handleToggle('push_rsvp_updates', v)}
       />
       <SettingRow
         id="push_date_finalized"
-        label="Date confirmed"
-        description="When event dates are finalized"
+        label={t('settings.date_confirmed')}
+        description={t('settings.date_description')}
         checked={preferences.push_date_finalized}
         onCheckedChange={(v) => handleToggle('push_date_finalized', v)}
       />
       <SettingRow
         id="push_waitlist_promotion"
-        label="Waitlist promotions"
-        description="When you get a spot at an event"
+        label={t('settings.waitlist_promotions')}
+        description={t('settings.waitlist_description')}
         checked={preferences.push_waitlist_promotion}
         onCheckedChange={(v) => handleToggle('push_waitlist_promotion', v)}
       />
       <SettingRow
         id="push_chat_messages"
-        label="Chat messages"
-        description="New messages in club and event chats"
+        label={t('settings.chat_messages')}
+        description={t('settings.chat_description')}
         checked={preferences.push_chat_messages}
         onCheckedChange={(v) => handleToggle('push_chat_messages', v)}
       />
       <SettingRow
         id="push_blinds_up"
-        label="Blinds up"
-        description="During tournaments when blinds increase"
+        label={t('settings.blinds_up')}
+        description={t('settings.blinds_description')}
         checked={preferences.push_blinds_up}
         onCheckedChange={(v) => handleToggle('push_blinds_up', v)}
       />
