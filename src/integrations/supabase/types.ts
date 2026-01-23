@@ -1047,6 +1047,63 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          email_club_invites: boolean | null
+          email_event_created: boolean | null
+          email_event_reminder: boolean | null
+          email_game_results: boolean | null
+          email_rsvp_confirmation: boolean | null
+          email_waitlist_promotion: boolean | null
+          id: string
+          push_blinds_up: boolean | null
+          push_chat_messages: boolean | null
+          push_date_finalized: boolean | null
+          push_rsvp_updates: boolean | null
+          push_waitlist_promotion: boolean | null
+          show_stats_publicly: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_club_invites?: boolean | null
+          email_event_created?: boolean | null
+          email_event_reminder?: boolean | null
+          email_game_results?: boolean | null
+          email_rsvp_confirmation?: boolean | null
+          email_waitlist_promotion?: boolean | null
+          id?: string
+          push_blinds_up?: boolean | null
+          push_chat_messages?: boolean | null
+          push_date_finalized?: boolean | null
+          push_rsvp_updates?: boolean | null
+          push_waitlist_promotion?: boolean | null
+          show_stats_publicly?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_club_invites?: boolean | null
+          email_event_created?: boolean | null
+          email_event_reminder?: boolean | null
+          email_game_results?: boolean | null
+          email_rsvp_confirmation?: boolean | null
+          email_waitlist_promotion?: boolean | null
+          id?: string
+          push_blinds_up?: boolean | null
+          push_chat_messages?: boolean | null
+          push_date_finalized?: boolean | null
+          push_rsvp_updates?: boolean | null
+          push_waitlist_promotion?: boolean | null
+          show_stats_publicly?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
