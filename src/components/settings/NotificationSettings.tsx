@@ -1,4 +1,4 @@
-import { Bell, BellOff, Check, X, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Check, X, Loader2, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +38,41 @@ export function NotificationSettings() {
       }
     }
   };
+
+  // iOS non-Safari specific message
+  if (!isSupported && error === 'ios_non_safari') {
+    return (
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">{t('settings.push_notifications')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+              <Smartphone className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold">{t('settings.ios_safari_required_title')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.ios_safari_required_desc')}
+              </p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-3 text-left space-y-2">
+              <p className="text-xs font-medium">{t('settings.ios_safari_steps_title')}:</p>
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>{t('settings.ios_safari_step_1')}</li>
+                <li>{t('settings.ios_safari_step_2')}</li>
+                <li>{t('settings.ios_safari_step_3')}</li>
+              </ol>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!isSupported) {
     return (
