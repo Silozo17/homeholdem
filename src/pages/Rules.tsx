@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { PokerHandRankings } from '@/components/clubs/PokerHandRankings';
 import { Logo } from '@/components/layout/Logo';
 
 export default function Rules() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -26,7 +28,7 @@ export default function Rules() {
 
       <main className="container px-4 py-6 pb-24">
         <h1 className="text-2xl font-bold text-gold-gradient mb-6 text-center">
-          Texas Hold'em Rules
+          {t('poker.texas_holdem_rules')}
         </h1>
         <PokerHandRankings />
       </main>

@@ -59,7 +59,8 @@
     "retry": "Spróbuj ponownie",
     "today": "Dzisiaj",
     "tomorrow": "Jutro",
-    "yesterday": "Wczoraj"
+    "yesterday": "Wczoraj",
+    "creating": "Tworzenie..."
   },
   "auth": {
     "welcome_back": "Witaj z powrotem",
@@ -256,7 +257,7 @@
     "past": "Przeszłe",
     "all_events": "Wszystkie wydarzenia",
     "no_upcoming": "Brak nadchodzących wydarzeń",
-    "no_pending": "Brak oczekujących wydarzeń",
+    "no_pending": "Brak wydarzeń oczekujących na potwierdzenie daty",
     "no_past": "Brak przeszłych wydarzeń",
     "event_chat": "Czat wydarzenia",
     "club_chat": "Czat klubu",
@@ -270,7 +271,38 @@
     "host_volunteer_removed": "Usunięto z potencjalnych gospodarzy",
     "host_confirmed": "Gospodarz potwierdzony",
     "rsvp_updated": "RSVP zaktualizowane",
-    "on_waitlist": "Jesteś na liście oczekujących"
+    "on_waitlist": "Jesteś na liście oczekujących",
+    "all_poker_nights": "Wszystkie wieczory pokerowe w twoich klubach",
+    "going": "Idę",
+    "maybe": "Może",
+    "not_going": "Nie idę",
+    "cant_go": "Nie mogę",
+    "no_rsvp": "Brak RSVP",
+    "vote_for_date": "Głosuj na datę",
+    "vote_count": "{{count}} głos",
+    "vote_count_plural": "{{count}} głosów",
+    "finalize": "Zatwierdź",
+    "voters": "Głosujący",
+    "voting_instructions": "Dotknij, aby głosować • Możesz głosować na wiele dat • Dotknij liczby głosów, aby zobaczyć głosujących",
+    "create_description": "Zaplanuj wieczór pokerowy i pozwól członkom głosować na najlepszą datę.",
+    "title_placeholder": "Styczniowy Wieczór Pokerowy",
+    "description_label": "Opis (opcjonalnie)",
+    "description_placeholder": "Miesięczny turniej Texas Hold'em",
+    "location_label": "Lokalizacja (opcjonalnie)",
+    "location_placeholder": "Do ustalenia - gospodarz potwierdzi",
+    "table": "Stół",
+    "tables": "Stoły",
+    "seats": "miejsc",
+    "date_options_voting": "Opcje dat do głosowania",
+    "date_select_instructions": "Kliknij daty, aby wybrać/odznaczyć. Wszystkie daty będą miały tę samą godzinę rozpoczęcia.",
+    "all_fridays": "Wszystkie piątki",
+    "all_saturdays": "Wszystkie soboty",
+    "start_time": "Godzina rozpoczęcia",
+    "applies_all_dates": "dotyczy wszystkich dat",
+    "dates_selected": "Wybrano {{count}} dat(ę)",
+    "select_at_least_one": "Wybierz co najmniej jedną datę do głosowania.",
+    "add_date_option": "Dodaj co najmniej jedną opcję daty",
+    "date_options_failed": "Wydarzenie utworzone, ale nie udało się dodać opcji dat"
   },
   "game": {
     "game_mode": "Tryb gry",
@@ -524,9 +556,10 @@
     "got_it": "Rozumiem!"
   },
   "notfound": {
-    "title": "404",
+    "title": "Ups! Strona nie znaleziona",
     "message": "Strona nie znaleziona",
-    "return_home": "Wróć na stronę główną"
+    "return_home": "Wróć na stronę główną",
+    "go_home": "Wróć do strony głównej"
   },
   "poker": {
     "hand_rankings": "Ranking układów",
@@ -577,7 +610,8 @@
     "small_blind": "Mały blind",
     "small_blind_desc": "Obowiązkowy zakład, po lewej od dealera",
     "big_blind": "Duży blind",
-    "big_blind_desc": "Obowiązkowy zakład, 2x mały blind"
+    "big_blind_desc": "Obowiązkowy zakład, 2x mały blind",
+    "texas_holdem_rules": "Zasady Texas Hold'em"
   },
   "toast": {
     "success": "Sukces!",
@@ -605,7 +639,10 @@
     "transaction_added": "Transakcja dodana",
     "player_eliminated": "Gracz wyeliminowany",
     "player_added": "Gracz dodany",
-    "language_changed": "Język zmieniony"
+    "language_changed": "Język zmieniony",
+    "failed_remove_vote": "Nie udało się usunąć głosu",
+    "failed_vote": "Nie udało się zagłosować",
+    "event_create_failed": "Nie udało się utworzyć wydarzenia"
   },
   "validation": {
     "email_invalid": "Wprowadź poprawny adres email",
@@ -668,7 +705,13 @@
     "times_hosted": "Ile razy gościł",
     "last_hosted": "Ostatnio gościł",
     "never": "Nigdy",
-    "suggested_next": "Sugerowany następny gospodarz"
+    "suggested_next": "Sugerowany następny gospodarz",
+    "host_needed": "Potrzebny gospodarz",
+    "select_new_host": "Wybierz nowego gospodarza",
+    "i_can_host": "Mogę być gospodarzem",
+    "withdraw_offer": "Wycofaj ofertę",
+    "volunteers": "Ochotnicy",
+    "no_volunteers": "Brak ochotników. Bądź pierwszy!"
   },
   "season": {
     "current_season": "Obecny sezon",

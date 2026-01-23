@@ -59,7 +59,8 @@
     "retry": "Retry",
     "today": "Today",
     "tomorrow": "Tomorrow",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "creating": "Creating..."
   },
   "auth": {
     "welcome_back": "Welcome Back",
@@ -256,8 +257,8 @@
     "past": "Past",
     "all_events": "All Events",
     "no_upcoming": "No upcoming events",
-    "no_pending": "No pending events",
-    "no_past": "No past events",
+    "no_pending": "No events awaiting date confirmation",
+    "no_past": "No past events yet",
     "event_chat": "Event Chat",
     "club_chat": "Club Chat",
     "type_message": "Type a message...",
@@ -270,7 +271,38 @@
     "host_volunteer_removed": "Removed as potential host",
     "host_confirmed": "Host confirmed",
     "rsvp_updated": "RSVP updated",
-    "on_waitlist": "You're on the waitlist"
+    "on_waitlist": "You're on the waitlist",
+    "all_poker_nights": "All poker nights across your clubs",
+    "going": "Going",
+    "maybe": "Maybe",
+    "not_going": "Not Going",
+    "cant_go": "Can't Go",
+    "no_rsvp": "No RSVP",
+    "vote_for_date": "Vote for Date",
+    "vote_count": "{{count}} vote",
+    "vote_count_plural": "{{count}} votes",
+    "finalize": "Finalize",
+    "voters": "Voters",
+    "voting_instructions": "Tap to vote • You can vote for multiple dates • Tap vote count to see voters",
+    "create_description": "Plan a poker night and let members vote on the best date.",
+    "title_placeholder": "January Poker Night",
+    "description_label": "Description (optional)",
+    "description_placeholder": "Monthly Texas Hold'em tournament",
+    "location_label": "Location (optional)",
+    "location_placeholder": "TBD - host will confirm",
+    "table": "Table",
+    "tables": "Tables",
+    "seats": "seats",
+    "date_options_voting": "Date Options for Voting",
+    "date_select_instructions": "Click dates to select/deselect. All dates will use the same start time.",
+    "all_fridays": "All Fridays",
+    "all_saturdays": "All Saturdays",
+    "start_time": "Start time",
+    "applies_all_dates": "applies to all dates",
+    "dates_selected": "{{count}} date(s) selected",
+    "select_at_least_one": "Select at least one date for members to vote on.",
+    "add_date_option": "Please add at least one date option",
+    "date_options_failed": "Event created but failed to add date options"
   },
   "game": {
     "game_mode": "Game Mode",
@@ -524,9 +556,10 @@
     "got_it": "Got it!"
   },
   "notfound": {
-    "title": "404",
+    "title": "Oops! Page not found",
     "message": "Page not found",
-    "return_home": "Return Home"
+    "return_home": "Return Home",
+    "go_home": "Return to Home"
   },
   "poker": {
     "hand_rankings": "Hand Rankings",
@@ -577,7 +610,8 @@
     "small_blind": "Small Blind",
     "small_blind_desc": "Forced bet, left of dealer",
     "big_blind": "Big Blind",
-    "big_blind_desc": "Forced bet, 2x small blind"
+    "big_blind_desc": "Forced bet, 2x small blind",
+    "texas_holdem_rules": "Texas Hold'em Rules"
   },
   "toast": {
     "success": "Success!",
@@ -605,7 +639,10 @@
     "transaction_added": "Transaction added",
     "player_eliminated": "Player eliminated",
     "player_added": "Player added",
-    "language_changed": "Language changed"
+    "language_changed": "Language changed",
+    "failed_remove_vote": "Failed to remove vote",
+    "failed_vote": "Failed to vote",
+    "event_create_failed": "Failed to create event"
   },
   "validation": {
     "email_invalid": "Please enter a valid email address",
@@ -668,7 +705,13 @@
     "times_hosted": "Times Hosted",
     "last_hosted": "Last Hosted",
     "never": "Never",
-    "suggested_next": "Suggested Next Host"
+    "suggested_next": "Suggested Next Host",
+    "host_needed": "Host Needed",
+    "select_new_host": "Select New Host",
+    "i_can_host": "I Can Host",
+    "withdraw_offer": "Withdraw Offer",
+    "volunteers": "Volunteers",
+    "no_volunteers": "No volunteers yet. Be the first!"
   },
   "season": {
     "current_season": "Current Season",

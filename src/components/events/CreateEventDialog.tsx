@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, startOfMonth, endOfMonth, addDays, isSameDay } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { pl, enUS } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -32,16 +34,6 @@ import { sendEmail } from '@/lib/email';
 import { eventCreatedTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
 
-const createEventSchema = z.object({
-  title: z.string().min(2, 'Title must be at least 2 characters').max(100),
-  description: z.string().max(500).optional(),
-  location: z.string().max(200).optional(),
-  maxTables: z.string(),
-  seatsPerTable: z.string(),
-});
-
-type CreateEventFormData = z.infer<typeof createEventSchema>;
-
 interface CreateEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,12 +43,24 @@ interface CreateEventDialogProps {
 }
 
 export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSuccess }: CreateEventDialogProps) {
+  const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [dateOptions, setDateOptions] = useState<Date[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedTime, setSelectedTime] = useState('19:00');
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const { user } = useAuth();
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
+
+  const createEventSchema = z.object({
+    title: z.string().min(2, t('validation.title_min')).max(100),
+    description: z.string().max(500).optional(),
+    location: z.string().max(200).optional(),
+    maxTables: z.string(),
+    seatsPerTable: z.string(),
+  });
+
+  type CreateEventFormData = z.infer<typeof createEventSchema>;
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventSchema),
@@ -122,7 +126,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
     if (!user) return;
     
     if (dateOptions.length === 0) {
-      toast.error('Please add at least one date option');
+      toast.error(t('event.add_date_option'));
       return;
     }
 
@@ -145,7 +149,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
     if (eventError || !event) {
       setIsLoading(false);
-      toast.error('Failed to create event: ' + eventError?.message);
+      toast.error(t('toast.event_create_failed') + ': ' + eventError?.message);
       return;
     }
 
@@ -161,7 +165,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
     if (dateError) {
       setIsLoading(false);
-      toast.error('Event created but failed to add date options');
+      toast.error(t('event.date_options_failed'));
       return;
     }
 
@@ -169,7 +173,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
     sendEventNotifications(event.id, data.title, data.description || undefined);
 
     setIsLoading(false);
-    toast.success('Event created! Members can now vote on dates.');
+    toast.success(t('toast.event_created'));
     form.reset();
     setDateOptions([]);
     setSelectedDates([]);
@@ -195,7 +199,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
       if (memberEmails.length === 0) return;
 
       const eventUrl = buildAppUrl(`/event/${eventId}`);
-      const formattedDates = dateOptions.map((d) => format(d, "EEEE, MMMM d 'at' h:mm a"));
+      const formattedDates = dateOptions.map((d) => format(d, "EEEE, MMMM d 'at' h:mm a", { locale: dateLocale }));
 
       const html = eventCreatedTemplate({
         eventTitle,
@@ -228,9 +232,9 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg bg-card border-border/50 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-gold-gradient">Create Event</DialogTitle>
+          <DialogTitle className="text-gold-gradient">{t('event.create_event')}</DialogTitle>
           <DialogDescription>
-            Plan a poker night and let members vote on the best date.
+            {t('event.create_description')}
           </DialogDescription>
         </DialogHeader>
         
@@ -241,10 +245,10 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Event Title</FormLabel>
+                  <FormLabel>{t('event.event_title')}</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="January Poker Night" 
+                      placeholder={t('event.title_placeholder')} 
                       className="bg-input/50 border-border/50"
                       {...field} 
                     />
@@ -259,10 +263,10 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (optional)</FormLabel>
+                  <FormLabel>{t('event.description_label')}</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Monthly Texas Hold'em tournament"
+                      placeholder={t('event.description_placeholder')}
                       className="bg-input/50 border-border/50 resize-none"
                       rows={2}
                       {...field} 
@@ -278,10 +282,10 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
               name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location (optional)</FormLabel>
+                  <FormLabel>{t('event.location_label')}</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="TBD - host will confirm"
+                      placeholder={t('event.location_placeholder')}
                       className="bg-input/50 border-border/50"
                       {...field} 
                     />
@@ -297,7 +301,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                 name="maxTables"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tables</FormLabel>
+                    <FormLabel>{t('event.tables')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="bg-input/50 border-border/50">
@@ -305,8 +309,8 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="1">1 Table</SelectItem>
-                        <SelectItem value="2">2 Tables</SelectItem>
+                        <SelectItem value="1">1 {t('event.table')}</SelectItem>
+                        <SelectItem value="2">2 {t('event.tables')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -319,7 +323,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                 name="seatsPerTable"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seats/Table</FormLabel>
+                    <FormLabel>{t('event.seats_per_table')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="bg-input/50 border-border/50">
@@ -328,7 +332,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                       </FormControl>
                       <SelectContent>
                         {[6, 7, 8, 9, 10].map(n => (
-                          <SelectItem key={n} value={n.toString()}>{n} seats</SelectItem>
+                          <SelectItem key={n} value={n.toString()}>{n} {t('event.seats')}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -340,9 +344,9 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
             {/* Date Options Section - Persistent Multi-Select Calendar */}
             <div className="space-y-3">
-              <FormLabel>Date Options for Voting</FormLabel>
+              <FormLabel>{t('event.date_options_voting')}</FormLabel>
               <p className="text-xs text-muted-foreground">
-                Click dates to select/deselect. All dates will use the same start time.
+                {t('event.date_select_instructions')}
               </p>
               
               {/* Persistent Calendar */}
@@ -371,7 +375,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                   onClick={() => selectWeekdayInMonth(5)} // Friday
                   className="text-xs"
                 >
-                  + All Fridays
+                  + {t('event.all_fridays')}
                 </Button>
                 <Button
                   type="button"
@@ -380,7 +384,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                   onClick={() => selectWeekdayInMonth(6)} // Saturday
                   className="text-xs"
                 >
-                  + All Saturdays
+                  + {t('event.all_saturdays')}
                 </Button>
                 {selectedDates.length > 0 && (
                   <Button
@@ -390,14 +394,14 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                     onClick={clearAllDates}
                     className="text-xs text-muted-foreground"
                   >
-                    Clear All
+                    {t('event.clear_all')}
                   </Button>
                 )}
               </div>
 
               {/* Time Selector */}
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Start time:</span>
+                <span className="text-sm text-muted-foreground">{t('event.start_time')}:</span>
                 <Select value={selectedTime} onValueChange={setSelectedTime}>
                   <SelectTrigger className="w-28 bg-input/50 border-border/50">
                     <SelectValue />
@@ -408,14 +412,14 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                     ))}
                   </SelectContent>
                 </Select>
-                <span className="text-xs text-muted-foreground">(applies to all dates)</span>
+                <span className="text-xs text-muted-foreground">({t('event.applies_all_dates')})</span>
               </div>
 
               {/* Selected Dates List */}
               {dateOptions.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">
-                    {dateOptions.length} date{dateOptions.length !== 1 ? 's' : ''} selected
+                    {t('event.dates_selected', { count: dateOptions.length })}
                   </div>
                   <div className="space-y-1.5 max-h-32 overflow-y-auto">
                     {dateOptions.map((date, index) => (
@@ -424,7 +428,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                         className="flex items-center justify-between p-2 bg-secondary/50 rounded-md"
                       >
                         <span className="text-sm">
-                          {format(date, "EEE, MMM d 'at' h:mm a")}
+                          {format(date, "EEE, MMM d 'at' h:mm a", { locale: dateLocale })}
                         </span>
                         <Button
                           type="button"
@@ -443,7 +447,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
               {dateOptions.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Select at least one date for members to vote on.
+                  {t('event.select_at_least_one')}
                 </p>
               )}
             </div>
@@ -455,7 +459,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                 className="flex-1"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button 
                 type="submit" 
@@ -463,9 +467,9 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.creating')}</>
                 ) : (
-                  'Create Event'
+                  t('event.create_event')
                 )}
               </Button>
             </div>
