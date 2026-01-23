@@ -339,13 +339,31 @@ export default function ClubDetail() {
               </Card>
             ) : (
               <div className="space-y-3">
-                {events.map((event) => (
-                  <EventCard 
-                    key={event.id}
-                    event={event}
-                    onClick={() => navigate(`/event/${event.id}`)}
-                  />
-                ))}
+                {(() => {
+                  const today = new Date();
+                  const upcomingEvents = events.filter(event => {
+                    if (!event.final_date) return true;
+                    return new Date(event.final_date) >= today;
+                  });
+                  return upcomingEvents.length > 0 ? (
+                    upcomingEvents.map((event) => (
+                      <EventCard 
+                        key={event.id}
+                        event={event}
+                        onClick={() => navigate(`/event/${event.id}`)}
+                      />
+                    ))
+                  ) : (
+                    <Card className="bg-card/50 border-border/50 border-dashed">
+                      <CardContent className="py-8 text-center">
+                        <div className="text-3xl mb-3 opacity-30">📅</div>
+                        <p className="text-muted-foreground">
+                          No upcoming events. Create one to get started!
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
               </div>
             )}
           </TabsContent>
