@@ -8,13 +8,16 @@ import { Trophy, Medal, Award, Download } from 'lucide-react';
 import { exportLeaderboardToCSV } from '@/lib/csv-export';
 
 interface PlayerStats {
-  user_id: string;
+  player_key: string; // either user_id or placeholder_player_id
   display_name: string;
   avatar_url: string | null;
   games_played: number;
   wins: number;
-  total_buy_ins: number;
+  second_places: number;
   total_winnings: number;
+  // For CSV export compatibility
+  user_id: string;
+  total_buy_ins: number;
   net_profit: number;
 }
 
@@ -42,6 +45,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       .eq('club_id', clubId);
 
     if (!events || events.length === 0) {
+      setStats([]);
       setLoading(false);
       return;
     }
@@ -55,107 +59,135 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       .in('event_id', eventIds);
 
     if (!sessions || sessions.length === 0) {
+      setStats([]);
       setLoading(false);
       return;
     }
 
     const sessionIds = sessions.map(s => s.id);
 
-    // Get all players and their transactions
+    // Get all players with placeholder_player_id
     const { data: players } = await supabase
       .from('game_players')
-      .select('user_id, display_name, finish_position, game_session_id')
+      .select('id, user_id, placeholder_player_id, display_name, finish_position, game_session_id')
       .in('game_session_id', sessionIds);
 
-    const { data: transactions } = await supabase
-      .from('game_transactions')
-      .select('game_player_id, transaction_type, amount')
-      .in('game_session_id', sessionIds);
+    if (!players) {
+      setStats([]);
+      setLoading(false);
+      return;
+    }
 
+    // Get all placeholder players with their linked user_ids
+    const placeholderIds = [...new Set(players.map(p => p.placeholder_player_id).filter(Boolean))];
+    const { data: placeholders } = await supabase
+      .from('placeholder_players')
+      .select('id, display_name, linked_user_id')
+      .in('id', placeholderIds);
+
+    const placeholderMap = new Map(placeholders?.map(p => [p.id, p]) || []);
+
+    // Get profiles for linked users
+    const linkedUserIds = placeholders?.map(p => p.linked_user_id).filter(Boolean) || [];
+    const directUserIds = players.map(p => p.user_id).filter(Boolean);
+    const allUserIds = [...new Set([...linkedUserIds, ...directUserIds])];
+    
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', allUserIds);
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    // Get payouts
     const { data: payouts } = await supabase
       .from('payout_structures')
       .select('player_id, amount')
       .in('game_session_id', sessionIds)
       .not('player_id', 'is', null);
 
-    if (!players) {
-      setLoading(false);
-      return;
-    }
+    // Create a map from game_player.id to payout amount
+    const payoutMap = new Map<string, number>();
+    payouts?.forEach(p => {
+      if (p.player_id && p.amount) {
+        payoutMap.set(p.player_id, (payoutMap.get(p.player_id) || 0) + p.amount);
+      }
+    });
 
-    // Get unique user IDs and fetch profiles
-    const userIds = [...new Set(players.map(p => p.user_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, display_name, avatar_url')
-      .in('id', userIds);
-
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-    // Aggregate stats per user
+    // Aggregate stats per unique player (by placeholder_player_id or user_id)
     const statsMap = new Map<string, PlayerStats>();
 
     players.forEach(player => {
-      const userId = player.user_id;
-      if (!statsMap.has(userId)) {
-        const profile = profileMap.get(userId);
-        statsMap.set(userId, {
-          user_id: userId,
-          display_name: profile?.display_name || player.display_name,
-          avatar_url: profile?.avatar_url || null,
+      // Determine the player key: prefer placeholder_player_id, fallback to user_id
+      const playerKey = player.placeholder_player_id || player.user_id;
+      if (!playerKey) return;
+
+      // Get display info
+      let displayName = player.display_name;
+      let avatarUrl: string | null = null;
+
+      if (player.placeholder_player_id) {
+        const placeholder = placeholderMap.get(player.placeholder_player_id);
+        if (placeholder) {
+          displayName = placeholder.display_name;
+          // If linked to a real user, use their profile
+          if (placeholder.linked_user_id) {
+            const profile = profileMap.get(placeholder.linked_user_id);
+            if (profile) {
+              displayName = profile.display_name;
+              avatarUrl = profile.avatar_url;
+            }
+          }
+        }
+      } else if (player.user_id) {
+        const profile = profileMap.get(player.user_id);
+        if (profile) {
+          displayName = profile.display_name;
+          avatarUrl = profile.avatar_url;
+        }
+      }
+
+      if (!statsMap.has(playerKey)) {
+        statsMap.set(playerKey, {
+          player_key: playerKey,
+          user_id: playerKey,
+          display_name: displayName,
+          avatar_url: avatarUrl,
           games_played: 0,
           wins: 0,
+          second_places: 0,
           total_buy_ins: 0,
           total_winnings: 0,
           net_profit: 0,
         });
       }
 
-      const stat = statsMap.get(userId)!;
+      const stat = statsMap.get(playerKey)!;
       stat.games_played++;
       
       if (player.finish_position === 1) {
         stat.wins++;
+      } else if (player.finish_position === 2) {
+        stat.second_places++;
+      }
+
+      // Add winnings from payout
+      const payout = payoutMap.get(player.id);
+      if (payout) {
+        stat.total_winnings += payout;
       }
     });
 
-    // Create a map from game_player.id to user_id
-    const { data: allPlayers } = await supabase
-      .from('game_players')
-      .select('id, user_id')
-      .in('game_session_id', sessionIds);
-    
-    const gamePlayerToUser = new Map(allPlayers?.map(p => [p.id, p.user_id]) || []);
-
-    transactions?.forEach(tx => {
-      const userId = gamePlayerToUser.get(tx.game_player_id);
-      if (userId && statsMap.has(userId)) {
-        const stat = statsMap.get(userId)!;
-        if (tx.transaction_type === 'buy_in' || tx.transaction_type === 'rebuy' || tx.transaction_type === 'addon') {
-          stat.total_buy_ins += tx.amount;
-        }
-      }
-    });
-
-    payouts?.forEach(payout => {
-      if (payout.player_id && payout.amount) {
-        const userId = gamePlayerToUser.get(payout.player_id);
-        if (userId && statsMap.has(userId)) {
-          statsMap.get(userId)!.total_winnings += payout.amount;
-        }
-      }
-    });
-
-    // Calculate net profit
+    // Calculate net profit (winnings only, no buy-in data for historical games)
     statsMap.forEach(stat => {
-      stat.net_profit = stat.total_winnings - stat.total_buy_ins;
+      stat.net_profit = stat.total_winnings;
     });
 
-    // Sort by wins, then net profit
+    // Sort by wins, then total winnings
     const sortedStats = Array.from(statsMap.values())
       .sort((a, b) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
-        return b.net_profit - a.net_profit;
+        return b.total_winnings - a.total_winnings;
       });
 
     setStats(sortedStats);
@@ -191,7 +223,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Trophy className="h-5 w-5 text-primary" />
-            Leaderboard
+            All-Time Leaderboard
           </CardTitle>
           {stats.length > 0 && (
             <Button size="sm" variant="outline" onClick={handleExport}>
@@ -210,10 +242,10 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-96 overflow-y-auto">
             {stats.map((player, index) => (
               <div 
-                key={player.user_id}
+                key={player.player_key}
                 className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0"
               >
                 <div className="w-8 flex justify-center">
@@ -237,15 +269,21 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{player.games_played} games</span>
                     <span>•</span>
-                    <span>{player.wins} wins</span>
+                    <span>{player.wins} 🥇</span>
+                    {player.second_places > 0 && (
+                      <>
+                        <span>•</span>
+                        <span>{player.second_places} 🥈</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
                   <Badge 
-                    variant={player.net_profit >= 0 ? 'default' : 'destructive'}
+                    variant="default"
                     className="font-mono"
                   >
-                    {player.net_profit >= 0 ? '+' : ''}{symbol}{Math.abs(player.net_profit)}
+                    {symbol}{player.total_winnings}
                   </Badge>
                 </div>
               </div>
