@@ -122,12 +122,21 @@ export default function Profile() {
 
     const { data: gamePlayersData } = await gamePlayersQuery;
 
+    const gamePlayerIds = gamePlayersData?.map(p => p.id) || [];
+
+    // Fetch transactions for buy-ins
     const { data: transactionsData } = await supabase
       .from('game_transactions')
       .select('amount, transaction_type, game_player_id')
-      .in('game_player_id', gamePlayersData?.map(p => p.id) || []);
+      .in('game_player_id', gamePlayerIds);
 
-    if (gamePlayersData && transactionsData) {
+    // Fetch payouts from payout_structures (where historical data lives)
+    const { data: payoutData } = await supabase
+      .from('payout_structures')
+      .select('player_id, amount')
+      .in('player_id', gamePlayerIds);
+
+    if (gamePlayersData) {
       const totalGames = gamePlayersData.length;
       const totalWins = gamePlayersData.filter(p => p.finish_position === 1).length;
       const totalCashes = gamePlayersData.filter(p => p.finish_position && p.finish_position <= 3).length;
@@ -135,12 +144,16 @@ export default function Profile() {
       let totalBuyIns = 0;
       let totalPrizeMoney = 0;
       
-      transactionsData.forEach(t => {
+      // Sum buy-ins from transactions
+      transactionsData?.forEach(t => {
         if (['buy_in', 'rebuy', 'addon'].includes(t.transaction_type)) {
           totalBuyIns += t.amount;
-        } else if (t.transaction_type === 'payout') {
-          totalPrizeMoney += Math.abs(t.amount);
         }
+      });
+
+      // Sum prize money from payout_structures
+      payoutData?.forEach(p => {
+        totalPrizeMoney += p.amount || 0;
       });
 
       setStats({
