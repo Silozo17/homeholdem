@@ -12,7 +12,7 @@ export default function Rules() {
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header with centered logo */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container flex items-center justify-center h-16 px-4 relative">
           <Button
             variant="ghost"
@@ -25,6 +25,8 @@ export default function Rules() {
           <Logo size="sm" />
         </div>
       </header>
+      {/* Header spacer */}
+      <div className="h-16 safe-area-top" />
 
       <main className="container px-4 py-6 pb-24">
         <h1 className="text-2xl font-bold text-gold-gradient mb-6 text-center">

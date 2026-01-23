@@ -681,7 +681,7 @@ export default function EventDetail() {
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-16 px-4">
           <Button 
             variant="ghost" 
@@ -704,6 +704,8 @@ export default function EventDetail() {
           </div>
         </div>
       </header>
+      {/* Header spacer */}
+      <div className="h-16 safe-area-top" />
 
       {/* Delete Event Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

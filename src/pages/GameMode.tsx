@@ -115,7 +115,7 @@ export default function GameMode() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container flex items-center justify-between h-14 px-4">
           <Button 
             variant="ghost" 
@@ -151,6 +151,8 @@ export default function GameMode() {
           </div>
         </div>
       </header>
+      {/* Header spacer */}
+      <div className="h-14 safe-area-top" />
 
       {/* Main Content */}
       <main className="container px-4 py-4 space-y-4">
