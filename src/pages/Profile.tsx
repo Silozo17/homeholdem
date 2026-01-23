@@ -92,11 +92,30 @@ export default function Profile() {
       })));
     }
 
-    // Fetch game statistics
-    const { data: gamePlayersData } = await supabase
+    // Find placeholder players linked to this user
+    const { data: linkedPlaceholders } = await supabase
+      .from('placeholder_players')
+      .select('id')
+      .eq('linked_user_id', user.id);
+
+    const placeholderIds = linkedPlaceholders?.map(p => p.id) || [];
+
+    // Fetch game statistics - include both direct user_id AND linked placeholder_player_id
+    let gamePlayersQuery = supabase
       .from('game_players')
-      .select('id, finish_position, game_session_id')
-      .eq('user_id', user.id);
+      .select('id, finish_position, game_session_id, user_id, placeholder_player_id');
+
+    if (placeholderIds.length > 0) {
+      // Query for direct user_id OR any linked placeholder_player_id
+      gamePlayersQuery = gamePlayersQuery.or(
+        `user_id.eq.${user.id},placeholder_player_id.in.(${placeholderIds.join(',')})`
+      );
+    } else {
+      // No linked placeholders, just query by user_id
+      gamePlayersQuery = gamePlayersQuery.eq('user_id', user.id);
+    }
+
+    const { data: gamePlayersData } = await gamePlayersQuery;
 
     const { data: transactionsData } = await supabase
       .from('game_transactions')
