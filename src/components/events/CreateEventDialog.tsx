@@ -49,6 +49,7 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedTime, setSelectedTime] = useState('19:00');
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
   const { user } = useAuth();
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -72,6 +73,35 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
       seatsPerTable: '10',
     },
   });
+
+  // Fetch club defaults when dialog opens
+  useEffect(() => {
+    if (!open || defaultsLoaded) return;
+
+    const fetchDefaults = async () => {
+      const { data } = await supabase
+        .from('clubs')
+        .select('default_event_time, default_max_tables, default_seats_per_table')
+        .eq('id', clubId)
+        .single();
+
+      if (data) {
+        setSelectedTime(data.default_event_time || '19:00');
+        form.setValue('maxTables', (data.default_max_tables || 1).toString());
+        form.setValue('seatsPerTable', (data.default_seats_per_table || 10).toString());
+        setDefaultsLoaded(true);
+      }
+    };
+
+    fetchDefaults();
+  }, [open, clubId, defaultsLoaded, form]);
+
+  // Reset defaults when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setDefaultsLoaded(false);
+    }
+  }, [open]);
 
   // Combine selected dates with time whenever either changes
   useEffect(() => {

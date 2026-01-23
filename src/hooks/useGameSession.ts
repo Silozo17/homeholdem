@@ -213,12 +213,58 @@ export function useGameSession(eventId: string) {
   const createSession = async () => {
     if (!user || !eventId) return;
 
-    // Create session
+    // Get event data to find club_id
+    const { data: eventData } = await supabase
+      .from('events')
+      .select('club_id')
+      .eq('id', eventId)
+      .single();
+
+    if (!eventData) {
+      toast.error('Failed to find event');
+      return;
+    }
+
+    // Fetch club defaults for tournament settings
+    const { data: clubData } = await supabase
+      .from('clubs')
+      .select(`
+        default_buy_in_amount,
+        default_starting_chips,
+        default_rebuy_amount,
+        default_rebuy_chips,
+        default_addon_amount,
+        default_addon_chips,
+        default_allow_rebuys,
+        default_allow_addons,
+        default_rebuy_until_level,
+        default_level_duration
+      `)
+      .eq('id', eventData.club_id)
+      .single();
+
+    // Use club defaults or fallback to hardcoded defaults
+    const sessionDefaults = {
+      buy_in_amount: clubData?.default_buy_in_amount ?? 20,
+      starting_chips: clubData?.default_starting_chips ?? 10000,
+      rebuy_amount: clubData?.default_rebuy_amount ?? 20,
+      rebuy_chips: clubData?.default_rebuy_chips ?? 10000,
+      addon_amount: clubData?.default_addon_amount ?? 10,
+      addon_chips: clubData?.default_addon_chips ?? 5000,
+      allow_rebuys: clubData?.default_allow_rebuys ?? true,
+      allow_addons: clubData?.default_allow_addons ?? true,
+      rebuy_until_level: clubData?.default_rebuy_until_level ?? 4,
+    };
+
+    const levelDuration = clubData?.default_level_duration ?? 15;
+
+    // Create session with club defaults
     const { data: newSession, error: sessionError } = await supabase
       .from('game_sessions')
       .insert({
         event_id: eventId,
         status: 'pending',
+        ...sessionDefaults,
       })
       .select()
       .single();
@@ -228,10 +274,11 @@ export function useGameSession(eventId: string) {
       return;
     }
 
-    // Create default blind structure
+    // Create default blind structure with club's level duration
     const blindsToInsert = DEFAULT_BLINDS.map(blind => ({
       ...blind,
       game_session_id: newSession.id,
+      duration_minutes: blind.is_break ? 10 : levelDuration, // Breaks stay at 10 mins
     }));
 
     await supabase.from('blind_structures').insert(blindsToInsert);

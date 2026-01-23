@@ -61,7 +61,9 @@
     "today": "Dzisiaj",
     "tomorrow": "Jutro",
     "yesterday": "Wczoraj",
-    "creating": "Tworzenie..."
+    "creating": "Tworzenie...",
+    "saving": "Zapisywanie...",
+    "minutes": "minut"
   },
   "auth": {
     "welcome_back": "Witaj z powrotem",
@@ -214,7 +216,14 @@
     "description_placeholder": "Opisz swój klub...",
     "name_required": "Nazwa klubu jest wymagana",
     "settings_saved": "Ustawienia klubu zapisane",
-    "currency_description": "Waluta używana do wszystkich wyświetleń finansowych w tym klubie"
+    "currency_description": "Waluta używana do wszystkich wyświetleń finansowych w tym klubie",
+    "event_defaults": "Domyślne ustawienia wydarzeń",
+    "event_defaults_description": "Domyślne ustawienia dla nowych wydarzeń",
+    "default_start_time": "Domyślna godzina rozpoczęcia",
+    "tournament_defaults": "Domyślne ustawienia turnieju",
+    "tournament_defaults_description": "Domyślne ustawienia dla sesji gry",
+    "level_duration": "Czas trwania poziomu blindów",
+    "level_duration_description": "Domyślny czas trwania każdego poziomu blindów"
   },
   "roles": {
     "owner": "Właściciel",
