@@ -106,15 +106,15 @@ export default function Events() {
     setLoadingEvents(false);
   };
 
-  const upcomingEvents = events.filter(e => 
-    e.final_date && (isFuture(new Date(e.final_date)) || isToday(new Date(e.final_date)))
-  );
+  const upcomingEvents = events
+    .filter(e => e.final_date && (isFuture(new Date(e.final_date)) || isToday(new Date(e.final_date))))
+    .sort((a, b) => new Date(a.final_date!).getTime() - new Date(b.final_date!).getTime());
   
   const pendingEvents = events.filter(e => !e.final_date);
   
-  const pastEvents = events.filter(e => 
-    e.final_date && isPast(new Date(e.final_date)) && !isToday(new Date(e.final_date))
-  );
+  const pastEvents = events
+    .filter(e => e.final_date && isPast(new Date(e.final_date)) && !isToday(new Date(e.final_date)))
+    .sort((a, b) => new Date(b.final_date!).getTime() - new Date(a.final_date!).getTime());
 
   const getRsvpBadge = (rsvp: string | null) => {
     switch (rsvp) {
