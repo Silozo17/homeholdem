@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -136,7 +138,7 @@ export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
       });
 
     if (error) {
-      toast.error('Failed to send message');
+      toast.error(t('chat.send_failed'));
       console.error('Error sending message:', error);
     } else {
       setNewMessage('');
@@ -149,13 +151,13 @@ export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="animate-pulse text-muted-foreground">Loading messages...</div>
+            <div className="animate-pulse text-muted-foreground">{t('chat.loading')}</div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center">
             <div className="text-3xl mb-2 opacity-30">💬</div>
             <p className="text-sm text-muted-foreground">
-              No messages yet. Start the conversation!
+              {t('chat.no_messages')}
             </p>
           </div>
         ) : (
@@ -179,7 +181,7 @@ export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
         <Input
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
+          placeholder={t('chat.type_message')}
           className="flex-1 bg-secondary/50"
           disabled={sending}
         />

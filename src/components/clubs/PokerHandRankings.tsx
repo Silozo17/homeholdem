@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Accordion,
@@ -7,105 +8,123 @@ import {
 } from '@/components/ui/accordion';
 import { Spade } from 'lucide-react';
 
-const handRankings = [
-  {
-    rank: 1,
-    name: 'Royal Flush',
-    description: 'A, K, Q, J, 10, all of the same suit.',
-    example: 'A♠ K♠ Q♠ J♠ 10♠',
-  },
-  {
-    rank: 2,
-    name: 'Straight Flush',
-    description: 'Five consecutive cards of the same suit.',
-    example: '9♥ 8♥ 7♥ 6♥ 5♥',
-  },
-  {
-    rank: 3,
-    name: 'Four of a Kind',
-    description: 'Four cards of the same rank.',
-    example: 'K♠ K♥ K♦ K♣ 3♠',
-  },
-  {
-    rank: 4,
-    name: 'Full House',
-    description: 'Three of a kind plus a pair.',
-    example: 'Q♠ Q♥ Q♦ 9♣ 9♠',
-  },
-  {
-    rank: 5,
-    name: 'Flush',
-    description: 'Five cards of the same suit, not in sequence.',
-    example: 'A♦ J♦ 8♦ 6♦ 2♦',
-  },
-  {
-    rank: 6,
-    name: 'Straight',
-    description: 'Five consecutive cards of different suits.',
-    example: '10♠ 9♥ 8♦ 7♣ 6♠',
-  },
-  {
-    rank: 7,
-    name: 'Three of a Kind',
-    description: 'Three cards of the same rank.',
-    example: '7♠ 7♥ 7♦ K♣ 2♠',
-  },
-  {
-    rank: 8,
-    name: 'Two Pair',
-    description: 'Two different pairs.',
-    example: 'J♠ J♥ 4♦ 4♣ A♠',
-  },
-  {
-    rank: 9,
-    name: 'One Pair',
-    description: 'Two cards of the same rank.',
-    example: '10♠ 10♥ K♦ 7♣ 4♠',
-  },
-  {
-    rank: 10,
-    name: 'High Card',
-    description: 'No matching cards; highest card plays.',
-    example: 'A♠ J♥ 8♦ 6♣ 2♠',
-  },
-];
-
-const bettingRounds = [
-  {
-    name: 'Pre-Flop',
-    description: 'Each player is dealt two hole cards face down. Betting begins with the player left of the big blind.',
-  },
-  {
-    name: 'The Flop',
-    description: 'Three community cards are dealt face up. Second round of betting begins with the player left of the dealer button.',
-  },
-  {
-    name: 'The Turn',
-    description: 'A fourth community card is dealt face up. Third round of betting.',
-  },
-  {
-    name: 'The River',
-    description: 'A fifth and final community card is dealt. Final round of betting.',
-  },
-  {
-    name: 'Showdown',
-    description: 'If multiple players remain, cards are revealed and the best five-card hand wins.',
-  },
-];
-
 export function PokerHandRankings() {
+  const { t } = useTranslation();
+
+  const handRankings = [
+    {
+      rank: 1,
+      name: t('poker.royal_flush'),
+      description: t('poker.royal_flush_desc'),
+      example: 'A♠ K♠ Q♠ J♠ 10♠',
+    },
+    {
+      rank: 2,
+      name: t('poker.straight_flush'),
+      description: t('poker.straight_flush_desc'),
+      example: '9♥ 8♥ 7♥ 6♥ 5♥',
+    },
+    {
+      rank: 3,
+      name: t('poker.four_of_kind'),
+      description: t('poker.four_of_kind_desc'),
+      example: 'K♠ K♥ K♦ K♣ 3♠',
+    },
+    {
+      rank: 4,
+      name: t('poker.full_house'),
+      description: t('poker.full_house_desc'),
+      example: 'Q♠ Q♥ Q♦ 9♣ 9♠',
+    },
+    {
+      rank: 5,
+      name: t('poker.flush'),
+      description: t('poker.flush_desc'),
+      example: 'A♦ J♦ 8♦ 6♦ 2♦',
+    },
+    {
+      rank: 6,
+      name: t('poker.straight'),
+      description: t('poker.straight_desc'),
+      example: '10♠ 9♥ 8♦ 7♣ 6♠',
+    },
+    {
+      rank: 7,
+      name: t('poker.three_of_kind'),
+      description: t('poker.three_of_kind_desc'),
+      example: '7♠ 7♥ 7♦ K♣ 2♠',
+    },
+    {
+      rank: 8,
+      name: t('poker.two_pair'),
+      description: t('poker.two_pair_desc'),
+      example: 'J♠ J♥ 4♦ 4♣ A♠',
+    },
+    {
+      rank: 9,
+      name: t('poker.one_pair'),
+      description: t('poker.one_pair_desc'),
+      example: '10♠ 10♥ K♦ 7♣ 4♠',
+    },
+    {
+      rank: 10,
+      name: t('poker.high_card'),
+      description: t('poker.high_card_desc'),
+      example: 'A♠ J♥ 8♦ 6♣ 2♠',
+    },
+  ];
+
+  const bettingRounds = [
+    {
+      name: t('poker.preflop'),
+      description: t('poker.preflop_desc'),
+    },
+    {
+      name: t('poker.flop'),
+      description: t('poker.flop_desc'),
+    },
+    {
+      name: t('poker.turn'),
+      description: t('poker.turn_desc'),
+    },
+    {
+      name: t('poker.river'),
+      description: t('poker.river_desc'),
+    },
+    {
+      name: t('poker.showdown'),
+      description: t('poker.showdown_desc'),
+    },
+  ];
+
+  const bettingActions = [
+    { name: t('poker.check'), description: t('poker.check_desc') },
+    { name: t('poker.bet'), description: t('poker.bet_desc') },
+    { name: t('poker.call'), description: t('poker.call_desc') },
+    { name: t('poker.raise'), description: t('poker.raise_desc') },
+    { name: t('poker.fold'), description: t('poker.fold_desc') },
+    { name: t('poker.all_in'), description: t('poker.all_in_desc') },
+  ];
+
+  const blindsInfo = [
+    { name: t('poker.dealer_button'), description: t('poker.dealer_desc') },
+    { name: t('poker.small_blind'), description: t('poker.small_blind_desc') },
+    { name: t('poker.big_blind'), description: t('poker.big_blind_desc') },
+    { name: t('poker.ante'), description: t('poker.ante_desc') },
+  ];
+
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Spade className="h-5 w-5 text-primary" />
-          Texas Hold'em Rules
+          {t('poker.title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="hand-rankings">
-            <AccordionTrigger>Hand Rankings (Best to Worst)</AccordionTrigger>
+            <AccordionTrigger>{t('poker.hand_rankings')}</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-3">
                 {handRankings.map((hand) => (
@@ -125,7 +144,7 @@ export function PokerHandRankings() {
           </AccordionItem>
 
           <AccordionItem value="betting-rounds">
-            <AccordionTrigger>Betting Rounds</AccordionTrigger>
+            <AccordionTrigger>{t('poker.betting_rounds')}</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-3">
                 {bettingRounds.map((round, index) => (
@@ -144,27 +163,27 @@ export function PokerHandRankings() {
           </AccordionItem>
 
           <AccordionItem value="betting-actions">
-            <AccordionTrigger>Betting Actions</AccordionTrigger>
+            <AccordionTrigger>{t('poker.betting_actions')}</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2 text-sm">
-                <div><span className="font-medium">Check</span> – Pass the action without betting (only if no bet has been made)</div>
-                <div><span className="font-medium">Bet</span> – Place the first wager in a betting round</div>
-                <div><span className="font-medium">Call</span> – Match the current bet</div>
-                <div><span className="font-medium">Raise</span> – Increase the current bet</div>
-                <div><span className="font-medium">Fold</span> – Surrender your cards and exit the hand</div>
-                <div><span className="font-medium">All-In</span> – Bet all remaining chips</div>
+                {bettingActions.map((action) => (
+                  <div key={action.name}>
+                    <span className="font-medium">{action.name}</span> – {action.description}
+                  </div>
+                ))}
               </div>
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="blinds">
-            <AccordionTrigger>Blinds & Button</AccordionTrigger>
+            <AccordionTrigger>{t('poker.blinds_button')}</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2 text-sm">
-                <div><span className="font-medium">Dealer Button</span> – Rotates clockwise each hand, marks the dealer position</div>
-                <div><span className="font-medium">Small Blind</span> – Forced bet posted by the player left of the button (usually half the big blind)</div>
-                <div><span className="font-medium">Big Blind</span> – Forced bet posted by the player two seats left of the button</div>
-                <div><span className="font-medium">Ante</span> – Optional small bet from all players before dealing (common in tournaments)</div>
+                {blindsInfo.map((item) => (
+                  <div key={item.name}>
+                    <span className="font-medium">{item.name}</span> – {item.description}
+                  </div>
+                ))}
               </div>
             </AccordionContent>
           </AccordionItem>
