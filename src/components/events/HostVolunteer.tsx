@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface VolunteerProfile {
 }
 
 export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer, onConfirm, showVolunteerSection = true }: HostVolunteerProps) {
+  const { t } = useTranslation();
   const [profiles, setProfiles] = useState<VolunteerProfile[]>([]);
   const [votes, setVotes] = useState<Map<string, number>>(new Map());
   const [userVote, setUserVote] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
       if (error) {
         setUserVote(previousVote);
         setVotes(previousVotes);
-        toast.error('Failed to remove vote');
+        toast.error(t('toast.failed_remove_vote'));
       }
     } else {
       // If already voted for someone else, remove that first
@@ -160,7 +162,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
       if (error) {
         setUserVote(previousVote);
         setVotes(previousVotes);
-        toast.error('Failed to vote');
+        toast.error(t('toast.failed_vote'));
       }
     }
   };
@@ -180,7 +182,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Home className="h-5 w-5 text-primary" />
-          {showVolunteerSection ? 'Host Needed' : 'Select New Host'}
+          {showVolunteerSection ? t('host.host_needed') : t('host.select_new_host')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -198,12 +200,12 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
             {isVolunteering ? (
               <>
                 <X className="mr-2 h-4 w-4" />
-                Withdraw Offer
+                {t('host.withdraw_offer')}
               </>
             ) : (
               <>
                 <Home className="mr-2 h-4 w-4" />
-                I Can Host
+                {t('host.i_can_host')}
               </>
             )}
           </Button>
@@ -211,7 +213,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
 
         {sortedProfiles.length > 0 && (
           <div className="space-y-2 pt-2">
-            <p className="text-sm text-muted-foreground">Volunteers:</p>
+            <p className="text-sm text-muted-foreground">{t('host.volunteers')}:</p>
             {sortedProfiles.map((profile) => {
               const voteCount = votes.get(profile.id) || 0;
               const hasVoted = userVote === profile.id;
@@ -260,7 +262,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
                         className="h-7 text-xs"
                         onClick={() => onConfirm(profile.id)}
                       >
-                        Confirm
+                        {t('common.confirm')}
                       </Button>
                     )}
                   </div>
@@ -272,7 +274,7 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
 
         {volunteers.length === 0 && (
           <p className="text-xs text-muted-foreground text-center">
-            No volunteers yet. Be the first!
+            {t('host.no_volunteers')}
           </p>
         )}
       </CardContent>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Check, HelpCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,7 @@ interface RsvpButtonsProps {
 }
 
 export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
+  const { t } = useTranslation();
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   const handleClick = async (status: 'going' | 'maybe' | 'not_going') => {
@@ -30,7 +32,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
         disabled={pendingStatus !== null}
       >
         <Check className="h-5 w-5" />
-        <span className="text-xs">Going</span>
+        <span className="text-xs">{t('event.going')}</span>
       </Button>
       
       <Button
@@ -43,7 +45,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
         disabled={pendingStatus !== null}
       >
         <HelpCircle className="h-5 w-5" />
-        <span className="text-xs">Maybe</span>
+        <span className="text-xs">{t('event.maybe')}</span>
       </Button>
       
       <Button
@@ -56,7 +58,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
         disabled={pendingStatus !== null}
       >
         <X className="h-5 w-5" />
-        <span className="text-xs">Can't Go</span>
+        <span className="text-xs">{t('event.cant_go')}</span>
       </Button>
     </div>
   );

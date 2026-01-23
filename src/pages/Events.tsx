@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Logo } from '@/components/layout/Logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, MapPin, Users, Clock, CheckCircle } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
+import { pl, enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 
 interface Event {
@@ -24,10 +26,13 @@ interface Event {
 }
 
 export default function Events() {
+  const { t, i18n } = useTranslation();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -119,13 +124,13 @@ export default function Events() {
   const getRsvpBadge = (rsvp: string | null) => {
     switch (rsvp) {
       case 'going':
-        return <Badge className="bg-success/20 text-success border-success/30">Going</Badge>;
+        return <Badge className="bg-success/20 text-success border-success/30">{t('event.going')}</Badge>;
       case 'maybe':
-        return <Badge variant="secondary">Maybe</Badge>;
+        return <Badge variant="secondary">{t('event.maybe')}</Badge>;
       case 'not_going':
-        return <Badge variant="outline" className="text-muted-foreground">Not Going</Badge>;
+        return <Badge variant="outline" className="text-muted-foreground">{t('event.not_going')}</Badge>;
       default:
-        return <Badge variant="outline">No RSVP</Badge>;
+        return <Badge variant="outline">{t('event.no_rsvp')}</Badge>;
     }
   };
 
@@ -147,13 +152,13 @@ export default function Events() {
           {event.final_date && (
             <div className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              {format(new Date(event.final_date), 'EEE, MMM d')}
+              {format(new Date(event.final_date), 'EEE, MMM d', { locale: dateLocale })}
             </div>
           )}
           {event.final_date && (
             <div className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              {format(new Date(event.final_date), 'h:mm a')}
+              {format(new Date(event.final_date), 'h:mm a', { locale: dateLocale })}
             </div>
           )}
           {event.location && (
@@ -164,7 +169,7 @@ export default function Events() {
           )}
           <div className="flex items-center gap-1">
             <Users className="h-3.5 w-3.5" />
-            {event.rsvp_count} going
+            {t('event.going_count', { count: event.rsvp_count })}
           </div>
         </div>
       </CardContent>
@@ -174,7 +179,7 @@ export default function Events() {
   if (loading || loadingEvents) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+        <div className="animate-pulse text-primary">{t('common.loading')}</div>
       </div>
     );
   }
@@ -192,23 +197,23 @@ export default function Events() {
         <div className="space-y-1">
           <h2 className="text-2xl font-bold text-gold-gradient flex items-center gap-2">
             <Calendar className="h-6 w-6" />
-            Events
+            {t('nav.events')}
           </h2>
           <p className="text-muted-foreground">
-            All poker nights across your clubs
+            {t('event.all_poker_nights')}
           </p>
         </div>
 
         <Tabs defaultValue="upcoming" className="w-full">
           <TabsList className="w-full grid grid-cols-3 bg-muted/50">
             <TabsTrigger value="upcoming">
-              Upcoming ({upcomingEvents.length})
+              {t('event.upcoming')} ({upcomingEvents.length})
             </TabsTrigger>
             <TabsTrigger value="pending">
-              Pending ({pendingEvents.length})
+              {t('event.pending')} ({pendingEvents.length})
             </TabsTrigger>
             <TabsTrigger value="past">
-              Past ({pastEvents.length})
+              {t('event.past')} ({pastEvents.length})
             </TabsTrigger>
           </TabsList>
 
@@ -217,7 +222,7 @@ export default function Events() {
               <Card className="bg-card/50 border-border/50">
                 <CardContent className="py-8 text-center">
                   <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No upcoming events</p>
+                  <p className="text-muted-foreground">{t('event.no_upcoming')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -232,7 +237,7 @@ export default function Events() {
               <Card className="bg-card/50 border-border/50">
                 <CardContent className="py-8 text-center">
                   <Clock className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No events awaiting date confirmation</p>
+                  <p className="text-muted-foreground">{t('event.no_pending')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -247,7 +252,7 @@ export default function Events() {
               <Card className="bg-card/50 border-border/50">
                 <CardContent className="py-8 text-center">
                   <CheckCircle className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No past events yet</p>
+                  <p className="text-muted-foreground">{t('event.no_past')}</p>
                 </CardContent>
               </Card>
             ) : (

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { pl, enUS } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Check, Calendar, Crown, ChevronDown, ChevronUp } from 'lucide-react';
@@ -27,8 +29,10 @@ interface DateVotingProps {
 }
 
 export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
+  const { t, i18n } = useTranslation();
   const maxVotes = Math.max(...options.map(o => o.vote_count), 1);
   const [expandedOption, setExpandedOption] = useState<string | null>(null);
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   const toggleVoterList = (optionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -40,7 +44,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Calendar className="h-5 w-5 text-primary" />
-          Vote for Date
+          {t('event.vote_for_date')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -73,10 +77,10 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-base">
-                    {format(new Date(option.proposed_date), "EEEE, MMM d")}
+                    {format(new Date(option.proposed_date), "EEEE, MMM d", { locale: dateLocale })}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(option.proposed_date), "h:mm a")}
+                    {format(new Date(option.proposed_date), "h:mm a", { locale: dateLocale })}
                   </p>
                 </div>
               </div>
@@ -92,7 +96,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                       : "cursor-default"
                   )}
                 >
-                  {option.vote_count} {option.vote_count === 1 ? 'vote' : 'votes'}
+                  {t('event.vote_count', { count: option.vote_count })}
                   {option.voters && option.voters.length > 0 && (
                     expandedOption === option.id 
                       ? <ChevronUp className="h-3.5 w-3.5" />
@@ -110,7 +114,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                     }}
                   >
                     <Crown className="h-3.5 w-3.5 mr-1.5" />
-                    Finalize
+                    {t('event.finalize')}
                   </Button>
                 )}
               </div>
@@ -119,7 +123,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
             {/* Expanded voter list */}
             {expandedOption === option.id && option.voters && option.voters.length > 0 && (
               <div className="ml-4 p-3 bg-secondary/20 rounded-lg border border-border/30 space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Voters:</p>
+                <p className="text-xs text-muted-foreground font-medium">{t('event.voters')}:</p>
                 <div className="flex flex-wrap gap-2">
                   {option.voters.map((voter) => (
                     <div 
@@ -141,7 +145,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
         ))}
 
         <p className="text-xs text-muted-foreground text-center pt-2">
-          Tap to vote • You can vote for multiple dates • Tap vote count to see voters
+          {t('event.voting_instructions')}
         </p>
       </CardContent>
     </Card>
