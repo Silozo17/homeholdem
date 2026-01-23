@@ -18,6 +18,77 @@ interface Event {
   club_id: string;
 }
 
+// HTML escape function to prevent XSS
+function escapeHtml(str: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return str.replace(/[&<>"']/g, (c) => htmlEscapeMap[c] || c);
+}
+
+// Premium event reminder email template with dark casino theme and shine effects
+function eventReminderEmail(data: {
+  eventTitle: string;
+  eventDate: string;
+  location?: string;
+  clubName?: string;
+  eventUrl: string;
+  recipientName?: string;
+}): string {
+  const safeTitle = escapeHtml(data.eventTitle);
+  const safeName = data.recipientName ? escapeHtml(data.recipientName) : undefined;
+  const safeClubName = data.clubName ? escapeHtml(data.clubName) : undefined;
+  const safeLocation = data.location ? escapeHtml(data.location) : undefined;
+  const safeDate = escapeHtml(data.eventDate);
+  const safeUrl = encodeURI(data.eventUrl);
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Night Tomorrow!</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f1f1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <div style="padding: 24px 16px; background-color: #0f1f1a;">
+    <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);">
+      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(180deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.04) 50%, transparent 100%);">
+        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase; text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);">♠ Home Hold'em Club ♠</p>
+      </div>
+      <div style="padding: 40px 28px; text-align: center;">
+        <div style="font-size: 48px; line-height: 1; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));">⏰</div>
+        <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Tomorrow night</h1>
+        <p style="color: #8fb5a5; font-size: 15px; line-height: 1.6; margin: 0 0 28px;">
+          ${safeName ? `Hey ${safeName}! ` : ''}Don't forget – you have a poker night coming up!
+        </p>
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.22) 0%, rgba(212, 175, 55, 0.12) 50%, rgba(212, 175, 55, 0.08) 100%); border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);">
+          <p style="margin: 0; color: #d4af37; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);">🎰 Get Ready! 🎰</p>
+        </div>
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.06) 50%, rgba(212, 175, 55, 0.03) 100%); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);">
+          <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${safeTitle}</p>
+          ${safeClubName ? `<p style="margin: 10px 0 0; color: #8fb5a5; font-size: 13px;">🎴 ${safeClubName}</p>` : ''}
+          <p style="margin: 12px 0 0; color: #b8d4c8; font-size: 14px;">📅 ${safeDate}</p>
+          ${safeLocation ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📍 ${safeLocation}</p>` : ''}
+        </div>
+        <a href="${safeUrl}" style="display: inline-block; background: linear-gradient(135deg, #e8c84a 0%, #d4af37 40%, #b8962e 100%); color: #000000; font-weight: 700; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 16px rgba(212, 175, 55, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.1); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);">
+          View Details
+        </a>
+      </div>
+      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(0deg, rgba(212, 175, 55, 0.06) 0%, rgba(212, 175, 55, 0.02) 50%, transparent 100%);">
+        <p style="color: #4a7566; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
+        <p style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);">♥ ♠ ♦ ♣</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -88,32 +159,21 @@ serve(async (req) => {
         minute: '2-digit'
       });
 
+      // Build event URL
+      const eventUrl = `https://homeholdem.lovable.app/event/${event.id}`;
+
       // Send reminder to each attendee
       for (const profile of profiles) {
         if (!profile.email) continue;
 
-        const html = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 30px; text-align: center;">
-              <h1 style="color: #ffd700; margin: 0;">🃏 Poker Night Tomorrow!</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #eee;">
-              <p style="font-size: 16px; color: #333;">Hey ${profile.display_name || 'Poker Pro'}!</p>
-              <p style="font-size: 16px; color: #333;">This is your 24-hour reminder for:</p>
-              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h2 style="margin: 0 0 10px; color: #1a1a2e;">${event.title}</h2>
-                <p style="margin: 5px 0; color: #666;"><strong>📅 When:</strong> ${formattedDate}</p>
-                ${event.location ? `<p style="margin: 5px 0; color: #666;"><strong>📍 Where:</strong> ${event.location}</p>` : ''}
-                ${club?.name ? `<p style="margin: 5px 0; color: #666;"><strong>🎴 Club:</strong> ${club.name}</p>` : ''}
-              </div>
-              <p style="font-size: 16px; color: #333;">Make sure you're ready to play! 🎰</p>
-              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-              <p style="font-size: 12px; color: #999; text-align: center;">
-                Home Hold'em Club - Your Private Poker Night Organizer
-              </p>
-            </div>
-          </div>
-        `;
+        const html = eventReminderEmail({
+          eventTitle: event.title,
+          eventDate: formattedDate,
+          location: event.location || undefined,
+          clubName: club?.name,
+          eventUrl,
+          recipientName: profile.display_name,
+        });
 
         try {
           const res = await fetch("https://api.resend.com/emails", {
