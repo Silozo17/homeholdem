@@ -21,7 +21,41 @@ const baseStyles = {
 };
 
 function emailWrapper(content: string): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Home Hold'em Club</title></head><body style="${baseStyles.wrapper}"><div style="${baseStyles.container}"><div style="${baseStyles.card}"><div style="${baseStyles.header}"><p style="${baseStyles.headerText}">♠ Home Hold'em Club ♠</p></div>${content}<div style="${baseStyles.footer}"><p style="${baseStyles.footerText}">Home Hold'em Club</p><p style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);">♥ ♠ ♦ ♣</p></div></div></div></body></html>`;
+  // iOS Mail (and some clients) auto-invert “dark” emails unless we explicitly
+  // declare supported color schemes. This ensures the email stays DARK.
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
+    <style>
+      :root {
+        color-scheme: dark;
+        supported-color-schemes: dark;
+      }
+      body {
+        background-color: #0f1f1a !important;
+      }
+    </style>
+    <title>Home Hold'em Club</title>
+  </head>
+  <body style="${baseStyles.wrapper}" bgcolor="#0f1f1a">
+    <div style="${baseStyles.container}">
+      <div style="${baseStyles.card}">
+        <div style="${baseStyles.header}">
+          <p style="${baseStyles.headerText}">♠ Home Hold'em Club ♠</p>
+        </div>
+        ${content}
+        <div style="${baseStyles.footer}">
+          <p style="${baseStyles.footerText}">Home Hold'em Club</p>
+          <p style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);">♥ ♠ ♦ ♣</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 export function otpTemplate({ code, name }: { code: string; name?: string }): string {
