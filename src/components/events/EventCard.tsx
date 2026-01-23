@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Users, ChevronRight, Clock } from 'lucide-react';
+import { Calendar, MapPin, Users, ChevronRight, Clock, Lock } from 'lucide-react';
 
 interface EventCardProps {
   event: {
@@ -17,9 +17,10 @@ interface EventCardProps {
     maybe_count: number;
   };
   onClick: () => void;
+  isLocked?: boolean;
 }
 
-export function EventCard({ event, onClick }: EventCardProps) {
+export function EventCard({ event, onClick, isLocked = false }: EventCardProps) {
   const totalCapacity = event.max_tables * event.seats_per_table;
   const isFull = event.going_count >= totalCapacity;
 
@@ -37,6 +38,11 @@ export function EventCard({ event, onClick }: EventCardProps) {
               </CardTitle>
               {event.is_finalized ? (
                 <Badge variant="default" className="text-xs">Confirmed</Badge>
+              ) : isLocked ? (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Locked
+                </Badge>
               ) : (
                 <Badge variant="secondary" className="text-xs">Voting</Badge>
               )}
@@ -59,8 +65,17 @@ export function EventCard({ event, onClick }: EventCardProps) {
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
-              <span>Date TBD - vote now!</span>
+              {isLocked ? (
+                <>
+                  <Lock className="h-4 w-4" />
+                  <span>Waiting for previous event</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-4 w-4" />
+                  <span>Date TBD - vote now!</span>
+                </>
+              )}
             </div>
           )}
           

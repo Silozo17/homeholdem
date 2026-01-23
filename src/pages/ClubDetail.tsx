@@ -72,6 +72,7 @@ interface EventWithCounts {
   seats_per_table: number;
   going_count: number;
   maybe_count: number;
+  created_at: string;
 }
 
 export default function ClubDetail() {
@@ -81,6 +82,7 @@ export default function ClubDetail() {
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
   const [events, setEvents] = useState<EventWithCounts[]>([]);
+  const [gameSessionStatus, setGameSessionStatus] = useState<Map<string, string>>(new Map());
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -159,11 +161,22 @@ export default function ClubDetail() {
     // Fetch events with RSVP counts
     const { data: eventsData } = await supabase
       .from('events')
-      .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table')
+      .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table, created_at')
       .eq('club_id', clubId)
-      .order('final_date', { ascending: true, nullsFirst: false });
+      .order('created_at', { ascending: true });
 
     if (eventsData) {
+      // Fetch game sessions for all events to determine locked status
+      const { data: gameSessions } = await supabase
+        .from('game_sessions')
+        .select('event_id, status')
+        .in('event_id', eventsData.map(e => e.id));
+
+      const statusMap = new Map(
+        gameSessions?.map(gs => [gs.event_id, gs.status]) || []
+      );
+      setGameSessionStatus(statusMap);
+
       const eventsWithCounts = await Promise.all(
         eventsData.map(async (event) => {
           const { data: rsvps } = await supabase
@@ -345,12 +358,32 @@ export default function ClubDetail() {
                     if (!event.final_date) return true;
                     return new Date(event.final_date) >= today;
                   });
-                  return upcomingEvents.length > 0 ? (
-                    upcomingEvents.map((event) => (
+                  
+                  // Sort by created_at to determine order
+                  const sortedUpcoming = [...upcomingEvents].sort((a, b) => 
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  );
+                  
+                  // Find first event that doesn't have a completed game session
+                  const currentEventIndex = sortedUpcoming.findIndex(event => {
+                    const status = gameSessionStatus.get(event.id);
+                    return status !== 'completed';
+                  });
+                  
+                  // Determine if an event is locked (after the current incomplete event)
+                  const isEventLocked = (eventId: string) => {
+                    if (currentEventIndex === -1) return false; // All events completed, nothing locked
+                    const eventIndex = sortedUpcoming.findIndex(e => e.id === eventId);
+                    return eventIndex > currentEventIndex;
+                  };
+                  
+                  return sortedUpcoming.length > 0 ? (
+                    sortedUpcoming.map((event) => (
                       <EventCard 
                         key={event.id}
                         event={event}
                         onClick={() => navigate(`/event/${event.id}`)}
+                        isLocked={isEventLocked(event.id)}
                       />
                     ))
                   ) : (
