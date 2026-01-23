@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
@@ -480,10 +480,38 @@ export default function EventDetail() {
     sendRsvpConfirmation(status);
   }, [user, event, userProfile, rsvps, userRsvp]);
 
+  // Rate limiting for RSVP emails - track last email per event
+  const lastRsvpEmailRef = useRef<{ eventId: string; timestamp: number } | null>(null);
+
   const sendRsvpConfirmation = async (status: 'going' | 'maybe' | 'not_going') => {
     if (!user || !event) return;
 
+    // Rate limit: max 1 email per event per 5 minutes
+    const now = Date.now();
+    const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+    
+    if (lastRsvpEmailRef.current?.eventId === event.id) {
+      const elapsed = now - lastRsvpEmailRef.current.timestamp;
+      if (elapsed < COOLDOWN_MS) {
+        console.log(`RSVP email rate limited. ${Math.ceil((COOLDOWN_MS - elapsed) / 1000)}s remaining`);
+        return;
+      }
+    }
+
     try {
+      // Check user preferences first
+      const { data: prefs } = await supabase
+        .from('user_preferences')
+        .select('email_rsvp_confirmation')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Respect user preference - default to true if no record
+      if (prefs && prefs.email_rsvp_confirmation === false) {
+        console.log('RSVP email disabled by user preference');
+        return;
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('email')
@@ -514,6 +542,9 @@ export default function EventDetail() {
           : `❌ RSVP Updated for ${event.title}`,
         html,
       });
+
+      // Update last email timestamp after successful send
+      lastRsvpEmailRef.current = { eventId: event.id, timestamp: now };
     } catch (error) {
       // Silently fail - email is optional
     }

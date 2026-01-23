@@ -111,6 +111,18 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     if (!user) return;
 
     try {
+      // Check user preference before sending
+      const { data: prefs } = await supabase
+        .from('user_preferences')
+        .select('email_club_invites')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (prefs && prefs.email_club_invites === false) {
+        console.log('Club invite emails disabled by user preference');
+        return;
+      }
+
       // Get user's email
       const { data: profile } = await supabase
         .from('profiles')

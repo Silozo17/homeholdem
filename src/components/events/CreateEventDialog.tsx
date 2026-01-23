@@ -222,7 +222,21 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
 
       if (!members || members.length === 0) return;
 
+      // Get preferences for all members to filter by email_event_created
+      const userIds = members.map(m => m.user_id);
+      const { data: preferences } = await supabase
+        .from('user_preferences')
+        .select('user_id, email_event_created')
+        .in('user_id', userIds);
+
+      const prefsMap = new Map(preferences?.map(p => [p.user_id, p.email_event_created]) || []);
+
+      // Filter to only members who want event emails (default true if no preference)
       const memberEmails = members
+        .filter(m => {
+          const pref = prefsMap.get(m.user_id);
+          return pref !== false; // Send if true or undefined (default to true)
+        })
         .map((m) => (m.profiles as any)?.email)
         .filter((email): email is string => !!email);
 
