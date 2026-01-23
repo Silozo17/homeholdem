@@ -196,7 +196,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">{t('settlements.loading')}</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('settlements_section.loading')}</div>
         </CardContent>
       </Card>
     );
@@ -209,7 +209,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Wallet className="h-5 w-5 text-primary" />
-              {t('settlements.title')}
+              {t('settlements_section.title')}
             </CardTitle>
             {isAdmin && (
               <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
@@ -223,13 +223,13 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
           {/* Net Balances */}
           {balances.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">{t('settlements.net_balances')}</p>
+              <p className="text-sm font-medium text-muted-foreground">{t('settlements_section.net_balances')}</p>
               <div className="space-y-1">
                 {balances.map(b => (
                   <div key={b.userId} className="flex items-center justify-between py-2 px-3 bg-secondary/30 rounded-lg">
                     <span className="font-medium">{b.name}</span>
                     <Badge variant={b.balance > 0 ? 'default' : 'destructive'}>
-                      {b.balance > 0 ? `+${t('settlements.owed')} ${symbol}${b.balance}` : `${t('settlements.owes')} ${symbol}${Math.abs(b.balance)}`}
+                      {b.balance > 0 ? `${t('settlements_section.owed')} ${symbol}${b.balance}` : `${t('settlements_section.owes')} ${symbol}${Math.abs(b.balance)}`}
                     </Badge>
                   </div>
                 ))}
@@ -240,7 +240,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
           {/* Pending Settlements */}
           {pendingSettlements.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">{t('settlements.pending')}</p>
+              <p className="text-sm font-medium text-muted-foreground">{t('settlements_section.pending')}</p>
               <div className="space-y-2">
                 {pendingSettlements.map(s => (
                   <div key={s.id} className="flex items-center justify-between py-3 px-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -269,7 +269,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
           {/* Settled */}
           {settledSettlements.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">{t('settlements.settled')}</p>
+              <p className="text-sm font-medium text-muted-foreground">{t('settlements_section.settled')}</p>
               <div className="space-y-1">
                 {settledSettlements.slice(0, 5).map(s => (
                   <div key={s.id} className="flex items-center justify-between py-2 px-3 bg-muted/20 rounded-lg opacity-60">
@@ -290,7 +290,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
             <div className="text-center py-6">
               <div className="text-3xl mb-2 opacity-30">💰</div>
               <p className="text-sm text-muted-foreground">
-                {t('settlements.no_settlements')}
+                {t('settlements_section.no_settlements')}
               </p>
             </div>
           )}
@@ -301,14 +301,14 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('settlements.add_settlement')}</DialogTitle>
+            <DialogTitle>{t('settlements_section.add_settlement')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>{t('settlements.from_who_owes')}</Label>
+              <Label>{t('settlements_section.from_label')}</Label>
               <Select value={fromUserId} onValueChange={setFromUserId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={t('settlements.select_player')} />
+                  <SelectValue placeholder={t('settlements_section.select_player')} />
                 </SelectTrigger>
                 <SelectContent>
                   {members.map(m => (
@@ -320,10 +320,10 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{t('settlements.to_who_is_owed')}</Label>
+              <Label>{t('settlements_section.to_label')}</Label>
               <Select value={toUserId} onValueChange={setToUserId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={t('settlements.select_player')} />
+                  <SelectValue placeholder={t('settlements_section.select_player')} />
                 </SelectTrigger>
                 <SelectContent>
                   {members.map(m => (
@@ -335,7 +335,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{t('settlements.amount')} ({symbol})</Label>
+              <Label>{t('settlements_section.amount')} ({symbol})</Label>
               <Input
                 type="number"
                 value={amount}
@@ -344,17 +344,17 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('settlements.notes_optional')}</Label>
+              <Label>{t('settlements_section.notes')}</Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder={t('settlements.notes_placeholder')}
+                placeholder={t('settlements_section.notes_placeholder')}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleAddSettlement}>{t('settlements.add_settlement')}</Button>
+            <Button onClick={handleAddSettlement}>{t('settlements_section.add_settlement')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

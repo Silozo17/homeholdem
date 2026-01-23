@@ -281,7 +281,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{player.display_name}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{player.games_played} {t('leaderboard.games')}</span>
+                    <span>{player.games_played} {t('stats_section.games_suffix')}</span>
                     <span>•</span>
                     <span>{player.wins} 🥇</span>
                     {player.second_places > 0 && (

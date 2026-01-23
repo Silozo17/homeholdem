@@ -125,9 +125,9 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
   };
 
   const getStatusLabel = (status: string) => {
-    if (status === 'completed') return t('history.completed');
-    if (status === 'active') return t('history.active');
-    if (status === 'paused') return t('history.paused');
+    if (status === 'completed') return t('stats_section.completed');
+    if (status === 'active') return t('stats_section.in_progress');
+    if (status === 'paused') return t('stats_section.in_progress');
     return status;
   };
 
@@ -135,7 +135,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">{t('history.loading')}</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('stats_section.loading_history')}</div>
         </CardContent>
       </Card>
     );
@@ -147,12 +147,12 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            {t('history.title')}
+            {t('stats_section.game_history')}
           </CardTitle>
           {sessions.length > 0 && (
             <Button size="sm" variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" />
-              {t('common.export')}
+              {t('stats_section.export')}
             </Button>
           )}
         </div>
@@ -162,7 +162,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
           <div className="text-center py-6">
             <div className="text-3xl mb-2 opacity-30">🃏</div>
             <p className="text-sm text-muted-foreground">
-              {t('history.no_games')}
+              {t('stats_section.no_history')}
             </p>
           </div>
         ) : (
@@ -188,13 +188,13 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
                       <span>{format(new Date(session.final_date), 'MMM d, yyyy', { locale: dateLocale })}</span>
                     )}
                     <span>•</span>
-                    <span>{session.player_count} {t('history.players')}</span>
+                    <span>{session.player_count} {t('stats_section.players')}</span>
                     <span>•</span>
-                    <span>{symbol}{session.prize_pool} {t('history.pool')}</span>
+                    <span>{symbol}{session.prize_pool} {t('stats_section.pool')}</span>
                   </div>
                   {session.winner_name && (
                     <p className="text-xs text-primary mt-1">
-                      🏆 {t('history.winner')}: {session.winner_name}
+                      🏆 {t('stats_section.winner')}: {session.winner_name}
                     </p>
                   )}
                 </div>

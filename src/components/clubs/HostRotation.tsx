@@ -104,7 +104,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">{t('host.loading')}</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('host_section.loading')}</div>
         </CardContent>
       </Card>
     );
@@ -117,7 +117,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <RotateCcw className="h-5 w-5 text-primary" />
-          {t('host.title')}
+          {t('host_section.title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -125,7 +125,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
           <div className="text-center py-6">
             <div className="text-3xl mb-2 opacity-30">🏠</div>
             <p className="text-sm text-muted-foreground">
-              {t('host.no_members')}
+              {t('host_section.no_members')}
             </p>
           </div>
         ) : (
@@ -133,7 +133,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
             {/* Suggested Next Host */}
             {suggestedHost && (
               <div className="bg-primary/10 rounded-lg p-3 mb-4">
-                <p className="text-xs text-primary font-medium mb-2">{t('host.suggested_next')}</p>
+                <p className="text-xs text-primary font-medium mb-2">{t('host_section.suggested_next')}</p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
                     {suggestedHost.avatar_url ? (
@@ -150,8 +150,8 @@ export function HostRotation({ clubId }: HostRotationProps) {
                     <p className="font-medium">{suggestedHost.display_name}</p>
                     <p className="text-xs text-muted-foreground">
                       {suggestedHost.host_count === 0 
-                        ? t('host.hasnt_hosted')
-                        : t('host.hosted_times', { count: suggestedHost.host_count })}
+                        ? t('host_section.hasnt_hosted')
+                        : t('host_section.hosted_times', { count: suggestedHost.host_count })}
                     </p>
                   </div>
                 </div>
@@ -160,7 +160,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
 
             {/* All Members */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">{t('host.all_members')}</p>
+              <p className="text-sm font-medium text-muted-foreground">{t('host_section.all_members')}</p>
               {hostStats.map((member, index) => (
                 <div 
                   key={member.user_id}
@@ -181,7 +181,7 @@ export function HostRotation({ clubId }: HostRotationProps) {
                       )}
                     </div>
                     <span className="text-sm">{member.display_name}</span>
-                    {index === 0 && <Badge variant="outline" className="text-xs">{t('host.next')}</Badge>}
+                    {index === 0 && <Badge variant="outline" className="text-xs">{t('host_section.next')}</Badge>}
                   </div>
                   <div className="text-right">
                     <Badge variant="secondary" className="font-mono">
