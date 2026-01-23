@@ -445,7 +445,10 @@
     "total_invested": "Suma zainwestowana",
     "finish_position": "Pozycja końcowa",
     "winnings": "Wygrane",
-    "display_blinds_as_currency": "Wyświetlaj blindy jako walutę"
+    "display_blinds_as_currency": "Wyświetlaj blindy jako walutę",
+    "rebuy_cost": "Koszt rebuy",
+    "addon_cost": "Koszt add-on",
+    "until_level": "Do poziomu"
   },
   "settings": {
     "title": "Ustawienia",

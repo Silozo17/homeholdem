@@ -445,7 +445,10 @@
     "total_invested": "Total Invested",
     "finish_position": "Finish Position",
     "winnings": "Winnings",
-    "display_blinds_as_currency": "Display Blinds as Currency"
+    "display_blinds_as_currency": "Display Blinds as Currency",
+    "rebuy_cost": "Rebuy Cost",
+    "addon_cost": "Add-on Cost",
+    "until_level": "Until Level"
   },
   "settings": {
     "title": "Settings",
