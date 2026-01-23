@@ -21,6 +21,7 @@ export interface UserPreferences {
   // Other preferences
   show_stats_publicly: boolean;
   language: string;
+  currency: string;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +40,7 @@ const defaultPreferences: Omit<UserPreferences, 'id' | 'user_id' | 'created_at' 
   push_blinds_up: true,
   show_stats_publicly: true,
   language: 'en',
+  currency: 'GBP',
 };
 
 export function useUserPreferences() {

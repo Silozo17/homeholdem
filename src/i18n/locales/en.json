@@ -68,7 +68,9 @@
     "create_account": "Create Account",
     "sign_in": "Sign In",
     "sign_up": "Sign Up",
+    "email": "Email",
     "email_placeholder": "Enter your email",
+    "password": "Password",
     "password_placeholder": "Enter your password",
     "confirm_password": "Confirm Password",
     "confirm_password_placeholder": "Confirm your password",
@@ -80,8 +82,10 @@
     "passwords_dont_match": "Passwords don't match",
     "already_have_account": "Already have an account?",
     "dont_have_account": "Don't have an account?",
+    "no_account": "Don't have an account?",
     "join_club_description": "Join your poker club and start playing",
     "sign_in_description": "Sign in to continue to your clubs",
+    "signin_description": "Sign in to continue to your clubs",
     "tagline": "Your private poker club, organized",
     "valid_email_required": "Please enter a valid email",
     "password_min_length": "Password must be at least 6 characters",
@@ -201,7 +205,16 @@
     "demote_member": "Demote to Member",
     "remove_member": "Remove from Club",
     "transfer_ownership": "Transfer Ownership",
-    "currency": "Currency"
+    "currency": "Currency",
+    "settings": "Settings",
+    "settings_description": "Manage your club settings",
+    "name": "Club Name",
+    "name_placeholder": "Enter club name",
+    "description": "Description",
+    "description_placeholder": "Describe your club...",
+    "name_required": "Club name is required",
+    "settings_saved": "Club settings saved",
+    "currency_description": "Currency used for all financial displays in this club"
   },
   "roles": {
     "owner": "Owner",
@@ -477,7 +490,11 @@
     "select_language": "Select your preferred language",
     "english": "English",
     "polish": "Polski",
-    "danger_zone": "Danger Zone"
+    "danger_zone": "Danger Zone",
+    "currency": "Currency",
+    "currency_description": "Select your preferred currency for displaying statistics",
+    "currency_note": "This affects how your personal stats are displayed. Club-specific currencies are set per club.",
+    "currency_updated": "Currency preference updated"
   },
   "profile": {
     "title": "Profile",

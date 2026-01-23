@@ -68,7 +68,9 @@
     "create_account": "Utwórz konto",
     "sign_in": "Zaloguj się",
     "sign_up": "Zarejestruj się",
+    "email": "Email",
     "email_placeholder": "Wprowadź swój email",
+    "password": "Hasło",
     "password_placeholder": "Wprowadź hasło",
     "confirm_password": "Potwierdź hasło",
     "confirm_password_placeholder": "Potwierdź swoje hasło",
@@ -80,8 +82,10 @@
     "passwords_dont_match": "Hasła nie są zgodne",
     "already_have_account": "Masz już konto?",
     "dont_have_account": "Nie masz konta?",
+    "no_account": "Nie masz konta?",
     "join_club_description": "Dołącz do swojego klubu pokerowego i zacznij grać",
     "sign_in_description": "Zaloguj się, aby przejść do swoich klubów",
+    "signin_description": "Zaloguj się, aby przejść do swoich klubów",
     "tagline": "Twój prywatny klub pokerowy, zorganizowany",
     "valid_email_required": "Wprowadź poprawny adres email",
     "password_min_length": "Hasło musi mieć co najmniej 6 znaków",
@@ -201,7 +205,16 @@
     "demote_member": "Zdegraduj do członka",
     "remove_member": "Usuń z klubu",
     "transfer_ownership": "Przekaż własność",
-    "currency": "Waluta"
+    "currency": "Waluta",
+    "settings": "Ustawienia",
+    "settings_description": "Zarządzaj ustawieniami klubu",
+    "name": "Nazwa klubu",
+    "name_placeholder": "Wprowadź nazwę klubu",
+    "description": "Opis",
+    "description_placeholder": "Opisz swój klub...",
+    "name_required": "Nazwa klubu jest wymagana",
+    "settings_saved": "Ustawienia klubu zapisane",
+    "currency_description": "Waluta używana do wszystkich wyświetleń finansowych w tym klubie"
   },
   "roles": {
     "owner": "Właściciel",
@@ -477,7 +490,11 @@
     "select_language": "Wybierz preferowany język",
     "english": "English",
     "polish": "Polski",
-    "danger_zone": "Strefa zagrożenia"
+    "danger_zone": "Strefa zagrożenia",
+    "currency": "Waluta",
+    "currency_description": "Wybierz preferowaną walutę do wyświetlania statystyk",
+    "currency_note": "To wpływa na sposób wyświetlania twoich osobistych statystyk. Waluty klubowe są ustawiane osobno dla każdego klubu.",
+    "currency_updated": "Preferencja waluty zaktualizowana"
   },
   "profile": {
     "title": "Profil",
