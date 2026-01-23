@@ -161,7 +161,7 @@ export default function ClubDetail() {
       .from('events')
       .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table')
       .eq('club_id', clubId)
-      .order('created_at', { ascending: false });
+      .order('final_date', { ascending: true, nullsFirst: false });
 
     if (eventsData) {
       const eventsWithCounts = await Promise.all(

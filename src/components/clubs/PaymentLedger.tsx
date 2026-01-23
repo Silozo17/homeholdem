@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +48,7 @@ interface PaymentLedgerProps {
 
 export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
   const { user } = useAuth();
+  const { symbol } = useClubCurrency(clubId);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,7 +227,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
                   <div key={b.userId} className="flex items-center justify-between py-2 px-3 bg-secondary/30 rounded-lg">
                     <span className="font-medium">{b.name}</span>
                     <Badge variant={b.balance > 0 ? 'default' : 'destructive'}>
-                      {b.balance > 0 ? '+' : ''}{b.balance > 0 ? `Owed $${b.balance}` : `Owes $${Math.abs(b.balance)}`}
+                      {b.balance > 0 ? '+' : ''}{b.balance > 0 ? `Owed ${symbol}${b.balance}` : `Owes ${symbol}${Math.abs(b.balance)}`}
                     </Badge>
                   </div>
                 ))}
@@ -244,7 +246,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
                       <span className="font-medium">{getMemberName(s.from_user_id)}</span>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">{getMemberName(s.to_user_id)}</span>
-                      <Badge variant="outline" className="ml-2">${s.amount}</Badge>
+                      <Badge variant="outline" className="ml-2">{symbol}{s.amount}</Badge>
                     </div>
                     {isAdmin && (
                       <div className="flex gap-1">
@@ -273,7 +275,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
                       <span>{getMemberName(s.from_user_id)}</span>
                       <ArrowRight className="h-3 w-3" />
                       <span>{getMemberName(s.to_user_id)}</span>
-                      <span className="text-muted-foreground">${s.amount}</span>
+                      <span className="text-muted-foreground">{symbol}{s.amount}</span>
                     </div>
                     <Check className="h-4 w-4 text-green-500" />
                   </div>
@@ -331,7 +333,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Amount ($)</Label>
+              <Label>Amount ({symbol})</Label>
               <Input
                 type="number"
                 value={amount}

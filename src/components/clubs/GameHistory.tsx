@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { symbol } = useClubCurrency(clubId);
 
   useEffect(() => {
     fetchSessions();
@@ -176,7 +178,7 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
                     <span>•</span>
                     <span>{session.player_count} players</span>
                     <span>•</span>
-                    <span>${session.prize_pool} pool</span>
+                    <span>{symbol}{session.prize_pool} pool</span>
                   </div>
                   {session.winner_name && (
                     <p className="text-xs text-primary mt-1">

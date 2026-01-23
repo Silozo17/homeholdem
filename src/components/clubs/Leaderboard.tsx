@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ interface LeaderboardProps {
 export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
   const [stats, setStats] = useState<PlayerStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const { symbol } = useClubCurrency(clubId);
 
   useEffect(() => {
     fetchStats();
@@ -243,7 +245,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                     variant={player.net_profit >= 0 ? 'default' : 'destructive'}
                     className="font-mono"
                   >
-                    {player.net_profit >= 0 ? '+' : ''}{player.net_profit}
+                    {player.net_profit >= 0 ? '+' : ''}{symbol}{Math.abs(player.net_profit)}
                   </Badge>
                 </div>
               </div>
