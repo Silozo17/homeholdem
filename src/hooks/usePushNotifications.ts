@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // VAPID public key - safe to expose publicly (like an SSL public certificate)
 // This must match the private key stored in backend secrets
-const VAPID_PUBLIC_KEY = 'BNq4Gxq4g8_r7j0-5F_sPPjKnDHGQ6c8xMbK3TMSM2ym9d7LvB5NmjZz0-5gxHQZm4D0qBE3cYl3_S8Q9vXPy4E';
+const VAPID_PUBLIC_KEY = 'BHzqX_L6AGFv6oq2pQh8ZSLpBxDMi3wOkl9FZ_9nRrBs0HZJVL6FvDhAZTmNKP9IUGdhAttS_P2VohvvYAigeRk';
 
 interface PushNotificationState {
   isSupported: boolean;
