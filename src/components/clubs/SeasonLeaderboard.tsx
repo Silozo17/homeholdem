@@ -150,7 +150,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
 
   const handleCreateSeason = async () => {
     if (!newSeasonName || !startDate || !endDate) {
-      toast.error(t('season.fill_all_fields'));
+      toast.error(t('stats_section.fill_all_fields'));
       return;
     }
 
@@ -174,11 +174,11 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       .single();
 
     if (error) {
-      toast.error(t('season.create_failed'));
+      toast.error(t('stats_section.failed_create_season'));
       return;
     }
 
-    toast.success(t('season.created'));
+    toast.success(t('stats_section.season_created'));
     setShowCreate(false);
     setNewSeasonName('');
     setStartDate('');
@@ -204,7 +204,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
     return (
       <Card className="bg-card/50 border-border/50">
         <CardContent className="py-8">
-          <div className="animate-pulse text-center text-muted-foreground">{t('season.loading')}</div>
+          <div className="animate-pulse text-center text-muted-foreground">{t('stats_section.loading_seasons')}</div>
         </CardContent>
       </Card>
     );
@@ -217,12 +217,12 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              {t('season.title')}
+              {t('stats_section.season_standings')}
             </CardTitle>
             {isAdmin && (
               <Button size="sm" variant="outline" onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-1" />
-                {t('season.new_season')}
+                {t('stats_section.new_season')}
               </Button>
             )}
           </div>
@@ -232,7 +232,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
             <div className="text-center py-6">
               <div className="text-3xl mb-2 opacity-30">🏆</div>
               <p className="text-sm text-muted-foreground">
-                {t('season.no_seasons')}
+                {t('stats_section.no_seasons')}
               </p>
             </div>
           ) : (
@@ -241,12 +241,12 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               <div className="flex items-center gap-2">
                 <Select value={selectedSeasonId || ''} onValueChange={setSelectedSeasonId}>
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder={t('season.select_season')} />
+                    <SelectValue placeholder={t('stats_section.select_season')} />
                   </SelectTrigger>
                 <SelectContent>
                     {seasons.map(season => (
                       <SelectItem key={season.id} value={season.id}>
-                        {season.name} ({season.computed_status === 'active' ? t('season.active') : season.computed_status === 'closed' ? t('season.closed') : t('season.upcoming')})
+                        {season.name} ({season.computed_status === 'active' ? t('stats_section.active') : season.computed_status === 'closed' ? t('stats_section.closed') : t('stats_section.upcoming')})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -258,13 +258,13 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                 <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2 flex-wrap">
                   <span>{format(new Date(selectedSeason.start_date), 'MMM d, yyyy', { locale: dateLocale })} - {format(new Date(selectedSeason.end_date), 'MMM d, yyyy', { locale: dateLocale })}</span>
                   {selectedSeason.computed_status === 'active' && (
-                    <Badge variant="default" className="bg-green-600">{t('season.active')}</Badge>
+                    <Badge variant="default" className="bg-green-600">{t('stats_section.active')}</Badge>
                   )}
                   {selectedSeason.computed_status === 'closed' && (
-                    <Badge variant="secondary">{t('season.closed')}</Badge>
+                    <Badge variant="secondary">{t('stats_section.closed')}</Badge>
                   )}
                   {selectedSeason.computed_status === 'upcoming' && (
-                    <Badge variant="outline" className="border-blue-500 text-blue-500">{t('season.upcoming')}</Badge>
+                    <Badge variant="outline" className="border-blue-500 text-blue-500">{t('stats_section.upcoming')}</Badge>
                   )}
                 </div>
               )}
@@ -273,7 +273,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               {standings.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">
-                    {t('season.no_standings')}
+                    {t('stats_section.no_standings')}
                   </p>
                 </div>
               ) : (
@@ -293,18 +293,18 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{player.display_name}</p>
                             {player.placeholder_player_id && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">{t('season.unlinked')}</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">{t('stats_section.unlinked')}</Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {player.games_played} {t('season.games')} • {player.wins}{t('season.wins_short')} • {player.second_places}×{t('season.second_short')}
+                            {player.games_played} {t('stats_section.games_suffix')} • {player.wins}{t('stats_section.wins_label')} • {player.second_places}{t('stats_section.second_label')}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-primary">{player.total_points} {t('season.pts')}</p>
+                        <p className="font-bold text-primary">{player.total_points} {t('stats_section.points_suffix')}</p>
                         <p className="text-xs text-muted-foreground">
-                          {symbol}{player.total_winnings} {t('season.won')}
+                          {symbol}{player.total_winnings} {t('stats_section.won_suffix')}
                         </p>
                       </div>
                     </div>
@@ -320,20 +320,20 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('season.create_new_season')}</DialogTitle>
+            <DialogTitle>{t('stats_section.create_season')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>{t('season.season_name')}</Label>
+              <Label>{t('stats_section.season_name')}</Label>
               <Input
                 value={newSeasonName}
                 onChange={(e) => setNewSeasonName(e.target.value)}
-                placeholder={t('season.name_placeholder')}
+                placeholder={t('stats_section.season_name_placeholder')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('season.start_date')}</Label>
+                <Label>{t('club.start_date')}</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -341,7 +341,7 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t('season.end_date')}</Label>
+                <Label>{t('club.end_date')}</Label>
                 <Input
                   type="date"
                   value={endDate}
@@ -350,13 +350,12 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               </div>
             </div>
             <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
-              <p className="font-medium mb-1">{t('season.default_points')}:</p>
-              <p>{t('season.points_breakdown')}</p>
+              <p className="font-medium">{t('stats_section.default_points')}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleCreateSeason}>{t('season.create_season')}</Button>
+            <Button onClick={handleCreateSeason}>{t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
