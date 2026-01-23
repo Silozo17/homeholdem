@@ -8,6 +8,7 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
 import { PrivacySettings } from '@/components/settings/PrivacySettings';
 import { LanguageSettings } from '@/components/settings/LanguageSettings';
+import { CurrencySettings } from '@/components/settings/CurrencySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
@@ -99,6 +100,8 @@ export default function Settings() {
         </Card>
 
         <LanguageSettings />
+
+        <CurrencySettings />
 
         <NotificationSettings />
 

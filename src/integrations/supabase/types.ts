@@ -282,6 +282,7 @@ export type Database = {
       clubs: {
         Row: {
           created_at: string
+          currency: string
           description: string | null
           id: string
           invite_code: string
@@ -290,6 +291,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          currency?: string
           description?: string | null
           id?: string
           invite_code: string
@@ -298,6 +300,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          currency?: string
           description?: string | null
           id?: string
           invite_code?: string
@@ -1050,6 +1053,7 @@ export type Database = {
       user_preferences: {
         Row: {
           created_at: string
+          currency: string | null
           email_club_invites: boolean | null
           email_event_created: boolean | null
           email_event_reminder: boolean | null
@@ -1069,6 +1073,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          currency?: string | null
           email_club_invites?: boolean | null
           email_event_created?: boolean | null
           email_event_reminder?: boolean | null
@@ -1088,6 +1093,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          currency?: string | null
           email_club_invites?: boolean | null
           email_event_created?: boolean | null
           email_event_reminder?: boolean | null

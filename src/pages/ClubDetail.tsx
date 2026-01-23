@@ -23,7 +23,8 @@ import {
   ScrollText,
   Coins,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -42,6 +43,7 @@ import { MemberActions } from '@/components/clubs/MemberActions';
 import { ShareClub } from '@/components/clubs/ShareClub';
 import { InviteByEmailDialog } from '@/components/clubs/InviteByEmailDialog';
 import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
+import { ClubSettings } from '@/components/clubs/ClubSettings';
 
 interface ClubMember {
   id: string;
@@ -59,6 +61,7 @@ interface Club {
   name: string;
   description: string | null;
   invite_code: string;
+  currency: string;
   created_at: string;
 }
 
@@ -298,7 +301,7 @@ export default function ClubDetail() {
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="events" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto gap-0.5">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 h-auto gap-0.5">
             <TabsTrigger value="events" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
               <Calendar className="h-4 w-4 shrink-0" />
               <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.events')}</span>
@@ -322,6 +325,10 @@ export default function ClubDetail() {
             <TabsTrigger value="members" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
               <Users className="h-4 w-4 shrink-0" />
               <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.members_tab')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.settings')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -422,6 +429,18 @@ export default function ClubDetail() {
           {/* Chips Tab */}
           <TabsContent value="chips" className="mt-4 space-y-4">
             <ChipTemplateManager clubId={clubId!} isAdmin={isAdmin} />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="mt-4 space-y-4">
+            <ClubSettings
+              clubId={clubId!}
+              clubName={club.name}
+              clubDescription={club.description}
+              clubCurrency={club.currency || 'GBP'}
+              isAdmin={isAdmin}
+              onUpdate={fetchClubData}
+            />
           </TabsContent>
 
           {/* Rules Tab */}
