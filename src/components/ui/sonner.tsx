@@ -10,11 +10,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       position="top-center"
-      className="toaster group"
-      style={{
-        // Safe area padding for PWA notch/status bar
-        paddingTop: 'max(env(safe-area-inset-top), 12px)',
-      }}
+      className="toaster group mt-safe"
+      offset={20}
       toastOptions={{
         classNames: {
           toast:
