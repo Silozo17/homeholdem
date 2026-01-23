@@ -704,7 +704,8 @@
     "pool": "pool",
     "winner": "Winner",
     "completed": "completed",
-    "in_progress": "in progress"
+    "in_progress": "in progress",
+    "game_history": "Game History"
   },
   "host_section": {
     "title": "Host Rotation",

@@ -704,7 +704,8 @@
     "pool": "pula",
     "winner": "Zwycięzca",
     "completed": "zakończona",
-    "in_progress": "w toku"
+    "in_progress": "w toku",
+    "game_history": "Historia gier"
   },
   "host_section": {
     "title": "Rotacja gospodarzy",
