@@ -236,14 +236,14 @@ export default function Events() {
         </div>
 
         <Tabs defaultValue="upcoming" className="w-full">
-          <TabsList className="w-full grid grid-cols-3 bg-muted/50">
-            <TabsTrigger value="upcoming">
+          <TabsList className="w-full flex justify-between bg-muted/50">
+            <TabsTrigger value="upcoming" className="flex-1 text-xs sm:text-sm px-2 sm:px-3">
               {t('event.upcoming')} ({upcomingEvents.length})
             </TabsTrigger>
-            <TabsTrigger value="pending">
+            <TabsTrigger value="pending" className="flex-1 text-xs sm:text-sm px-2 sm:px-3">
               {t('event.pending')} ({pendingEvents.length})
             </TabsTrigger>
-            <TabsTrigger value="past">
+            <TabsTrigger value="past" className="flex-1 text-xs sm:text-sm px-2 sm:px-3">
               {t('event.past')} ({pastEvents.length})
             </TabsTrigger>
           </TabsList>
