@@ -463,7 +463,8 @@
     "language": "Language",
     "select_language": "Select your preferred language",
     "english": "English",
-    "polish": "Polski"
+    "polish": "Polski",
+    "danger_zone": "Danger Zone"
   },
   "profile": {
     "title": "Profile",

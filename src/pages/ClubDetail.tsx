@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,6 +77,7 @@ interface EventWithCounts {
 }
 
 export default function ClubDetail() {
+  const { t } = useTranslation();
   const { clubId } = useParams<{ clubId: string }>();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -115,7 +117,7 @@ export default function ClubDetail() {
       .single();
 
     if (clubError || !clubData) {
-      toast.error('Club not found');
+      toast.error(t('common.error'));
       navigate('/dashboard');
       return;
     }
@@ -205,7 +207,7 @@ export default function ClubDetail() {
     if (!club) return;
     await navigator.clipboard.writeText(club.invite_code);
     setCopied(true);
-    toast.success('Invite code copied!');
+    toast.success(t('club.code_copied'));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -220,7 +222,7 @@ export default function ClubDetail() {
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+        <div className="animate-pulse text-primary">{t('common.loading')}</div>
       </div>
     );
   }
@@ -254,7 +256,7 @@ export default function ClubDetail() {
             <h1 className="text-2xl font-bold text-gold-gradient">{club.name}</h1>
             {userRole && (
               <Badge variant={userRole === 'owner' ? 'default' : 'secondary'} className="capitalize">
-                {userRole}
+                {t(`club.${userRole}`)}
               </Badge>
             )}
           </div>
@@ -267,7 +269,7 @@ export default function ClubDetail() {
         <Card className="bg-card/50 border-border/50">
           <CardContent className="flex items-center justify-between py-4">
             <div>
-              <p className="text-sm text-muted-foreground">Invite Code</p>
+              <p className="text-sm text-muted-foreground">{t('club.invite_code')}</p>
               <p className="text-2xl font-mono tracking-[0.3em] text-primary">
                 {club.invite_code}
               </p>
@@ -299,34 +301,34 @@ export default function ClubDetail() {
           <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="events" className="flex flex-col items-center gap-1 py-2">
               <Calendar className="h-4 w-4" />
-              <span className="text-xs">Events</span>
+              <span className="text-xs">{t('club.events')}</span>
             </TabsTrigger>
             <TabsTrigger value="chat" className="flex flex-col items-center gap-1 py-2">
               <MessageCircle className="h-4 w-4" />
-              <span className="text-xs">Chat</span>
+              <span className="text-xs">{t('club.chat')}</span>
             </TabsTrigger>
             <TabsTrigger value="leaderboard" className="flex flex-col items-center gap-1 py-2">
               <Trophy className="h-4 w-4" />
-              <span className="text-xs">Stats</span>
+              <span className="text-xs">{t('club.stats')}</span>
             </TabsTrigger>
             <TabsTrigger value="chips" className="flex flex-col items-center gap-1 py-2">
               <Coins className="h-4 w-4" />
-              <span className="text-xs">Chips</span>
+              <span className="text-xs">{t('club.chips')}</span>
             </TabsTrigger>
             <TabsTrigger value="rules" className="flex flex-col items-center gap-1 py-2">
               <ScrollText className="h-4 w-4" />
-              <span className="text-xs">Rules</span>
+              <span className="text-xs">{t('club.rules')}</span>
             </TabsTrigger>
             <TabsTrigger value="members" className="flex flex-col items-center gap-1 py-2">
               <Users className="h-4 w-4" />
-              <span className="text-xs">Members</span>
+              <span className="text-xs">{t('club.members_tab')}</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Events Tab */}
           <TabsContent value="events" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Upcoming Events</h2>
+              <h2 className="text-lg font-semibold">{t('club.upcoming_events')}</h2>
               {isAdmin && (
                 <Button 
                   size="sm"
@@ -334,7 +336,7 @@ export default function ClubDetail() {
                   className="glow-gold"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  New Event
+                  {t('club.new_event')}
                 </Button>
               )}
             </div>
@@ -345,8 +347,8 @@ export default function ClubDetail() {
                   <div className="text-3xl mb-3 opacity-30">📅</div>
                   <p className="text-muted-foreground">
                     {isAdmin 
-                      ? "No events yet. Create the first one!" 
-                      : "No events scheduled. Check back soon!"}
+                      ? t('club.no_events_admin')
+                      : t('club.no_events_member')}
                   </p>
                 </CardContent>
               </Card>
@@ -391,7 +393,7 @@ export default function ClubDetail() {
                       <CardContent className="py-8 text-center">
                         <div className="text-3xl mb-3 opacity-30">📅</div>
                         <p className="text-muted-foreground">
-                          No upcoming events. Create one to get started!
+                          {t('club.no_events_admin')}
                         </p>
                       </CardContent>
                     </Card>
@@ -435,7 +437,7 @@ export default function ClubDetail() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
-                  Members ({members.length})
+                  {t('common.members')} ({members.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -462,7 +464,7 @@ export default function ClubDetail() {
                         <p className="font-medium">{member.profile.display_name}</p>
                         <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
                           {getRoleIcon(member.role)}
-                          {member.role}
+                          {t(`club.${member.role}`)}
                         </p>
                       </div>
                     </div>
@@ -496,12 +498,12 @@ export default function ClubDetail() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2 text-destructive">
                     <AlertTriangle className="h-5 w-5" />
-                    Danger Zone
+                    {t('settings.danger_zone')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Deleting this club is permanent and cannot be undone.
+                    {t('club.delete_club_confirm')}
                   </p>
                   <DeleteClubDialog clubId={clubId!} clubName={club.name} />
                 </CardContent>
