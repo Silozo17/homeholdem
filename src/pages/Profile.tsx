@@ -193,7 +193,7 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-16 px-4">
           <Logo size="sm" />
           <Button
@@ -206,6 +206,8 @@ export default function Profile() {
           </Button>
         </div>
       </header>
+      {/* Header spacer */}
+      <div className="h-16 safe-area-top" />
 
       <main className="container px-4 py-6 space-y-6">
         {/* Profile Header Card */}
