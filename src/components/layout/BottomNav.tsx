@@ -1,21 +1,23 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Home, Calendar, Plus, Trophy, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { QuickCreateDialog } from './QuickCreateDialog';
 
-const navItems = [
-  { icon: Home, label: 'Home', path: '/dashboard' },
-  { icon: Calendar, label: 'Events', path: '/events' },
-  { icon: Plus, label: 'Create', path: null }, // Opens modal
-  { icon: Trophy, label: 'Stats', path: '/stats' },
-  { icon: User, label: 'Profile', path: '/profile' },
-];
-
 export function BottomNav() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const navItems = [
+    { icon: Home, label: t('nav.home'), path: '/dashboard' },
+    { icon: Calendar, label: t('nav.events'), path: '/events' },
+    { icon: Plus, label: t('nav.create'), path: null }, // Opens modal
+    { icon: Trophy, label: t('nav.stats'), path: '/stats' },
+    { icon: User, label: t('nav.profile'), path: '/profile' },
+  ];
 
   const handleNavClick = (path: string | null) => {
     if (path === null) {

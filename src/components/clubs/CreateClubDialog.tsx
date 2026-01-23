@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,13 +25,6 @@ import {
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const createClubSchema = z.object({
-  name: z.string().min(2, 'Club name must be at least 2 characters').max(50),
-  description: z.string().max(200).optional(),
-});
-
-type CreateClubFormData = z.infer<typeof createClubSchema>;
-
 interface CreateClubDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,7 +32,15 @@ interface CreateClubDialogProps {
 }
 
 export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDialogProps) {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
+
+  const createClubSchema = z.object({
+    name: z.string().min(2, t('validation.club_name_min')).max(50),
+    description: z.string().max(200).optional(),
+  });
+
+  type CreateClubFormData = z.infer<typeof createClubSchema>;
 
   const form = useForm<CreateClubFormData>({
     resolver: zodResolver(createClubSchema),
@@ -60,11 +62,11 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
     setIsLoading(false);
 
     if (error) {
-      toast.error('Failed to create club: ' + error.message);
+      toast.error(t('club.create_failed') + ': ' + error.message);
       return;
     }
 
-    toast.success('Club created! Share the invite code with your friends.');
+    toast.success(t('club.created_success'));
     form.reset();
     onOpenChange(false);
     onSuccess();
@@ -74,9 +76,9 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card border-border/50">
         <DialogHeader>
-          <DialogTitle className="text-gold-gradient">Create a Club</DialogTitle>
+          <DialogTitle className="text-gold-gradient">{t('club.create')}</DialogTitle>
           <DialogDescription>
-            Start your own poker club and invite friends to join.
+            {t('club.create_description')}
           </DialogDescription>
         </DialogHeader>
         
@@ -87,10 +89,10 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Club Name</FormLabel>
+                  <FormLabel>{t('club.name')}</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="The Royal Flush Club" 
+                      placeholder={t('club.name_placeholder')}
                       className="bg-input/50 border-border/50"
                       {...field} 
                     />
@@ -104,10 +106,10 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (optional)</FormLabel>
+                  <FormLabel>{t('club.description_label')}</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Monthly Texas Hold'em poker nights with friends"
+                      placeholder={t('club.description_placeholder')}
                       className="bg-input/50 border-border/50 resize-none"
                       rows={3}
                       {...field} 
@@ -124,7 +126,7 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
                 className="flex-1"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button 
                 type="submit" 
@@ -132,9 +134,9 @@ export function CreateClubDialog({ open, onOpenChange, onSuccess }: CreateClubDi
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.creating')}</>
                 ) : (
-                  'Create Club'
+                  t('club.create')
                 )}
               </Button>
             </div>

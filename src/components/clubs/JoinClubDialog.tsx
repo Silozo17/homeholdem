@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -27,12 +28,6 @@ import { sendEmail } from '@/lib/email';
 import { welcomeToClubTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
 
-const joinClubSchema = z.object({
-  inviteCode: z.string().length(6, 'Invite code must be 6 characters').toUpperCase(),
-});
-
-type JoinClubFormData = z.infer<typeof joinClubSchema>;
-
 interface JoinClubDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,8 +35,15 @@ interface JoinClubDialogProps {
 }
 
 export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialogProps) {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+
+  const joinClubSchema = z.object({
+    inviteCode: z.string().length(6, t('validation.invite_code_length')).toUpperCase(),
+  });
+
+  type JoinClubFormData = z.infer<typeof joinClubSchema>;
 
   const form = useForm<JoinClubFormData>({
     resolver: zodResolver(joinClubSchema),
@@ -60,7 +62,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
 
     if (clubError || !clubData) {
       setIsLoading(false);
-      toast.error('Invalid invite code. Please check and try again.');
+      toast.error(t('club.invalid_code'));
       return;
     }
 
@@ -76,7 +78,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
 
     if (existingMember) {
       setIsLoading(false);
-      toast.error('You are already a member of this club.');
+      toast.error(t('club.already_member_error'));
       return;
     }
 
@@ -92,14 +94,14 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     setIsLoading(false);
 
     if (joinError) {
-      toast.error('Failed to join club: ' + joinError.message);
+      toast.error(t('club.join_failed') + ': ' + joinError.message);
       return;
     }
 
     // Send welcome email (fire and forget)
     sendWelcomeEmail(club.id, club.name, data.inviteCode.toUpperCase());
 
-    toast.success(`Welcome to ${club.name}!`);
+    toast.success(t('club.welcome', { name: club.name }));
     form.reset();
     onOpenChange(false);
     onSuccess();
@@ -147,9 +149,9 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card border-border/50">
         <DialogHeader>
-          <DialogTitle className="text-gold-gradient">Join a Club</DialogTitle>
+          <DialogTitle className="text-gold-gradient">{t('club.join')}</DialogTitle>
           <DialogDescription>
-            Enter the 6-character invite code to join an existing club.
+            {t('club.join_description')}
           </DialogDescription>
         </DialogHeader>
         
@@ -160,7 +162,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
               name="inviteCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Invite Code</FormLabel>
+                  <FormLabel>{t('club.invite_code')}</FormLabel>
                   <FormControl>
                     <Input 
                       placeholder="ABC123"
@@ -181,7 +183,7 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
                 className="flex-1"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button 
                 type="submit" 
@@ -189,9 +191,9 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Joining...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.joining')}</>
                 ) : (
-                  'Join Club'
+                  t('club.join')
                 )}
               </Button>
             </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Users, Calendar, ArrowRight } from 'lucide-react';
@@ -20,6 +21,7 @@ interface ClubOption {
 }
 
 export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [adminClubs, setAdminClubs] = useState<ClubOption[]>([]);
@@ -99,9 +101,9 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">
-              {mode === 'select' && 'Quick Create'}
-              {mode === 'club' && 'Create a Club First'}
-              {mode === 'event' && 'Select Club'}
+              {mode === 'select' && t('quick_create.title')}
+              {mode === 'club' && t('quick_create.create_club_first')}
+              {mode === 'event' && t('quick_create.select_club')}
             </DialogTitle>
           </DialogHeader>
 
@@ -120,8 +122,8 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
                     <Users className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <div className="font-semibold">New Club</div>
-                    <div className="text-xs text-muted-foreground">Start a poker group</div>
+                    <div className="font-semibold">{t('quick_create.new_club')}</div>
+                    <div className="text-xs text-muted-foreground">{t('quick_create.new_club_desc')}</div>
                   </div>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -137,8 +139,8 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
                     <Calendar className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <div className="font-semibold">New Event</div>
-                    <div className="text-xs text-muted-foreground">Schedule a poker night</div>
+                    <div className="font-semibold">{t('quick_create.new_event')}</div>
+                    <div className="text-xs text-muted-foreground">{t('quick_create.new_event_desc')}</div>
                   </div>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -149,7 +151,7 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
           {mode === 'club' && (
             <div className="space-y-4 py-4">
               <p className="text-sm text-muted-foreground">
-                You need to be an admin of a club to create events. Create a club first!
+                {t('quick_create.need_admin')}
               </p>
               <Button
                 className="w-full"
@@ -159,14 +161,14 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
                   setMode('select');
                 }}
               >
-                <Users className="mr-2 h-4 w-4" /> Create Club
+                <Users className="mr-2 h-4 w-4" /> {t('club.create')}
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={() => setMode('select')}
               >
-                Back
+                {t('common.back')}
               </Button>
             </div>
           )}
@@ -174,10 +176,10 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
           {mode === 'event' && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Which club?</label>
+                <label className="text-sm font-medium">{t('quick_create.which_club')}</label>
                 <Select value={selectedClubId} onValueChange={setSelectedClubId}>
                   <SelectTrigger className="bg-input border-border">
-                    <SelectValue placeholder="Select a club" />
+                    <SelectValue placeholder={t('quick_create.select_club_placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {adminClubs.map((club) => (
@@ -194,14 +196,14 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
                   className="flex-1"
                   onClick={() => setMode('select')}
                 >
-                  Back
+                  {t('common.back')}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleStartEventCreation}
                   disabled={!selectedClubId}
                 >
-                  Continue
+                  {t('common.continue')}
                 </Button>
               </div>
             </div>

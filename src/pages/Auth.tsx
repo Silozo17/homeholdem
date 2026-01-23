@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Logo } from '@/components/layout/Logo';
@@ -7,6 +8,7 @@ import { Logo } from '@/components/layout/Logo';
 export default function Auth() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!loading && user) {
@@ -17,7 +19,7 @@ export default function Auth() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary">Loading...</div>
+        <div className="animate-pulse text-primary">{t('common.loading')}</div>
       </div>
     );
   }
@@ -28,7 +30,7 @@ export default function Auth() {
         <Logo size="lg" />
         
         <p className="text-center text-muted-foreground max-w-sm mx-auto">
-          Organize private poker nights, run tournaments, and track your club's history.
+          {t('auth.tagline')}
         </p>
         
         <AuthForm />

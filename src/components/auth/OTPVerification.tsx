@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
@@ -16,6 +17,7 @@ interface OTPVerificationProps {
 }
 
 export function OTPVerification({ email, password, displayName, onSuccess, onBack }: OTPVerificationProps) {
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -30,7 +32,7 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
 
   const handleVerify = async () => {
     if (code.length !== 6) {
-      toast.error('Please enter the 6-digit code');
+      toast.error(t('auth.otp_enter_code'));
       return;
     }
 
@@ -42,7 +44,7 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || 'Invalid or expired code');
+        toast.error(data?.error || t('auth.otp_invalid'));
         setIsVerifying(false);
         return;
       }
@@ -65,11 +67,11 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
         return;
       }
 
-      toast.success('Account created successfully!');
+      toast.success(t('auth.account_created'));
       onSuccess();
     } catch (err) {
       console.error('Verification error:', err);
-      toast.error('Something went wrong. Please try again.');
+      toast.error(t('common.error'));
       setIsVerifying(false);
     }
   };
@@ -84,15 +86,15 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || 'Failed to resend code');
+        toast.error(data?.error || t('auth.otp_resend_failed'));
       } else {
-        toast.success('New code sent!');
+        toast.success(t('auth.otp_new_sent'));
         setCountdown(60); // 60 second cooldown
         setCode('');
       }
     } catch (err) {
       console.error('Resend error:', err);
-      toast.error('Failed to resend code');
+      toast.error(t('auth.otp_resend_failed'));
     } finally {
       setIsResending(false);
     }
@@ -108,12 +110,12 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
           onClick={onBack}
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+          {t('common.back')}
         </Button>
         <div className="text-4xl mb-2">🔐</div>
-        <CardTitle className="text-xl">Check your email</CardTitle>
+        <CardTitle className="text-xl">{t('auth.check_email')}</CardTitle>
         <CardDescription className="text-sm">
-          We sent a 6-digit code to<br />
+          {t('auth.otp_sent_to')}<br />
           <span className="text-foreground font-medium">{email}</span>
         </CardDescription>
       </CardHeader>
@@ -144,10 +146,10 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
           {isVerifying ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Verifying...
+              {t('auth.verifying')}
             </>
           ) : (
-            'Verify & Create Account'
+            t('auth.verify_create')
           )}
         </Button>
 
@@ -162,14 +164,14 @@ export function OTPVerification({ email, password, displayName, onSuccess, onBac
             {isResending ? (
               <>
                 <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Sending...
+                {t('auth.sending')}
               </>
             ) : countdown > 0 ? (
-              `Resend code in ${countdown}s`
+              t('auth.resend_countdown', { seconds: countdown })
             ) : (
               <>
                 <RefreshCw className="mr-2 h-3 w-3" />
-                Resend code
+                {t('auth.resend_code')}
               </>
             )}
           </Button>
