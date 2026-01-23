@@ -30,7 +30,7 @@ function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (c) => htmlEscapeMap[c] || c);
 }
 
-// Premium email template - inline with casino green theme
+// Premium waitlist promotion email template with dark casino theme and shine effects
 function waitlistPromotionEmail(data: {
   eventTitle: string;
   eventDate?: string;
@@ -56,29 +56,32 @@ function waitlistPromotionEmail(data: {
 </head>
 <body style="margin: 0; padding: 0; background-color: #0f1f1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <div style="padding: 24px 16px; background-color: #0f1f1a;">
-    <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(212, 175, 55, 0.1);">
-      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(180deg, rgba(212, 175, 55, 0.08) 0%, transparent 100%);">
-        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase;">♠ Home Hold'em Club ♠</p>
+    <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);">
+      <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(180deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.04) 50%, transparent 100%);">
+        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase; text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);">♠ Home Hold'em Club ♠</p>
       </div>
       <div style="padding: 40px 28px; text-align: center;">
-        <div style="font-size: 48px; line-height: 1; margin-bottom: 20px;">🎉</div>
-        <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">A spot opened up!</h1>
-        <p style="color: #7a9e90; font-size: 15px; line-height: 1.5; margin: 0 0 28px;">
+        <div style="font-size: 48px; line-height: 1; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));">🎉</div>
+        <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">A spot opened up!</h1>
+        <p style="color: #8fb5a5; font-size: 15px; line-height: 1.6; margin: 0 0 28px;">
           ${safeName ? `Great news ${safeName}! ` : ''}You've been promoted from the waitlist and your seat is now confirmed.
         </p>
-        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.06) 100%); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left;">
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.22) 0%, rgba(212, 175, 55, 0.12) 50%, rgba(212, 175, 55, 0.08) 100%); border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);">
+          <p style="margin: 0; color: #d4af37; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);">✨ Seat Confirmed ✨</p>
+        </div>
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.06) 50%, rgba(212, 175, 55, 0.03) 100%); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 20px 24px; margin: 0 0 28px; text-align: left; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);">
           <p style="margin: 0 0 4px; color: #ffffff; font-weight: 600; font-size: 16px;">${safeTitle}</p>
-          ${safeClubName ? `<p style="margin: 8px 0 0; color: #7a9e90; font-size: 13px;">🎴 ${safeClubName}</p>` : ''}
+          ${safeClubName ? `<p style="margin: 10px 0 0; color: #8fb5a5; font-size: 13px;">🎴 ${safeClubName}</p>` : ''}
           ${safeDate ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📅 ${safeDate}</p>` : ''}
           ${safeLocation ? `<p style="margin: 8px 0 0; color: #b8d4c8; font-size: 14px;">📍 ${safeLocation}</p>` : ''}
         </div>
-        <a href="${safeUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #b8962e 100%); color: #000000; font-weight: 600; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);">
+        <a href="${safeUrl}" style="display: inline-block; background: linear-gradient(135deg, #e8c84a 0%, #d4af37 40%, #b8962e 100%); color: #000000; font-weight: 700; font-size: 14px; padding: 16px 40px; border-radius: 8px; text-decoration: none; text-align: center; box-shadow: 0 4px 16px rgba(212, 175, 55, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.1); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);">
           View Event
         </a>
       </div>
-      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.15); background: linear-gradient(0deg, rgba(212, 175, 55, 0.05) 0%, transparent 100%);">
-        <p style="color: #3d5e52; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
-        <p style="color: #2d4a40; font-size: 14px; letter-spacing: 8px; margin-top: 8px;">♥ ♠ ♦ ♣</p>
+      <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(0deg, rgba(212, 175, 55, 0.06) 0%, rgba(212, 175, 55, 0.02) 50%, transparent 100%);">
+        <p style="color: #4a7566; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
+        <p style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);">♥ ♠ ♦ ♣</p>
       </div>
     </div>
   </div>
