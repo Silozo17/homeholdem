@@ -11,6 +11,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       position="top-center"
       className="toaster group"
+      style={{
+        // Safe area padding for PWA notch/status bar
+        paddingTop: 'max(env(safe-area-inset-top), 12px)',
+      }}
       toastOptions={{
         classNames: {
           toast:

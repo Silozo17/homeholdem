@@ -298,30 +298,30 @@ export default function ClubDetail() {
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="events" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 h-auto">
-            <TabsTrigger value="events" className="flex flex-col items-center gap-1 py-2">
-              <Calendar className="h-4 w-4" />
-              <span className="text-xs">{t('club.events')}</span>
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto gap-0.5">
+            <TabsTrigger value="events" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.events')}</span>
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex flex-col items-center gap-1 py-2">
-              <MessageCircle className="h-4 w-4" />
-              <span className="text-xs">{t('club.chat')}</span>
+            <TabsTrigger value="chat" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.chat')}</span>
             </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="flex flex-col items-center gap-1 py-2">
-              <Trophy className="h-4 w-4" />
-              <span className="text-xs">{t('club.stats')}</span>
+            <TabsTrigger value="leaderboard" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <Trophy className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.stats')}</span>
             </TabsTrigger>
-            <TabsTrigger value="chips" className="flex flex-col items-center gap-1 py-2">
-              <Coins className="h-4 w-4" />
-              <span className="text-xs">{t('club.chips')}</span>
+            <TabsTrigger value="chips" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <Coins className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.chips')}</span>
             </TabsTrigger>
-            <TabsTrigger value="rules" className="flex flex-col items-center gap-1 py-2">
-              <ScrollText className="h-4 w-4" />
-              <span className="text-xs">{t('club.rules')}</span>
+            <TabsTrigger value="rules" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <ScrollText className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.rules')}</span>
             </TabsTrigger>
-            <TabsTrigger value="members" className="flex flex-col items-center gap-1 py-2">
-              <Users className="h-4 w-4" />
-              <span className="text-xs">{t('club.members_tab')}</span>
+            <TabsTrigger value="members" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="text-[10px] sm:text-xs truncate max-w-full">{t('club.members_tab')}</span>
             </TabsTrigger>
           </TabsList>
 
