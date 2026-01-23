@@ -1,7 +1,7 @@
 // Service Worker for Home Hold'em Club
 // Handles push notifications and offline caching
 
-const CACHE_NAME = 'holdem-club-v3';
+const CACHE_NAME = 'holdem-club-v4';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
