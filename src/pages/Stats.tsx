@@ -65,13 +65,23 @@ export default function Stats() {
     if (!user) return;
     setLoadingData(true);
 
-    // Fetch all game players data for this user
-    const { data: gamePlayers } = await supabase
+    // Step 1: Find any placeholder_players linked to this user
+    const { data: linkedPlaceholders } = await supabase
+      .from('placeholder_players')
+      .select('id')
+      .eq('linked_user_id', user.id);
+
+    const placeholderIds = linkedPlaceholders?.map(p => p.id) || [];
+
+    // Step 2: Get game_players for BOTH user_id AND placeholder_player_id matches
+    let query = supabase
       .from('game_players')
       .select(`
         id,
         finish_position,
         game_session_id,
+        user_id,
+        placeholder_player_id,
         game_sessions (
           id,
           event_id,
@@ -84,91 +94,147 @@ export default function Stats() {
             )
           )
         )
-      `)
-      .eq('user_id', user.id);
+      `);
+
+    // Build OR condition for user_id or any linked placeholder_player_id
+    if (placeholderIds.length > 0) {
+      query = query.or(`user_id.eq.${user.id},placeholder_player_id.in.(${placeholderIds.join(',')})`);
+    } else {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data: gamePlayers } = await query;
+
+    if (!gamePlayers || gamePlayers.length === 0) {
+      setOverallStats({
+        totalGames: 0,
+        totalWins: 0,
+        totalCashes: 0,
+        totalBuyIns: 0,
+        totalWinnings: 0,
+        netProfit: 0,
+        avgFinishPosition: 0,
+        bestFinish: 0,
+        winRate: 0,
+        cashRate: 0,
+      });
+      setClubStats([]);
+      setLoadingData(false);
+      return;
+    }
 
     // Fetch all transactions for this user's game players
-    const playerIds = gamePlayers?.map(p => p.id) || [];
+    const playerIds = gamePlayers.map(p => p.id);
     const { data: transactions } = await supabase
       .from('game_transactions')
       .select('amount, transaction_type, game_player_id')
       .in('game_player_id', playerIds);
 
-    if (gamePlayers) {
-      // Calculate overall stats
-      const totalGames = gamePlayers.length;
-      const finishedGames = gamePlayers.filter(p => p.finish_position !== null);
-      const totalWins = gamePlayers.filter(p => p.finish_position === 1).length;
-      const totalCashes = gamePlayers.filter(p => p.finish_position && p.finish_position <= 3).length;
-      const bestFinish = finishedGames.length > 0 
-        ? Math.min(...finishedGames.map(p => p.finish_position!))
-        : 0;
-      const avgFinishPosition = finishedGames.length > 0
-        ? finishedGames.reduce((sum, p) => sum + (p.finish_position || 0), 0) / finishedGames.length
-        : 0;
+    // Also fetch payouts from payout_structures
+    const sessionIds = [...new Set(gamePlayers.map(p => p.game_session_id))];
+    const { data: payouts } = await supabase
+      .from('payout_structures')
+      .select('player_id, amount')
+      .in('game_session_id', sessionIds)
+      .not('player_id', 'is', null);
 
-      let totalBuyIns = 0;
-      let totalWinnings = 0;
+    // Create payout map
+    const payoutMap = new Map<string, number>();
+    payouts?.forEach(p => {
+      if (p.player_id && p.amount) {
+        payoutMap.set(p.player_id, (payoutMap.get(p.player_id) || 0) + p.amount);
+      }
+    });
 
-      transactions?.forEach(t => {
+    // Calculate overall stats
+    const totalGames = gamePlayers.length;
+    const finishedGames = gamePlayers.filter(p => p.finish_position !== null);
+    const totalWins = gamePlayers.filter(p => p.finish_position === 1).length;
+    const totalCashes = gamePlayers.filter(p => p.finish_position && p.finish_position <= 3).length;
+    const bestFinish = finishedGames.length > 0 
+      ? Math.min(...finishedGames.map(p => p.finish_position!))
+      : 0;
+    const avgFinishPosition = finishedGames.length > 0
+      ? finishedGames.reduce((sum, p) => sum + (p.finish_position || 0), 0) / finishedGames.length
+      : 0;
+
+    let totalBuyIns = 0;
+    let totalWinnings = 0;
+
+    // Sum from transactions
+    transactions?.forEach(t => {
+      if (['buy_in', 'rebuy', 'addon'].includes(t.transaction_type)) {
+        totalBuyIns += t.amount;
+      } else if (t.transaction_type === 'payout') {
+        totalWinnings += Math.abs(t.amount);
+      }
+    });
+
+    // Also sum from payout_structures (for historical data)
+    gamePlayers.forEach(gp => {
+      const payout = payoutMap.get(gp.id);
+      if (payout) {
+        totalWinnings += payout;
+      }
+    });
+
+    setOverallStats({
+      totalGames,
+      totalWins,
+      totalCashes,
+      totalBuyIns,
+      totalWinnings,
+      netProfit: totalWinnings - totalBuyIns,
+      avgFinishPosition: Math.round(avgFinishPosition * 10) / 10,
+      bestFinish,
+      winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0,
+      cashRate: totalGames > 0 ? Math.round((totalCashes / totalGames) * 100) : 0,
+    });
+
+    // Calculate per-club stats
+    const clubStatsMap = new Map<string, ClubStats>();
+
+    gamePlayers.forEach(gp => {
+      const club = (gp.game_sessions as any)?.events?.clubs;
+      if (!club) return;
+
+      const existing = clubStatsMap.get(club.id) || {
+        clubId: club.id,
+        clubName: club.name,
+        gamesPlayed: 0,
+        wins: 0,
+        cashes: 0,
+        totalBuyIns: 0,
+        totalWinnings: 0,
+        netProfit: 0,
+      };
+
+      existing.gamesPlayed++;
+      if (gp.finish_position === 1) existing.wins++;
+      if (gp.finish_position && gp.finish_position <= 3) existing.cashes++;
+
+      // Calculate buy-ins and winnings for this player
+      const playerTransactions = transactions?.filter(t => t.game_player_id === gp.id) || [];
+      playerTransactions.forEach(t => {
         if (['buy_in', 'rebuy', 'addon'].includes(t.transaction_type)) {
-          totalBuyIns += t.amount;
+          existing.totalBuyIns += t.amount;
         } else if (t.transaction_type === 'payout') {
-          totalWinnings += Math.abs(t.amount);
+          existing.totalWinnings += Math.abs(t.amount);
         }
       });
 
-      setOverallStats({
-        totalGames,
-        totalWins,
-        totalCashes,
-        totalBuyIns,
-        totalWinnings,
-        netProfit: totalWinnings - totalBuyIns,
-        avgFinishPosition: Math.round(avgFinishPosition * 10) / 10,
-        bestFinish,
-        winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0,
-        cashRate: totalGames > 0 ? Math.round((totalCashes / totalGames) * 100) : 0,
-      });
+      // Add from payout_structures
+      const payout = payoutMap.get(gp.id);
+      if (payout) {
+        existing.totalWinnings += payout;
+      }
 
-      // Calculate per-club stats
-      const clubStatsMap = new Map<string, ClubStats>();
+      existing.netProfit = existing.totalWinnings - existing.totalBuyIns;
 
-      gamePlayers.forEach(gp => {
-        const club = (gp.game_sessions as any)?.events?.clubs;
-        if (!club) return;
+      clubStatsMap.set(club.id, existing);
+    });
 
-        const existing = clubStatsMap.get(club.id) || {
-          clubId: club.id,
-          clubName: club.name,
-          gamesPlayed: 0,
-          wins: 0,
-          cashes: 0,
-          totalBuyIns: 0,
-          totalWinnings: 0,
-          netProfit: 0,
-        };
-
-        existing.gamesPlayed++;
-        if (gp.finish_position === 1) existing.wins++;
-        if (gp.finish_position && gp.finish_position <= 3) existing.cashes++;
-
-        // Calculate buy-ins and winnings for this player
-        const playerTransactions = transactions?.filter(t => t.game_player_id === gp.id) || [];
-        playerTransactions.forEach(t => {
-          if (['buy_in', 'rebuy', 'addon'].includes(t.transaction_type)) {
-            existing.totalBuyIns += t.amount;
-          } else if (t.transaction_type === 'payout') {
-            existing.totalWinnings += Math.abs(t.amount);
-          }
-        });
-        existing.netProfit = existing.totalWinnings - existing.totalBuyIns;
-
-        clubStatsMap.set(club.id, existing);
-      });
-
-      setClubStats(Array.from(clubStatsMap.values()).sort((a, b) => b.gamesPlayed - a.gamesPlayed));
-    }
+    setClubStats(Array.from(clubStatsMap.values()).sort((a, b) => b.gamesPlayed - a.gamesPlayed));
 
     setLoadingData(false);
   };

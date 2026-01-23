@@ -844,6 +844,7 @@ export default function EventDetail() {
             {/* Host Volunteer - show when no host OR when admin wants to change */}
             {(!event.host_user_id || isAdmin) && (
               <HostVolunteer
+                eventId={event.id}
                 volunteers={hostVolunteers}
                 currentUserId={user?.id || ''}
                 onVolunteer={handleHostVolunteer}

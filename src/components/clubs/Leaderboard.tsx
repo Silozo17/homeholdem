@@ -8,7 +8,7 @@ import { Trophy, Medal, Award, Download } from 'lucide-react';
 import { exportLeaderboardToCSV } from '@/lib/csv-export';
 
 interface PlayerStats {
-  player_key: string; // either user_id or placeholder_player_id
+  player_key: string; // canonical key (linked_user_id or placeholder_player_id or user_id)
   display_name: string;
   avatar_url: string | null;
   games_played: number;
@@ -87,9 +87,9 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
 
     const placeholderMap = new Map(placeholders?.map(p => [p.id, p]) || []);
 
-    // Get profiles for linked users
-    const linkedUserIds = placeholders?.map(p => p.linked_user_id).filter(Boolean) || [];
-    const directUserIds = players.map(p => p.user_id).filter(Boolean);
+    // Get profiles for linked users AND direct users
+    const linkedUserIds = placeholders?.map(p => p.linked_user_id).filter(Boolean) as string[] || [];
+    const directUserIds = players.map(p => p.user_id).filter(Boolean) as string[];
     const allUserIds = [...new Set([...linkedUserIds, ...directUserIds])];
     
     const { data: profiles } = await supabase
@@ -114,37 +114,43 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       }
     });
 
-    // Aggregate stats per unique player (by placeholder_player_id or user_id)
+    // Aggregate stats per unique player
+    // KEY LOGIC: Use linked_user_id if placeholder has one, otherwise use placeholder_player_id, otherwise user_id
     const statsMap = new Map<string, PlayerStats>();
 
     players.forEach(player => {
-      // Determine the player key: prefer placeholder_player_id, fallback to user_id
-      const playerKey = player.placeholder_player_id || player.user_id;
-      if (!playerKey) return;
-
-      // Get display info
+      let playerKey: string;
       let displayName = player.display_name;
       let avatarUrl: string | null = null;
 
       if (player.placeholder_player_id) {
         const placeholder = placeholderMap.get(player.placeholder_player_id);
         if (placeholder) {
-          displayName = placeholder.display_name;
-          // If linked to a real user, use their profile
+          // If placeholder is linked to a real user, use that user_id as the key
           if (placeholder.linked_user_id) {
+            playerKey = placeholder.linked_user_id;
             const profile = profileMap.get(placeholder.linked_user_id);
             if (profile) {
               displayName = profile.display_name;
               avatarUrl = profile.avatar_url;
             }
+          } else {
+            // Placeholder not linked, use placeholder_player_id as key
+            playerKey = player.placeholder_player_id;
+            displayName = placeholder.display_name;
           }
+        } else {
+          playerKey = player.placeholder_player_id;
         }
       } else if (player.user_id) {
+        playerKey = player.user_id;
         const profile = profileMap.get(player.user_id);
         if (profile) {
           displayName = profile.display_name;
           avatarUrl = profile.avatar_url;
         }
+      } else {
+        return; // Skip if no identifier
       }
 
       if (!statsMap.has(playerKey)) {
@@ -163,6 +169,12 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       }
 
       const stat = statsMap.get(playerKey)!;
+      // Update display name/avatar if better data available
+      if (avatarUrl && !stat.avatar_url) {
+        stat.avatar_url = avatarUrl;
+        stat.display_name = displayName;
+      }
+
       stat.games_played++;
       
       if (player.finish_position === 1) {
