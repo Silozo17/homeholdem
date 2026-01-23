@@ -497,7 +497,20 @@
     "change_avatar": "Change Avatar",
     "remove_avatar": "Remove Avatar",
     "crop_image": "Crop Image",
-    "save_avatar": "Save Avatar"
+    "save_avatar": "Save Avatar",
+    "quick_summary": "You've played {{games}} games and won {{wins}} times across {{clubs}} clubs",
+    "view_full_stats": "View Full Statistics",
+    "achievements": {
+      "title": "Achievements",
+      "first_game": "First Game",
+      "first_game_desc": "Played your first poker night",
+      "first_win": "Champion",
+      "first_win_desc": "Won your first tournament",
+      "five_games": "Regular",
+      "five_games_desc": "Played 5 games",
+      "three_wins": "Hat Trick",
+      "three_wins_desc": "Won 3 tournaments"
+    }
   },
   "stats": {
     "your_stats": "Your Stats",
