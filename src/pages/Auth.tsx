@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Logo } from '@/components/layout/Logo';
+import { SuitRow } from '@/components/common/CardSuits';
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -35,12 +36,7 @@ export default function Auth() {
         
         <AuthForm />
         
-        <div className="flex justify-center gap-6 text-2xl opacity-20">
-          <span className="text-poker-red">♥</span>
-          <span>♠</span>
-          <span className="text-poker-red">♦</span>
-          <span>♣</span>
-        </div>
+        <SuitRow size="lg" opacity={0.2} />
       </div>
     </div>
   );

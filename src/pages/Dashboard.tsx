@@ -13,6 +13,7 @@ import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { toast } from 'sonner';
+import { SuitRow } from '@/components/common/CardSuits';
 
 interface ClubWithRole {
   id: string;
@@ -246,7 +247,7 @@ export default function Dashboard() {
         ) : clubs.length === 0 ? (
           <Card className="bg-card/50 border-border/50 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-4xl mb-4 opacity-30">♠ ♥ ♦ ♣</div>
+              <SuitRow size="xl" opacity={0.3} className="mb-4" />
               <CardTitle className="text-lg mb-2">{t('dashboard.no_clubs')}</CardTitle>
               <CardDescription>
                 {t('dashboard.no_clubs_description')}

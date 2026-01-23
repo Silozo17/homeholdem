@@ -35,7 +35,16 @@ function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Premium OTP Email Template with casino green theme and shine effects
+// Premium SVG lock icon
+const lockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+
+// Premium spade icon for header
+const spadeIcon = `<span style="color: #d4af37; margin: 0 4px;">♠</span>`;
+
+// Footer suits row
+const footerSuits = `<div style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);"><span style="color: #ef4444;">♥</span> <span style="color: #d4af37;">♠</span> <span style="color: #ef4444;">♦</span> <span style="color: #d4af37;">♣</span></div>`;
+
+// Premium OTP Email Template with casino green theme and premium SVG icons
 function otpEmailTemplate(code: string, name?: string): string {
   const safeName = name ? escapeHtml(name) : undefined;
   return `
@@ -56,10 +65,10 @@ function otpEmailTemplate(code: string, name?: string): string {
   <div style="padding: 24px 16px; background-color: #0f1f1a;">
     <div style="background: linear-gradient(180deg, #172a24 0%, #0d1916 100%); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 16px; max-width: 480px; margin: 0 auto; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);">
       <div style="text-align: center; padding: 28px 16px 20px; border-bottom: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(180deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.04) 50%, transparent 100%);">
-        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase; text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);">♠ Home Hold'em Club ♠</p>
+        <p style="color: #d4af37; font-size: 11px; font-weight: 600; letter-spacing: 4px; margin: 0; text-transform: uppercase; text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);">${spadeIcon}Home Hold'em Club${spadeIcon}</p>
       </div>
       <div style="padding: 40px 28px; text-align: center;">
-        <div style="font-size: 48px; line-height: 1; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));">🔐</div>
+        <div style="margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));">${lockIcon}</div>
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Verify your email</h1>
         <p style="color: #8fb5a5; font-size: 15px; line-height: 1.6; margin: 0 0 28px;">
           ${safeName ? `Hey ${safeName}, enter` : 'Enter'} this code to complete your signup
@@ -73,7 +82,7 @@ function otpEmailTemplate(code: string, name?: string): string {
       </div>
       <div style="text-align: center; padding: 20px 24px; border-top: 1px solid rgba(212, 175, 55, 0.2); background: linear-gradient(0deg, rgba(212, 175, 55, 0.06) 0%, rgba(212, 175, 55, 0.02) 50%, transparent 100%);">
         <p style="color: #4a7566; font-size: 11px; margin: 0; letter-spacing: 1px;">Home Hold'em Club</p>
-        <p style="color: #3d5e52; font-size: 14px; letter-spacing: 8px; margin-top: 8px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);">♥ ♠ ♦ ♣</p>
+        ${footerSuits}
       </div>
     </div>
   </div>
