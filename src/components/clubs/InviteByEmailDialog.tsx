@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,6 +47,7 @@ export function InviteByEmailDialog({
   clubName,
   inviteCode,
 }: InviteByEmailDialogProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -85,12 +87,12 @@ export function InviteByEmailDialog({
         html,
       });
 
-      toast.success(`Invitation sent to ${data.email}`);
+      toast.success(t('club.invite_sent'));
       form.reset();
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to send invite:', error);
-      toast.error('Failed to send invitation');
+      toast.error(t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -102,10 +104,10 @@ export function InviteByEmailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            Invite by Email
+            {t('club.invite_by_email')}
           </DialogTitle>
           <DialogDescription>
-            Send a club invitation directly to someone's email address.
+            {t('club.join_club_description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -116,7 +118,7 @@ export function InviteByEmailDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Address</FormLabel>
+                  <FormLabel>{t('common.email')}</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
@@ -136,18 +138,18 @@ export function InviteByEmailDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={loading}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sending...
+                    {t('common.loading')}
                   </>
                 ) : (
                   <>
                     <Mail className="h-4 w-4 mr-2" />
-                    Send Invite
+                    {t('club.send_invite')}
                   </>
                 )}
               </Button>

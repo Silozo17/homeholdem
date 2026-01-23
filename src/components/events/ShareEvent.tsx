@@ -1,4 +1,6 @@
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { pl, enUS } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -28,18 +30,20 @@ export function ShareEvent({
   goingCount,
   capacity
 }: ShareEventProps) {
+  const { t, i18n } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
   const eventUrl = buildAppUrl(`/event/${eventId}`);
   
   const formattedDate = eventDate 
-    ? format(new Date(eventDate), "EEEE, MMM d 'at' h:mm a")
-    : 'Date TBD';
+    ? format(new Date(eventDate), "EEEE, MMM d 'at' h:mm a", { locale: dateLocale })
+    : t('event.date_tbd');
 
   const spotsLeft = capacity - goingCount;
   const spotsText = spotsLeft > 0 
-    ? `${spotsLeft} spots left!` 
-    : 'Waitlist open';
+    ? t('event.spots_left', { count: spotsLeft })
+    : t('event.waitlist');
 
   // Build the share message
   const shareMessage = [
@@ -48,9 +52,9 @@ export function ShareEvent({
     `📅 ${formattedDate}`,
     location ? `📍 ${location}` : null,
     '',
-    `👥 ${goingCount}/${capacity} confirmed • ${spotsText}`,
+    `👥 ${goingCount}/${capacity} ${t('event.confirmed').toLowerCase()} • ${spotsText}`,
     '',
-    `RSVP here: ${eventUrl}`,
+    `RSVP: ${eventUrl}`,
   ].filter(Boolean).join('\n');
 
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
@@ -58,7 +62,7 @@ export function ShareEvent({
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(eventUrl);
     setCopied(true);
-    toast.success('Link copied!');
+    toast.success(t('event.link_copied'));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -76,7 +80,7 @@ export function ShareEvent({
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={handleWhatsApp}>
           <MessageCircle className="h-4 w-4 mr-2 text-green-500" />
-          Share to WhatsApp
+          {t('club.share_to_whatsapp')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopyLink}>
           {copied ? (
@@ -84,7 +88,7 @@ export function ShareEvent({
           ) : (
             <Copy className="h-4 w-4 mr-2" />
           )}
-          Copy Link
+          {t('event.copy_link')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

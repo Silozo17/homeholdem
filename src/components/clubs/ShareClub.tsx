@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share2, Copy, Check, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,11 +17,12 @@ interface ShareClubProps {
 }
 
 export function ShareClub({ clubName, inviteCode }: ShareClubProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const joinUrl = buildAppUrl(`/dashboard?join=${inviteCode}`);
 
-  const shareMessage = `🃏 Join our poker club: ${clubName}!\n\nUse code: ${inviteCode}\nOr join directly: ${joinUrl}`;
+  const shareMessage = `🃏 ${t('club.share_club')}: ${clubName}!\n\n${t('club.invite_code')}: ${inviteCode}\n${joinUrl}`;
 
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
@@ -28,10 +30,10 @@ export function ShareClub({ clubName, inviteCode }: ShareClubProps) {
     try {
       await navigator.clipboard.writeText(shareMessage);
       setCopied(true);
-      toast.success('Invite message copied!');
+      toast.success(t('common.copied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy');
+      toast.error(t('common.error'));
     }
   };
 
@@ -49,11 +51,11 @@ export function ShareClub({ clubName, inviteCode }: ShareClubProps) {
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onClick={handleWhatsApp}>
           <MessageCircle className="h-4 w-4 mr-2" />
-          Share to WhatsApp
+          {t('club.share_to_whatsapp')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopyInvite}>
           {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-          Copy Invite
+          {t('club.copy_invite')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { useChipToCashRatio } from '@/hooks/useChipToCashRatio';
 
 export default function GameMode() {
+  const { t } = useTranslation();
   const { eventId } = useParams<{ eventId: string }>();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -130,7 +132,7 @@ export default function GameMode() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setTvMode(true)}
-                title="TV Display Mode"
+                title={t('game.tv_display')}
               >
                 <Tv className="h-5 w-5" />
               </Button>
@@ -153,8 +155,8 @@ export default function GameMode() {
         {!session ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-6">
             <div className="text-center space-y-2">
-              <h1 className="text-2xl font-bold text-gold-gradient">Game Mode</h1>
-              <p className="text-muted-foreground">Start your poker tournament</p>
+              <h1 className="text-2xl font-bold text-gold-gradient">{t('game.game_mode')}</h1>
+              <p className="text-muted-foreground">{t('game.start_tournament')}</p>
             </div>
             {isAdmin ? (
               <Button 
@@ -162,10 +164,10 @@ export default function GameMode() {
                 className="glow-gold"
                 onClick={handleStartGame}
               >
-                Start Tournament
+                {t('game.start_tournament')}
               </Button>
             ) : (
-              <p className="text-muted-foreground">Waiting for host to start the game...</p>
+              <p className="text-muted-foreground">{t('game.waiting_host')}</p>
             )}
           </div>
         ) : (
@@ -184,15 +186,15 @@ export default function GameMode() {
             {/* Stats Bar */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
-                <div className="text-xs text-muted-foreground">Players</div>
+                <div className="text-xs text-muted-foreground">{t('game.players')}</div>
                 <div className="text-lg font-bold text-primary">{activePlayers}/{players.length}</div>
               </div>
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
-                <div className="text-xs text-muted-foreground">Prize Pool</div>
+                <div className="text-xs text-muted-foreground">{t('game.prize_pool')}</div>
                 <div className="text-lg font-bold text-gold-gradient">{currencySymbol}{prizePool}</div>
               </div>
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
-                <div className="text-xs text-muted-foreground">Avg Stack</div>
+                <div className="text-xs text-muted-foreground">{t('game.avg_stack')}</div>
                 <div className="text-lg font-bold">
                   {activePlayers > 0 
                     ? Math.round((players.filter(p => p.status === 'active').length * (session.starting_chips || 10000)) / activePlayers).toLocaleString()
@@ -204,14 +206,14 @@ export default function GameMode() {
 
             <Tabs defaultValue="players" className="space-y-4">
               <TabsList className="w-full grid grid-cols-5">
-                <TabsTrigger value="players">Players</TabsTrigger>
-                <TabsTrigger value="seats">Seats</TabsTrigger>
-                <TabsTrigger value="buyins">Buy-ins</TabsTrigger>
+                <TabsTrigger value="players">{t('game.players')}</TabsTrigger>
+                <TabsTrigger value="seats">{t('game.seats')}</TabsTrigger>
+                <TabsTrigger value="buyins">{t('game.buyins')}</TabsTrigger>
                 <TabsTrigger value="cashout" className="flex items-center gap-1">
                   <Coins className="h-3 w-3" />
-                  Cash Out
+                  {t('game.cash_out')}
                 </TabsTrigger>
-                <TabsTrigger value="payouts">Payouts</TabsTrigger>
+                <TabsTrigger value="payouts">{t('game.payouts')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="players">
@@ -253,8 +255,7 @@ export default function GameMode() {
                   players={players}
                   transactions={transactions}
                   isAdmin={isAdmin}
-                  onComplete={(totals) => {
-                    // Totals will be used for settlement calculations
+                  onComplete={() => {
                     refetch();
                   }}
                 />

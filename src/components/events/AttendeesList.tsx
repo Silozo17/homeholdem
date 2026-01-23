@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock, HelpCircle } from 'lucide-react';
@@ -22,13 +23,15 @@ interface AttendeesListProps {
 }
 
 export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesListProps) {
+  const { t } = useTranslation();
+
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Attendees
+            {t('event.attendees')}
           </CardTitle>
           <Badge variant="outline">
             {going.length}/{capacity}
@@ -41,7 +44,7 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="w-2 h-2 rounded-full bg-primary" />
-              Going ({going.length})
+              {t('event.going')} ({going.length})
             </div>
             <div className="flex flex-wrap gap-2">
               {going.map((attendee) => (
@@ -66,7 +69,7 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-3 w-3" />
-              Waitlist ({waitlist.length})
+              {t('event.waitlist')} ({waitlist.length})
             </div>
             <div className="flex flex-wrap gap-2">
               {waitlist.map((attendee, index) => (
@@ -87,7 +90,7 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <HelpCircle className="h-3 w-3" />
-              Maybe ({maybe.length})
+              {t('event.maybe')} ({maybe.length})
             </div>
             <div className="flex flex-wrap gap-2">
               {maybe.map((attendee) => (
@@ -109,7 +112,7 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
 
         {going.length === 0 && waitlist.length === 0 && maybe.length === 0 && (
           <p className="text-center text-muted-foreground py-4">
-            No RSVPs yet. Be the first!
+            {t('event.no_rsvps')} {t('event.be_first')}
           </p>
         )}
       </CardContent>
