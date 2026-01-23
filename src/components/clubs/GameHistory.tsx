@@ -109,7 +109,15 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
       })
     );
 
-    setSessions(sessionsWithData);
+    // Sort by final_date descending (newest first)
+    const sortedSessions = sessionsWithData.sort((a, b) => {
+      if (!a.final_date && !b.final_date) return 0;
+      if (!a.final_date) return 1;
+      if (!b.final_date) return -1;
+      return new Date(b.final_date).getTime() - new Date(a.final_date).getTime();
+    });
+
+    setSessions(sortedSessions);
     setLoading(false);
   };
 
