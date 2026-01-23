@@ -68,7 +68,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
 
     const sessionIds = sessions.map(s => s.id);
 
-    // Get all players with placeholder_player_id
+    // Get all players from game sessions
     const { data: players } = await supabase
       .from('game_players')
       .select('id, user_id, placeholder_player_id, display_name, finish_position, game_session_id')
@@ -80,17 +80,16 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       return;
     }
 
-    // Get all placeholder players with their linked user_ids
-    const placeholderIds = [...new Set(players.map(p => p.placeholder_player_id).filter(Boolean))];
-    const { data: placeholders } = await supabase
+    // Get ALL placeholder players for this club (not just those with games)
+    const { data: allPlaceholders } = await supabase
       .from('placeholder_players')
       .select('id, display_name, linked_user_id')
-      .in('id', placeholderIds);
+      .eq('club_id', clubId);
 
-    const placeholderMap = new Map(placeholders?.map(p => [p.id, p]) || []);
+    const placeholderMap = new Map(allPlaceholders?.map(p => [p.id, p]) || []);
 
     // Get profiles for linked users AND direct users
-    const linkedUserIds = placeholders?.map(p => p.linked_user_id).filter(Boolean) as string[] || [];
+    const linkedUserIds = allPlaceholders?.map(p => p.linked_user_id).filter(Boolean) as string[] || [];
     const directUserIds = players.map(p => p.user_id).filter(Boolean) as string[];
     const allUserIds = [...new Set([...linkedUserIds, ...directUserIds])];
     
@@ -116,10 +115,42 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       }
     });
 
-    // Aggregate stats per unique player
-    // KEY LOGIC: Use linked_user_id if placeholder has one, otherwise use placeholder_player_id, otherwise user_id
+    // Initialize stats for ALL placeholder players (so everyone appears)
     const statsMap = new Map<string, PlayerStats>();
+    
+    allPlaceholders?.forEach(placeholder => {
+      let playerKey: string;
+      let displayName = placeholder.display_name;
+      let avatarUrl: string | null = null;
+      
+      if (placeholder.linked_user_id) {
+        playerKey = placeholder.linked_user_id;
+        const profile = profileMap.get(placeholder.linked_user_id);
+        if (profile) {
+          displayName = profile.display_name;
+          avatarUrl = profile.avatar_url;
+        }
+      } else {
+        playerKey = placeholder.id;
+      }
+      
+      if (!statsMap.has(playerKey)) {
+        statsMap.set(playerKey, {
+          player_key: playerKey,
+          user_id: playerKey,
+          display_name: displayName,
+          avatar_url: avatarUrl,
+          games_played: 0,
+          wins: 0,
+          second_places: 0,
+          total_buy_ins: 0,
+          total_winnings: 0,
+          net_profit: 0,
+        });
+      }
+    });
 
+    // Aggregate stats from actual game records
     players.forEach(player => {
       let playerKey: string;
       let displayName = player.display_name;
@@ -128,7 +159,6 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       if (player.placeholder_player_id) {
         const placeholder = placeholderMap.get(player.placeholder_player_id);
         if (placeholder) {
-          // If placeholder is linked to a real user, use that user_id as the key
           if (placeholder.linked_user_id) {
             playerKey = placeholder.linked_user_id;
             const profile = profileMap.get(placeholder.linked_user_id);
@@ -137,7 +167,6 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
               avatarUrl = profile.avatar_url;
             }
           } else {
-            // Placeholder not linked, use placeholder_player_id as key
             playerKey = player.placeholder_player_id;
             displayName = placeholder.display_name;
           }
@@ -171,7 +200,6 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
       }
 
       const stat = statsMap.get(playerKey)!;
-      // Update display name/avatar if better data available
       if (avatarUrl && !stat.avatar_url) {
         stat.avatar_url = avatarUrl;
         stat.display_name = displayName;
@@ -185,22 +213,21 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
         stat.second_places++;
       }
 
-      // Add winnings from payout
       const payout = payoutMap.get(player.id);
       if (payout) {
         stat.total_winnings += payout;
       }
     });
 
-    // Calculate net profit (winnings only, no buy-in data for historical games)
     statsMap.forEach(stat => {
       stat.net_profit = stat.total_winnings;
     });
 
-    // Sort by wins, then total winnings
+    // Sort by wins, then second places, then total winnings
     const sortedStats = Array.from(statsMap.values())
       .sort((a, b) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.second_places !== a.second_places) return b.second_places - a.second_places;
         return b.total_winnings - a.total_winnings;
       });
 
