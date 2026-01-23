@@ -207,18 +207,16 @@ export default function GameMode() {
             </div>
 
             <Tabs defaultValue="players" className="space-y-4">
-              <div className="overflow-x-auto -mx-4 px-4">
-                <TabsList className="inline-flex w-auto min-w-full">
-                  <TabsTrigger value="players" className="flex-1 min-w-[70px]">{t('game.players')}</TabsTrigger>
-                  <TabsTrigger value="seats" className="flex-1 min-w-[60px]">{t('game.seats')}</TabsTrigger>
-                  <TabsTrigger value="buyins" className="flex-1 min-w-[70px]">{t('game.buyins')}</TabsTrigger>
-                  <TabsTrigger value="cashout" className="flex-1 min-w-[85px] flex items-center justify-center gap-1">
-                    <Coins className="h-3 w-3" />
-                    {t('game.cash_out')}
-                  </TabsTrigger>
-                  <TabsTrigger value="payouts" className="flex-1 min-w-[70px]">{t('game.payouts')}</TabsTrigger>
-                </TabsList>
-              </div>
+              <TabsList className="grid grid-cols-3 gap-1 h-auto p-1">
+                <TabsTrigger value="players" className="text-xs px-2 py-2">{t('game.players')}</TabsTrigger>
+                <TabsTrigger value="seats" className="text-xs px-2 py-2">{t('game.seats')}</TabsTrigger>
+                <TabsTrigger value="buyins" className="text-xs px-2 py-2">{t('game.buyins')}</TabsTrigger>
+                <TabsTrigger value="cashout" className="text-xs px-2 py-2 flex items-center justify-center gap-1">
+                  <Coins className="h-3 w-3" />
+                  {t('game.cash_out')}
+                </TabsTrigger>
+                <TabsTrigger value="payouts" className="col-span-2 text-xs px-2 py-2">{t('game.payouts')}</TabsTrigger>
+              </TabsList>
 
               <TabsContent value="players">
                 <PlayerList

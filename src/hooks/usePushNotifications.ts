@@ -29,6 +29,11 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+// Detect iOS and Safari
+const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent) && !/CriOS/.test(navigator.userAgent);
+const isIOSNonSafari = isIOS && !isSafari;
+
 export function usePushNotifications() {
   const { user } = useAuth();
   const [state, setState] = useState<PushNotificationState>({
@@ -40,6 +45,17 @@ export function usePushNotifications() {
   });
 
   const checkSubscription = useCallback(async () => {
+    // iOS non-Safari browsers don't support Web Push
+    if (isIOSNonSafari) {
+      setState(prev => ({ 
+        ...prev, 
+        isSupported: false, 
+        loading: false,
+        error: 'ios_non_safari'
+      }));
+      return;
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setState(prev => ({ ...prev, isSupported: false, loading: false }));
       return;
