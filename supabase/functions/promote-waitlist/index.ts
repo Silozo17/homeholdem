@@ -164,6 +164,22 @@ serve(async (req) => {
       );
     }
 
+    // Check user preferences for waitlist promotion emails
+    const { data: prefs } = await supabase
+      .from("user_preferences")
+      .select("email_waitlist_promotion")
+      .eq("user_id", promoted_user_id)
+      .single();
+
+    // Only send if preference is not explicitly false
+    if (prefs && prefs.email_waitlist_promotion === false) {
+      console.log("Waitlist promotion email disabled by user preference");
+      return new Response(
+        JSON.stringify({ success: true, email_sent: false, reason: "user_preference_disabled" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get club name
     const { data: club } = await supabase
       .from("clubs")
