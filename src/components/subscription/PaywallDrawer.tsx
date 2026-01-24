@@ -82,11 +82,16 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </div>
 
           {/* Content overlays on top */}
-          <div className="relative z-10 h-full flex flex-col justify-end px-6">
+          <div className="relative z-10 h-full flex flex-col px-6">
+          {/* Logo at top */}
+          <div className="flex justify-center pt-4">
+            <Logo />
+          </div>
+          
+          {/* Spacer to push content to bottom */}
+          <div className="flex-1" />
+          
           <DrawerHeader className="px-0 pt-0 pb-2">
-            <div className="flex justify-center mb-1">
-              <Logo />
-            </div>
             <DrawerTitle className="text-xl font-bold text-center text-gold-gradient">
               {t('subscription.unlock_title', 'Unlock Your Poker Club')}
             </DrawerTitle>
