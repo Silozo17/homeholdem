@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Home, Calendar, Plus, Trophy, User, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -14,6 +14,29 @@ export function BottomNav() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { isActive: hasActiveSubscription } = useSubscription();
+  const navRef = useRef<HTMLElement>(null);
+
+  // Pin nav to screen bottom even when iOS keyboard opens
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const positionNav = () => {
+      if (navRef.current && viewport) {
+        const offsetY = window.innerHeight - viewport.height - viewport.offsetTop;
+        navRef.current.style.transform = `translateY(-${offsetY}px) translateZ(0)`;
+      }
+    };
+
+    viewport.addEventListener('resize', positionNav);
+    viewport.addEventListener('scroll', positionNav);
+    positionNav();
+
+    return () => {
+      viewport.removeEventListener('resize', positionNav);
+      viewport.removeEventListener('scroll', positionNav);
+    };
+  }, []);
 
   const navItems = [
     { icon: Home, label: t('nav.home'), path: '/dashboard' },
@@ -42,7 +65,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-bottom safe-area-x transform-gpu">
+      <nav ref={navRef} className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-bottom safe-area-x transform-gpu">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2 pb-[5px]">
           {navItems.map((item) => {
             const Icon = item.icon;
