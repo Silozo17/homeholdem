@@ -67,22 +67,21 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[95vh] bg-background flex flex-col">
-        {/* Hero Image Section */}
-        <div className="relative h-[28%] min-h-[160px] overflow-hidden flex-shrink-0">
+      <DrawerContent className="h-[95vh] bg-background">
+        {/* Full-screen Hero Image as Background */}
+        <div className="absolute inset-0 overflow-hidden">
           <img 
             src={`${SUPABASE_URL}/storage/v1/object/public/graphics/paywall.webp`}
             alt="Poker night"
             className="w-full h-full object-cover"
           />
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+          {/* Subtle gradient at bottom for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col px-6 -mt-14 relative z-10 min-h-0">
-          {/* Header */}
-          <DrawerHeader className="px-0 pt-0 pb-2 flex-shrink-0">
+        {/* Content overlays on top */}
+        <div className="relative z-10 h-full flex flex-col justify-end px-6">
+          <DrawerHeader className="px-0 pt-0 pb-2">
             <div className="flex justify-center mb-1">
               <Logo />
             </div>
@@ -94,8 +93,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
             </DrawerDescription>
           </DrawerHeader>
 
-          {/* Features */}
-          <ul className="space-y-2 mb-4 flex-shrink-0">
+          <ul className="space-y-2 mb-4">
             {features.map((feature, index) => (
               <li key={index} className="flex items-center gap-2">
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
@@ -107,7 +105,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </ul>
 
           {/* Plan Toggle */}
-          <div className="flex items-center justify-center gap-3 mb-4 flex-shrink-0">
+          <div className="flex items-center justify-center gap-3 mb-4">
             <span className={`text-sm font-medium transition-colors ${!isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
               {t('subscription.monthly', 'Monthly')}
             </span>
@@ -127,7 +125,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </div>
 
           {/* Plan Card */}
-          <Card className="p-3 border-2 border-primary bg-card/50 mb-4 flex-shrink-0">
+          <Card className="p-3 border-2 border-primary bg-card/50 backdrop-blur-sm mb-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold">{t('subscription.plan_name', 'Home Hold\'em Pro')}</h3>
@@ -156,7 +154,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           <Button 
             onClick={handleSubscribe}
             disabled={isLoading}
-            className="w-full h-11 text-base font-semibold glow-gold flex-shrink-0"
+            className="w-full h-11 text-base font-semibold glow-gold"
           >
             {isLoading ? (
               <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t('common.loading', 'Loading...')}</>
@@ -165,8 +163,8 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
             )}
           </Button>
 
-          {/* Footer - Always visible at bottom */}
-          <div className="mt-auto pt-3 pb-safe space-y-1 text-center flex-shrink-0">
+          {/* Footer */}
+          <div className="pt-3 pb-safe space-y-1 text-center">
             <p className="text-xs text-muted-foreground">
               {t('subscription.cancel_anytime', 'Cancel anytime.')} {isAnnual 
                 ? t('subscription.after_trial_yearly', 'After 7 days, charged annually.') 
