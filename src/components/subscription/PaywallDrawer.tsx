@@ -67,20 +67,22 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[95vh] bg-background relative overflow-hidden">
-        {/* Full-screen Hero Image as Background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <img 
-            src={`${SUPABASE_URL}/storage/v1/object/public/graphics/paywall.webp`}
-            alt="Poker night"
-            className="w-full h-full object-cover"
-          />
-          {/* Subtle gradient at bottom for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
-        </div>
+      <DrawerContent className="h-[95vh] bg-background overflow-hidden">
+        {/* Wrapper for positioning context */}
+        <div className="relative h-full w-full">
+          {/* Full-screen Hero Image as Background */}
+          <div className="absolute inset-0 overflow-hidden">
+            <img 
+              src={`${SUPABASE_URL}/storage/v1/object/public/graphics/paywall.webp`}
+              alt="Poker night"
+              className="w-full h-full object-cover"
+            />
+            {/* Subtle gradient at bottom for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
+          </div>
 
-        {/* Content overlays on top */}
-        <div className="relative z-10 h-full flex flex-col justify-end px-6">
+          {/* Content overlays on top */}
+          <div className="relative z-10 h-full flex flex-col justify-end px-6">
           <DrawerHeader className="px-0 pt-0 pb-2">
             <div className="flex justify-center mb-1">
               <Logo />
@@ -173,6 +175,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
             <p className="text-xs text-muted-foreground">
               {t('subscription.terms_agreement', 'By continuing, you agree to our Terms, Privacy Policy & EULA.')}
             </p>
+          </div>
           </div>
         </div>
       </DrawerContent>
