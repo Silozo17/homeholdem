@@ -67,7 +67,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[95vh] bg-background">
+      <DrawerContent className="h-[95vh] bg-background relative overflow-hidden">
         {/* Full-screen Hero Image as Background */}
         <div className="absolute inset-0 overflow-hidden">
           <img 
@@ -164,7 +164,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </Button>
 
           {/* Footer */}
-          <div className="pt-3 pb-safe space-y-1 text-center">
+          <div className="pt-3 pb-[7px] space-y-1 text-center">
             <p className="text-xs text-muted-foreground">
               {t('subscription.cancel_anytime', 'Cancel anytime.')} {isAnnual 
                 ? t('subscription.after_trial_yearly', 'After 7 days, charged annually.') 
