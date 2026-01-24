@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/layout/Logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, MapPin, Users, Clock, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, CheckCircle, Crown } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
 import { pl, enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 
 interface Event {
   id: string;
@@ -32,6 +34,7 @@ export default function Events() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -219,7 +222,15 @@ export default function Events() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
-        <div className="container flex items-center justify-center h-16 px-4">
+        <div className="container relative flex items-center justify-center h-16 px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPaywallOpen(true)}
+            className="absolute left-4 text-primary hover:text-primary/80"
+          >
+            <Crown className="h-5 w-5" />
+          </Button>
           <Logo size="sm" />
         </div>
       </header>
@@ -296,6 +307,8 @@ export default function Events() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
     </div>
   );
 }

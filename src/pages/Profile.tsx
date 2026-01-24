@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown } from 'lucide-react';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 
@@ -56,6 +57,7 @@ export default function Profile() {
   });
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -195,6 +197,14 @@ export default function Profile() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-16 px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPaywallOpen(true)}
+            className="absolute left-4 text-primary hover:text-primary/80"
+          >
+            <Crown className="h-5 w-5" />
+          </Button>
           <Logo size="sm" />
           <Button
             variant="ghost"
@@ -323,6 +333,8 @@ export default function Profile() {
           </CardContent>
         </Card>
       </main>
+
+      <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
     </div>
   );
 }
