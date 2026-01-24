@@ -1,15 +1,19 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Home, Calendar, Plus, Trophy, User } from 'lucide-react';
+import { Home, Calendar, Plus, Trophy, User, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { QuickCreateDialog } from './QuickCreateDialog';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export function BottomNav() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const { isActive: hasActiveSubscription } = useSubscription();
 
   const navItems = [
     { icon: Home, label: t('nav.home'), path: '/dashboard' },
@@ -21,7 +25,11 @@ export function BottomNav() {
 
   const handleNavClick = (path: string | null) => {
     if (path === null) {
-      setCreateDialogOpen(true);
+      if (hasActiveSubscription) {
+        setCreateDialogOpen(true);
+      } else {
+        setPaywallOpen(true);
+      }
     } else {
       navigate(path);
     }
@@ -101,9 +109,13 @@ export function BottomNav() {
                           className="fill-background"
                         />
                       </svg>
-                      {/* Plus icon in center */}
+                      {/* Icon in center - Plus for subscribed, Crown for non-subscribed */}
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <Plus className="h-6 w-6 text-primary" strokeWidth={3} />
+                        {hasActiveSubscription ? (
+                          <Plus className="h-6 w-6 text-primary" strokeWidth={3} />
+                        ) : (
+                          <Crown className="h-5 w-5 text-primary" strokeWidth={2.5} />
+                        )}
                       </div>
                     </div>
                     {/* Glow effect */}
@@ -129,6 +141,11 @@ export function BottomNav() {
       <QuickCreateDialog 
         open={createDialogOpen} 
         onOpenChange={setCreateDialogOpen} 
+      />
+
+      <PaywallDrawer 
+        open={paywallOpen} 
+        onOpenChange={setPaywallOpen} 
       />
     </>
   );
