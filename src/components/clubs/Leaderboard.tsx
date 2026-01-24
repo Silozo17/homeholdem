@@ -207,10 +207,14 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
 
       stat.games_played++;
       
-      if (player.finish_position === 1) {
-        stat.wins++;
-      } else if (player.finish_position === 2) {
-        stat.second_places++;
+      // Filter out unreasonable finish positions (>20 indicates bad/placeholder data)
+      const MAX_REASONABLE_POSITION = 20;
+      if (player.finish_position && player.finish_position <= MAX_REASONABLE_POSITION) {
+        if (player.finish_position === 1) {
+          stat.wins++;
+        } else if (player.finish_position === 2) {
+          stat.second_places++;
+        }
       }
 
       const payout = payoutMap.get(player.id);
