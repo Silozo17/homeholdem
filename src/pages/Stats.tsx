@@ -149,8 +149,12 @@ export default function Stats() {
     });
 
     // Calculate overall stats
+    // Filter out unreasonable finish positions (>20 indicates bad/placeholder data)
+    const MAX_REASONABLE_POSITION = 20;
     const totalGames = gamePlayers.length;
-    const finishedGames = gamePlayers.filter(p => p.finish_position !== null);
+    const finishedGames = gamePlayers.filter(
+      p => p.finish_position !== null && p.finish_position <= MAX_REASONABLE_POSITION
+    );
     const totalWins = gamePlayers.filter(p => p.finish_position === 1).length;
     const totalCashes = gamePlayers.filter(p => p.finish_position && p.finish_position <= 3).length;
     const bestFinish = finishedGames.length > 0 
