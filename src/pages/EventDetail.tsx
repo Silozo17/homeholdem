@@ -37,12 +37,14 @@ import { toast } from 'sonner';
 import { DateVoting } from '@/components/events/DateVoting';
 import { RsvpButtons } from '@/components/events/RsvpButtons';
 import { HostVolunteer } from '@/components/events/HostVolunteer';
+import { HostAddressDialog } from '@/components/events/HostAddressDialog';
 import { AttendeesList } from '@/components/events/AttendeesList';
 import { ShareEvent } from '@/components/events/ShareEvent';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
+import { notifyHostConfirmed } from '@/lib/push-notifications';
 
 interface Event {
   id: string;
@@ -104,6 +106,8 @@ export default function EventDetail() {
   const [loadingData, setLoadingData] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  const [volunteerLoading, setVolunteerLoading] = useState(false);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -550,20 +554,16 @@ export default function EventDetail() {
     }
   };
 
-  // Optimistic host volunteer handler
-  const handleHostVolunteer = useCallback(async () => {
+  // Host volunteer handler with address support
+  const handleHostVolunteer = useCallback(async (address?: string) => {
     if (!user || !event) return;
 
     const isVolunteering = hostVolunteers.includes(user.id);
     
-    // Optimistic update
-    setHostVolunteers(prev => 
-      isVolunteering 
-        ? prev.filter(id => id !== user.id)
-        : [...prev, user.id]
-    );
-
     if (isVolunteering) {
+      // Withdrawing - direct action, no dialog
+      setHostVolunteers(prev => prev.filter(id => id !== user.id));
+      
       const { error } = await supabase
         .from('event_host_volunteers')
         .delete()
@@ -577,9 +577,23 @@ export default function EventDetail() {
         toast.success('Removed from host volunteers');
       }
     } else {
+      // Volunteering - address is required (passed from dialog)
+      if (!address) {
+        setAddressDialogOpen(true);
+        return;
+      }
+      
+      setVolunteerLoading(true);
+      
+      // Optimistic update
+      setHostVolunteers(prev => [...prev, user.id]);
+      
       const { error } = await supabase
         .from('event_host_volunteers')
-        .insert({ event_id: event.id, user_id: user.id });
+        .insert({ event_id: event.id, user_id: user.id, address });
+      
+      setVolunteerLoading(false);
+      setAddressDialogOpen(false);
       
       if (error) {
         setHostVolunteers(prev => prev.filter(id => id !== user.id));
@@ -618,17 +632,52 @@ export default function EventDetail() {
   const handleConfirmHost = async (hostUserId: string) => {
     if (!event) return;
 
+    // Get the volunteer's address
+    const { data: volunteer } = await supabase
+      .from('event_host_volunteers')
+      .select('address')
+      .eq('event_id', event.id)
+      .eq('user_id', hostUserId)
+      .single();
+
+    // Update event with host and location (address from volunteer)
     const { error } = await supabase
       .from('events')
-      .update({ host_user_id: hostUserId })
+      .update({ 
+        host_user_id: hostUserId,
+        location: volunteer?.address || null
+      })
       .eq('id', event.id);
 
     if (error) {
       toast.error('Failed to confirm host');
-    } else {
-      toast.success('Host confirmed!');
-      fetchEventData();
+      return;
     }
+
+    // Get host profile for notification
+    const { data: hostData } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', hostUserId)
+      .single();
+
+    // Send push notification to all 'going' attendees (excluding the host)
+    const goingUserIds = rsvps
+      .filter(r => r.status === 'going' && r.user_id !== hostUserId)
+      .map(r => r.user_id);
+    
+    if (goingUserIds.length > 0) {
+      notifyHostConfirmed(
+        goingUserIds,
+        event.title,
+        event.id,
+        hostData?.display_name || 'Host',
+        volunteer?.address
+      ).catch(err => console.error('Failed to send host notification:', err));
+    }
+
+    toast.success('Host confirmed!');
+    fetchEventData();
   };
 
   const handleClearHost = async () => {
@@ -885,12 +934,14 @@ export default function EventDetail() {
                 eventId={event.id}
                 volunteers={hostVolunteers}
                 currentUserId={user?.id || ''}
-                onVolunteer={handleHostVolunteer}
+                onVolunteer={() => handleHostVolunteer()}
                 onConfirm={isAdmin ? handleConfirmHost : undefined}
                 showVolunteerSection={!event.host_user_id}
               />
             )}
           </TabsContent>
+
+          {/* Attendees Tab */}
 
           {/* Attendees Tab */}
           <TabsContent value="attendees" className="mt-4">
@@ -910,6 +961,14 @@ export default function EventDetail() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Host Address Dialog */}
+      <HostAddressDialog
+        open={addressDialogOpen}
+        onOpenChange={setAddressDialogOpen}
+        onSubmit={(address) => handleHostVolunteer(address)}
+        loading={volunteerLoading}
+      />
     </div>
   );
 }

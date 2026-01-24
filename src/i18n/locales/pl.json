@@ -888,7 +888,12 @@
     "i_can_host": "Mogę być gospodarzem",
     "withdraw_offer": "Wycofaj ofertę",
     "volunteers": "Ochotnicy",
-    "no_volunteers": "Brak ochotników. Bądź pierwszy!"
+    "no_volunteers": "Brak ochotników. Bądź pierwszy!",
+    "enter_address": "Podaj swój adres",
+    "address_hidden_until_confirmed": "Twój adres zostanie udostępniony uczestnikom dopiero po potwierdzeniu Ciebie jako gospodarza.",
+    "your_address": "Twój adres",
+    "address_placeholder": "Wpisz pełny adres z numerem mieszkania",
+    "volunteer_to_host": "Zgłoś się na gospodarza"
   },
   "season": {
     "current_season": "Obecny sezon",

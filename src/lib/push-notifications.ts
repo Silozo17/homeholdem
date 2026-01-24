@@ -119,3 +119,22 @@ export async function notifyBlindsUp(
     notificationType: 'blinds_up',
   });
 }
+
+export async function notifyHostConfirmed(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string,
+  hostName: string,
+  address?: string | null
+) {
+  return sendPushNotification({
+    userIds,
+    title: "Host Confirmed",
+    body: address
+      ? `${hostName} is hosting at ${address}`
+      : `${hostName} is confirmed to host ${eventTitle}`,
+    url: `/event/${eventId}`,
+    tag: `host-${eventId}`,
+    notificationType: 'rsvp_updates',
+  });
+}
