@@ -435,18 +435,21 @@ export type Database = {
       }
       event_host_volunteers: {
         Row: {
+          address: string | null
           created_at: string
           event_id: string
           id: string
           user_id: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           event_id: string
           id?: string
           user_id: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           event_id?: string
           id?: string

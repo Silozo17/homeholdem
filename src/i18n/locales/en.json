@@ -888,7 +888,12 @@
     "i_can_host": "I Can Host",
     "withdraw_offer": "Withdraw Offer",
     "volunteers": "Volunteers",
-    "no_volunteers": "No volunteers yet. Be the first!"
+    "no_volunteers": "No volunteers yet. Be the first!",
+    "enter_address": "Enter Your Address",
+    "address_hidden_until_confirmed": "Your address will only be shared with attendees once you're confirmed as host.",
+    "your_address": "Your Address",
+    "address_placeholder": "Enter your full address including flat/unit number",
+    "volunteer_to_host": "Volunteer to Host"
   },
   "season": {
     "current_season": "Current Season",
