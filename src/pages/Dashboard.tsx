@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { toast } from 'sonner';
 import { SuitRow } from '@/components/common/CardSuits';
 
@@ -27,13 +29,30 @@ interface ClubWithRole {
 export default function Dashboard() {
   const { t } = useTranslation();
   const { user, loading } = useAuth();
+  const { isActive, loading: subscriptionLoading, refetch: refetchSubscription } = useSubscription();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [clubs, setClubs] = useState<ClubWithRole[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [processingInvite, setProcessingInvite] = useState(false);
+
+  // Handle subscription URL params
+  useEffect(() => {
+    const subscriptionStatus = searchParams.get('subscription');
+    if (subscriptionStatus === 'success') {
+      toast.success(t('subscription.subscription_success'));
+      refetchSubscription();
+      searchParams.delete('subscription');
+      setSearchParams(searchParams);
+    } else if (subscriptionStatus === 'canceled') {
+      toast.info(t('subscription.subscription_canceled'));
+      searchParams.delete('subscription');
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams, t, refetchSubscription]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -163,7 +182,31 @@ export default function Dashboard() {
     }
   }, [user, fetchClubs, searchParams, processInviteCode]);
 
-  if (loading) {
+  const handleCreateClub = () => {
+    if (!isActive) {
+      setPaywallOpen(true);
+      return;
+    }
+    setCreateDialogOpen(true);
+  };
+
+  const handleJoinClub = () => {
+    if (!isActive) {
+      setPaywallOpen(true);
+      return;
+    }
+    setJoinDialogOpen(true);
+  };
+
+  const handleClubClick = (clubId: string) => {
+    if (!isActive) {
+      setPaywallOpen(true);
+      return;
+    }
+    navigate(`/club/${clubId}`);
+  };
+
+  if (loading || subscriptionLoading) {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -216,14 +259,14 @@ export default function Dashboard() {
         {/* Action Buttons */}
         <div className="flex gap-3">
           <Button 
-            onClick={() => setCreateDialogOpen(true)}
+            onClick={handleCreateClub}
             className="flex-1 glow-gold"
           >
             <Plus className="mr-2 h-4 w-4" /> {t('club.create')}
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => setJoinDialogOpen(true)}
+            onClick={handleJoinClub}
             className="flex-1 border-border/50 hover:bg-secondary"
           >
             <Users className="mr-2 h-4 w-4" /> {t('club.join')}
@@ -262,7 +305,8 @@ export default function Dashboard() {
               <ClubCard 
                 key={club.id} 
                 club={club} 
-                onClick={() => navigate(`/club/${club.id}`)}
+                isLocked={!isActive}
+                onClick={() => handleClubClick(club.id)}
               />
             ))}
           </div>
@@ -279,6 +323,10 @@ export default function Dashboard() {
         open={joinDialogOpen} 
         onOpenChange={setJoinDialogOpen}
         onSuccess={fetchClubs}
+      />
+      <PaywallDrawer
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
       />
     </div>
   );

@@ -1,14 +1,18 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen, Crown, Loader2 } from 'lucide-react';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
 import { PrivacySettings } from '@/components/settings/PrivacySettings';
 import { LanguageSettings } from '@/components/settings/LanguageSettings';
 import { CurrencySettings } from '@/components/settings/CurrencySettings';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
@@ -16,12 +20,39 @@ import { getAppUrl } from '@/lib/app-url';
 
 export default function Settings() {
   const { t } = useTranslation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, session } = useAuth();
+  const { isActive, isTrialing, daysRemaining, plan, loading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [managingSubscription, setManagingSubscription] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleManageSubscription = async () => {
+    if (!session?.access_token) return;
+    
+    setManagingSubscription(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error('Portal error:', err);
+      toast.error(t('subscription.checkout_error'));
+    } finally {
+      setManagingSubscription(false);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -101,6 +132,57 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Subscription Card */}
+        <Card className="bg-card/50 border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-primary" />
+              {t('subscription.current_plan', 'Subscription')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {subscriptionLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : isActive ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{t('subscription.plan_name')}</p>
+                    <p className="text-sm text-muted-foreground capitalize">{plan}</p>
+                  </div>
+                  <Badge variant="default" className="bg-primary">
+                    {isTrialing ? t('subscription.trial_ends_in', { days: daysRemaining }) : t('subscription.renews_in', { days: daysRemaining })}
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleManageSubscription}
+                  disabled={managingSubscription}
+                >
+                  {managingSubscription ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.loading')}</>
+                  ) : (
+                    t('subscription.manage_subscription')
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t('subscription.subscription_required')}
+                </p>
+                <Button className="w-full glow-gold" onClick={() => setPaywallOpen(true)}>
+                  <Crown className="mr-2 h-4 w-4" />
+                  {t('subscription.upgrade_to_access')}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <LanguageSettings />
 
         <CurrencySettings />
@@ -144,6 +226,8 @@ export default function Settings() {
           {t('settings.sign_out')}
         </Button>
       </main>
+
+      <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +45,7 @@ import { ShareClub } from '@/components/clubs/ShareClub';
 import { InviteByEmailDialog } from '@/components/clubs/InviteByEmailDialog';
 import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 import { ClubSettings } from '@/components/clubs/ClubSettings';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 
 interface ClubMember {
   id: string;
@@ -83,6 +85,7 @@ export default function ClubDetail() {
   const { t } = useTranslation();
   const { clubId } = useParams<{ clubId: string }>();
   const { user, loading } = useAuth();
+  const { isActive, loading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
@@ -94,12 +97,20 @@ export default function ClubDetail() {
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [inviteEmailOpen, setInviteEmailOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/');
     }
   }, [user, loading, navigate]);
+
+  // Redirect to dashboard with paywall if subscription is not active
+  useEffect(() => {
+    if (!subscriptionLoading && !isActive && user) {
+      setPaywallOpen(true);
+    }
+  }, [subscriptionLoading, isActive, user]);
 
   useEffect(() => {
     if (user && clubId) {
@@ -222,7 +233,7 @@ export default function ClubDetail() {
     }
   };
 
-  if (loading || loadingData) {
+  if (loading || loadingData || subscriptionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-primary">{t('common.loading')}</div>
@@ -231,6 +242,18 @@ export default function ClubDetail() {
   }
 
   if (!club) return null;
+
+  // Show paywall overlay for expired subscriptions
+  if (!isActive) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <PaywallDrawer open={paywallOpen} onOpenChange={(open) => {
+          setPaywallOpen(open);
+          if (!open) navigate('/dashboard');
+        }} />
+      </div>
+    );
+  }
 
   const isAdmin = userRole === 'owner' || userRole === 'admin';
 
