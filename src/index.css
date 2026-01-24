@@ -281,3 +281,16 @@
 .mt-safe {
   margin-top: max(env(safe-area-inset-top, 0px), 12px);
 }
+
+/* Fix iOS keyboard viewport issues for fixed bottom elements */
+@supports (-webkit-touch-callout: none) {
+  .fixed.bottom-0 {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+}
+
+/* Prevent body scroll issues when keyboard opens */
+html, body {
+  overscroll-behavior: none;
+}
