@@ -67,9 +67,9 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[95vh] bg-background">
+      <DrawerContent className="h-[95vh] bg-background flex flex-col">
         {/* Hero Image Section */}
-        <div className="relative h-[35%] overflow-hidden">
+        <div className="relative h-[28%] min-h-[160px] overflow-hidden flex-shrink-0">
           <img 
             src={`${SUPABASE_URL}/storage/v1/object/public/graphics/paywall.webp`}
             alt="Poker night"
@@ -80,26 +80,26 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-8 -mt-16 relative z-10">
+        <div className="flex-1 flex flex-col px-6 -mt-14 relative z-10 min-h-0">
           {/* Header */}
-          <DrawerHeader className="px-0 pt-0 pb-4">
-            <div className="flex justify-center mb-2">
+          <DrawerHeader className="px-0 pt-0 pb-2 flex-shrink-0">
+            <div className="flex justify-center mb-1">
               <Logo />
             </div>
-            <DrawerTitle className="text-2xl font-bold text-center text-gold-gradient">
+            <DrawerTitle className="text-xl font-bold text-center text-gold-gradient">
               {t('subscription.unlock_title', 'Unlock Your Poker Club')}
             </DrawerTitle>
-            <DrawerDescription className="text-center text-muted-foreground">
+            <DrawerDescription className="text-center text-muted-foreground text-sm">
               {t('subscription.unlock_subtitle', 'Get full access to all features')}
             </DrawerDescription>
           </DrawerHeader>
 
           {/* Features */}
-          <ul className="space-y-3 mb-6">
+          <ul className="space-y-2 mb-4 flex-shrink-0">
             {features.map((feature, index) => (
-              <li key={index} className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <feature.icon className="w-4 h-4 text-primary" />
+              <li key={index} className="flex items-center gap-2">
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  <feature.icon className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <span className="text-sm">{feature.text}</span>
               </li>
@@ -107,7 +107,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </ul>
 
           {/* Plan Toggle */}
-          <div className="flex items-center justify-center gap-4 mb-6">
+          <div className="flex items-center justify-center gap-3 mb-4 flex-shrink-0">
             <span className={`text-sm font-medium transition-colors ${!isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
               {t('subscription.monthly', 'Monthly')}
             </span>
@@ -116,27 +116,27 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
               onCheckedChange={setIsAnnual}
               className="data-[state=checked]:bg-primary"
             />
-            <span className={`text-sm font-medium transition-colors ${isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
-              {t('subscription.yearly', 'Yearly')}
-            </span>
-            {isAnnual && (
-              <Badge variant="secondary" className="bg-primary/20 text-primary border-0">
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium transition-colors ${isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
+                {t('subscription.yearly', 'Yearly')}
+              </span>
+              <Badge variant="secondary" className="bg-primary/20 text-primary border-0 text-xs">
                 {t('subscription.save_percent', 'Save 45%')}
               </Badge>
-            )}
+            </div>
           </div>
 
           {/* Plan Card */}
-          <Card className="p-4 border-2 border-primary bg-card/50 mb-6">
+          <Card className="p-3 border-2 border-primary bg-card/50 mb-4 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-lg">{t('subscription.plan_name', 'Home Hold\'em Pro')}</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="font-semibold">{t('subscription.plan_name', 'Home Hold\'em Pro')}</h3>
+                <p className="text-xs text-muted-foreground">
                   {t('subscription.full_access', 'Full access to all features')}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-primary">
+                <p className="text-xl font-bold text-primary">
                   {isAnnual ? '£12.99' : '£1.99'}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -144,7 +144,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
                 </p>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="mt-2 pt-2 border-t border-border/50">
               <div className="flex items-center gap-2 text-sm text-primary">
                 <Check className="w-4 h-4" />
                 <span>{t('subscription.trial_included', '7-day free trial included')}</span>
@@ -156,7 +156,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           <Button 
             onClick={handleSubscribe}
             disabled={isLoading}
-            className="w-full h-12 text-lg font-semibold glow-gold"
+            className="w-full h-11 text-base font-semibold glow-gold flex-shrink-0"
           >
             {isLoading ? (
               <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t('common.loading', 'Loading...')}</>
@@ -165,8 +165,8 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
             )}
           </Button>
 
-          {/* Footer */}
-          <div className="mt-4 space-y-2 text-center">
+          {/* Footer - Always visible at bottom */}
+          <div className="mt-auto pt-3 pb-safe space-y-1 text-center flex-shrink-0">
             <p className="text-xs text-muted-foreground">
               {t('subscription.cancel_anytime', 'Cancel anytime.')} {isAnnual 
                 ? t('subscription.after_trial_yearly', 'After 7 days, charged annually.') 
