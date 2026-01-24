@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Crown } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
@@ -236,7 +236,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background card-suit-pattern">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
-        <div className="container flex items-center justify-center h-16 px-4">
+        <div className="container relative flex items-center justify-center h-16 px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPaywallOpen(true)}
+            className="absolute left-4 text-primary hover:text-primary/80"
+          >
+            <Crown className="h-5 w-5" />
+          </Button>
           <Logo size="sm" />
         </div>
       </header>
