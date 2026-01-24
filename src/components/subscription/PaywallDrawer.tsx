@@ -171,7 +171,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
           </Button>
 
           {/* Footer */}
-          <div className="pt-3 pb-[7px] space-y-1 text-center">
+          <div className="pt-3 pb-[10px] space-y-1 text-center">
             <p className="text-xs text-muted-foreground">
               {t('subscription.cancel_anytime', 'Cancel anytime.')} {isAnnual 
                 ? t('subscription.after_trial_yearly', 'After 7 days, charged annually.') 
