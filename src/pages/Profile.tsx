@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield } from 'lucide-react';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 
@@ -59,6 +60,7 @@ export default function Profile() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const { isAdmin } = useIsAppAdmin();
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -336,6 +338,21 @@ export default function Profile() {
             )}
           </CardContent>
         </Card>
+
+        {/* Admin Panel Link - Only visible to app admins */}
+        {isAdmin && (
+          <Button
+            variant="outline"
+            className="w-full justify-between border-primary/30 hover:bg-primary/10"
+            onClick={() => navigate('/admin')}
+          >
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <span>Admin Panel</span>
+            </div>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        )}
       </main>
 
       <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
