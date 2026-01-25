@@ -336,7 +336,9 @@
     "applies_all_dates": "dotyczy wszystkich dat",
     "select_at_least_one": "Wybierz co najmniej jedną datę do głosowania.",
     "add_date_option": "Dodaj co najmniej jedną opcję daty",
-    "date_options_failed": "Wydarzenie utworzone, ale nie udało się dodać opcji dat"
+    "date_options_failed": "Wydarzenie utworzone, ale nie udało się dodać opcji dat",
+    "confirm_change_vote": "Zmienić głos?",
+    "change_vote_description": "Czy na pewno chcesz zmienić swój głos? Twój wybór zostanie zaktualizowany."
   },
   "game": {
     "game_mode": "Tryb gry",

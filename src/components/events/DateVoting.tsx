@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Check, Calendar, Crown, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/common/UserAvatar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Voter {
   id: string;
@@ -32,7 +42,36 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
   const { t, i18n } = useTranslation();
   const maxVotes = Math.max(...options.map(o => o.vote_count), 1);
   const [expandedOption, setExpandedOption] = useState<string | null>(null);
+  const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
+  
+  // Check if user has voted on ANY option
+  const hasVoted = options.some(o => o.user_voted);
+  
+  const handleOptionClick = (optionId: string) => {
+    // If user has already voted, show confirmation before changing
+    if (hasVoted) {
+      setPendingVoteId(optionId);
+      setShowConfirmDialog(true);
+    } else {
+      // First vote - no confirmation needed
+      onVote(optionId);
+    }
+  };
+  
+  const confirmVoteChange = () => {
+    if (pendingVoteId) {
+      onVote(pendingVoteId);
+    }
+    setShowConfirmDialog(false);
+    setPendingVoteId(null);
+  };
+  
+  const cancelVoteChange = () => {
+    setShowConfirmDialog(false);
+    setPendingVoteId(null);
+  };
 
   const toggleVoterList = (optionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,7 +96,7 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
                   ? "border-primary bg-primary/10" 
                   : "border-border/50 bg-secondary/30 hover:border-primary/50"
               )}
-              onClick={() => onVote(option.id)}
+              onClick={() => handleOptionClick(option.id)}
             >
               {/* Vote bar background */}
               <div 
@@ -148,6 +187,25 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
           {t('event.voting_instructions')}
         </p>
       </CardContent>
+      
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('event.confirm_change_vote')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('event.change_vote_description')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelVoteChange}>
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmVoteChange}>
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
