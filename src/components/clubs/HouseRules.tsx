@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,20 @@ export function HouseRules({ clubId, isAdmin }: HouseRulesProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Protect unsaved changes from page navigation/refresh
+  const hasUnsavedChanges = dialogOpen && (title.trim() !== '' || content.trim() !== '');
+
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '';
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     fetchRules();
