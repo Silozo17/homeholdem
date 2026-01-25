@@ -338,7 +338,9 @@
     "add_date_option": "Dodaj co najmniej jedną opcję daty",
     "date_options_failed": "Wydarzenie utworzone, ale nie udało się dodać opcji dat",
     "confirm_change_vote": "Zmienić głos?",
-    "change_vote_description": "Czy na pewno chcesz zmienić swój głos? Twój wybór zostanie zaktualizowany."
+    "change_vote_description": "Czy na pewno chcesz zmienić swój głos? Twój wybór zostanie zaktualizowany.",
+    "confirm_change_rsvp": "Zmienić odpowiedź?",
+    "change_rsvp_description": "Zamierzasz zmienić swój status obecności. Czy na pewno?"
   },
   "game": {
     "game_mode": "Tryb gry",
