@@ -46,6 +46,7 @@ import { InviteByEmailDialog } from '@/components/clubs/InviteByEmailDialog';
 import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 import { ClubSettings } from '@/components/clubs/ClubSettings';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface ClubMember {
   id: string;
@@ -276,6 +277,7 @@ export default function ClubDetail() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
+          <NotificationBell className="absolute right-4" />
         </div>
       </header>
       {/* Header spacer */}
