@@ -39,6 +39,13 @@ export default function Dashboard() {
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [processingInvite, setProcessingInvite] = useState(false);
+  
+  // Track if user was ever authenticated to prevent redirect on transient auth failures
+  const [wasAuthenticated, setWasAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (user) setWasAuthenticated(true);
+  }, [user]);
 
   // Handle subscription URL params
   useEffect(() => {
@@ -55,11 +62,12 @@ export default function Dashboard() {
     }
   }, [searchParams, setSearchParams, t, refetchSubscription]);
 
+  // Only redirect if NEVER authenticated, not on temporary auth failures
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !wasAuthenticated) {
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, wasAuthenticated]);
 
   const fetchClubs = useCallback(async () => {
     if (!user) return;

@@ -22,7 +22,16 @@ import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,  // Don't refetch when user returns to app
+      refetchOnReconnect: false,    // Don't refetch on network reconnect
+      retry: 1,                      // Limit retries to prevent loops
+      staleTime: 5 * 60 * 1000,     // Data stays fresh for 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

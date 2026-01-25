@@ -9,10 +9,20 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('SW registered:', registration.scope);
+        
+        // Listen for updates but DON'T auto-reload
+        registration.addEventListener('updatefound', () => {
+          console.log('New SW version available - will activate on next visit');
+        });
       })
       .catch((error) => {
         console.log('SW registration failed:', error);
       });
+  });
+  
+  // Handle controller changes gracefully - NO reload
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('SW controller changed - changes will apply on next visit');
   });
 }
 

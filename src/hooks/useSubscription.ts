@@ -80,12 +80,49 @@ export function useSubscription() {
     }
   }, [user, checkSubscription]);
 
-  // Auto-refresh subscription status every minute
+  // Daily check at midnight
   useEffect(() => {
     if (!user) return;
 
-    const interval = setInterval(checkSubscription, 60000);
-    return () => clearInterval(interval);
+    const scheduleNextMidnightCheck = (): NodeJS.Timeout => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const msUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      return setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          checkSubscription();
+        }
+        // Schedule next day's check
+        scheduleNextMidnightCheck();
+      }, msUntilMidnight);
+    };
+
+    const timeoutId = scheduleNextMidnightCheck();
+    return () => clearTimeout(timeoutId);
+  }, [user, checkSubscription]);
+
+  // Check on app resume after 1+ hour away
+  useEffect(() => {
+    if (!user) return;
+    
+    let lastCheckTime = Date.now();
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const hoursSinceLastCheck = (Date.now() - lastCheckTime) / (1000 * 60 * 60);
+        if (hoursSinceLastCheck >= 1) {
+          checkSubscription();
+          lastCheckTime = Date.now();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user, checkSubscription]);
 
   const isActive = state.subscribed && (state.status === 'active' || state.status === 'trialing');

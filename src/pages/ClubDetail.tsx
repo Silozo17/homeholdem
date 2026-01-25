@@ -99,12 +99,20 @@ export default function ClubDetail() {
   const [inviteEmailOpen, setInviteEmailOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  
+  // Track if user was ever authenticated to prevent redirect on transient auth failures
+  const [wasAuthenticated, setWasAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (user) setWasAuthenticated(true);
+  }, [user]);
+
+  // Only redirect if NEVER authenticated, not on temporary auth failures
+  useEffect(() => {
+    if (!loading && !user && !wasAuthenticated) {
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, wasAuthenticated]);
 
   // Redirect to dashboard with paywall if subscription is not active
   // Only trigger if we explicitly know subscription is inactive (not just loading/error)
