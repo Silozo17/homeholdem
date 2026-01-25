@@ -725,14 +725,17 @@ export default function EventDetail() {
 
     const { error } = await supabase
       .from('events')
-      .update({ host_user_id: null })
+      .update({ 
+        host_user_id: null,
+        location: 'TBC'
+      })
       .eq('id', event.id);
 
     if (error) {
       toast.error('Failed to clear host');
     } else {
       toast.success('Host cleared');
-      setEvent(prev => prev ? { ...prev, host_user_id: null } : null);
+      setEvent(prev => prev ? { ...prev, host_user_id: null, location: 'TBC' } : null);
       setHostProfile(null);
     }
   };
