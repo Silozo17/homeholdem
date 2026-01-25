@@ -928,8 +928,8 @@ export default function EventDetail() {
               />
             )}
 
-            {/* Host Volunteer - show when no host OR when admin wants to change */}
-            {(!event.host_user_id || isAdmin) && (
+            {/* Host Volunteer - show when no host OR when admin wants to change OR when user is a volunteer (to withdraw) */}
+            {(!event.host_user_id || isAdmin || hostVolunteers.includes(user?.id || '')) && (
               <HostVolunteer
                 eventId={event.id}
                 volunteers={hostVolunteers}
@@ -937,6 +937,7 @@ export default function EventDetail() {
                 onVolunteer={() => handleHostVolunteer()}
                 onConfirm={isAdmin ? handleConfirmHost : undefined}
                 showVolunteerSection={!event.host_user_id}
+                confirmedHostId={event.host_user_id}
               />
             )}
           </TabsContent>
