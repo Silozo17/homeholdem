@@ -933,5 +933,19 @@
     "renews_in": "Renews in {{days}} days",
     "subscription_success": "Subscription activated! Welcome to Home Hold'em Pro.",
     "subscription_canceled": "Subscription checkout canceled"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "mark_all_read": "Mark all read",
+    "no_notifications": "No notifications yet",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "earlier": "Earlier",
+    "new_rsvp": "New RSVP",
+    "date_confirmed": "Date Confirmed",
+    "waitlist_promoted": "You're In!",
+    "host_confirmed": "Host Confirmed",
+    "new_message": "New Message",
+    "new_event": "New Event"
   }
 }
