@@ -1,1 +1,7 @@
 project_id = "kmsthmtbvuxmpjzmwybj"
+
+[functions.admin-send-password-reset]
+verify_jwt = false
+
+[functions.admin-manage-subscription]
+verify_jwt = false
