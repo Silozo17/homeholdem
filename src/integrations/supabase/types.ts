@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_admins: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1279,6 +1300,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_app_admin: { Args: { _user_id: string }; Returns: boolean }
       is_club_admin_or_owner: {
         Args: { _club_id: string; _user_id: string }
         Returns: boolean
@@ -1312,6 +1334,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "superadmin" | "support"
       club_role: "owner" | "admin" | "member"
       rsvp_status: "going" | "maybe" | "not_going"
     }
@@ -1441,6 +1464,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["superadmin", "support"],
       club_role: ["owner", "admin", "member"],
       rsvp_status: ["going", "maybe", "not_going"],
     },
