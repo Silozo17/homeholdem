@@ -15,6 +15,7 @@ interface HostVolunteerProps {
   onVolunteer: () => void;
   onConfirm?: (userId: string) => void;
   showVolunteerSection?: boolean;
+  confirmedHostId?: string | null;
 }
 
 interface VolunteerProfile {
@@ -23,7 +24,7 @@ interface VolunteerProfile {
   avatar_url: string | null;
 }
 
-export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer, onConfirm, showVolunteerSection = true }: HostVolunteerProps) {
+export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer, onConfirm, showVolunteerSection = true, confirmedHostId }: HostVolunteerProps) {
   const { t } = useTranslation();
   const [profiles, setProfiles] = useState<VolunteerProfile[]>([]);
   const [votes, setVotes] = useState<Map<string, number>>(new Map());
@@ -172,8 +173,12 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
     (votes.get(b.id) || 0) - (votes.get(a.id) || 0)
   );
 
-  // Don't render at all if admin is just viewing with no volunteers
-  if (!showVolunteerSection && volunteers.length === 0) {
+  // Filter out the confirmed host from volunteers list (they shouldn't appear again)
+  const filteredProfiles = sortedProfiles.filter(p => p.id !== confirmedHostId);
+
+  // Don't render at all if admin is just viewing with no volunteers (after filtering)
+  // BUT always render if the current user is volunteering (so they can withdraw)
+  if (!showVolunteerSection && filteredProfiles.length === 0 && !isVolunteering) {
     return null;
   }
 
@@ -186,7 +191,8 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {showVolunteerSection && (
+        {/* Show volunteer button when section is active, OR if user is already volunteering (to allow withdrawal) */}
+        {(showVolunteerSection || isVolunteering) && (
           <Button
             variant={isVolunteering ? 'outline' : 'outline'}
             className={cn(
@@ -211,10 +217,10 @@ export function HostVolunteer({ eventId, volunteers, currentUserId, onVolunteer,
           </Button>
         )}
 
-        {sortedProfiles.length > 0 && (
+        {filteredProfiles.length > 0 && (
           <div className="space-y-2 pt-2">
             <p className="text-sm text-muted-foreground">{t('host.volunteers')}:</p>
-            {sortedProfiles.map((profile) => {
+            {filteredProfiles.map((profile) => {
               const voteCount = votes.get(profile.id) || 0;
               const hasVoted = userVote === profile.id;
               const isOwnProfile = profile.id === currentUserId;
