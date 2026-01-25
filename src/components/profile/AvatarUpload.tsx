@@ -16,15 +16,16 @@ interface AvatarUploadProps {
 }
 
 // Helper function to resize large images before cropping (prevents iOS memory issues)
-async function resizeImageForCropper(file: File, maxDimension: number = 1200): Promise<string> {
+// Uses Object URLs instead of Data URLs for ~50-70% less memory usage
+async function resizeImageForCropper(file: File, maxDimension: number = 800): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // If image is small enough, use original
+        // If image is small enough, use original file as blob URL
         if (img.width <= maxDimension && img.height <= maxDimension) {
-          resolve(e.target?.result as string);
+          resolve(URL.createObjectURL(file));
           return;
         }
         
@@ -45,7 +46,15 @@ async function resizeImageForCropper(file: File, maxDimension: number = 1200): P
         }
         
         ctx.drawImage(img, 0, 0, newWidth, newHeight);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        
+        // Convert to Blob and create Object URL (much more memory-efficient than Data URL)
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(URL.createObjectURL(blob));
+          } else {
+            reject(new Error('Failed to create blob from canvas'));
+          }
+        }, 'image/jpeg', 0.85);
       };
       img.onerror = () => reject(new Error('Failed to load image for resizing'));
       img.src = e.target?.result as string;
@@ -136,8 +145,10 @@ export function AvatarUpload({ userId, currentAvatarUrl, displayName, onUploadCo
     }
 
     try {
-      // Resize image before cropping to avoid iOS memory issues
-      const resizedImageSrc = await resizeImageForCropper(file, 1200);
+      console.log('Resizing image...', file.name, `${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      // Resize image before cropping to avoid iOS memory issues (uses Object URLs)
+      const resizedImageSrc = await resizeImageForCropper(file, 800);
+      console.log('Resize complete, opening cropper with Blob URL');
       setImageSrc(resizedImageSrc);
       setShowCropper(true);
       setCrop({ x: 0, y: 0 });
@@ -206,6 +217,10 @@ export function AvatarUpload({ userId, currentAvatarUrl, displayName, onUploadCo
       toast.error('Failed to upload image');
     } finally {
       setUploading(false);
+      // Revoke Object URL to prevent memory leaks
+      if (imageSrc && imageSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(imageSrc);
+      }
       setImageSrc(null);
       // Reset input so same file can be selected again
       if (fileInputRef.current) {
@@ -215,6 +230,10 @@ export function AvatarUpload({ userId, currentAvatarUrl, displayName, onUploadCo
   };
 
   const handleCropCancel = () => {
+    // Revoke Object URL to prevent memory leaks
+    if (imageSrc && imageSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(imageSrc);
+    }
     setShowCropper(false);
     setImageSrc(null);
     if (fileInputRef.current) {
