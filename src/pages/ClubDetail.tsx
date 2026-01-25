@@ -106,11 +106,16 @@ export default function ClubDetail() {
   }, [user, loading, navigate]);
 
   // Redirect to dashboard with paywall if subscription is not active
+  // Only trigger if we explicitly know subscription is inactive (not just loading/error)
   useEffect(() => {
-    if (!subscriptionLoading && !isActive && user) {
-      setPaywallOpen(true);
+    if (!subscriptionLoading && !isActive && user && !paywallOpen) {
+      // Small delay to prevent flickering during subscription refresh
+      const timer = setTimeout(() => {
+        setPaywallOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [subscriptionLoading, isActive, user]);
+  }, [subscriptionLoading, isActive, user, paywallOpen]);
 
   useEffect(() => {
     if (user && clubId) {

@@ -52,10 +52,13 @@ export function useSubscription() {
       });
     } catch (err) {
       console.error('Error checking subscription:', err);
+      // Keep previous subscription state on error to prevent UI disruption
+      // This prevents redirects/paywall triggers when network issues occur during active use
       setState(prev => ({
         ...prev,
         loading: false,
         error: err instanceof Error ? err.message : 'Failed to check subscription',
+        // Preserve previous subscription values - don't reset on network errors
       }));
     }
   }, [session?.access_token]);
