@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Bell, Check } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Bell, Check, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { NotificationItem } from './NotificationItem';
@@ -40,24 +40,31 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0">
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 [&>button]:hidden">
         <SheetHeader className="p-4 pt-6 safe-area-top border-b border-border/50">
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
               {t('notifications.title')}
             </SheetTitle>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-xs h-8"
-              >
-                <Check className="h-3.5 w-3.5 mr-1" />
-                {t('notifications.mark_all_read')}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="text-xs h-8"
+                >
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                  {t('notifications.mark_all_read')}
+                </Button>
+              )}
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
+            </div>
           </div>
         </SheetHeader>
 
