@@ -221,8 +221,24 @@ serve(async (req) => {
 
     console.log("Waitlist promotion email sent:", emailResponse);
 
+    // Create in-app notification for the promoted user
+    const { error: notificationError } = await supabase
+      .from("notifications")
+      .insert({
+        user_id: promoted_user_id,
+        type: "waitlist_promotion",
+        title: "You're In!",
+        body: `A spot opened up for ${event.title}`,
+        url: `/event/${event_id}`,
+        event_id: event_id,
+      });
+
+    if (notificationError) {
+      console.error("Failed to create in-app notification:", notificationError);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, message: "Waitlist promotion email sent" }),
+      JSON.stringify({ success: true, message: "Waitlist promotion email and notification sent" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
