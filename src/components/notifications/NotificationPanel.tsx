@@ -41,7 +41,7 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md p-0">
-        <SheetHeader className="p-4 border-b border-border/50">
+        <SheetHeader className="p-4 pt-6 safe-area-top border-b border-border/50">
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
