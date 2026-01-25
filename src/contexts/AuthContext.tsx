@@ -22,7 +22,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // Token refresh - just update session silently, don't trigger loading state
+        if (event === 'TOKEN_REFRESHED') {
+          setSession(session);
+          return;
+        }
+        
+        // Sign out - clear everything
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        // All other events (SIGNED_IN, INITIAL_SESSION, USER_UPDATED)
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);

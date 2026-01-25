@@ -21,7 +21,8 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  // DO NOT use skipWaiting() - let new SW wait until user naturally navigates
+  // This prevents forced page reloads when updates are deployed
 });
 
 // Activate - clean old caches
@@ -36,7 +37,7 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim();
+  // DO NOT use clients.claim() - this would force take control and cause reloads
 });
 
 // Fetch - network first, fallback to cache
