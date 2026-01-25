@@ -933,5 +933,19 @@
     "renews_in": "Odnawia się za {{days}} dni",
     "subscription_success": "Subskrypcja aktywowana! Witamy w Home Hold'em Pro.",
     "subscription_canceled": "Płatność za subskrypcję anulowana"
+  },
+  "notifications": {
+    "title": "Powiadomienia",
+    "mark_all_read": "Oznacz wszystkie",
+    "no_notifications": "Brak powiadomień",
+    "today": "Dzisiaj",
+    "yesterday": "Wczoraj",
+    "earlier": "Wcześniej",
+    "new_rsvp": "Nowe RSVP",
+    "date_confirmed": "Data potwierdzona",
+    "waitlist_promoted": "Masz miejsce!",
+    "host_confirmed": "Gospodarz potwierdzony",
+    "new_message": "Nowa wiadomość",
+    "new_event": "Nowe wydarzenie"
   }
 }

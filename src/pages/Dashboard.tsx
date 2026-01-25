@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
 import { Plus, Users, Crown } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
@@ -246,6 +247,7 @@ export default function Dashboard() {
             <Crown className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
+          <NotificationBell className="absolute right-4" />
         </div>
       </header>
       {/* Header spacer */}

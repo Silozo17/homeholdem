@@ -782,6 +782,63 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string
+          club_id: string | null
+          created_at: string | null
+          event_id: string | null
+          id: string
+          read_at: string | null
+          sender_id: string | null
+          title: string
+          type: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          club_id?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          read_at?: string | null
+          sender_id?: string | null
+          title: string
+          type: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          club_id?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          read_at?: string | null
+          sender_id?: string | null
+          title?: string
+          type?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payout_structures: {
         Row: {
           amount: number | null

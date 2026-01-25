@@ -10,6 +10,7 @@ import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown } from 'lucide-react';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 
@@ -206,14 +207,17 @@ export default function Profile() {
             <Crown className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/settings')}
-            className="absolute right-4 text-muted-foreground hover:text-foreground"
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
+          <div className="absolute right-4 flex items-center gap-1">
+            <NotificationBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/settings')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
       {/* Header spacer */}
