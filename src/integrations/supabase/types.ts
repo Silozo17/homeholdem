@@ -68,6 +68,39 @@ export type Database = {
         }
         Relationships: []
       }
+      banned_users: {
+        Row: {
+          banned_at: string
+          banned_by: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          reason: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          banned_at?: string
+          banned_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason?: string | null
+          type?: string
+          user_id: string
+        }
+        Update: {
+          banned_at?: string
+          banned_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       blind_structures: {
         Row: {
           ante: number
@@ -1325,6 +1358,7 @@ export type Database = {
         Args: { _game_session_id: string; _user_id: string }
         Returns: boolean
       }
+      is_user_banned: { Args: { _user_id: string }; Returns: boolean }
       lookup_club_by_invite_code: {
         Args: { _invite_code: string }
         Returns: {

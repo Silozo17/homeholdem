@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.admin-manage-subscription]
 verify_jwt = false
+
+[functions.admin-ban-user]
+verify_jwt = false
+
+[functions.admin-delete-user]
+verify_jwt = false
+
+[functions.admin-stripe-operations]
+verify_jwt = false
