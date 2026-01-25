@@ -45,6 +45,11 @@ import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
 import { notifyHostConfirmed } from '@/lib/push-notifications';
+import { 
+  notifyEventRsvpInApp, 
+  notifyDateFinalizedInApp, 
+  notifyHostConfirmedInApp 
+} from '@/lib/in-app-notifications';
 
 interface Event {
   id: string;
@@ -57,6 +62,7 @@ interface Event {
   final_date: string | null;
   host_user_id: string | null;
   is_finalized: boolean;
+  created_by: string;
 }
 
 interface Voter {
@@ -482,6 +488,17 @@ export default function EventDetail() {
 
     // Send confirmation email (fire and forget)
     sendRsvpConfirmation(status);
+    
+    // Send in-app notification to event creator/admins when someone RSVPs going
+    if (status === 'going' && !isWaitlisted && event.created_by && event.created_by !== user.id) {
+      notifyEventRsvpInApp(
+        event.created_by,
+        event.title,
+        userProfile.display_name,
+        event.id,
+        user.id
+      ).catch(console.error);
+    }
   }, [user, event, userProfile, rsvps, userRsvp]);
 
   // Rate limiting for RSVP emails - track last email per event
@@ -626,6 +643,19 @@ export default function EventDetail() {
       toast.error('Failed to finalize date');
     } else {
       toast.success('Date finalized!');
+      
+      // Send in-app notification to all club members
+      const { data: members } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', event.club_id)
+        .neq('user_id', user?.id || '');
+      
+      if (members && members.length > 0) {
+        const userIds = members.map(m => m.user_id);
+        const formattedDate = format(new Date(option.proposed_date), "EEEE, MMMM d", { locale: dateLocale });
+        notifyDateFinalizedInApp(userIds, event.title, event.id, formattedDate).catch(console.error);
+      }
     }
   };
 
@@ -667,6 +697,7 @@ export default function EventDetail() {
       .map(r => r.user_id);
     
     if (goingUserIds.length > 0) {
+      // Send push notification
       notifyHostConfirmed(
         goingUserIds,
         event.title,
@@ -674,6 +705,15 @@ export default function EventDetail() {
         hostData?.display_name || 'Host',
         volunteer?.address
       ).catch(err => console.error('Failed to send host notification:', err));
+      
+      // Send in-app notification
+      notifyHostConfirmedInApp(
+        goingUserIds,
+        event.title,
+        event.id,
+        hostData?.display_name || 'Host',
+        volunteer?.address
+      ).catch(console.error);
     }
 
     toast.success('Host confirmed!');

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from './ChatMessage';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { notifyNewChatMessageInApp } from '@/lib/in-app-notifications';
 
 interface Message {
   id: string;
@@ -142,8 +143,52 @@ export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
       console.error('Error sending message:', error);
     } else {
       setNewMessage('');
+      
+      // Send in-app notifications to other club members (fire and forget)
+      sendChatNotifications();
     }
     setSending(false);
+  };
+  
+  // Throttled chat notifications - only send one per user per 5 minutes
+  const lastNotificationRef = React.useRef<number>(0);
+  const sendChatNotifications = async () => {
+    const now = Date.now();
+    const THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
+    
+    if (now - lastNotificationRef.current < THROTTLE_MS) {
+      return; // Throttled
+    }
+    lastNotificationRef.current = now;
+    
+    try {
+      // Get other club members
+      const { data: members } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', clubId)
+        .neq('user_id', user!.id);
+      
+      if (!members || members.length === 0) return;
+      
+      // Get sender name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user!.id)
+        .single();
+      
+      const userIds = members.map(m => m.user_id);
+      notifyNewChatMessageInApp(
+        userIds,
+        profile?.display_name || 'Someone',
+        clubId,
+        user!.id,
+        eventId
+      ).catch(console.error);
+    } catch (err) {
+      console.error('Failed to send chat notifications:', err);
+    }
   };
 
   return (

@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { sendEmail } from '@/lib/email';
 import { eventCreatedTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
+import { notifyEventCreatedInApp } from '@/lib/in-app-notifications';
 
 interface CreateEventDialogProps {
   open: boolean;
@@ -221,6 +222,10 @@ export function CreateEventDialog({ open, onOpenChange, clubId, clubName, onSucc
         .neq('user_id', user!.id);
 
       if (!members || members.length === 0) return;
+      
+      // Send in-app notifications to all members
+      const memberUserIds = members.map(m => m.user_id);
+      notifyEventCreatedInApp(memberUserIds, eventTitle, clubName, eventId, clubId).catch(console.error);
 
       // Get preferences for all members to filter by email_event_created
       const userIds = members.map(m => m.user_id);
