@@ -15,11 +15,56 @@ interface AvatarUploadProps {
   onUploadComplete: (url: string) => void;
 }
 
+// Helper function to resize large images before cropping (prevents iOS memory issues)
+async function resizeImageForCropper(file: File, maxDimension: number = 1200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // If image is small enough, use original
+        if (img.width <= maxDimension && img.height <= maxDimension) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        
+        // Calculate new dimensions maintaining aspect ratio
+        const ratio = Math.min(maxDimension / img.width, maxDimension / img.height);
+        const newWidth = Math.round(img.width * ratio);
+        const newHeight = Math.round(img.height * ratio);
+        
+        // Resize using canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Cannot get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for resizing'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 // Helper function to create cropped image
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const image = new Image();
-  image.src = imageSrc;
-  await new Promise((resolve) => { image.onload = resolve; });
+  
+  // Wait for image to load with proper error handling
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('Failed to load image'));
+    image.src = imageSrc;
+  });
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -84,21 +129,23 @@ export function AvatarUpload({ userId, currentAvatarUrl, displayName, onUploadCo
       return;
     }
 
-    // Validate file size (max 5MB for cropping, final will be smaller)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+    // Validate file size (max 10MB to accommodate high-res mobile photos)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
       return;
     }
 
-    // Read file as data URL for cropper
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageSrc(reader.result as string);
+    try {
+      // Resize image before cropping to avoid iOS memory issues
+      const resizedImageSrc = await resizeImageForCropper(file, 1200);
+      setImageSrc(resizedImageSrc);
       setShowCropper(true);
       setCrop({ x: 0, y: 0 });
       setZoom(1);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error loading image:', error);
+      toast.error('Failed to load image. Please try a different photo.');
+    }
   };
 
   const handleCropConfirm = async () => {
@@ -108,8 +155,17 @@ export function AvatarUpload({ userId, currentAvatarUrl, displayName, onUploadCo
     setShowCropper(false);
 
     try {
-      // Get cropped image blob
-      const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      // Get cropped image blob with better error handling
+      let croppedBlob: Blob;
+      try {
+        croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      } catch (cropError) {
+        console.error('Error cropping image:', cropError);
+        toast.error('Failed to crop image. Please try a smaller photo.');
+        setUploading(false);
+        setImageSrc(null);
+        return;
+      }
       
       // Generate unique filename
       const fileName = `${userId}/avatar.jpg`;
