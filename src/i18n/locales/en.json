@@ -338,7 +338,9 @@
     "add_date_option": "Please add at least one date option",
     "date_options_failed": "Event created but failed to add date options",
     "confirm_change_vote": "Change your vote?",
-    "change_vote_description": "Are you sure you want to change your vote? This will update your selection."
+    "change_vote_description": "Are you sure you want to change your vote? This will update your selection.",
+    "confirm_change_rsvp": "Change your RSVP?",
+    "change_rsvp_description": "You're about to change your attendance status. Are you sure?"
   },
   "game": {
     "game_mode": "Game Mode",
