@@ -336,7 +336,9 @@
     "applies_all_dates": "applies to all dates",
     "select_at_least_one": "Select at least one date for members to vote on.",
     "add_date_option": "Please add at least one date option",
-    "date_options_failed": "Event created but failed to add date options"
+    "date_options_failed": "Event created but failed to add date options",
+    "confirm_change_vote": "Change your vote?",
+    "change_vote_description": "Are you sure you want to change your vote? This will update your selection."
   },
   "game": {
     "game_mode": "Game Mode",
