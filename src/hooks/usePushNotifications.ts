@@ -193,9 +193,38 @@ export function usePushNotifications() {
     }
   }, [user]);
 
+  // Silent subscribe for auto-prompt - doesn't show errors to users
+  const subscribeQuietly = useCallback(async () => {
+    if (!user || !VAPID_PUBLIC_KEY || !state.isSupported) {
+      return false;
+    }
+
+    // Don't even try if already subscribed or permission denied
+    if (state.permission === 'denied' || state.isSubscribed) {
+      return false;
+    }
+
+    try {
+      // Request permission - this shows the browser's native prompt
+      const permissionResult = await Notification.requestPermission();
+      
+      if (permissionResult !== 'granted') {
+        setState(prev => ({ ...prev, permission: permissionResult }));
+        return false;
+      }
+
+      // If granted, proceed with subscription
+      return await subscribe();
+    } catch (error) {
+      console.error('Auto push subscription failed:', error);
+      return false;
+    }
+  }, [user, state.isSupported, state.permission, state.isSubscribed, subscribe]);
+
   return {
     ...state,
     subscribe,
+    subscribeQuietly,
     unsubscribe,
   };
 }
