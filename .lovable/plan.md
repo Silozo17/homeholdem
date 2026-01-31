@@ -1,80 +1,61 @@
 
 
-## Plan: Enhanced End Game Dialog with Payout & Prize Pool Override
+## Plan: Fix End Game Dialog Winner Assignment with Player Dropdown Selectors
 
-### Problem Summary
+### Problems Identified
 
-When a user clicks the **End Game** button (red flag icon), the current dialog is very basic:
-1. It uses fixed default payout percentages (50/30/20 or 65/35, etc.)
-2. **No way to enter custom winner amounts or percentages**
-3. **No way to override the prize pool** if transactions were forgotten during the game
+Based on the screenshot and code analysis:
 
-This forces users to manually track missed buy-ins or go back to add them before ending, which is inconvenient.
+**Problem 1: Wrong Winner Detection**
+The `getPlayerForPosition()` function uses flawed logic:
+```typescript
+// Current buggy code - just picks from array in reverse order
+if (activePlayers.length > 0 && index < activePlayers.length) {
+  return activePlayers[activePlayers.length - 1 - index]?.display_name;
+}
+```
+This randomly assigns active players to positions based on array order, not actual performance.
+
+**Problem 2: No Manual Winner Selection**
+When 10 players are still active (as shown in your screenshot), admins cannot manually select who finished 1st, 2nd, etc. The current UI just shows auto-detected names with no way to change them.
 
 ---
 
 ## Solution Overview
 
-Transform the simple `EndGameDialog` into a comprehensive **End Game Wizard** that allows:
+Transform the payout structure section to include **dropdown selectors** for each prize position, allowing admins to:
 
-1. **Override the Prize Pool** - manually adjust the total if buy-ins/add-ons were missed
-2. **Set Winner Payouts** - enter amounts as either percentages OR currency values
-3. **Choose Paid Positions** - 1 to 5 positions, with preset or custom splits
-4. **Validation** - ensure payouts equal the (potentially adjusted) prize pool
-
----
-
-## Current vs Proposed Flow
-
-### Current Flow
-```
-Click End Game → Simple confirm dialog → Auto-calculates 50/30/20 → Done
-```
-
-### Proposed Flow
-```
-Click End Game → Enhanced dialog with:
-  ├── Prize Pool Override (optional adjustment)
-  ├── Paid Positions Selector (1-5)
-  ├── Input Mode Toggle (% or £)
-  ├── Payout Editor (per position)
-  ├── Winner Assignment (auto-detected from finish positions)
-  └── Finalize Button (with validation)
-```
+1. See all players in a dropdown menu for each position
+2. Manually select who gets 1st, 2nd, 3rd, etc.
+3. Prevent the same player from being selected for multiple positions
+4. Default to "Not assigned" when there are many active players
 
 ---
 
-## UI Design
+## UI Design (Updated)
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  🏁 End Tournament                              │
-├─────────────────────────────────────────────────┤
+│  Payout Structure                               │
 │                                                 │
-│  Prize Pool                                     │
-│  ┌──────────────────────────────────────────┐  │
-│  │ Calculated: £300                         │  │
-│  │ ☐ Override prize pool                    │  │
-│  │   ┌─────────────────┐                    │  │
-│  │   │ £ [ 320        ]│ (if checkbox on)   │  │
-│  │   └─────────────────┘                    │  │
-│  └──────────────────────────────────────────┘  │
+│  🏆 1st Place                                   │
+│  ┌─────────────────────────┐  £ ┌──────┐       │
+│  │ Select winner...      ▼ │    │ 312  │       │
+│  └─────────────────────────┘    └──────┘       │
+│    ├─ Damian C                                  │
+│    ├─ Borys                                     │
+│    ├─ John                                      │
+│    └─ (all 10 active players)                   │
 │                                                 │
-│  Paid Positions:  [1] [2] [3●] [4] [5]         │
+│  🥈 2nd Place                                   │
+│  ┌─────────────────────────┐  £ ┌──────┐       │
+│  │ Select player...      ▼ │    │ 168  │       │
+│  └─────────────────────────┘    └──────┘       │
 │                                                 │
-│  Input Mode:  [%●] [£]                         │
+│  Total: £480 ✓                                  │
 │                                                 │
-│  Payouts:                                       │
-│  ┌──────────────────────────────────────────┐  │
-│  │  🥇 1st (John):    [50]% = £160          │  │
-│  │  🥈 2nd (Sarah):   [30]% = £96           │  │
-│  │  🥉 3rd (Mike):    [20]% = £64           │  │
-│  │                    ─────────             │  │
-│  │  Total:            100% = £320  ✓        │  │
-│  └──────────────────────────────────────────┘  │
-│                                                 │
-│  ⚠️ 2 players still active. Finish positions   │
-│     will be auto-assigned.                      │
+│  ⚠️ 8 remaining players will be auto-assigned  │
+│     positions 3–10                              │
 │                                                 │
 │         [Cancel]  [End Tournament]              │
 └─────────────────────────────────────────────────┘
@@ -86,126 +67,195 @@ Click End Game → Enhanced dialog with:
 
 ### File: `src/components/game/EndGameDialog.tsx`
 
-**Major Changes:**
+**Key Changes:**
 
-1. **Add prize pool override state:**
-```tsx
-const [overridePrizePool, setOverridePrizePool] = useState(false);
-const [customPrizePool, setCustomPrizePool] = useState(calculatedPrizePool);
-
-const effectivePrizePool = overridePrizePool ? customPrizePool : calculatedPrizePool;
+1. **Add state for selected players per position:**
+```typescript
+// Track which player is selected for each prize position
+const [selectedPlayers, setSelectedPlayers] = useState<(string | null)[]>(
+  [null, null, null, null, null]
+);
 ```
 
-2. **Add payout configuration state:**
-```tsx
-const [paidPositions, setPaidPositions] = useState(3);
-const [inputMode, setInputMode] = useState<'percentage' | 'currency'>('percentage');
-const [customPayouts, setCustomPayouts] = useState([50, 30, 20]);
-const [currencyPayouts, setCurrencyPayouts] = useState<number[]>([]);
+2. **Get available players for each position dropdown:**
+```typescript
+// All players (both active and eliminated) can be selected as winners
+const allPlayers = useMemo(() => {
+  return players.map(p => ({
+    id: p.id,
+    name: p.display_name,
+    status: p.status,
+    finishPosition: p.finish_position
+  }));
+}, [players]);
+
+// Filter out already-selected players from other positions
+const getAvailablePlayersForPosition = (positionIndex: number) => {
+  const selectedAtOtherPositions = selectedPlayers
+    .filter((_, i) => i !== positionIndex)
+    .filter(Boolean);
+  
+  return allPlayers.filter(p => !selectedAtOtherPositions.includes(p.id));
+};
 ```
 
-3. **Add validation logic:**
+3. **Replace text display with Select dropdown:**
 ```tsx
-const totalPercentage = customPayouts.slice(0, paidPositions).reduce((a, b) => a + b, 0);
-const isValidPercentage = totalPercentage === 100;
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-const currencyTotal = currencyPayouts.slice(0, paidPositions).reduce((a, b) => a + b, 0);
-const isCurrencyValid = currencyTotal === effectivePrizePool;
-
-const canFinalize = inputMode === 'percentage' ? isValidPercentage : isCurrencyValid;
+// In the payout row:
+<Select
+  value={selectedPlayers[index] || ''}
+  onValueChange={(value) => handlePlayerSelection(index, value)}
+>
+  <SelectTrigger className="w-40">
+    <SelectValue placeholder={t('game.select_player')} />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="">
+      <span className="text-muted-foreground">{t('game.not_assigned')}</span>
+    </SelectItem>
+    {getAvailablePlayersForPosition(index).map((player) => (
+      <SelectItem key={player.id} value={player.id}>
+        {player.name}
+        {player.status === 'eliminated' && (
+          <span className="text-muted-foreground text-xs ml-1">
+            (#{player.finishPosition})
+          </span>
+        )}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
 ```
 
-4. **Update handleEndGame to use custom payouts:**
-```tsx
-const payouts = inputMode === 'currency'
-  ? currencyPayouts.slice(0, paidPositions).map((amount, i) => ({
+4. **Handle player selection:**
+```typescript
+const handlePlayerSelection = (positionIndex: number, playerId: string) => {
+  setSelectedPlayers(prev => {
+    const updated = [...prev];
+    updated[positionIndex] = playerId || null;
+    return updated;
+  });
+};
+```
+
+5. **Smart default selection based on elimination order:**
+```typescript
+useEffect(() => {
+  if (open) {
+    // Pre-select players based on elimination order (if any)
+    const eliminatedByPosition = players
+      .filter(p => p.finish_position !== null)
+      .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
+    
+    const defaultSelections = Array(5).fill(null);
+    eliminatedByPosition.slice(0, 5).forEach((player, i) => {
+      defaultSelections[i] = player.id;
+    });
+    
+    // If only 1 active player remains, auto-select as winner
+    if (activePlayers.length === 1) {
+      defaultSelections[0] = activePlayers[0].id;
+    }
+    
+    setSelectedPlayers(defaultSelections);
+  }
+}, [open, players]);
+```
+
+6. **Update handleEndGame to use selected players:**
+```typescript
+const handleEndGame = async () => {
+  // Validate that all paid positions have players selected
+  for (let i = 0; i < paidPositions; i++) {
+    if (!selectedPlayers[i]) {
+      toast.error(t('game.select_all_winners', { position: getPositionLabel(i) }));
+      return;
+    }
+  }
+  
+  // Build payouts using selected players
+  const payouts = [];
+  for (let i = 0; i < paidPositions; i++) {
+    const playerId = selectedPlayers[i];
+    const player = players.find(p => p.id === playerId);
+    
+    payouts.push({
       position: i + 1,
-      percentage: Math.round((amount / effectivePrizePool) * 100),
-      amount,
-      playerId: finishedPlayers[i]?.id || null,
-    }))
-  : customPayouts.slice(0, paidPositions).map((pct, i) => ({
-      position: i + 1,
-      percentage: pct,
-      amount: Math.round((effectivePrizePool * pct) / 100),
-      playerId: finishedPlayers[i]?.id || null,
-    }));
-```
-
-5. **Auto-assign remaining players on end:**
-```tsx
-// If there are active players, assign finish positions automatically
-// Winner gets position 1, others get next available positions
-if (activePlayers.length > 0) {
-  const highestPosition = Math.max(
-    ...players.filter(p => p.finish_position).map(p => p.finish_position || 0),
-    0
+      percentage: /* ... */,
+      amount: /* ... */,
+      playerId: playerId,
+    });
+  }
+  
+  // Assign finish positions to selected players
+  for (let i = 0; i < paidPositions; i++) {
+    const playerId = selectedPlayers[i];
+    await supabase
+      .from('game_players')
+      .update({
+        status: 'eliminated',
+        finish_position: i + 1,
+        eliminated_at: new Date().toISOString(),
+      })
+      .eq('id', playerId);
+  }
+  
+  // Auto-assign remaining active players positions after paid positions
+  const remainingActive = activePlayers.filter(
+    p => !selectedPlayers.slice(0, paidPositions).includes(p.id)
   );
   
-  for (let i = 0; i < activePlayers.length; i++) {
-    const position = activePlayers.length === 1 ? 1 : highestPosition + 1 + i;
-    // ... update player finish position
+  for (let i = 0; i < remainingActive.length; i++) {
+    await supabase
+      .from('game_players')
+      .update({
+        status: 'eliminated',
+        finish_position: paidPositions + i + 1,
+        eliminated_at: new Date().toISOString(),
+      })
+      .eq('id', remainingActive[i].id);
   }
-}
+  
+  // Continue with finalization...
+};
 ```
 
----
-
-### New Props Required
-
+7. **Update the warning message to be more accurate:**
 ```tsx
-interface EndGameDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  sessionId: string;
-  eventId: string;
-  clubId: string;
-  players: GamePlayer[];
-  transactions: Transaction[];
-  onComplete: () => void;
-  currencySymbol: string;  // NEW: for displaying currency
-}
+{remainingActivePlayers.length > 0 && (
+  <div className="flex items-start gap-2 text-amber-500 bg-amber-500/10 rounded-lg p-3">
+    <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+    <span className="text-sm">
+      {t('game.remaining_players_note', { 
+        count: remainingActivePlayers.length,
+        startPos: paidPositions + 1,
+        endPos: paidPositions + remainingActivePlayers.length
+      })}
+    </span>
+  </div>
+)}
 ```
 
 ---
 
-### File: `src/pages/GameMode.tsx`
-
-Pass `currencySymbol` to EndGameDialog:
-
-```tsx
-<EndGameDialog
-  open={endGameDialogOpen}
-  onOpenChange={setEndGameDialogOpen}
-  sessionId={session.id}
-  eventId={eventId || ''}
-  clubId={clubId || ''}
-  players={players}
-  transactions={transactions}
-  onComplete={refetch}
-  currencySymbol={currencySymbol}  // NEW
-/>
-```
-
----
-
-### Translation Keys
+### Translation Updates
 
 **English (`src/i18n/locales/en.json`):**
 ```json
 {
   "game": {
-    "calculated_prize_pool": "Calculated Prize Pool",
-    "override_prize_pool": "Override prize pool",
-    "prize_pool_override_hint": "Adjust if buy-ins or add-ons were missed during the game",
-    "paid_positions": "Paid Positions",
-    "payout_structure": "Payout Structure",
-    "will_receive": "will receive",
-    "no_player_assigned": "Not assigned yet",
-    "auto_assign_note": "{{count}} active players will be auto-assigned finish positions",
-    "total_payout": "Total Payout",
-    "payout_valid": "Payouts match prize pool",
-    "payout_invalid": "Payouts must equal prize pool"
+    "select_player": "Select player...",
+    "not_assigned": "Not assigned",
+    "select_all_winners": "Please select a player for {{position}}",
+    "remaining_players_note": "{{count}} remaining players will be assigned positions {{startPos}}–{{endPos}}"
   }
 }
 ```
@@ -214,17 +264,10 @@ Pass `currencySymbol` to EndGameDialog:
 ```json
 {
   "game": {
-    "calculated_prize_pool": "Obliczona pula nagród",
-    "override_prize_pool": "Nadpisz pulę nagród",
-    "prize_pool_override_hint": "Dostosuj jeśli pominięto wpłaty podczas gry",
-    "paid_positions": "Płatne pozycje",
-    "payout_structure": "Struktura wypłat",
-    "will_receive": "otrzyma",
-    "no_player_assigned": "Jeszcze nie przypisano",
-    "auto_assign_note": "{{count}} aktywnych graczy otrzyma automatycznie pozycje końcowe",
-    "total_payout": "Suma wypłat",
-    "payout_valid": "Wypłaty odpowiadają puli",
-    "payout_invalid": "Wypłaty muszą równać się puli nagród"
+    "select_player": "Wybierz gracza...",
+    "not_assigned": "Nie przypisano",
+    "select_all_winners": "Wybierz gracza dla pozycji {{position}}",
+    "remaining_players_note": "{{count}} pozostałych graczy otrzyma pozycje {{startPos}}–{{endPos}}"
   }
 }
 ```
@@ -235,47 +278,39 @@ Pass `currencySymbol` to EndGameDialog:
 
 | File | Change |
 |------|--------|
-| `src/components/game/EndGameDialog.tsx` | Complete rewrite with prize pool override, payout editor, validation |
-| `src/pages/GameMode.tsx` | Pass currencySymbol to EndGameDialog |
-| `src/i18n/locales/en.json` | Add new translation keys |
+| `src/components/game/EndGameDialog.tsx` | Add player selection dropdowns for each prize position; fix auto-assignment logic; add validation |
+| `src/i18n/locales/en.json` | Add new translation keys for player selection |
 | `src/i18n/locales/pl.json` | Add Polish translations |
 
 ---
 
 ## User Experience After Implementation
 
-### Scenario 1: Simple End (All players eliminated, no changes needed)
+### Scenario: 10 Active Players (No One Eliminated)
 1. Click End Game
-2. See calculated prize pool (£300) and auto-detected payouts
-3. Winners already assigned from elimination order
-4. Click "End Tournament" → Done
+2. See dropdown selectors for 1st, 2nd, etc. - all empty by default
+3. **Manually select** the winner from dropdown showing all 10 players
+4. Select 2nd place from remaining 9 players
+5. Warning shows: "8 remaining players will be assigned positions 3–10"
+6. Click End Tournament → Winners correctly recorded
 
-### Scenario 2: Forgot to Track Buy-ins
+### Scenario: Some Players Already Eliminated  
 1. Click End Game
-2. Notice prize pool shows £200, but actual pool was £300
-3. Check "Override prize pool" → Enter £300
-4. Adjust payout percentages or amounts as needed
-5. Click "End Tournament" → Corrected payouts recorded
+2. Dropdowns pre-filled with eliminated players by their finish order
+3. Can override selections if needed
+4. Click End Tournament → Payouts match selected players
 
-### Scenario 3: Custom Payout Split
+### Scenario: 1 Active Player Remaining
 1. Click End Game
-2. Switch to currency mode (£)
-3. Enter exact amounts: 1st = £150, 2nd = £100, 3rd = £50
-4. Validation shows ✓ when total equals prize pool
-5. Click "End Tournament" → Custom payouts recorded
-
-### Scenario 4: Still Have Active Players
-1. Click End Game with 2 players still active
-2. See warning: "2 players will be auto-assigned positions (1st, 2nd)"
-3. Configure payouts for those positions
-4. Click "End Tournament" → Players auto-eliminated and paid
+2. Winner dropdown auto-selected with the last active player
+3. 2nd/3rd pre-filled from elimination order
+4. Click End Tournament → Clean finish
 
 ---
 
 ## Validation Rules
 
-1. **Percentage Mode:** All percentages must sum to 100%
-2. **Currency Mode:** All amounts must sum to prize pool (calculated or overridden)
-3. **Active Players:** If >0 active, warn user they'll be auto-positioned
-4. **Zero Prize Pool:** Show warning if no buy-ins recorded and no override
+1. **All paid positions must have a player selected** before "End Game" can proceed
+2. **Same player cannot be selected for multiple positions** (dropdown filters out already-selected players)
+3. **Prize pool validation** still applies (totals must match)
 
