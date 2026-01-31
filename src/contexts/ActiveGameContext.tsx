@@ -18,6 +18,7 @@ interface ActiveGame {
   status: string;
   currentLevel: number;
   timeRemainingSeconds: number | null;
+  levelStartedAt: string | null;
   blindStructure: BlindLevel[];
   prizePool: number;
   playersRemaining: number;
@@ -93,6 +94,7 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
             status: newData.status,
             currentLevel: newData.current_level,
             timeRemainingSeconds: newData.time_remaining_seconds,
+            levelStartedAt: newData.level_started_at,
           };
           // Clear if game is completed
           if (newData.status === 'completed') {

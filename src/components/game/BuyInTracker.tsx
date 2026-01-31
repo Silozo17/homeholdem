@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { DollarSign, Plus, RefreshCcw, Gift } from 'lucide-react';
+import { DollarSign, Plus, RefreshCcw, Gift, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserAvatar } from '@/components/common/UserAvatar';
 
@@ -79,6 +79,8 @@ export function BuyInTracker({
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [transactionType, setTransactionType] = useState<TransactionType>('buyin');
   const [pendingQuickAdd, setPendingQuickAdd] = useState<string | null>(null);
+  const [showBulkBuyIn, setShowBulkBuyIn] = useState(false);
+  const [bulkBuyInPending, setBulkBuyInPending] = useState(false);
 
   const getPlayerTransactions = useCallback((playerId: string) => {
     return transactions.filter(t => t.game_player_id === playerId);
@@ -164,6 +166,45 @@ export function BuyInTracker({
     onRefresh();
   };
 
+  const activePlayers = players.filter(p => p.status === 'active');
+
+  // Get players who need buy-in (for bulk buy-in feature)
+  const playersWithoutBuyIn = activePlayers.filter(player => {
+    return !transactions.some(
+      t => t.game_player_id === player.id && t.transaction_type === 'buyin'
+    );
+  });
+
+  const handleBulkBuyIn = async () => {
+    if (!user || playersWithoutBuyIn.length === 0) return;
+    
+    setBulkBuyInPending(true);
+    
+    const transactionsToInsert = playersWithoutBuyIn.map(player => ({
+      game_session_id: session.id,
+      game_player_id: player.id,
+      transaction_type: 'buyin',
+      amount: session.buy_in_amount,
+      chips: session.starting_chips,
+      created_by: user.id,
+    }));
+    
+    const { error } = await supabase
+      .from('game_transactions')
+      .insert(transactionsToInsert);
+    
+    setBulkBuyInPending(false);
+    
+    if (error) {
+      toast.error('Failed to add buy-ins');
+      return;
+    }
+    
+    toast.success(`Buy-in added for ${playersWithoutBuyIn.length} players`);
+    setShowBulkBuyIn(false);
+    onRefresh();
+  };
+
   const canRebuy = session.allow_rebuys && 
     (!session.rebuy_until_level || session.current_level <= session.rebuy_until_level);
 
@@ -177,8 +218,6 @@ export function BuyInTracker({
     .filter(t => t.transaction_type === 'addon')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const activePlayers = players.filter(p => p.status === 'active');
-
   return (
     <>
       <Card className="bg-card/50 border-border/50">
@@ -189,14 +228,27 @@ export function BuyInTracker({
               Buy-ins & Rebuys
             </CardTitle>
             {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddTransaction(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
+              <div className="flex items-center gap-2">
+                {playersWithoutBuyIn.length > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowBulkBuyIn(true)}
+                    className="glow-gold"
+                  >
+                    <Users className="h-4 w-4 mr-1" />
+                    Buy-In All ({playersWithoutBuyIn.length})
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddTransaction(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -354,6 +406,56 @@ export function BuyInTracker({
             </Button>
             <Button onClick={handleAddTransaction} disabled={!selectedPlayer}>
               Add Transaction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Buy-In Confirmation Dialog */}
+      <Dialog open={showBulkBuyIn} onOpenChange={setShowBulkBuyIn}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buy-In All Players</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-muted-foreground">
+              Add buy-in for <span className="font-bold text-foreground">{playersWithoutBuyIn.length} players</span>?
+            </p>
+            <div className="bg-primary/10 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Buy-in per player:</span>
+                <span className="font-bold">{currencySymbol}{session.buy_in_amount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Chips per player:</span>
+                <span className="font-bold">{session.starting_chips.toLocaleString()}</span>
+              </div>
+              <div className="border-t border-border/30 pt-2 flex justify-between">
+                <span className="font-bold">Total:</span>
+                <span className="font-bold text-primary">
+                  {currencySymbol}{session.buy_in_amount * playersWithoutBuyIn.length}
+                </span>
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Players to buy-in:
+              <div className="flex flex-wrap gap-1 mt-1">
+                {playersWithoutBuyIn.map(p => (
+                  <Badge key={p.id} variant="secondary">{p.display_name}</Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkBuyIn(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBulkBuyIn} 
+              disabled={bulkBuyInPending}
+              className="glow-gold"
+            >
+              {bulkBuyInPending ? 'Processing...' : `Buy-In ${playersWithoutBuyIn.length} Players`}
             </Button>
           </DialogFooter>
         </DialogContent>

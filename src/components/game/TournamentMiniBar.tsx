@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,25 +7,56 @@ import { useActiveGame } from '@/contexts/ActiveGameContext';
 export function TournamentMiniBar() {
   const navigate = useNavigate();
   const { activeGame } = useActiveGame();
-  const [timeRemaining, setTimeRemaining] = useState(activeGame?.timeRemainingSeconds || 0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
-  // Sync with active game
-  useEffect(() => {
-    if (activeGame?.timeRemainingSeconds !== null && activeGame?.timeRemainingSeconds !== undefined) {
-      setTimeRemaining(activeGame.timeRemainingSeconds);
+  // Calculate time remaining from timestamps (drift-resistant)
+  const calculateTimeRemaining = useCallback(() => {
+    if (!activeGame) return 0;
+    
+    // When paused, use stored time
+    if (activeGame.status !== 'active') {
+      return activeGame.timeRemainingSeconds ?? 0;
     }
-  }, [activeGame?.timeRemainingSeconds]);
+    
+    // When active, calculate from levelStartedAt timestamp
+    if (!activeGame.levelStartedAt) {
+      return activeGame.timeRemainingSeconds ?? 0;
+    }
+    
+    const startTime = new Date(activeGame.levelStartedAt).getTime();
+    const initialSeconds = activeGame.timeRemainingSeconds ?? 0;
+    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+    
+    return Math.max(0, initialSeconds - elapsedSeconds);
+  }, [activeGame]);
 
-  // Local countdown when game is active
+  // Initialize and recalculate on changes
+  useEffect(() => {
+    setTimeRemaining(calculateTimeRemaining());
+  }, [calculateTimeRemaining]);
+
+  // Recalculate when app returns from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeRemaining(calculateTimeRemaining());
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [calculateTimeRemaining]);
+
+  // Timer tick - recalculates from timestamp each second
   useEffect(() => {
     if (activeGame?.status !== 'active') return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(prev => Math.max(0, prev - 1));
+      setTimeRemaining(calculateTimeRemaining());
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeGame?.status]);
+  }, [activeGame?.status, calculateTimeRemaining]);
 
   if (!activeGame || activeGame.status === 'completed') {
     return null;
