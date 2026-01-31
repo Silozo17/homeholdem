@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useTournamentSounds } from '@/hooks/useTournamentSounds';
 
 interface BlindLevel {
@@ -51,51 +51,76 @@ export function ClassicTimerMode({
   const currentLevel = blindStructure.find(b => b.level === session.current_level);
   const nextLevel = blindStructure.find(b => b.level === session.current_level + 1);
 
-  // Initialize and manage timer
-  useEffect(() => {
-    if (session.time_remaining_seconds !== null) {
-      setTimeRemaining(session.time_remaining_seconds);
-    } else if (currentLevel) {
-      setTimeRemaining(currentLevel.duration_minutes * 60);
+  // Calculate time remaining from timestamps (drift-resistant)
+  const calculateTimeRemaining = useCallback(() => {
+    if (!currentLevel) return 0;
+    
+    if (session.status !== 'active') {
+      return session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
     }
-  }, [session.current_level, session.time_remaining_seconds, currentLevel]);
+    
+    if (!session.level_started_at) {
+      return session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
+    }
+    
+    const startTime = new Date(session.level_started_at).getTime();
+    const initialSeconds = session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
+    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+    
+    return Math.max(0, initialSeconds - elapsedSeconds);
+  }, [session.status, session.level_started_at, session.time_remaining_seconds, currentLevel]);
 
+  // Initialize and sync on changes
+  useEffect(() => {
+    setTimeRemaining(calculateTimeRemaining());
+  }, [calculateTimeRemaining]);
+
+  // Recalculate when app returns from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeRemaining(calculateTimeRemaining());
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [calculateTimeRemaining]);
+
+  // Timer tick - recalculates from timestamp each second
   useEffect(() => {
     if (session.status !== 'active') return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          // Level complete - auto advance
-          const nextLevelData = blindStructure.find(b => b.level === session.current_level + 1);
-          if (nextLevelData) {
-            if (nextLevelData.is_break) {
-              playAnnouncement('break_start');
-            } else if (currentLevel?.is_break) {
-              playAnnouncement('break_end');
-            } else {
-              playAnnouncement('blinds_up');
-            }
-            onUpdateSession({
-              current_level: session.current_level + 1,
-              time_remaining_seconds: nextLevelData.duration_minutes * 60,
-              level_started_at: new Date().toISOString()
-            });
+      const newTime = calculateTimeRemaining();
+      setTimeRemaining(newTime);
+
+      // Time warnings
+      if (newTime === 301) playAnnouncement('five_minutes');
+      if (newTime === 61) playAnnouncement('one_minute');
+      if (newTime === 11) playAnnouncement('ten_seconds');
+
+      if (newTime <= 0) {
+        const nextLevelData = blindStructure.find(b => b.level === session.current_level + 1);
+        if (nextLevelData) {
+          if (nextLevelData.is_break) {
+            playAnnouncement('break_start');
+          } else if (currentLevel?.is_break) {
+            playAnnouncement('break_end');
+          } else {
+            playAnnouncement('blinds_up');
           }
-          return 0;
+          onUpdateSession({
+            current_level: session.current_level + 1,
+            time_remaining_seconds: nextLevelData.duration_minutes * 60,
+            level_started_at: new Date().toISOString()
+          });
         }
-
-        // Time warnings
-        if (prev === 301) playAnnouncement('five_minutes');
-        if (prev === 61) playAnnouncement('one_minute');
-        if (prev === 11) playAnnouncement('ten_seconds');
-
-        return prev - 1;
-      });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [session.status, session.current_level, blindStructure, onUpdateSession, playAnnouncement, currentLevel]);
+  }, [session.status, session.current_level, calculateTimeRemaining, blindStructure, onUpdateSession, playAnnouncement, currentLevel]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

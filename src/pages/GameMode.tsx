@@ -66,6 +66,7 @@ export default function GameMode() {
         status: session.status,
         currentLevel: session.current_level,
         timeRemainingSeconds: session.time_remaining_seconds,
+        levelStartedAt: session.level_started_at,
         blindStructure,
         prizePool,
         playersRemaining: activePlayers,

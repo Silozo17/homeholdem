@@ -64,14 +64,43 @@ export function TournamentClock({
   const currentLevel = blindStructure.find(b => b.level === session.current_level);
   const nextLevel = blindStructure.find(b => b.level === session.current_level + 1);
 
-  // Initialize timer
-  useEffect(() => {
-    if (session.time_remaining_seconds !== null) {
-      setTimeRemaining(session.time_remaining_seconds);
-    } else if (currentLevel) {
-      setTimeRemaining(currentLevel.duration_minutes * 60);
+  // Calculate time remaining from timestamps (drift-resistant)
+  const calculateTimeRemaining = useCallback(() => {
+    if (!currentLevel) return 0;
+    
+    // When paused, use stored time_remaining_seconds
+    if (session.status !== 'active') {
+      return session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
     }
-  }, [session.current_level, session.time_remaining_seconds, currentLevel]);
+    
+    // When active, calculate from level_started_at timestamp
+    if (!session.level_started_at) {
+      return session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
+    }
+    
+    const startTime = new Date(session.level_started_at).getTime();
+    const initialSeconds = session.time_remaining_seconds ?? currentLevel.duration_minutes * 60;
+    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+    
+    return Math.max(0, initialSeconds - elapsedSeconds);
+  }, [session.status, session.level_started_at, session.time_remaining_seconds, currentLevel]);
+
+  // Initialize timer and sync on visibility change
+  useEffect(() => {
+    setTimeRemaining(calculateTimeRemaining());
+  }, [calculateTimeRemaining]);
+
+  // Recalculate immediately when app returns from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeRemaining(calculateTimeRemaining());
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [calculateTimeRemaining]);
 
   // Handle level changes and announcements
   useEffect(() => {
@@ -102,36 +131,40 @@ export function TournamentClock({
     }
   }, [isFinalTable, playAnnouncement]);
 
-  // Timer countdown with time-based announcements
+  const handleLevelComplete = useCallback(() => {
+    if (nextLevel && isAdmin) {
+      onUpdate({
+        current_level: nextLevel.level,
+        time_remaining_seconds: nextLevel.duration_minutes * 60,
+        level_started_at: new Date().toISOString(),
+      });
+    }
+  }, [nextLevel, isAdmin, onUpdate]);
+
+  // Timer countdown with time-based announcements (recalculates from timestamp each tick)
   useEffect(() => {
     if (session.status === 'active') {
       intervalRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          // Five minute warning
-          if (prev === 301 && !announcedRef.current['five_minutes']) {
-            announcedRef.current['five_minutes'] = true;
-            playAnnouncement('five_minutes');
-          }
-          
-          // One minute warning
-          if (prev === 61 && !announcedRef.current['one_minute']) {
-            announcedRef.current['one_minute'] = true;
-            playAnnouncement('one_minute');
-          }
-          
-          // Ten seconds warning
-          if (prev === 11 && !announcedRef.current['ten_seconds']) {
-            announcedRef.current['ten_seconds'] = true;
-            playAnnouncement('ten_seconds');
-          }
-          
-          if (prev <= 1) {
-            // Level complete
-            handleLevelComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
+        const newTime = calculateTimeRemaining();
+        setTimeRemaining(newTime);
+        
+        // Time-based announcements
+        if (newTime === 301 && !announcedRef.current['five_minutes']) {
+          announcedRef.current['five_minutes'] = true;
+          playAnnouncement('five_minutes');
+        }
+        if (newTime === 61 && !announcedRef.current['one_minute']) {
+          announcedRef.current['one_minute'] = true;
+          playAnnouncement('one_minute');
+        }
+        if (newTime === 11 && !announcedRef.current['ten_seconds']) {
+          announcedRef.current['ten_seconds'] = true;
+          playAnnouncement('ten_seconds');
+        }
+        
+        if (newTime <= 0) {
+          handleLevelComplete();
+        }
       }, 1000);
     } else {
       if (intervalRef.current) {
@@ -144,28 +177,7 @@ export function TournamentClock({
         clearInterval(intervalRef.current);
       }
     };
-  }, [session.status, playAnnouncement]);
-
-  // Sync time to server periodically
-  useEffect(() => {
-    if (session.status === 'active' && isAdmin) {
-      const syncInterval = setInterval(() => {
-        onUpdate({ time_remaining_seconds: timeRemaining });
-      }, 10000); // Sync every 10 seconds
-
-      return () => clearInterval(syncInterval);
-    }
-  }, [session.status, isAdmin, timeRemaining, onUpdate]);
-
-  const handleLevelComplete = useCallback(() => {
-    if (nextLevel && isAdmin) {
-      onUpdate({
-        current_level: nextLevel.level,
-        time_remaining_seconds: nextLevel.duration_minutes * 60,
-        level_started_at: new Date().toISOString(),
-      });
-    }
-  }, [nextLevel, isAdmin, onUpdate]);
+  }, [session.status, calculateTimeRemaining, playAnnouncement, handleLevelComplete]);
 
   const handlePlayPause = () => {
     if (session.status === 'active') {
