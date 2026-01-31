@@ -602,6 +602,7 @@ export type Database = {
           host_user_id: string | null
           id: string
           is_finalized: boolean
+          is_unlocked: boolean
           location: string | null
           max_tables: number
           seats_per_table: number
@@ -617,6 +618,7 @@ export type Database = {
           host_user_id?: string | null
           id?: string
           is_finalized?: boolean
+          is_unlocked?: boolean
           location?: string | null
           max_tables?: number
           seats_per_table?: number
@@ -632,6 +634,7 @@ export type Database = {
           host_user_id?: string | null
           id?: string
           is_finalized?: boolean
+          is_unlocked?: boolean
           location?: string | null
           max_tables?: number
           seats_per_table?: number

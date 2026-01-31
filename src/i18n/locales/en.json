@@ -340,7 +340,15 @@
     "confirm_change_vote": "Change your vote?",
     "change_vote_description": "Are you sure you want to change your vote? This will update your selection.",
     "confirm_change_rsvp": "Change your RSVP?",
-    "change_rsvp_description": "You're about to change your attendance status. Are you sure?"
+    "change_rsvp_description": "You're about to change your attendance status. Are you sure?",
+    "event_locked_title": "Event Locked",
+    "event_locked_description": "\"{{title}}\" is locked. Complete or delete the previous event to unlock voting and RSVPs.",
+    "event_locked_member_hint": "Contact an admin if you need this event unlocked early.",
+    "unlock_event": "Unlock",
+    "unlock_confirm_title": "Confirm Unlock",
+    "unlock_confirm_description": "Are you sure you want to unlock this event? All members will be able to vote and RSVP immediately.",
+    "unlocked_success": "Event unlocked successfully",
+    "event_locked_actions_disabled": "Voting and RSVPs are disabled until this event is unlocked"
   },
   "game": {
     "game_mode": "Game Mode",
