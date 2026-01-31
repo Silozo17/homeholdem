@@ -1,311 +1,189 @@
 
 
-## Plan: End Game Button, Flexible Payout Input & Contextual Mini-Bar
+## Plan: Fix Display Mode Consistency & Add Custom Buy-in/Rebuy Inputs
 
-### Overview
-This plan addresses three key issues:
-1. **End Game button** – Allows admins to finalize + complete a tournament from the game page
-2. **Flexible payout input** – Let users enter winnings as £ amounts OR % (their choice)
-3. **Contextual mini-bar** – Show the active game for the club you're currently viewing, fixing the stale game issue
+### Problems Identified
+
+Based on my code analysis and your screenshots:
+
+**Problem 1: Mixed Chips & Cash Display**
+The "Display Mode" setting (Cash vs Chips) is not being applied consistently across the app. Several components still show BOTH values together, creating confusion:
+
+| Location | Current Behavior | Expected (Cash Mode) | Expected (Chips Mode) |
+|----------|------------------|----------------------|----------------------|
+| Stats Bar "Avg Stack" | Shows chips (1,670) | Should show £16.70 | Shows 1,670 |
+| Add Transaction dropdown | Shows "£30 → 1670 chips" | Shows "£30" only | Shows "1,670 chips" only |
+| Bulk Buy-In dialog | Shows both £ and chips | Shows £ only | Shows chips only |
+| Player transaction badge | Shows £30 | Correct | Should show chips |
+
+**Problem 2: Cannot Add Custom Buy-in/Rebuy Amounts**
+Currently:
+- Custom add-on dialog exists ✓
+- **Buy-ins** are locked to session default (no custom input)
+- **Rebuys** are locked to session default (no custom input)
 
 ---
 
-## Part 1: End Game Button
+## Solution Overview
 
-### Problem
-Currently there's no prominent "End Game" button. The only way to finalize is through the "Finalize Game & Create Settlements" button in the Payouts tab, which is hidden and requires specific conditions.
+### Part 1: Pass Display Mode to All Components
+Thread the `displayMode` setting through to:
+- `BuyInTracker` component
+- Stats bar in GameMode
+- Create a utility function for consistent formatting
 
-### Solution
-Add a visible "End Game" button in the game header (next to Settings) that:
-- Is only shown to admins
-- Opens a confirmation dialog
-- Handles different scenarios:
-  - **1 player remaining**: Auto-finalize, mark winner, calculate settlements
-  - **Multiple players remaining**: Prompt for chop deal or elimination first
+### Part 2: Update All Value Displays Based on Mode
+In **Cash Mode**, show only cash values (e.g., "£30")
+In **Chips Mode**, show only chip values (e.g., "1,670 chips")
 
-### Files to Modify
+### Part 3: Add Custom Buy-in/Rebuy Dialogs
+Create dialogs similar to `CustomAddonDialog` that allow:
+- Custom cash amount
+- Custom chips amount
+- For both buy-ins and rebuys
 
-**File: `src/pages/GameMode.tsx`**
+---
 
-Add an End Game button in the header and a confirmation dialog:
+## Technical Implementation
 
-```typescript
-// New state
-const [endGameDialogOpen, setEndGameDialogOpen] = useState(false);
-const [endingGame, setEndingGame] = useState(false);
+### File 1: `src/pages/GameMode.tsx`
 
-// End game handler
-const handleEndGame = async () => {
-  const activePlayers = players.filter(p => p.status === 'active');
-  
-  if (activePlayers.length === 0) {
-    // All players eliminated - just finalize
-    await finalizeAndComplete();
-  } else if (activePlayers.length === 1) {
-    // Mark last player as winner (position 1)
-    await markWinnerAndFinalize(activePlayers[0]);
-  } else {
-    // Multiple players - need to handle (chop or eliminate)
-    toast.error(`${activePlayers.length} players still active. Mark eliminations or make a deal first.`);
-    return;
+**Changes:**
+1. Pass `displayMode` and `chipToCashRatio` to `BuyInTracker`
+2. Format "Avg Stack" based on display mode
+
+```tsx
+// Stats bar - format avg stack based on mode
+<div className="text-lg font-bold">
+  {displayMode === 'cash' && chipToCashRatio > 0
+    ? `${currencySymbol}${(avgStackChips * chipToCashRatio).toFixed(2).replace(/\.00$/, '')}`
+    : avgStackChips.toLocaleString()
   }
-};
-```
-
-**Header addition:**
-```tsx
-{isAdmin && session?.status !== 'completed' && (
-  <Button
-    variant="ghost"
-    size="icon"
-    onClick={() => setEndGameDialogOpen(true)}
-    title="End Game"
-  >
-    <Flag className="h-5 w-5 text-destructive" />
-  </Button>
-)}
-```
-
-**Confirmation dialog:**
-```tsx
-<AlertDialog open={endGameDialogOpen} onOpenChange={setEndGameDialogOpen}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>End Tournament?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This will finalize the game, calculate settlements, and update the leaderboard.
-        {activePlayers.length > 1 && (
-          <span className="text-destructive block mt-2">
-            {activePlayers.length} players are still active. 
-            You must eliminate all but one player or make a chop deal first.
-          </span>
-        )}
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction 
-        onClick={handleEndGame}
-        disabled={activePlayers.length > 1 || endingGame}
-        className="bg-destructive"
-      >
-        {endingGame ? 'Ending...' : 'End Game'}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-```
-
----
-
-## Part 2: Flexible Payout Input (£ or %)
-
-### Problem
-The PayoutCalculator only accepts percentage splits. Users want to enter actual currency amounts.
-
-### Solution
-Add a toggle to switch between "%" and "£" input modes:
-- **% mode** (current): Enter percentages that must sum to 100%
-- **£ mode** (new): Enter currency amounts that must sum to prize pool
-
-### Files to Modify
-
-**File: `src/components/game/PayoutCalculator.tsx`**
-
-1. Add input mode state:
-```typescript
-type InputMode = 'percentage' | 'currency';
-const [inputMode, setInputMode] = useState<InputMode>('percentage');
-const [currencyPayouts, setCurrencyPayouts] = useState<number[]>([]);
-
-// Initialize currency payouts from percentages
-useEffect(() => {
-  const amounts = currentPayouts.map(p => Math.round((prizePool * p) / 100));
-  setCurrencyPayouts(amounts);
-}, [currentPayouts, prizePool]);
-```
-
-2. Add mode toggle UI:
-```tsx
-<div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-  <Label className="text-sm">Input mode:</Label>
-  <div className="flex gap-1">
-    <Button
-      variant={inputMode === 'percentage' ? 'default' : 'outline'}
-      size="sm"
-      onClick={() => setInputMode('percentage')}
-    >
-      %
-    </Button>
-    <Button
-      variant={inputMode === 'currency' ? 'default' : 'outline'}
-      size="sm"
-      onClick={() => setInputMode('currency')}
-    >
-      {currencySymbol}
-    </Button>
-  </div>
 </div>
-```
 
-3. Add currency input fields (in the custom tab):
-```tsx
-{inputMode === 'currency' && (
-  <div className="space-y-3">
-    {currencyPayouts.slice(0, paidPositions).map((amount, index) => (
-      <div key={index} className="flex items-center gap-2">
-        <Label className="w-16 text-sm">{index + 1}{getOrdinalSuffix(index + 1)}</Label>
-        <span className="text-muted-foreground">{currencySymbol}</span>
-        <Input
-          type="number"
-          value={amount}
-          onChange={(e) => {
-            const newAmounts = [...currencyPayouts];
-            newAmounts[index] = parseInt(e.target.value) || 0;
-            setCurrencyPayouts(newAmounts);
-          }}
-          className="flex-1"
-        />
-      </div>
-    ))}
-    {/* Validation */}
-    {currencyTotal !== prizePool && (
-      <p className="text-sm text-destructive">
-        Total must equal {currencySymbol}{prizePool} (currently {currencySymbol}{currencyTotal})
-      </p>
-    )}
-  </div>
-)}
-```
-
-4. Update finalization to use the correct payouts:
-```typescript
-const handleFinalizeGame = async () => {
-  const payoutsData = inputMode === 'currency'
-    ? currencyPayouts.slice(0, paidPositions).map((amount, index) => ({
-        position: index + 1,
-        percentage: Math.round((amount / prizePool) * 100),
-        amount,
-        playerId: finishedPlayers.find(p => p.finish_position === index + 1)?.id || null,
-      }))
-    : currentPayouts.map((percentage, index) => ({
-        position: index + 1,
-        percentage,
-        amount: calculatePayout(index + 1),
-        playerId: finishedPlayers.find(p => p.finish_position === index + 1)?.id || null,
-      }));
-  
-  // ... rest of finalization
-};
+// Pass props to BuyInTracker
+<BuyInTracker
+  ...existing props
+  displayMode={displayMode}
+  chipToCashRatio={chipToCashRatio}
+/>
 ```
 
 ---
 
-## Part 3: Contextual Mini-Bar (Fix Active Game Sync)
+### File 2: `src/components/game/BuyInTracker.tsx`
 
-### Problem
-The mini-bar shows stale game data from `sessionStorage`. When Kuba starts a game, Amir still sees his old cached game.
+**Major Changes:**
 
-### Root Cause
-The `ActiveGameContext` caches game data in `sessionStorage` and doesn't properly prioritize the correct game based on context.
-
-### Solution
-Make the mini-bar context-aware:
-1. **On club/event pages**: Show that club's active game
-2. **On neutral pages** (Dashboard, Profile): Show most recent active game across all clubs
-3. **Force refresh** when navigating between clubs
-
-### Files to Modify
-
-**File: `src/contexts/ActiveGameContext.tsx`**
-
-1. Add context-aware game selection:
-
-```typescript
-interface ActiveGameContextType {
-  activeGame: ActiveGame | null;
-  setActiveGame: (game: ActiveGame | null) => void;
-  clearActiveGame: () => void;
-  allActiveGames: ActiveGame[]; // NEW: all active games across clubs
-  setCurrentClubId: (clubId: string | null) => void; // NEW: context setter
+1. **Add new props:**
+```tsx
+interface BuyInTrackerProps {
+  ...existing
+  displayMode?: 'cash' | 'chips';
+  chipToCashRatio?: number;
 }
 ```
 
-2. Track all active games, not just one:
-
-```typescript
-const [allActiveGames, setAllActiveGames] = useState<ActiveGame[]>([]);
-const [currentClubId, setCurrentClubId] = useState<string | null>(null);
-
-// Derive the "active game" based on context
-const activeGame = useMemo(() => {
-  if (allActiveGames.length === 0) return null;
-  
-  // If viewing a specific club, prioritize that club's game
-  if (currentClubId) {
-    const clubGame = allActiveGames.find(async g => {
-      const { data } = await supabase
-        .from('events')
-        .select('club_id')
-        .eq('id', g.eventId)
-        .single();
-      return data?.club_id === currentClubId;
-    });
-    if (clubGame) return clubGame;
+2. **Create format helper:**
+```tsx
+const formatValue = (amount: number, chips: number) => {
+  if (displayMode === 'cash') {
+    return `${currencySymbol}${amount}`;
   }
-  
-  // Otherwise return most recent
-  return allActiveGames[0];
-}, [allActiveGames, currentClubId]);
-```
-
-3. Remove `sessionStorage` dependency for initial load (keep it only for quick restore after page refresh within the same session):
-
-```typescript
-// On mount: ALWAYS fetch fresh from DB, don't trust sessionStorage for status
-const fetchActiveGames = async () => {
-  // Clear any stale cache first
-  sessionStorage.removeItem('activeGame');
-  
-  // Fetch ALL active games for user's clubs
-  const { data: activeSessions } = await supabase
-    .from('game_sessions')
-    .select(`id, event_id, status, ...`)
-    .in('status', ['pending', 'active', 'paused'])
-    .order('created_at', { ascending: false });
-  
-  // Filter to user's clubs and build full game data
-  // ... fetch all game details
-  
-  setAllActiveGames(gamesData);
+  return `${chips.toLocaleString()} chips`;
 };
 ```
 
-**File: `src/pages/ClubDetail.tsx`, `src/pages/EventDetail.tsx`, `src/pages/GameMode.tsx`**
+3. **Update Add Transaction dropdown:**
+```tsx
+// Before (shows both):
+Buy-in ({currencySymbol}{session.buy_in_amount} → {session.starting_chips.toLocaleString()} chips)
 
-Set the current club context when entering these pages:
-
-```typescript
-const { setCurrentClubId } = useActiveGame();
-
-useEffect(() => {
-  if (clubId) {
-    setCurrentClubId(clubId);
-  }
-  return () => setCurrentClubId(null);
-}, [clubId, setCurrentClubId]);
+// After (shows one based on mode):
+Buy-in ({formatValue(session.buy_in_amount, session.starting_chips)})
 ```
 
-**File: `src/components/layout/AppLayout.tsx`**
+4. **Create Custom Buy-in Dialog:**
+Add a dialog similar to `CustomAddonDialog` that allows entering custom amounts for buy-ins.
 
-The mini-bar will automatically show the correct game based on the context set by child pages.
+5. **Create Custom Rebuy Dialog:**
+Same for rebuys - allow custom amount/chips input.
+
+6. **Update transaction type selection logic:**
+When "Buy-in" or "Rebuy" is selected with custom amounts enabled, open the custom dialog instead of using preset values.
 
 ---
 
-## Database Changes
+### File 3: `src/components/game/CustomBuyInDialog.tsx` (New)
 
-### None required
-All changes are frontend-only. The existing `game_sessions` table and RLS policies support this.
+```tsx
+interface CustomBuyInDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  player: GamePlayer | null;
+  defaultAmount: number;
+  defaultChips: number;
+  currencySymbol: string;
+  transactionType: 'buyin' | 'rebuy';
+  onConfirm: (amount: number, chips: number) => Promise<void>;
+}
+
+// Dialog with:
+// - Player info display
+// - Amount input (£)
+// - Chips input
+// - Confirm/Cancel buttons
+```
+
+---
+
+### File 4: `src/components/game/CustomAddonDialog.tsx`
+
+**Minor Update:**
+The dialog shows both amount AND chips. Consider updating to respect display mode for the preview section, but keep both inputs available (since admin needs to set both values).
+
+---
+
+### File 5: `src/components/game/GameSettings.tsx`
+
+**Updates:**
+1. Group inputs more clearly with visual separation
+2. Add info text explaining the relationship between cash and chips
+3. Consider showing a calculated ratio: "£1 = 55.67 chips"
+
+---
+
+### File 6: `src/components/game/tv/DashboardMode.tsx` (and other TV modes)
+
+**Already done** - TV modes already receive and use `blindsDisplayMode` for blinds. 
+**Need to verify:** Average stack display in these modes.
+
+---
+
+## Updated Component Flow
+
+```text
+GameMode
+  ├── useDisplayMode(clubId) → 'cash' | 'chips'
+  ├── useChipToCashRatio(clubId) → number
+  │
+  ├── Stats Bar
+  │   └── Avg Stack → formatValue(chips, mode)
+  │
+  ├── TournamentClock (already updated ✓)
+  │   └── Blinds → formatBlind(chips, mode)
+  │
+  ├── BuyInTracker ← NEW: receives displayMode, chipToCashRatio
+  │   ├── Summary totals → formatValue()
+  │   ├── Player badges → formatValue()
+  │   ├── Transaction dropdown → formatValue()
+  │   ├── CustomBuyInDialog (new)
+  │   ├── CustomRebuyDialog (or reuse with type param)
+  │   └── CustomAddonDialog (existing)
+  │
+  └── TVDisplay (already updated ✓)
+      └── All modes use blindsDisplayMode
+```
 
 ---
 
@@ -313,75 +191,46 @@ All changes are frontend-only. The existing `game_sessions` table and RLS polici
 
 | File | Change |
 |------|--------|
-| `src/pages/GameMode.tsx` | Add End Game button + confirmation dialog |
-| `src/components/game/PayoutCalculator.tsx` | Add £/% toggle, currency input mode |
-| `src/contexts/ActiveGameContext.tsx` | Track all active games, context-aware selection |
-| `src/pages/ClubDetail.tsx` | Set current club context |
-| `src/pages/EventDetail.tsx` | Set current club context |
+| `src/pages/GameMode.tsx` | Pass displayMode to BuyInTracker; format avg stack |
+| `src/components/game/BuyInTracker.tsx` | Add displayMode prop; format all values; add custom buy-in/rebuy flow |
+| `src/components/game/CustomBuyInDialog.tsx` | **New file** - dialog for custom buy-in/rebuy amounts |
+| `src/components/game/CustomAddonDialog.tsx` | Minor: consider display mode in preview |
+| `src/i18n/locales/en.json` | Add new translation keys |
+| `src/i18n/locales/pl.json` | Add Polish translations |
 
 ---
 
 ## User Experience After Implementation
 
-### End Game Button
-- Admin sees a **red flag icon** in the game header
-- Tapping opens confirmation: "End Tournament?"
-- If 1 player left → ends immediately, finalizes settlements
-- If multiple players → shows warning, user must eliminate or make a deal first
+### Cash Mode (Default)
+- **Avg Stack:** £16.70
+- **Transaction dropdown:** "Buy-in (£30)" or "Rebuy (£30)" or "Add-on (£10)"
+- **Player badge:** £30
+- **Summary:** "Buy-ins: £300 | Rebuys: £0 | Add-ons: £60"
+- **Custom input available:** Yes, tap "Add" → Select type → Enter custom £ amount
 
-### Payout Input
-- New toggle: **[%] [£]** 
-- **% mode**: Enter percentages (50/30/20)
-- **£ mode**: Enter amounts (£100/£60/£40)
-- Validation ensures totals match 100% or prize pool
+### Chips Mode
+- **Avg Stack:** 1,670
+- **Transaction dropdown:** "Buy-in (1,670 chips)" or "Rebuy (1,670 chips)"
+- **Player badge:** 1,670 chips
+- **Summary:** "Buy-ins: 16,700 chips | Rebuys: 0 | Add-ons: 5,570 chips"
+- **Custom input available:** Yes, tap "Add" → Select type → Enter custom chip amount
 
-### Contextual Mini-Bar
-- **In Royal Poles club** → Shows Royal Poles' active game
-- **In Pokerstars club** → Shows Pokerstars' active game
-- **On Dashboard** → Shows most recent active game
-- All club members now see the **same game** for their club
+### Adding a Custom Transaction
+1. Admin taps "+ Add"
+2. Selects player from dropdown
+3. Selects type: Buy-in / Rebuy / Add-on
+4. Dialog opens with editable fields:
+   - **Amount (£):** Pre-filled with default, editable
+   - **Chips:** Pre-filled with default, editable
+5. Taps "Add [Type]" to confirm
 
 ---
 
-## Technical Notes
+## Edge Cases Handled
 
-### End Game Flow
-```
-Admin taps "End Game"
-    ↓
-Confirmation dialog
-    ↓
-Check active players count:
-  - 0 players → finalize directly
-  - 1 player → mark as winner (pos 1) → finalize
-  - 2+ players → error: "Eliminate players or make a deal"
-    ↓
-finalizeGame() runs:
-  - Calculate settlements
-  - Update season standings
-  - Send notifications
-  - Mark session completed
-```
-
-### Payout Input Validation
-```
-% Mode:
-  - Sum of percentages must equal 100
-  - Amounts auto-calculated from percentages
-
-£ Mode:
-  - Sum of amounts must equal prize pool
-  - Percentages derived for storage
-```
-
-### Mini-Bar Context Logic
-```
-if (currentClubId) {
-  // User is viewing a specific club
-  show(activeGames.find(g => g.clubId === currentClubId))
-} else {
-  // Neutral page (Dashboard, Profile, etc.)
-  show(activeGames[0]) // Most recent
-}
-```
+1. **Prize Pool always shows cash** - This is correct since payouts are real money
+2. **Chip-to-cash ratio of 0** - Falls back to showing chips
+3. **Display mode not set** - Defaults to 'cash'
+4. **Existing transactions** - Displayed correctly based on stored amount/chips values
 
