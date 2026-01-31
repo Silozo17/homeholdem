@@ -131,7 +131,38 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
     if (isInitializedRef.current) return;
 
     const fetchActiveGames = async () => {
-      // 1. Get all clubs the user is a member of
+      // 1. Check if there's cached data and validate it against the database
+      const stored = sessionStorage.getItem('activeGame');
+      let cachedSessionId: string | null = null;
+      
+      if (stored) {
+        try {
+          const cached = JSON.parse(stored);
+          cachedSessionId = cached.sessionId;
+          
+          // Validate the cached session is still active in the database
+          const { data: validSession } = await supabase
+            .from('game_sessions')
+            .select('id, status')
+            .eq('id', cached.sessionId)
+            .maybeSingle();
+          
+          if (!validSession || validSession.status === 'completed') {
+            // Cached data is stale - clear it
+            sessionStorage.removeItem('activeGame');
+            setActiveGameState(null);
+            cachedSessionId = null;
+          } else {
+            // Cache is valid, use it for fast initial render
+            setActiveGameState(cached);
+          }
+        } catch (e) {
+          sessionStorage.removeItem('activeGame');
+          setActiveGameState(null);
+        }
+      }
+
+      // 2. Get all clubs the user is a member of
       const { data: memberships } = await supabase
         .from('club_members')
         .select('club_id')
@@ -145,7 +176,7 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
       const clubIds = memberships.map(m => m.club_id);
       userClubIdsRef.current = clubIds;
 
-      // 2. Find active game sessions in any of these clubs
+      // 3. Find active game sessions in any of these clubs
       const { data: activeSessions } = await supabase
         .from('game_sessions')
         .select(`
@@ -171,73 +202,22 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
 
       if (userClubSessions && userClubSessions.length > 0) {
         const session = userClubSessions[0];
-        const eventData = session.events as unknown as { id: string; club_id: string };
-
-        // 3. Fetch blind structure, players, transactions, and club currency in parallel
-        const [blindsResult, playersResult, transactionsResult, clubResult] = await Promise.all([
-          supabase
-            .from('blind_structures')
-            .select('*')
-            .eq('game_session_id', session.id)
-            .order('level'),
-          supabase
-            .from('game_players')
-            .select('id, status')
-            .eq('game_session_id', session.id),
-          supabase
-            .from('game_transactions')
-            .select('amount, transaction_type')
-            .eq('game_session_id', session.id),
-          supabase
-            .from('clubs')
-            .select('currency')
-            .eq('id', eventData.club_id)
-            .single(),
-        ]);
-
-        const activePlayers = playersResult.data?.filter(p => p.status === 'active').length || 0;
-        const prizePool = transactionsResult.data
-          ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
-          .reduce((sum, t) => sum + t.amount, 0) || 0;
-
-        const gameData: ActiveGame = {
-          sessionId: session.id,
-          eventId: session.event_id,
-          status: session.status,
-          currentLevel: session.current_level,
-          timeRemainingSeconds: session.time_remaining_seconds,
-          levelStartedAt: session.level_started_at,
-          blindStructure: blindsResult.data || [],
-          prizePool,
-          playersRemaining: activePlayers,
-          currencySymbol: CURRENCY_SYMBOLS[clubResult.data?.currency || 'GBP'] || '£',
-        };
-
-        setActiveGameState(gameData);
-        sessionStorage.setItem('activeGame', JSON.stringify(gameData));
+        
+        // 4. If the freshest active game is different from cached, update to the new one
+        if (session.id !== cachedSessionId) {
+          await refreshActiveGame(session.id, session.event_id);
+        }
+      } else if (cachedSessionId) {
+        // No active games found but we had cached data - clear it
+        sessionStorage.removeItem('activeGame');
+        setActiveGameState(null);
       }
 
       isInitializedRef.current = true;
     };
 
-    // Check sessionStorage first for faster initial render
-    const stored = sessionStorage.getItem('activeGame');
-    if (stored) {
-      try {
-        const game = JSON.parse(stored);
-        if (game.status !== 'completed') {
-          setActiveGameState(game);
-        } else {
-          sessionStorage.removeItem('activeGame');
-        }
-      } catch (e) {
-        sessionStorage.removeItem('activeGame');
-      }
-    }
-
-    // Then fetch fresh data from server
     fetchActiveGames();
-  }, [user]);
+  }, [user, refreshActiveGame]);
 
   // Subscribe to global game_sessions changes for user's clubs
   useEffect(() => {
@@ -274,13 +254,25 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
 
           // Handle based on status
           if (session.status === 'completed') {
-            // Game ended - clear if this was our active game
+            // Game ended - clear if this was our active game OR if cached game matches
+            const stored = sessionStorage.getItem('activeGame');
+            if (stored) {
+              try {
+                const cached = JSON.parse(stored);
+                if (cached.sessionId === session.id) {
+                  sessionStorage.removeItem('activeGame');
+                  setActiveGameState(null);
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+            // Also clear state if it matches
             setActiveGameState(prev => 
               prev?.sessionId === session.id ? null : prev
             );
-            sessionStorage.removeItem('activeGame');
           } else if (['pending', 'active', 'paused'].includes(session.status)) {
-            // Game started or updated - fetch full data and set
+            // Game started or updated - always refresh to get latest data
             await refreshActiveGame(session.id, session.event_id);
           }
         }
