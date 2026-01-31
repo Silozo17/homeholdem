@@ -499,7 +499,14 @@
     "finalize_failed": "Failed to finalize game",
     "finalizing": "Finalizing...",
     "players_still_in_game": "{{count}} player(s) still in the game",
-    "game_completed": "Game Completed"
+    "game_completed": "Game Completed",
+    "calculated_prize_pool": "Calculated Prize Pool",
+    "override_prize_pool": "Override prize pool",
+    "prize_pool_override_hint": "Adjust if buy-ins were missed",
+    "paid_positions": "Paid Positions",
+    "auto_assign_note": "{{count}} active player(s) will be auto-assigned finish positions",
+    "total_payout": "Total Payout",
+    "prize_pool_zero_hint": "No buy-ins recorded. Check 'Override' to set prize pool manually."
   },
   "settings": {
     "title": "Settings",

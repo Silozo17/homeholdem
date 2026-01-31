@@ -499,7 +499,14 @@
     "finalize_failed": "Nie udało się zakończyć gry",
     "finalizing": "Finalizowanie...",
     "players_still_in_game": "{{count}} graczy wciąż w grze",
-    "game_completed": "Gra zakończona"
+    "game_completed": "Gra zakończona",
+    "calculated_prize_pool": "Obliczona pula nagród",
+    "override_prize_pool": "Nadpisz pulę nagród",
+    "prize_pool_override_hint": "Dostosuj jeśli pominięto wpłaty",
+    "paid_positions": "Płatne pozycje",
+    "auto_assign_note": "{{count}} aktywnych graczy otrzyma automatycznie pozycje końcowe",
+    "total_payout": "Suma wypłat",
+    "prize_pool_zero_hint": "Brak zarejestrowanych wpłat. Zaznacz 'Nadpisz' aby ręcznie ustawić pulę."
   },
   "settings": {
     "title": "Ustawienia",
