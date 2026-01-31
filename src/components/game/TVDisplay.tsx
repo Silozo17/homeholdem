@@ -249,6 +249,7 @@ export function TVDisplay({
           onUpdateSession={onUpdateSession}
           isAdmin={isAdmin}
           chipToCashRatio={chipToCashRatio}
+          blindsDisplayMode={blindsDisplayMode}
         />
       </div>
     );
