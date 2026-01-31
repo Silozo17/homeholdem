@@ -172,8 +172,8 @@ export function TableViewMode({
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 overflow-hidden">
-      {/* Top Stats Bar - with padding for overlay buttons */}
-      <div className="flex items-center justify-between pl-20 pr-20 py-4 bg-black/50 backdrop-blur-sm border-b border-emerald-900/30">
+      {/* Top Stats Bar - with padding for overlay buttons and safe areas */}
+      <div className="flex items-center justify-between px-[max(5rem,calc(4rem+env(safe-area-inset-left,0px)))] pt-[max(1rem,env(safe-area-inset-top,0.5rem))] pb-3 bg-black/50 backdrop-blur-sm border-b border-emerald-900/30">
         {/* Timer */}
         <div className="flex items-center gap-6">
           <div>
@@ -227,9 +227,9 @@ export function TableViewMode({
         </div>
       </div>
 
-      {/* Table Visualization - Pill/Racetrack Shape */}
+      {/* Table Visualization - Pill/Racetrack Shape - Responsive sizing */}
       <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="relative w-full max-w-5xl aspect-[2.5/1]">
+        <div className="relative w-full max-w-[90vw] max-h-[70vh] aspect-[2.5/1]">
           {/* Outer Rail - Pill Shape */}
           <div className="absolute inset-4 md:inset-8 rounded-full bg-gradient-to-b from-amber-900 via-amber-800 to-amber-900 shadow-2xl shadow-amber-950/50">
             {/* Inner Rail */}

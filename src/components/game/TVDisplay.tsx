@@ -5,6 +5,7 @@ import { ClassicTimerMode } from './tv/ClassicTimerMode';
 import { DashboardMode } from './tv/DashboardMode';
 import { TableViewMode } from './tv/TableViewMode';
 import { CombinedMode } from './tv/CombinedMode';
+import { PortraitTimerMode } from './tv/PortraitTimerMode';
 import { TVControlPanel } from './tv/TVControlPanel';
 import { useWakeLock } from '@/hooks/useWakeLock';
 
@@ -93,7 +94,23 @@ export function TVDisplay({
   const [showControls, setShowControls] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [idleTime, setIdleTime] = useState(0);
+  const [isLandscape, setIsLandscape] = useState(true);
   const { requestWakeLock, releaseWakeLock, isActive: wakeLockActive } = useWakeLock();
+
+  // Detect orientation changes
+  useEffect(() => {
+    const checkOrientation = () => {
+      const landscape = window.matchMedia('(orientation: landscape)').matches;
+      setIsLandscape(landscape);
+    };
+    
+    checkOrientation();
+    
+    const mql = window.matchMedia('(orientation: landscape)');
+    mql.addEventListener('change', checkOrientation);
+    
+    return () => mql.removeEventListener('change', checkOrientation);
+  }, []);
 
   const activePlayers = players.filter(p => p.status === 'active');
   const totalChipsInPlay = transactions
@@ -186,6 +203,55 @@ export function TVDisplay({
     onExit();
   };
 
+  // Portrait mode - use dedicated portrait layout
+  if (!isLandscape) {
+    return (
+      <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950">
+        {/* Exit Button with safe area */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleExit}
+          className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-[max(1rem,env(safe-area-inset-left,1rem))] z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
+        >
+          <X className="w-5 h-5" />
+        </Button>
+
+        {/* Wake Lock Indicator */}
+        {wakeLockActive && (
+          <div className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-14 z-50 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm">
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+        )}
+
+        {/* Admin Controls Toggle */}
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowControls(!showControls)}
+            className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] right-[max(1rem,env(safe-area-inset-right,1rem))] z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
+          >
+            <Settings className="w-5 h-5" />
+          </Button>
+        )}
+
+        <PortraitTimerMode
+          session={session}
+          blindStructure={blindStructure}
+          prizePool={prizePool}
+          currencySymbol={currencySymbol}
+          playersRemaining={activePlayers.length}
+          totalPlayers={players.length}
+          onUpdateSession={onUpdateSession}
+          isAdmin={isAdmin}
+          chipToCashRatio={chipToCashRatio}
+        />
+      </div>
+    );
+  }
+
+  // Landscape mode - existing modes
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex">
       {/* Main TV Display Area */}
@@ -195,14 +261,14 @@ export function TVDisplay({
           variant="ghost"
           size="icon"
           onClick={handleExit}
-          className="absolute top-4 left-4 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40 md:top-6 md:left-6"
+          className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-[max(1rem,env(safe-area-inset-left,1rem))] z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
         >
           <X className="w-5 h-5" />
         </Button>
 
         {/* Wake Lock Indicator */}
         {wakeLockActive && (
-          <div className="absolute top-4 left-14 z-50 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm md:top-6 md:left-16">
+          <div className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-14 z-50 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm">
             <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-xs text-emerald-400 hidden sm:inline">Screen on</span>
           </div>
@@ -214,7 +280,7 @@ export function TVDisplay({
             variant="ghost"
             size="icon"
             onClick={() => setShowControls(true)}
-            className="absolute top-4 right-4 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40 md:top-6 md:right-6"
+            className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] right-[max(1rem,env(safe-area-inset-right,1rem))] z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
           >
             <Settings className="w-5 h-5" />
           </Button>

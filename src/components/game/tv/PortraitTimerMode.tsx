@@ -20,31 +20,29 @@ interface GameSession {
   time_remaining_seconds: number | null;
 }
 
-interface ClassicTimerModeProps {
+interface PortraitTimerModeProps {
   session: GameSession;
   blindStructure: BlindLevel[];
   prizePool: number;
   currencySymbol: string;
   playersRemaining: number;
   totalPlayers: number;
-  averageStack: number;
   onUpdateSession: (updates: Partial<GameSession>) => void;
   isAdmin: boolean;
   chipToCashRatio?: number;
 }
 
-export function ClassicTimerMode({
+export function PortraitTimerMode({
   session,
   blindStructure,
   prizePool,
   currencySymbol,
   playersRemaining,
   totalPlayers,
-  averageStack,
   onUpdateSession,
   isAdmin,
   chipToCashRatio = 0.01
-}: ClassicTimerModeProps) {
+}: PortraitTimerModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
 
@@ -66,7 +64,6 @@ export function ClassicTimerMode({
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          // Level complete - auto advance
           const nextLevelData = blindStructure.find(b => b.level === session.current_level + 1);
           if (nextLevelData) {
             if (nextLevelData.is_break) {
@@ -85,7 +82,6 @@ export function ClassicTimerMode({
           return 0;
         }
 
-        // Time warnings
         if (prev === 301) playAnnouncement('five_minutes');
         if (prev === 61) playAnnouncement('one_minute');
         if (prev === 11) playAnnouncement('ten_seconds');
@@ -123,83 +119,53 @@ export function ClassicTimerMode({
   if (!currentLevel) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-2xl text-muted-foreground">No blind structure configured</p>
+        <p className="text-xl text-muted-foreground">No blind structure configured</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950">
-      {/* Stats Bar - responsive with padding for overlay buttons and safe areas */}
-      <div className="flex flex-wrap items-center justify-between px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 md:px-16 md:pt-[max(0.75rem,env(safe-area-inset-top,0px))] md:pb-3 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30 gap-2">
-        <div className="flex items-center gap-3 md:gap-8">
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-emerald-400 font-medium text-sm md:text-base">LIVE</span>
+    <div className="flex flex-col h-full bg-gradient-to-b from-slate-950 via-emerald-950/30 to-slate-950 px-4 pt-[max(4rem,calc(3rem+env(safe-area-inset-top,0px)))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+      {/* Level Badge - Centered at top */}
+      <div className="flex justify-center mb-4">
+        {currentLevel.is_break ? (
+          <div className="px-6 py-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 shadow-lg shadow-blue-500/30">
+            <span className="text-xl font-bold text-white tracking-wide">☕ BREAK</span>
           </div>
-          <div className="flex items-center gap-1 md:gap-2 text-white/80">
-            <span className="text-lg md:text-2xl font-bold text-white">{playersRemaining}</span>
-            <span className="text-sm md:text-lg">/ {totalPlayers}</span>
+        ) : (
+          <div className="px-6 py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg shadow-emerald-500/30">
+            <span className="text-xl font-bold text-white tracking-wide">LEVEL {currentLevel.level}</span>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-4 md:gap-8">
-          <div className="text-center">
-            <div className="text-xs md:text-sm text-amber-400/80 uppercase tracking-wider">Prize</div>
-            <div className="text-lg md:text-3xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent">
-              {currencySymbol}{prizePool.toLocaleString()}
-            </div>
-          </div>
-          <div className="text-center hidden sm:block">
-            <div className="text-xs md:text-sm text-white/60 uppercase tracking-wider">Avg Stack</div>
-            <div className="text-lg md:text-2xl font-semibold text-white">
-              {averageStack.toLocaleString()}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Main Timer Area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8">
-        {/* Level Badge */}
-        <div className="mb-3 md:mb-6">
-          {currentLevel.is_break ? (
-            <div className="px-4 py-2 md:px-8 md:py-3 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 shadow-lg shadow-blue-500/30">
-              <span className="text-lg md:text-3xl font-bold text-white tracking-wide">☕ BREAK</span>
-            </div>
-          ) : (
-            <div className="px-4 py-2 md:px-8 md:py-3 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg shadow-emerald-500/30">
-              <span className="text-lg md:text-3xl font-bold text-white tracking-wide">LEVEL {currentLevel.level}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Timer - Responsive with clamp, scales from phone landscape to TV */}
-        <div className={`text-[clamp(3rem,15vh,12rem)] font-mono font-black tracking-tight leading-none ${getTimerColor()} drop-shadow-2xl`}>
+      {/* Timer - Large, centered, scales with viewport width */}
+      <div className="flex-1 flex flex-col items-center justify-center -mt-8">
+        <div className={`text-[clamp(5rem,22vw,10rem)] font-mono font-black tracking-tight leading-none ${getTimerColor()} drop-shadow-2xl`}>
           {formatTime(timeRemaining)}
         </div>
 
-        {/* Blinds Display - Responsive */}
+        {/* Blinds - Stacked vertically for portrait */}
         {!currentLevel.is_break && (
-          <div className="mt-4 md:mt-8 flex flex-col items-center gap-2 md:gap-4">
-            <div className="flex items-center gap-3 md:gap-6">
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <div className="flex items-center gap-4">
               <div className="text-center">
-                <div className="text-xs md:text-lg text-blue-400 uppercase tracking-wider mb-0.5 md:mb-1">SB</div>
-                <div className="text-[clamp(1.25rem,5vh,3.75rem)] font-bold text-blue-400">
+                <div className="text-sm text-blue-400/80 uppercase tracking-wider">SB</div>
+                <div className="text-4xl font-bold text-blue-400">
                   {formatBlind(currentLevel.small_blind)}
                 </div>
               </div>
-              <div className="text-[clamp(1.5rem,4vh,3rem)] text-white/30 font-light">/</div>
+              <div className="text-3xl text-white/30 font-light">/</div>
               <div className="text-center">
-                <div className="text-xs md:text-lg text-amber-400 uppercase tracking-wider mb-0.5 md:mb-1">BB</div>
-                <div className="text-[clamp(1.25rem,5vh,3.75rem)] font-bold text-amber-400">
+                <div className="text-sm text-amber-400/80 uppercase tracking-wider">BB</div>
+                <div className="text-4xl font-bold text-amber-400">
                   {formatBlind(currentLevel.big_blind)}
                 </div>
               </div>
             </div>
             {currentLevel.ante > 0 && (
-              <div className="text-center mt-1 md:mt-2">
-                <span className="text-base md:text-xl text-rose-400">
+              <div className="text-center">
+                <span className="text-xl text-rose-400">
                   Ante: <span className="font-bold">{formatBlind(currentLevel.ante)}</span>
                 </span>
               </div>
@@ -207,16 +173,16 @@ export function ClassicTimerMode({
           </div>
         )}
 
-        {/* Next Level Preview - Responsive */}
+        {/* Next Level Preview */}
         {nextLevel && (
-          <div className="mt-6 md:mt-12 px-4 py-2 md:px-6 md:py-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-            <div className="text-xs md:text-sm text-white/50 uppercase tracking-wider mb-0.5 md:mb-1">
+          <div className="mt-6 px-5 py-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+            <div className="text-xs text-white/50 uppercase tracking-wider mb-1 text-center">
               Next {nextLevel.is_break ? 'Break' : `Level ${nextLevel.level}`}
             </div>
             {nextLevel.is_break ? (
-              <div className="text-base md:text-xl text-blue-400">☕ {nextLevel.duration_minutes} min break</div>
+              <div className="text-lg text-blue-400 text-center">☕ {nextLevel.duration_minutes} min break</div>
             ) : (
-              <div className="text-base md:text-xl text-white/80">
+              <div className="text-lg text-white/80 text-center">
                 {formatBlind(nextLevel.small_blind)} / {formatBlind(nextLevel.big_blind)}
                 {nextLevel.ante > 0 && (
                   <span className="text-rose-400 ml-2">(ante {formatBlind(nextLevel.ante)})</span>
@@ -227,13 +193,29 @@ export function ClassicTimerMode({
         )}
       </div>
 
-      {/* Progress Bar - Responsive */}
-      <div className="mt-auto px-4 pb-4 md:pb-6">
-        <div className="flex justify-between text-[10px] md:text-xs text-white/50 mb-1">
+      {/* Stats Row - Two columns at bottom */}
+      <div className="grid grid-cols-2 gap-4 mt-auto">
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="text-xs text-emerald-400/80 uppercase tracking-wider mb-1">Players</div>
+          <div className="text-3xl font-bold text-white">
+            {playersRemaining}<span className="text-lg text-white/40">/{totalPlayers}</span>
+          </div>
+        </div>
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="text-xs text-amber-400/80 uppercase tracking-wider mb-1">Prize Pool</div>
+          <div className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent">
+            {currencySymbol}{prizePool.toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mt-4">
+        <div className="flex justify-between text-[10px] text-white/50 mb-1">
           <span>Progress</span>
           <span>Level {currentLevel.level} of {blindStructure.length}</span>
         </div>
-        <div className="h-1.5 md:h-2 bg-black/50 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-black/50 rounded-full overflow-hidden">
           <div 
             className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-1000 rounded-full"
             style={{ 
