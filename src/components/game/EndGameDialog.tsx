@@ -16,6 +16,13 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AlertTriangle, Check, Trophy, Medal } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,6 +104,11 @@ export function EndGameDialog({
   const [percentagePayouts, setPercentagePayouts] = useState<number[]>([50, 30, 20, 0, 0]);
   const [currencyPayouts, setCurrencyPayouts] = useState<number[]>([0, 0, 0, 0, 0]);
 
+  // State for selected players per position
+  const [selectedPlayers, setSelectedPlayers] = useState<(string | null)[]>([null, null, null, null, null]);
+
+  const activePlayers = useMemo(() => players.filter(p => p.status === 'active'), [players]);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
@@ -106,7 +118,7 @@ export function EndGameDialog({
       
       // Determine default paid positions based on player count
       const eliminatedCount = players.filter(p => p.finish_position !== null).length;
-      const activeCount = players.filter(p => p.status === 'active').length;
+      const activeCount = activePlayers.length;
       const totalFinishing = eliminatedCount + activeCount;
       const defaultPositions = Math.min(Math.max(1, Math.min(totalFinishing, 3)), 5);
       setPaidPositions(defaultPositions);
@@ -115,8 +127,25 @@ export function EndGameDialog({
       const preset = PAYOUT_PRESETS[defaultPositions] || [100];
       const paddedPreset = [...preset, 0, 0, 0, 0, 0].slice(0, 5);
       setPercentagePayouts(paddedPreset);
+
+      // Pre-select players based on elimination order (if any)
+      const eliminatedByPosition = players
+        .filter(p => p.finish_position !== null)
+        .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
+      
+      const defaultSelections: (string | null)[] = [null, null, null, null, null];
+      eliminatedByPosition.slice(0, 5).forEach((player, i) => {
+        defaultSelections[i] = player.id;
+      });
+      
+      // If only 1 active player remains, auto-select as winner
+      if (activePlayers.length === 1 && !defaultSelections[0]) {
+        defaultSelections[0] = activePlayers[0].id;
+      }
+      
+      setSelectedPlayers(defaultSelections);
     }
-  }, [open, calculatedPrizePool, players]);
+  }, [open, calculatedPrizePool, players, activePlayers]);
 
   // Update currency payouts when percentage or prize pool changes
   useEffect(() => {
@@ -129,27 +158,39 @@ export function EndGameDialog({
 
   const effectivePrizePool = overridePrizePool ? customPrizePool : calculatedPrizePool;
 
-  // Get players sorted by finish position (eliminated first, then active)
-  const finishedPlayers = useMemo(() => {
-    const eliminated = players
-      .filter(p => p.finish_position !== null)
-      .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
+  // Get available players for each position dropdown (exclude already-selected)
+  const getAvailablePlayersForPosition = (positionIndex: number) => {
+    const selectedAtOtherPositions = selectedPlayers
+      .filter((_, i) => i !== positionIndex)
+      .filter(Boolean) as string[];
     
-    const active = players.filter(p => p.status === 'active');
-    
-    // Active players will be assigned positions starting from 1
-    // (or next available if some are already eliminated)
-    return [...active, ...eliminated];
-  }, [players]);
+    return players.filter(p => !selectedAtOtherPositions.includes(p.id));
+  };
 
-  const activePlayers = players.filter(p => p.status === 'active');
+  const handlePlayerSelection = (positionIndex: number, playerId: string) => {
+    setSelectedPlayers(prev => {
+      const updated = [...prev];
+      updated[positionIndex] = playerId || null;
+      return updated;
+    });
+  };
 
   // Validation
   const totalPercentage = percentagePayouts.slice(0, paidPositions).reduce((a, b) => a + b, 0);
   const totalCurrency = currencyPayouts.slice(0, paidPositions).reduce((a, b) => a + b, 0);
   const isPercentageValid = totalPercentage === 100;
   const isCurrencyValid = totalCurrency === effectivePrizePool;
-  const isValid = inputMode === 'percentage' ? isPercentageValid : isCurrencyValid;
+  const isPayoutValid = inputMode === 'percentage' ? isPercentageValid : isCurrencyValid;
+
+  // Check if all paid positions have players selected
+  const allPositionsFilled = selectedPlayers.slice(0, paidPositions).every(p => p !== null);
+  const isValid = isPayoutValid && allPositionsFilled;
+
+  // Calculate remaining active players not assigned to paid positions
+  const remainingActivePlayers = useMemo(() => {
+    const assignedPlayerIds = selectedPlayers.slice(0, paidPositions).filter(Boolean) as string[];
+    return activePlayers.filter(p => !assignedPlayerIds.includes(p.id));
+  }, [activePlayers, selectedPlayers, paidPositions]);
 
   const handlePaidPositionsChange = (count: number) => {
     setPaidPositions(count);
@@ -181,7 +222,15 @@ export function EndGameDialog({
   };
 
   const handleEndGame = async () => {
-    if (!isValid) {
+    // Validate that all paid positions have players selected
+    for (let i = 0; i < paidPositions; i++) {
+      if (!selectedPlayers[i]) {
+        toast.error(t('game.select_all_winners', { position: getPositionLabel(i) }));
+        return;
+      }
+    }
+
+    if (!isPayoutValid) {
       if (inputMode === 'percentage') {
         toast.error(t('game.percentage_must_equal_100'));
       } else {
@@ -195,19 +244,33 @@ export function EndGameDialog({
     try {
       const user = (await supabase.auth.getUser()).data.user;
 
-      // Auto-assign finish positions to active players
-      const highestPosition = Math.max(
-        ...players.filter(p => p.finish_position !== null).map(p => p.finish_position || 0),
-        0
-      );
+      // Assign finish positions to selected players (paid positions)
+      for (let i = 0; i < paidPositions; i++) {
+        const playerId = selectedPlayers[i];
+        if (playerId) {
+          const player = players.find(p => p.id === playerId);
+          await supabase
+            .from('game_players')
+            .update({
+              status: 'eliminated',
+              finish_position: i + 1,
+              eliminated_at: new Date().toISOString(),
+            })
+            .eq('id', playerId);
 
-      // Update active players with finish positions
-      for (let i = 0; i < activePlayers.length; i++) {
-        const player = activePlayers[i];
-        // First active player gets position 1, or next available if multiple
-        const position = activePlayers.length === 1 
-          ? 1 
-          : (activePlayers.length - i);
+          if (player) {
+            await logGameActivity(sessionId, 'player_eliminated', playerId, player.display_name, {
+              position: i + 1,
+              isWinner: i === 0,
+            });
+          }
+        }
+      }
+
+      // Auto-assign remaining active players positions after paid positions
+      for (let i = 0; i < remainingActivePlayers.length; i++) {
+        const player = remainingActivePlayers[i];
+        const position = paidPositions + i + 1;
         
         await supabase
           .from('game_players')
@@ -218,10 +281,9 @@ export function EndGameDialog({
           })
           .eq('id', player.id);
 
-        // Log activity
         await logGameActivity(sessionId, 'player_eliminated', player.id, player.display_name, {
           position,
-          isWinner: position === 1,
+          isWinner: false,
         });
       }
 
@@ -235,15 +297,10 @@ export function EndGameDialog({
         throw new Error('Failed to fetch players');
       }
 
-      // Sort by finish position for payout assignment
-      const sortedPlayers = updatedPlayers
-        .filter(p => p.finish_position !== null)
-        .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
-
-      // Build payouts using user-configured values
+      // Build payouts using selected players
       const payouts = [];
       for (let i = 0; i < paidPositions; i++) {
-        const player = sortedPlayers[i];
+        const playerId = selectedPlayers[i];
         const amount = inputMode === 'currency'
           ? currencyPayouts[i]
           : Math.round((effectivePrizePool * percentagePayouts[i]) / 100);
@@ -255,7 +312,7 @@ export function EndGameDialog({
           position: i + 1,
           percentage,
           amount,
-          playerId: player?.id || null,
+          playerId: playerId,
         });
       }
 
@@ -272,7 +329,7 @@ export function EndGameDialog({
         }
       }
 
-      // Finalize the game - payouts already contain amounts calculated from effective prize pool
+      // Finalize the game
       const result = await finalizeGame(
         sessionId,
         clubId,
@@ -300,20 +357,6 @@ export function EndGameDialog({
   const getPositionLabel = (index: number) => {
     const labels = ['1st', '2nd', '3rd', '4th', '5th'];
     return labels[index];
-  };
-
-  const getPlayerForPosition = (index: number) => {
-    // If there are active players, they'll be assigned positions starting from 1
-    if (activePlayers.length > 0 && index < activePlayers.length) {
-      return activePlayers[activePlayers.length - 1 - index]?.display_name;
-    }
-    
-    // Otherwise, use eliminated players by finish position
-    const eliminated = players
-      .filter(p => p.finish_position !== null)
-      .sort((a, b) => (a.finish_position || 999) - (b.finish_position || 999));
-    
-    return eliminated[index]?.display_name;
   };
 
   return (
@@ -405,57 +448,78 @@ export function EndGameDialog({
                   {Array.from({ length: paidPositions }).map((_, index) => {
                     const IconComponent = POSITION_ICONS[index]?.icon;
                     const iconColor = POSITION_ICONS[index]?.color || 'text-muted-foreground';
-                    const playerName = getPlayerForPosition(index);
+                    const selectedPlayer = players.find(p => p.id === selectedPlayers[index]);
+                    const availablePlayers = getAvailablePlayersForPosition(index);
                     const amount = inputMode === 'currency'
                       ? currencyPayouts[index]
                       : Math.round((effectivePrizePool * percentagePayouts[index]) / 100);
 
                     return (
-                      <div key={index} className="flex items-center gap-2 bg-muted/20 rounded-lg p-2">
-                        <div className="w-8 flex justify-center">
-                          {IconComponent ? (
-                            <IconComponent className={`h-5 w-5 ${iconColor}`} />
-                          ) : (
-                            <span className={`text-sm font-medium ${iconColor}`}>{index + 1}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
-                            {getPositionLabel(index)}
-                            {playerName && (
-                              <span className="text-muted-foreground ml-1">({playerName})</span>
+                      <div key={index} className="flex flex-col gap-2 bg-muted/20 rounded-lg p-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 flex justify-center">
+                            {IconComponent ? (
+                              <IconComponent className={`h-5 w-5 ${iconColor}`} />
+                            ) : (
+                              <span className={`text-sm font-medium ${iconColor}`}>{index + 1}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <Select
+                              value={selectedPlayers[index] || ''}
+                              onValueChange={(value) => handlePlayerSelection(index, value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder={t('game.select_winner')}>
+                                  {selectedPlayer ? selectedPlayer.display_name : t('game.select_winner')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover border-border z-50">
+                                {availablePlayers.map((player) => (
+                                  <SelectItem key={player.id} value={player.id}>
+                                    {player.display_name}
+                                    {player.status === 'eliminated' && player.finish_position && (
+                                      <span className="text-muted-foreground text-xs ml-1">
+                                        (#{player.finish_position})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {inputMode === 'percentage' ? (
+                              <>
+                                <Input
+                                  type="number"
+                                  value={percentagePayouts[index]}
+                                  onChange={(e) => handlePercentageChange(index, e.target.value)}
+                                  className="w-16 h-8 text-center"
+                                  min={0}
+                                  max={100}
+                                />
+                                <span className="text-muted-foreground">%</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-muted-foreground">{currencySymbol}</span>
+                                <Input
+                                  type="number"
+                                  value={currencyPayouts[index]}
+                                  onChange={(e) => handleCurrencyChange(index, e.target.value)}
+                                  className="w-20 h-8 text-center"
+                                  min={0}
+                                />
+                              </>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          {inputMode === 'percentage' ? (
-                            <>
-                              <Input
-                                type="number"
-                                value={percentagePayouts[index]}
-                                onChange={(e) => handlePercentageChange(index, e.target.value)}
-                                className="w-16 h-8 text-center"
-                                min={0}
-                                max={100}
-                              />
-                              <span className="text-muted-foreground">%</span>
-                              <span className="text-sm text-muted-foreground w-20 text-right">
-                                = {currencySymbol}{amount}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-muted-foreground">{currencySymbol}</span>
-                              <Input
-                                type="number"
-                                value={currencyPayouts[index]}
-                                onChange={(e) => handleCurrencyChange(index, e.target.value)}
-                                className="w-20 h-8 text-center"
-                                min={0}
-                              />
-                            </>
-                          )}
-                        </div>
+                        {inputMode === 'percentage' && (
+                          <div className="text-xs text-muted-foreground text-right">
+                            = {currencySymbol}{amount}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -474,7 +538,7 @@ export function EndGameDialog({
                         {currencySymbol}{totalCurrency}
                       </span>
                     )}
-                    {isValid ? (
+                    {isPayoutValid ? (
                       <Check className="h-4 w-4 text-green-500" />
                     ) : (
                       <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -482,7 +546,7 @@ export function EndGameDialog({
                   </div>
                 </div>
 
-                {!isValid && (
+                {!isPayoutValid && (
                   <p className="text-xs text-destructive">
                     {inputMode === 'percentage'
                       ? t('game.total_must_equal_100', { total: totalPercentage })
@@ -490,14 +554,24 @@ export function EndGameDialog({
                     }
                   </p>
                 )}
+
+                {!allPositionsFilled && (
+                  <p className="text-xs text-destructive">
+                    {t('game.select_all_positions')}
+                  </p>
+                )}
               </div>
 
-              {/* Active Players Warning */}
-              {activePlayers.length > 0 && (
+              {/* Remaining Active Players Warning */}
+              {remainingActivePlayers.length > 0 && (
                 <div className="flex items-start gap-2 text-amber-500 bg-amber-500/10 rounded-lg p-3">
                   <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
                   <span className="text-sm">
-                    {t('game.auto_assign_note', { count: activePlayers.length })}
+                    {t('game.remaining_players_note', { 
+                      count: remainingActivePlayers.length,
+                      startPos: paidPositions + 1,
+                      endPos: paidPositions + remainingActivePlayers.length
+                    })}
                   </span>
                 </div>
               )}

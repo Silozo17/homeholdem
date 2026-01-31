@@ -506,7 +506,11 @@
     "paid_positions": "Płatne pozycje",
     "auto_assign_note": "{{count}} aktywnych graczy otrzyma automatycznie pozycje końcowe",
     "total_payout": "Suma wypłat",
-    "prize_pool_zero_hint": "Brak zarejestrowanych wpłat. Zaznacz 'Nadpisz' aby ręcznie ustawić pulę."
+    "prize_pool_zero_hint": "Brak zarejestrowanych wpłat. Zaznacz 'Nadpisz' aby ręcznie ustawić pulę.",
+    "select_winner": "Wybierz gracza...",
+    "select_all_winners": "Wybierz gracza dla pozycji {{position}}",
+    "select_all_positions": "Wybierz gracza dla każdej płatnej pozycji",
+    "remaining_players_note": "{{count}} pozostałych graczy otrzyma pozycje {{startPos}}–{{endPos}}"
   },
   "settings": {
     "title": "Ustawienia",

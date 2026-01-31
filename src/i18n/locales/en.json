@@ -506,7 +506,11 @@
     "paid_positions": "Paid Positions",
     "auto_assign_note": "{{count}} active player(s) will be auto-assigned finish positions",
     "total_payout": "Total Payout",
-    "prize_pool_zero_hint": "No buy-ins recorded. Check 'Override' to set prize pool manually."
+    "prize_pool_zero_hint": "No buy-ins recorded. Check 'Override' to set prize pool manually.",
+    "select_winner": "Select player...",
+    "select_all_winners": "Please select a player for {{position}}",
+    "select_all_positions": "Please select a player for each paid position",
+    "remaining_players_note": "{{count}} remaining players will be assigned positions {{startPos}}–{{endPos}}"
   },
   "settings": {
     "title": "Settings",
