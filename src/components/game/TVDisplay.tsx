@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClassicTimerMode } from './tv/ClassicTimerMode';
 import { DashboardMode } from './tv/DashboardMode';
 import { TableViewMode } from './tv/TableViewMode';
 import { CombinedMode } from './tv/CombinedMode';
 import { TVControlPanel } from './tv/TVControlPanel';
+import { useWakeLock } from '@/hooks/useWakeLock';
 
 interface BlindLevel {
   id: string;
@@ -92,6 +93,7 @@ export function TVDisplay({
   const [showControls, setShowControls] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [idleTime, setIdleTime] = useState(0);
+  const { requestWakeLock, releaseWakeLock, isActive: wakeLockActive } = useWakeLock();
 
   const activePlayers = players.filter(p => p.status === 'active');
   const totalChipsInPlay = transactions
@@ -129,25 +131,53 @@ export function TVDisplay({
     };
   }, [showControls, pinned]);
 
-  // Request fullscreen on mount
+  // Request fullscreen, landscape orientation, and wake lock on mount
   useEffect(() => {
-    const enterFullscreen = async () => {
+    const enterTVMode = async () => {
       try {
+        // Enter fullscreen first (required for orientation lock on most browsers)
         if (document.documentElement.requestFullscreen) {
           await document.documentElement.requestFullscreen();
         }
+        
+        // Lock to landscape orientation
+        if (screen.orientation && typeof screen.orientation.lock === 'function') {
+          try {
+            await screen.orientation.lock('landscape');
+          } catch (err) {
+            // Orientation lock not supported or denied
+            console.log('Orientation lock not supported:', err);
+          }
+        }
+        
+        // Request wake lock to prevent screen from sleeping
+        await requestWakeLock();
       } catch (err) {
-        // Fullscreen not supported or denied
+        console.log('TV mode setup partial:', err);
       }
     };
-    enterFullscreen();
+    
+    enterTVMode();
 
     return () => {
+      // Unlock orientation
+      if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+        try {
+          screen.orientation.unlock();
+        } catch (err) {
+          // Ignore unlock errors
+        }
+      }
+      
+      // Exit fullscreen
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
+      
+      // Release wake lock
+      releaseWakeLock();
     };
-  }, []);
+  }, [requestWakeLock, releaseWakeLock]);
 
   const handleExit = () => {
     if (document.fullscreenElement) {
@@ -165,10 +195,18 @@ export function TVDisplay({
           variant="ghost"
           size="icon"
           onClick={handleExit}
-          className="absolute top-6 left-6 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
+          className="absolute top-4 left-4 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40 md:top-6 md:left-6"
         >
           <X className="w-5 h-5" />
         </Button>
+
+        {/* Wake Lock Indicator */}
+        {wakeLockActive && (
+          <div className="absolute top-4 left-14 z-50 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm md:top-6 md:left-16">
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-xs text-emerald-400 hidden sm:inline">Screen on</span>
+          </div>
+        )}
 
         {/* Admin Controls Toggle - positioned in header bar area */}
         {isAdmin && !showControls && (
@@ -176,7 +214,7 @@ export function TVDisplay({
             variant="ghost"
             size="icon"
             onClick={() => setShowControls(true)}
-            className="absolute top-6 right-6 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40"
+            className="absolute top-4 right-4 z-50 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-sm bg-black/40 md:top-6 md:right-6"
           >
             <Settings className="w-5 h-5" />
           </Button>
