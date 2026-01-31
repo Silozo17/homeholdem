@@ -1,359 +1,297 @@
 
 
-## Plan: Fix TV Display Safe Areas, Mini Bar Position, and Multi-Device Responsiveness
+## Plan: Fix Timer Drift and Add Bulk Buy-In Feature
 
 ### Overview
-This plan addresses the four distinct issues:
-1. **TV Display header safe area** - Exit/Settings buttons overlapped by phone status bar (only affects TV mode)
-2. **Mini bar position** - Currently at bottom, hidden under navigation. Move to TOP of page, below header
-3. **TV mode landscape** - Better orientation handling with portrait fallback
-4. **Responsive TV layouts** - Dedicated portrait mode and improved landscape responsiveness for all devices
+This plan addresses two critical issues:
+1. **Timer drift when screen is locked/app backgrounded** - The current `setInterval` approach doesn't work reliably when the device sleeps
+2. **Bulk buy-in for all players** - No option to add buy-ins to all players at tournament start
 
 ---
 
-### Part 1: Fix Mini Bar Position (Move to Top of Page)
+## Issue 1: Timer Drift - Root Cause Analysis
 
-#### Problem
-The `TournamentMiniBar` is positioned at `bottom-20` which places it UNDER the `BottomNav` (which also uses z-40), making it barely visible or completely hidden.
+### The Problem
+The current timer implementation in `TournamentClock.tsx`, `ClassicTimerMode.tsx`, `PortraitTimerMode.tsx`, and other TV modes uses `setInterval` to decrement a counter every second:
 
-#### Solution
-Move the mini bar to the TOP of the page, directly below the header navigation. This makes it:
-- Always visible
-- Not competing with bottom navigation
-- Similar to how Uber shows delivery tracking at the top
-
-**File: `src/components/game/TournamentMiniBar.tsx`**
-
-Change positioning from bottom to top:
 ```typescript
-// Before:
-className="fixed bottom-20 left-2 right-2 z-40"
-
-// After:
-className="fixed top-[calc(4rem+env(safe-area-inset-top,0px))] left-3 right-3 z-40"
+const interval = setInterval(() => {
+  setTimeRemaining(prev => prev - 1);
+}, 1000);
 ```
 
-The mini bar will sit just below the standard header height (h-16 = 4rem) plus any safe area inset.
+**Why this fails:**
+- When the screen locks or the app goes to background, JavaScript execution is paused/throttled
+- `setInterval` doesn't run while suspended
+- When the user returns, the timer shows incorrect time (it "paused" while the real clock continued)
+- Example: If 5 minutes pass while phone is locked, the timer still shows the old value
 
-Also improve the styling for better visibility:
-- Stronger gradient background
-- More prominent border and shadow
-- Display prize pool alongside timer
+### The Solution: Timestamp-Based Timer
+Instead of decrementing a counter, calculate time remaining based on:
+1. `level_started_at` - When the current level started (stored in DB)
+2. `time_remaining_seconds` - The initial time for this level
+3. Current time - Calculate elapsed time since level started
+
+**Formula:**
+```typescript
+const elapsedSeconds = Math.floor((Date.now() - new Date(level_started_at).getTime()) / 1000);
+const actualTimeRemaining = Math.max(0, initialTimeRemaining - elapsedSeconds);
+```
+
+**Benefits:**
+- Works correctly even when app is backgrounded
+- When user returns, timer immediately shows correct time
+- Uses `level_started_at` timestamp as source of truth (already stored in DB)
 
 ---
 
-### Part 2: Fix TV Display Safe Area (Header Buttons)
+### Files to Update
 
-#### Problem
-In `TVDisplay.tsx`, the exit button and wake lock indicator are positioned at `top-4` which doesn't account for the device status bar on notched phones (iPhone, newer Android). This ONLY affects TV mode, not other pages.
-
-#### Solution
-Add safe area padding to all elements in the TV display header area.
-
-**File: `src/components/game/TVDisplay.tsx`**
+#### 1. `src/components/game/TournamentClock.tsx`
+- Replace interval-based decrement with timestamp calculation
+- On each tick, calculate: `timeRemaining = initialTime - elapsed`
+- Handle `visibilitychange` event to recalculate immediately when app returns to foreground
+- Only sync to DB when admin pauses (save `time_remaining_seconds` for resume)
 
 ```typescript
-// Before:
-<Button
-  className="absolute top-4 left-4 z-50 ..."
->
+// NEW: Calculate time from timestamps
+const calculateTimeRemaining = useCallback(() => {
+  if (!currentLevel) return 0;
+  
+  if (session.status !== 'active') {
+    // When paused, use stored time_remaining_seconds
+    return session.time_remaining_seconds || currentLevel.duration_minutes * 60;
+  }
+  
+  if (!session.level_started_at) {
+    return currentLevel.duration_minutes * 60;
+  }
+  
+  const startTime = new Date(session.level_started_at).getTime();
+  const initialSeconds = session.time_remaining_seconds || currentLevel.duration_minutes * 60;
+  const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+  
+  return Math.max(0, initialSeconds - elapsedSeconds);
+}, [session, currentLevel]);
 
-// After - account for safe area:
-<Button
-  className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-[max(1rem,env(safe-area-inset-left,1rem))] z-50 ..."
->
-```
-
-Apply same pattern to:
-- Exit button (top-left)
-- Wake lock indicator (top-left, after exit button)
-- Settings button (top-right)
-
-**Also update the TV mode display components** to add top padding for the stats bar:
-
-**File: `src/components/game/tv/ClassicTimerMode.tsx`**
-```typescript
-// Stats bar needs safe area padding
-<div className="flex flex-wrap items-center justify-between 
-  px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 
-  md:px-16 md:pt-[max(0.75rem,env(safe-area-inset-top,0px))] md:pb-3 
-  bg-black/40 ...">
-```
-
-Same for `DashboardMode.tsx`, `TableViewMode.tsx`, and `CombinedMode.tsx`.
-
----
-
-### Part 3: Create Portrait TV Layout
-
-#### Problem
-The current TV modes are designed for landscape/TV screens. On a phone in portrait mode, they look cramped and unusable. Need a dedicated portrait layout.
-
-#### Solution
-Create a new `PortraitTimerMode` component optimized for portrait orientation on mobile:
-
-**New file: `src/components/game/tv/PortraitTimerMode.tsx`**
-
-Layout structure (top to bottom):
-```text
-┌─────────────────────────┐
-│      LEVEL 1            │  ← Badge (small)
-│                         │
-│        15:42            │  ← Large timer (fills width)
-│                         │
-│       SB: 100           │  ← Blinds stacked vertically
-│       BB: 200           │
-│      Ante: 25           │
-│                         │
-│   Next: 200/400         │  ← Next level preview
-│                         │
-│  ┌─────────┬─────────┐  │  ← Stats row
-│  │  8/10   │  £300   │  │
-│  │ Players │  Prize  │  │
-│  └─────────┴─────────┘  │
-│                         │
-│   ════════════════      │  ← Progress bar
-└─────────────────────────┘
-```
-
-Key styling:
-- Timer: `text-[clamp(4rem,22vw,8rem)]` - Large, width-constrained
-- Blinds: Stacked vertically, not side-by-side
-- Full width utilization
-- Simplified stats (no average stack in portrait)
-- No table visualization (too cramped)
-
----
-
-### Part 4: Add Orientation Detection and Layout Switching
-
-#### Problem
-The Screen Orientation API's `lock()` method isn't supported on iOS Safari. Need to detect actual orientation and switch layouts accordingly.
-
-#### Solution
-Add orientation detection to `TVDisplay.tsx` and automatically switch to portrait layout when needed.
-
-**File: `src/components/game/TVDisplay.tsx`**
-
-```typescript
-const [isLandscape, setIsLandscape] = useState(true);
-
+// Listen for visibility changes (app returns from background)
 useEffect(() => {
-  const checkOrientation = () => {
-    // Use matchMedia for reliable orientation detection
-    const landscape = window.matchMedia('(orientation: landscape)').matches;
-    setIsLandscape(landscape);
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible' && session.status === 'active') {
+      setTimeRemaining(calculateTimeRemaining());
+    }
   };
   
-  checkOrientation();
-  
-  const mql = window.matchMedia('(orientation: landscape)');
-  mql.addEventListener('change', checkOrientation);
-  
-  return () => mql.removeEventListener('change', checkOrientation);
-}, []);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [calculateTimeRemaining, session.status]);
 ```
 
-Then in the render:
+#### 2. `src/components/game/tv/ClassicTimerMode.tsx`
+- Same timestamp-based calculation
+- Add `visibilitychange` listener
+
+#### 3. `src/components/game/tv/PortraitTimerMode.tsx`
+- Same timestamp-based calculation
+- Add `visibilitychange` listener
+
+#### 4. `src/components/game/tv/DashboardMode.tsx`
+- Same timestamp-based calculation
+- Add `visibilitychange` listener
+
+#### 5. `src/components/game/tv/CombinedMode.tsx`
+- Same timestamp-based calculation
+- Add `visibilitychange` listener
+
+#### 6. `src/components/game/TournamentMiniBar.tsx`
+- Already uses local countdown, but should also use timestamp-based calculation for accuracy
+
+#### 7. Database behavior changes
+- When **starting/resuming**: Set `level_started_at` to current timestamp
+- When **pausing**: Save current `time_remaining_seconds` (calculated from elapsed time)
+- When **advancing level**: Set new `level_started_at`, new `time_remaining_seconds` for new level
+
+---
+
+## Issue 2: Bulk Buy-In for All Players
+
+### The Problem
+Currently, admins must click "Add Buy-in" for each player individually. For a 10-player tournament, this requires 10 separate clicks.
+
+### The Solution
+Add a "Buy-In All" button that:
+1. Identifies all active players WITHOUT a buy-in transaction
+2. Creates buy-in transactions for all of them in one batch
+3. Shows a confirmation dialog with player count and total amount
+
+---
+
+### Files to Update
+
+#### `src/components/game/BuyInTracker.tsx`
+
+**Add new state and handler:**
 ```typescript
-// Portrait mode - use dedicated portrait layout
-if (!isLandscape) {
-  return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950">
-      {/* Exit button with safe area */}
-      <Button ... />
-      
-      <PortraitTimerMode
-        session={session}
-        blindStructure={blindStructure}
-        prizePool={prizePool}
-        currencySymbol={currencySymbol}
-        playersRemaining={activePlayers.length}
-        totalPlayers={players.length}
-        onUpdateSession={onUpdateSession}
-        isAdmin={isAdmin}
-        chipToCashRatio={chipToCashRatio}
-      />
-    </div>
+const [showBulkBuyIn, setShowBulkBuyIn] = useState(false);
+const [bulkBuyInPending, setBulkBuyInPending] = useState(false);
+
+// Get players who need buy-in
+const playersWithoutBuyIn = activePlayers.filter(player => {
+  return !transactions.some(
+    t => t.game_player_id === player.id && t.transaction_type === 'buyin'
   );
-}
+});
 
-// Landscape mode - use existing modes based on displayMode setting
-return (
-  <div className="fixed inset-0 z-50 ...">
-    {displayMode === 'classic' && <ClassicTimerMode ... />}
-    {/* etc */}
-  </div>
-);
+const handleBulkBuyIn = async () => {
+  if (!user || playersWithoutBuyIn.length === 0) return;
+  
+  setBulkBuyInPending(true);
+  
+  // Create buy-in transactions for all players without one
+  const transactionsToInsert = playersWithoutBuyIn.map(player => ({
+    game_session_id: session.id,
+    game_player_id: player.id,
+    transaction_type: 'buyin',
+    amount: session.buy_in_amount,
+    chips: session.starting_chips,
+    created_by: user.id,
+  }));
+  
+  const { error } = await supabase
+    .from('game_transactions')
+    .insert(transactionsToInsert);
+  
+  setBulkBuyInPending(false);
+  
+  if (error) {
+    toast.error('Failed to add buy-ins');
+    return;
+  }
+  
+  toast.success(`Buy-in added for ${playersWithoutBuyIn.length} players`);
+  setShowBulkBuyIn(false);
+  onRefresh();
+};
 ```
 
----
-
-### Part 5: Improve Landscape Responsiveness for All Devices
-
-#### Problem
-Even in landscape, the layouts don't adapt well to different screen sizes (phone landscape vs iPad landscape vs desktop/TV).
-
-#### Solution
-Use viewport-relative units (`vw`, `vh`) with CSS `clamp()` more aggressively.
-
-**File: `src/components/game/tv/ClassicTimerMode.tsx`**
-
+**Add UI button and confirmation dialog:**
 ```typescript
-// Timer - scales from small phone landscape to large TV
-<div className={`text-[clamp(3rem,15vh,12rem)] font-mono font-black ...`}>
+{/* Bulk Buy-In Button - shown when there are players without buy-in */}
+{isAdmin && playersWithoutBuyIn.length > 0 && (
+  <Button
+    variant="default"
+    size="sm"
+    onClick={() => setShowBulkBuyIn(true)}
+    className="glow-gold"
+  >
+    <Users className="h-4 w-4 mr-1" />
+    Buy-In All ({playersWithoutBuyIn.length})
+  </Button>
+)}
 
-// Blinds - also viewport-relative
-<div className="text-[clamp(1.25rem,5vh,3.75rem)] font-bold text-blue-400">
-
-// Stats bar values - responsive
-<div className="text-[clamp(1rem,3vh,2rem)] font-bold text-white">
-```
-
-**File: `src/components/game/tv/DashboardMode.tsx`**
-
-The right sidebar (fixed 400px width) is problematic on smaller screens:
-```typescript
-// Before:
-<div className="w-[400px] bg-black/40 ...">
-
-// After - responsive width:
-<div className="w-[min(400px,35vw)] bg-black/40 ...">
-```
-
-Timer sizing:
-```typescript
-// Before:
-<div className="text-[10rem] font-mono ...">
-
-// After:
-<div className="text-[clamp(4rem,12vh,10rem)] font-mono ...">
-```
-
-**File: `src/components/game/tv/TableViewMode.tsx`**
-
-The stats bar needs responsive padding:
-```typescript
-// Before:
-<div className="flex items-center justify-between pl-20 pr-20 py-4 ...">
-
-// After - responsive padding that accounts for overlay buttons:
-<div className="flex items-center justify-between 
-  px-[max(5rem,env(safe-area-inset-left,1rem)+4rem)] 
-  pt-[max(1rem,env(safe-area-inset-top,0.5rem))] pb-4 ...">
-```
-
-Table sizing - ensure it fills available space:
-```typescript
-// Before:
-<div className="relative w-full max-w-5xl aspect-[2.5/1]">
-
-// After - more flexible:
-<div className="relative w-full max-w-[90vw] max-h-[70vh] aspect-[2.5/1]">
-```
-
----
-
-### Part 6: Update AppLayout for Top-Positioned Mini Bar
-
-Since the mini bar moves to the top, pages need padding at the top when the mini bar is shown:
-
-**File: `src/components/layout/AppLayout.tsx`**
-
-```typescript
-export function AppLayout({ children }: AppLayoutProps) {
-  const location = useLocation();
-  const { activeGame } = useActiveGame();
-
-  // ... existing logic ...
-
-  const showMiniBar = activeGame && 
-    activeGame.status !== 'completed' && 
-    !isOnGamePage && 
-    showBottomNav;
-
-  return (
-    <div className="min-h-screen safe-area-top">
-      {/* Mini bar at top, only when there's an active game */}
-      {showMiniBar && <TournamentMiniBar />}
-      
-      {/* Main content - add top padding when mini bar is shown */}
-      <div className={cn(
-        showBottomNav ? 'pb-20' : '',
-        showMiniBar ? 'pt-16' : '' // Space for mini bar
-      )}>
-        {children}
+{/* Bulk Buy-In Confirmation Dialog */}
+<Dialog open={showBulkBuyIn} onOpenChange={setShowBulkBuyIn}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Buy-In All Players</DialogTitle>
+    </DialogHeader>
+    <div className="py-4 space-y-4">
+      <p className="text-muted-foreground">
+        Add buy-in for <span className="font-bold text-foreground">{playersWithoutBuyIn.length} players</span>?
+      </p>
+      <div className="bg-primary/10 rounded-lg p-4 space-y-2">
+        <div className="flex justify-between">
+          <span>Buy-in per player:</span>
+          <span className="font-bold">{currencySymbol}{session.buy_in_amount}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Chips per player:</span>
+          <span className="font-bold">{session.starting_chips.toLocaleString()}</span>
+        </div>
+        <div className="border-t border-border/30 pt-2 flex justify-between">
+          <span className="font-bold">Total:</span>
+          <span className="font-bold text-primary">
+            {currencySymbol}{session.buy_in_amount * playersWithoutBuyIn.length}
+          </span>
+        </div>
       </div>
-      
-      {showBottomNav && <BottomNav />}
+      <div className="text-sm text-muted-foreground">
+        Players to buy-in:
+        <div className="flex flex-wrap gap-1 mt-1">
+          {playersWithoutBuyIn.map(p => (
+            <Badge key={p.id} variant="secondary">{p.display_name}</Badge>
+          ))}
+        </div>
+      </div>
     </div>
-  );
-}
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowBulkBuyIn(false)}>
+        Cancel
+      </Button>
+      <Button 
+        onClick={handleBulkBuyIn} 
+        disabled={bulkBuyInPending}
+        className="glow-gold"
+      >
+        {bulkBuyInPending ? 'Processing...' : `Buy-In ${playersWithoutBuyIn.length} Players`}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 ```
 
 ---
 
-### Summary of File Changes
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/components/game/TournamentMiniBar.tsx` | Move to top position, improve styling |
-| `src/components/layout/AppLayout.tsx` | Move mini bar render to top, add content padding |
-| `src/components/game/TVDisplay.tsx` | Add safe area to buttons, add orientation detection, portrait layout |
-| `src/components/game/tv/PortraitTimerMode.tsx` | **New file** - Portrait-optimized TV layout |
-| `src/components/game/tv/ClassicTimerMode.tsx` | Add safe area to stats bar, improve responsive sizing |
-| `src/components/game/tv/DashboardMode.tsx` | Responsive sidebar width, safe area padding |
-| `src/components/game/tv/TableViewMode.tsx` | Safe area padding, responsive table sizing |
-| `src/components/game/tv/CombinedMode.tsx` | Safe area padding, responsive sizing |
+| `src/components/game/TournamentClock.tsx` | Replace interval decrement with timestamp calculation, add visibility listener |
+| `src/components/game/tv/ClassicTimerMode.tsx` | Same timestamp-based timer fix |
+| `src/components/game/tv/PortraitTimerMode.tsx` | Same timestamp-based timer fix |
+| `src/components/game/tv/DashboardMode.tsx` | Same timestamp-based timer fix |
+| `src/components/game/tv/CombinedMode.tsx` | Same timestamp-based timer fix |
+| `src/components/game/TournamentMiniBar.tsx` | Timestamp-based calculation for accuracy |
+| `src/components/game/BuyInTracker.tsx` | Add "Buy-In All" button with confirmation dialog |
 
 ---
 
-### Device Support Matrix
+## Technical Details
 
-| Device | Orientation | Layout Used |
-|--------|-------------|-------------|
-| iPhone (portrait) | Portrait | PortraitTimerMode |
-| iPhone (landscape) | Landscape | ClassicTimerMode (or selected mode) |
-| iPad (portrait) | Portrait | PortraitTimerMode (larger text) |
-| iPad (landscape) | Landscape | Selected mode (Classic/Dashboard/Table/Combined) |
-| Desktop browser | Landscape | Selected mode, full size |
-| TV via AirPlay/HDMI | Landscape | Full landscape, large text |
-
----
-
-### Technical Details
-
-#### Safe Area CSS Pattern for Fixed Elements
-```css
-/* For buttons in TV display */
-top: max(1rem, env(safe-area-inset-top, 1rem));
-left: max(1rem, env(safe-area-inset-left, 1rem));
-right: max(1rem, env(safe-area-inset-right, 1rem));
-```
-
-#### Orientation Detection
+### Timer Calculation Logic
 ```typescript
-const mql = window.matchMedia('(orientation: landscape)');
-mql.addEventListener('change', (e) => setIsLandscape(e.matches));
+// When game is ACTIVE:
+// 1. level_started_at = timestamp when timer started/resumed
+// 2. time_remaining_seconds = initial time when level started
+// 3. actualRemaining = time_remaining_seconds - elapsed since level_started_at
+
+// When game is PAUSED:
+// 1. time_remaining_seconds = saved remaining time at pause moment
+// 2. Display this directly (no calculation needed)
+
+// When RESUMING:
+// 1. Update level_started_at to NOW
+// 2. Keep time_remaining_seconds as the starting point
 ```
 
-#### Viewport-Relative Typography
-```css
-/* clamp(min, preferred, max) */
-font-size: clamp(3rem, 15vh, 12rem);
-/* - Never smaller than 3rem
-   - Prefers 15% of viewport height
-   - Never larger than 12rem */
-```
+### Handling Level Advancement
+When a level ends automatically:
+1. Set `current_level` to next level
+2. Set `level_started_at` to current timestamp
+3. Set `time_remaining_seconds` to new level's duration
 
 ---
 
-### User Experience After Fix
+## User Experience After Fix
 
-1. **Mini Bar**: Visible at TOP of screen when tournament is active, below header navigation
-2. **TV Mode on Phone (Portrait)**: Clean, stacked layout optimized for vertical screen
-3. **TV Mode on Phone (Landscape)**: Responsive layout that fills the screen
-4. **TV Mode on iPad**: Works in both orientations with appropriate layouts
-5. **TV Mode on TV (via casting)**: Full-size landscape layout with large, readable text
-6. **Safe Areas**: All buttons and content respect device notches and status bars
+1. **Timer accuracy**: Timer will show correct time even after:
+   - Locking phone screen
+   - Switching to another app
+   - Minimizing browser
+   - Phone going to sleep
+
+2. **Bulk buy-in**: At tournament start, admin can:
+   - Tap "Buy-In All" button
+   - See confirmation with player list and total amount
+   - One tap to add buy-ins for everyone
 
