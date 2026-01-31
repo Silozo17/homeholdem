@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
+import { getOrdinalSuffix } from './club-members';
+
 interface SendPushParams {
   userIds: string[];
   title: string;
@@ -7,7 +9,7 @@ interface SendPushParams {
   icon?: string;
   url?: string;
   tag?: string;
-  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
+  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'game_started' | 'player_eliminated' | 'rebuy_addon';
 }
 
 export async function sendPushNotification({
@@ -187,5 +189,58 @@ export async function notifyNewEventAvailable(
     url: `/event/${eventId}`,
     tag: `event-available-${eventId}`,
     notificationType: 'event_unlocked',
+  });
+}
+
+// Game notifications
+
+export async function notifyGameStarted(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title: 'Tournament Started',
+    body: `${eventTitle} is now underway!`,
+    url: `/event/${eventId}/game`,
+    tag: `game-started-${eventId}`,
+    notificationType: 'game_started',
+  });
+}
+
+export async function notifyPlayerEliminated(
+  userIds: string[],
+  playerName: string,
+  position: number,
+  playersRemaining: number,
+  eventId: string
+) {
+  const suffix = getOrdinalSuffix(position);
+  return sendPushNotification({
+    userIds,
+    title: 'Player Out',
+    body: `${playerName} finished ${position}${suffix} • ${playersRemaining} remaining`,
+    url: `/event/${eventId}/game`,
+    tag: `elimination-${eventId}`,
+    notificationType: 'player_eliminated',
+  });
+}
+
+export async function notifyRebuyAddon(
+  userIds: string[],
+  playerName: string,
+  type: 'rebuy' | 'addon',
+  prizePool: number,
+  currencySymbol: string,
+  eventId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title: type === 'rebuy' ? 'Rebuy Added' : 'Add-on Added',
+    body: `${playerName} ${type === 'rebuy' ? 'rebought' : 'added on'} • Pool: ${currencySymbol}${prizePool}`,
+    url: `/event/${eventId}/game`,
+    tag: `transaction-${eventId}`,
+    notificationType: 'rebuy_addon',
   });
 }

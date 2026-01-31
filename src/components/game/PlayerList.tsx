@@ -37,6 +37,9 @@ import {
 import { Users, UserMinus, UserPlus, Trophy, RotateCcw, ChevronsUpDown, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserAvatar } from '@/components/common/UserAvatar';
+import { getClubMemberIds, logGameActivity, getOrdinalSuffix } from '@/lib/club-members';
+import { notifyPlayerEliminated } from '@/lib/push-notifications';
+import { notifyPlayerEliminatedInApp } from '@/lib/in-app-notifications';
 
 interface GamePlayer {
   id: string;
@@ -66,12 +69,14 @@ interface PlayerListProps {
   players: GamePlayer[];
   session: GameSession;
   clubId: string;
+  eventId: string;
   maxTables: number;
   isAdmin: boolean;
+  currencySymbol: string;
   onRefresh: () => void;
 }
 
-export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRefresh }: PlayerListProps) {
+export function PlayerList({ players, session, clubId, eventId, maxTables, isAdmin, currencySymbol, onRefresh }: PlayerListProps) {
   const { user } = useAuth();
   const [localPlayers, setLocalPlayers] = useState<GamePlayer[]>(players);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -134,6 +139,7 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
   const handleEliminatePlayer = useCallback(async (player: GamePlayer) => {
     const activeCount = activePlayers.length;
     const finishPosition = activeCount;
+    const remainingCount = activeCount - 1;
 
     // Optimistic update
     setLocalPlayers(prev => prev.map(p => 
@@ -163,7 +169,23 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
     }
 
     toast.success(`${player.display_name} finished in ${finishPosition}${getOrdinalSuffix(finishPosition)} place`);
-  }, [activePlayers.length]);
+    
+    // Send notifications in background (don't await to keep UI responsive)
+    if (clubId && eventId) {
+      getClubMemberIds(clubId).then(memberIds => {
+        if (memberIds.length > 0) {
+          Promise.all([
+            notifyPlayerEliminated(memberIds, player.display_name, finishPosition, remainingCount, eventId),
+            notifyPlayerEliminatedInApp(memberIds, player.display_name, finishPosition, remainingCount, eventId, clubId),
+            logGameActivity(session.id, 'player_eliminated', player.id, player.display_name, {
+              position: finishPosition,
+              playersRemaining: remainingCount,
+            }),
+          ]).catch(console.error);
+        }
+      });
+    }
+  }, [activePlayers.length, clubId, eventId, session.id]);
 
   // Optimistic reinstate
   const handleReinstate = useCallback(async (player: GamePlayer) => {
@@ -269,7 +291,7 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
     }
   }, []);
 
-  const getOrdinalSuffix = (n: number) => {
+  const localGetOrdinalSuffix = (n: number) => {
     const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return s[(v - 20) % 10] || s[v] || s[0];
@@ -365,7 +387,7 @@ export function PlayerList({ players, session, clubId, maxTables, isAdmin, onRef
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className="font-mono">
-                        {player.finish_position}{getOrdinalSuffix(player.finish_position || 0)}
+                        {player.finish_position}{localGetOrdinalSuffix(player.finish_position || 0)}
                       </Badge>
                       <span className="text-muted-foreground">{player.display_name}</span>
                     </div>

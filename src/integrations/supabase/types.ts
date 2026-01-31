@@ -651,6 +651,51 @@ export type Database = {
           },
         ]
       }
+      game_activity_log: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          game_session_id: string
+          id: string
+          metadata: Json | null
+          player_id: string | null
+          player_name: string | null
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          game_session_id: string
+          id?: string
+          metadata?: Json | null
+          player_id?: string | null
+          player_name?: string | null
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          game_session_id?: string
+          id?: string
+          metadata?: Json | null
+          player_id?: string | null
+          player_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_activity_log_game_session_id_fkey"
+            columns: ["game_session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_activity_log_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "game_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_players: {
         Row: {
           created_at: string
@@ -1329,8 +1374,11 @@ export type Database = {
           push_date_finalized: boolean | null
           push_event_unlocked: boolean
           push_game_completed: boolean
+          push_game_started: boolean | null
           push_member_rsvp: boolean
           push_member_vote: boolean
+          push_player_eliminated: boolean | null
+          push_rebuy_addon: boolean | null
           push_rsvp_updates: boolean | null
           push_waitlist_promotion: boolean | null
           show_stats_publicly: boolean | null
@@ -1353,8 +1401,11 @@ export type Database = {
           push_date_finalized?: boolean | null
           push_event_unlocked?: boolean
           push_game_completed?: boolean
+          push_game_started?: boolean | null
           push_member_rsvp?: boolean
           push_member_vote?: boolean
+          push_player_eliminated?: boolean | null
+          push_rebuy_addon?: boolean | null
           push_rsvp_updates?: boolean | null
           push_waitlist_promotion?: boolean | null
           show_stats_publicly?: boolean | null
@@ -1377,8 +1428,11 @@ export type Database = {
           push_date_finalized?: boolean | null
           push_event_unlocked?: boolean
           push_game_completed?: boolean
+          push_game_started?: boolean | null
           push_member_rsvp?: boolean
           push_member_vote?: boolean
+          push_player_eliminated?: boolean | null
+          push_rebuy_addon?: boolean | null
           push_rsvp_updates?: boolean | null
           push_waitlist_promotion?: boolean | null
           show_stats_publicly?: boolean | null

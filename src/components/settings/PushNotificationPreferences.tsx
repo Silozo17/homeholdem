@@ -102,6 +102,27 @@ export function PushNotificationPreferences({ isEnabled }: PushNotificationPrefe
         checked={preferences.push_blinds_up}
         onCheckedChange={(v) => handleToggle('push_blinds_up', v)}
       />
+      <SettingRow
+        id="push_game_started"
+        label={t('settings.game_started')}
+        description={t('settings.game_started_description')}
+        checked={preferences.push_game_started ?? true}
+        onCheckedChange={(v) => handleToggle('push_game_started', v)}
+      />
+      <SettingRow
+        id="push_player_eliminated"
+        label={t('settings.player_eliminated')}
+        description={t('settings.player_eliminated_description')}
+        checked={preferences.push_player_eliminated ?? true}
+        onCheckedChange={(v) => handleToggle('push_player_eliminated', v)}
+      />
+      <SettingRow
+        id="push_rebuy_addon"
+        label={t('settings.rebuy_addon')}
+        description={t('settings.rebuy_addon_description')}
+        checked={preferences.push_rebuy_addon ?? true}
+        onCheckedChange={(v) => handleToggle('push_rebuy_addon', v)}
+      />
     </div>
   );
 }

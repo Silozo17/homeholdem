@@ -18,6 +18,9 @@ export interface UserPreferences {
   push_waitlist_promotion: boolean;
   push_chat_messages: boolean;
   push_blinds_up: boolean;
+  push_game_started: boolean;
+  push_player_eliminated: boolean;
+  push_rebuy_addon: boolean;
   // Other preferences
   show_stats_publicly: boolean;
   language: string;
@@ -38,6 +41,9 @@ const defaultPreferences: Omit<UserPreferences, 'id' | 'user_id' | 'created_at' 
   push_waitlist_promotion: true,
   push_chat_messages: true,
   push_blinds_up: true,
+  push_game_started: true,
+  push_player_eliminated: true,
+  push_rebuy_addon: true,
   show_stats_publicly: true,
   language: 'en',
   currency: 'GBP',

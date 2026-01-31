@@ -22,6 +22,9 @@ import { Label } from '@/components/ui/label';
 import { DollarSign, Plus, RefreshCcw, Gift, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserAvatar } from '@/components/common/UserAvatar';
+import { getClubMemberIds, logGameActivity } from '@/lib/club-members';
+import { notifyRebuyAddon } from '@/lib/push-notifications';
+import { notifyRebuyAddonInApp } from '@/lib/in-app-notifications';
 
 interface GamePlayer {
   id: string;
@@ -59,6 +62,8 @@ interface BuyInTrackerProps {
   players: GamePlayer[];
   transactions: GameTransaction[];
   session: GameSession;
+  eventId: string;
+  clubId: string;
   currencySymbol: string;
   isAdmin: boolean;
   onRefresh: () => void;
@@ -70,6 +75,8 @@ export function BuyInTracker({
   players, 
   transactions, 
   session, 
+  eventId,
+  clubId,
   currencySymbol,
   isAdmin, 
   onRefresh 
@@ -135,6 +142,24 @@ export function BuyInTracker({
 
     const player = players.find(p => p.id === selectedPlayer);
     toast.success(`${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} added for ${player?.display_name}`);
+    
+    // Send notifications for rebuys and addons
+    if ((transactionType === 'rebuy' || transactionType === 'addon') && player && clubId && eventId) {
+      const newPrizePool = totalBuyIns + totalRebuys + totalAddons + amount;
+      getClubMemberIds(clubId).then(memberIds => {
+        if (memberIds.length > 0) {
+          Promise.all([
+            notifyRebuyAddon(memberIds, player.display_name, transactionType, newPrizePool, currencySymbol, eventId),
+            notifyRebuyAddonInApp(memberIds, player.display_name, transactionType, newPrizePool, currencySymbol, eventId, clubId),
+            logGameActivity(session.id, transactionType, player.id, player.display_name, {
+              amount,
+              prizePool: newPrizePool,
+            }),
+          ]).catch(console.error);
+        }
+      });
+    }
+    
     setShowAddTransaction(false);
     setSelectedPlayer('');
     onRefresh();

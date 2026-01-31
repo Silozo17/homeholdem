@@ -210,8 +210,8 @@ export function useGameSession(eventId: string) {
     };
   }, [session?.id]);
 
-  const createSession = async () => {
-    if (!user || !eventId) return;
+  const createSession = async (): Promise<GameSession | null> => {
+    if (!user || !eventId) return null;
 
     // Get event data to find club_id
     const { data: eventData } = await supabase
@@ -222,7 +222,7 @@ export function useGameSession(eventId: string) {
 
     if (!eventData) {
       toast.error('Failed to find event');
-      return;
+      return null;
     }
 
     // Fetch club defaults for tournament settings
@@ -269,9 +269,9 @@ export function useGameSession(eventId: string) {
       .select()
       .single();
 
-    if (sessionError) {
+    if (sessionError || !newSession) {
       toast.error('Failed to create game session');
-      return;
+      return null;
     }
 
     // Create default blind structure with club's level duration
@@ -310,6 +310,8 @@ export function useGameSession(eventId: string) {
 
     toast.success('Tournament created!');
     fetchData();
+    
+    return newSession as GameSession;
   };
 
   const updateSession = async (updates: Partial<GameSession>) => {
