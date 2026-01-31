@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveGame } from '@/contexts/ActiveGameContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -101,6 +102,7 @@ export default function EventDetail() {
   const { t, i18n } = useTranslation();
   const { eventId } = useParams<{ eventId: string }>();
   const { user, loading } = useAuth();
+  const { setCurrentClubId } = useActiveGame();
   const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
@@ -123,6 +125,14 @@ export default function EventDetail() {
       navigate('/');
     }
   }, [user, loading, navigate]);
+
+  // Set current club context for mini-bar when event is loaded
+  useEffect(() => {
+    if (event?.club_id) {
+      setCurrentClubId(event.club_id);
+    }
+    return () => setCurrentClubId(null);
+  }, [event?.club_id, setCurrentClubId]);
 
   useEffect(() => {
     if (user && eventId) {

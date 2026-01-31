@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
-import { ArrowLeft, Tv, Settings, Coins, Activity } from 'lucide-react';
+import { ArrowLeft, Tv, Settings, Coins, Activity, Flag } from 'lucide-react';
+import { EndGameDialog } from '@/components/game/EndGameDialog';
 import { TournamentClock } from '@/components/game/TournamentClock';
 import { TVDisplay } from '@/components/game/TVDisplay';
 import { PlayerList } from '@/components/game/PlayerList';
@@ -29,10 +30,11 @@ export default function GameMode() {
   const { t } = useTranslation();
   const { eventId } = useParams<{ eventId: string }>();
   const { user, loading } = useAuth();
-  const { setActiveGame, clearActiveGame } = useActiveGame();
+  const { setActiveGame, clearActiveGame, setCurrentClubId } = useActiveGame();
   const navigate = useNavigate();
   const [tvMode, setTvMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [endGameDialogOpen, setEndGameDialogOpen] = useState(false);
 
   const {
     session,
@@ -57,9 +59,17 @@ export default function GameMode() {
     }
   }, [user, loading, navigate]);
 
+  // Set current club context for mini-bar
+  useEffect(() => {
+    if (clubId) {
+      setCurrentClubId(clubId);
+    }
+    return () => setCurrentClubId(null);
+  }, [clubId, setCurrentClubId]);
+
   // Update active game context when session changes
   useEffect(() => {
-    if (session && eventId && session.status !== 'completed') {
+    if (session && eventId && clubId && session.status !== 'completed') {
       const activePlayers = players.filter(p => p.status === 'active').length;
       const prizePool = transactions
         .filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
@@ -68,6 +78,7 @@ export default function GameMode() {
       setActiveGame({
         sessionId: session.id,
         eventId,
+        clubId,
         status: session.status,
         currentLevel: session.current_level,
         timeRemainingSeconds: session.time_remaining_seconds,
@@ -80,7 +91,7 @@ export default function GameMode() {
     } else if (session?.status === 'completed') {
       clearActiveGame();
     }
-  }, [session, eventId, blindStructure, players, transactions, currencySymbol, setActiveGame, clearActiveGame]);
+  }, [session, eventId, clubId, blindStructure, players, transactions, currencySymbol, setActiveGame, clearActiveGame]);
 
   const handleStartGame = async () => {
     if (!session && eventId) {
@@ -191,6 +202,16 @@ export default function GameMode() {
                 title={t('game.tv_display')}
               >
                 <Tv className="h-5 w-5" />
+              </Button>
+            )}
+            {isAdmin && session && session.status !== 'completed' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEndGameDialogOpen(true)}
+                title={t('game.end_game')}
+              >
+                <Flag className="h-5 w-5 text-destructive" />
               </Button>
             )}
             {isAdmin && (
@@ -360,6 +381,20 @@ export default function GameMode() {
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           onUpdate={refetch}
+        />
+      )}
+
+      {/* End Game Dialog */}
+      {session && (
+        <EndGameDialog
+          open={endGameDialogOpen}
+          onOpenChange={setEndGameDialogOpen}
+          sessionId={session.id}
+          eventId={eventId || ''}
+          clubId={clubId || ''}
+          players={players}
+          transactions={transactions}
+          onComplete={refetch}
         />
       )}
     </div>

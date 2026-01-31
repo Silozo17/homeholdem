@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
@@ -15,6 +15,7 @@ interface BlindLevel {
 interface ActiveGame {
   sessionId: string;
   eventId: string;
+  clubId: string;
   status: string;
   currentLevel: number;
   timeRemainingSeconds: number | null;
@@ -27,8 +28,11 @@ interface ActiveGame {
 
 interface ActiveGameContextType {
   activeGame: ActiveGame | null;
+  allActiveGames: ActiveGame[];
   setActiveGame: (game: ActiveGame | null) => void;
   clearActiveGame: () => void;
+  setCurrentClubId: (clubId: string | null) => void;
+  currentClubId: string | null;
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -42,25 +46,42 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 
 const ActiveGameContext = createContext<ActiveGameContextType>({
   activeGame: null,
+  allActiveGames: [],
   setActiveGame: () => {},
   clearActiveGame: () => {},
+  setCurrentClubId: () => {},
+  currentClubId: null,
 });
 
 export function ActiveGameProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [activeGame, setActiveGameState] = useState<ActiveGame | null>(null);
-  const userClubIdsRef = useRef<string[]>([]);
+  const [allActiveGames, setAllActiveGames] = useState<ActiveGame[]>([]);
+  const [currentClubId, setCurrentClubId] = useState<string | null>(null);
   const isInitializedRef = useRef(false);
 
-  // Helper function to refresh active game data
-  const refreshActiveGame = useCallback(async (sessionId: string, eventId: string) => {
+  // Derive the active game based on current club context
+  const activeGame = useMemo(() => {
+    if (allActiveGames.length === 0) return null;
+    
+    // If viewing a specific club, prioritize that club's game
+    if (currentClubId) {
+      const clubGame = allActiveGames.find(g => g.clubId === currentClubId);
+      if (clubGame) return clubGame;
+    }
+    
+    // Otherwise return most recent (first in sorted list)
+    return allActiveGames[0];
+  }, [allActiveGames, currentClubId]);
+
+  // Helper function to build full game data
+  const buildGameData = useCallback(async (sessionId: string, eventId: string): Promise<ActiveGame | null> => {
     const { data: session } = await supabase
       .from('game_sessions')
       .select('*')
       .eq('id', sessionId)
       .single();
 
-    if (!session) return;
+    if (!session) return null;
 
     const [blindsResult, playersResult, transactionsResult, eventResult] = await Promise.all([
       supabase
@@ -83,10 +104,13 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
         .single(),
     ]);
 
+    const clubId = eventResult.data?.club_id;
+    if (!clubId) return null;
+
     const { data: clubData } = await supabase
       .from('clubs')
       .select('currency')
-      .eq('id', eventResult.data?.club_id)
+      .eq('id', clubId)
       .single();
 
     const activePlayers = playersResult.data?.filter(p => p.status === 'active').length || 0;
@@ -94,9 +118,10 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
       ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
       .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-    const gameData: ActiveGame = {
+    return {
       sessionId,
       eventId,
+      clubId,
       status: session.status,
       currentLevel: session.current_level,
       timeRemainingSeconds: session.time_remaining_seconds,
@@ -106,120 +131,86 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
       playersRemaining: activePlayers,
       currencySymbol: CURRENCY_SYMBOLS[clubData?.currency || 'GBP'] || '£',
     };
-
-    setActiveGameState(gameData);
-    sessionStorage.setItem('activeGame', JSON.stringify(gameData));
   }, []);
 
   const setActiveGame = useCallback((game: ActiveGame | null) => {
-    setActiveGameState(game);
     if (game) {
-      sessionStorage.setItem('activeGame', JSON.stringify(game));
-    } else {
-      sessionStorage.removeItem('activeGame');
+      // Update or add to allActiveGames
+      setAllActiveGames(prev => {
+        const filtered = prev.filter(g => g.sessionId !== game.sessionId);
+        return [game, ...filtered];
+      });
     }
   }, []);
 
   const clearActiveGame = useCallback(() => {
-    setActiveGameState(null);
-    sessionStorage.removeItem('activeGame');
+    setAllActiveGames([]);
   }, []);
+
+  // Fetch all active games for user's clubs
+  const fetchAllActiveGames = useCallback(async () => {
+    if (!user) return;
+
+    // 1. Get all clubs the user is a member of
+    const { data: memberships } = await supabase
+      .from('club_members')
+      .select('club_id')
+      .eq('user_id', user.id);
+
+    if (!memberships || memberships.length === 0) {
+      setAllActiveGames([]);
+      return;
+    }
+
+    const clubIds = memberships.map(m => m.club_id);
+
+    // 2. Find active game sessions in any of these clubs
+    const { data: activeSessions } = await supabase
+      .from('game_sessions')
+      .select(`
+        id,
+        event_id,
+        status,
+        events!inner (
+          id,
+          club_id
+        )
+      `)
+      .in('status', ['pending', 'active', 'paused'])
+      .order('created_at', { ascending: false });
+
+    // Filter to only sessions in user's clubs
+    const userClubSessions = activeSessions?.filter(session => {
+      const eventData = session.events as unknown as { id: string; club_id: string };
+      return clubIds.includes(eventData.club_id);
+    });
+
+    if (!userClubSessions || userClubSessions.length === 0) {
+      setAllActiveGames([]);
+      return;
+    }
+
+    // 3. Build full game data for each active session
+    const gameDataPromises = userClubSessions.map(session => 
+      buildGameData(session.id, session.event_id)
+    );
+    
+    const gamesData = await Promise.all(gameDataPromises);
+    const validGames = gamesData.filter((g): g is ActiveGame => g !== null);
+    
+    setAllActiveGames(validGames);
+  }, [user, buildGameData]);
 
   // Auto-detect active games on mount or user login
   useEffect(() => {
     if (!user) return;
     if (isInitializedRef.current) return;
 
-    const fetchActiveGames = async () => {
-      // 1. Check if there's cached data and validate it against the database
-      const stored = sessionStorage.getItem('activeGame');
-      let cachedSessionId: string | null = null;
-      
-      if (stored) {
-        try {
-          const cached = JSON.parse(stored);
-          cachedSessionId = cached.sessionId;
-          
-          // Validate the cached session is still active in the database
-          const { data: validSession } = await supabase
-            .from('game_sessions')
-            .select('id, status')
-            .eq('id', cached.sessionId)
-            .maybeSingle();
-          
-          if (!validSession || validSession.status === 'completed') {
-            // Cached data is stale - clear it
-            sessionStorage.removeItem('activeGame');
-            setActiveGameState(null);
-            cachedSessionId = null;
-          } else {
-            // Cache is valid, use it for fast initial render
-            setActiveGameState(cached);
-          }
-        } catch (e) {
-          sessionStorage.removeItem('activeGame');
-          setActiveGameState(null);
-        }
-      }
+    fetchAllActiveGames();
+    isInitializedRef.current = true;
+  }, [user, fetchAllActiveGames]);
 
-      // 2. Get all clubs the user is a member of
-      const { data: memberships } = await supabase
-        .from('club_members')
-        .select('club_id')
-        .eq('user_id', user.id);
-
-      if (!memberships || memberships.length === 0) {
-        isInitializedRef.current = true;
-        return;
-      }
-
-      const clubIds = memberships.map(m => m.club_id);
-      userClubIdsRef.current = clubIds;
-
-      // 3. Find active game sessions in any of these clubs
-      const { data: activeSessions } = await supabase
-        .from('game_sessions')
-        .select(`
-          id,
-          event_id,
-          status,
-          current_level,
-          time_remaining_seconds,
-          level_started_at,
-          events!inner (
-            id,
-            club_id
-          )
-        `)
-        .in('status', ['pending', 'active', 'paused'])
-        .order('created_at', { ascending: false });
-
-      // Filter to only sessions in user's clubs
-      const userClubSessions = activeSessions?.filter(session => {
-        const eventData = session.events as unknown as { id: string; club_id: string };
-        return clubIds.includes(eventData.club_id);
-      });
-
-      if (userClubSessions && userClubSessions.length > 0) {
-        const session = userClubSessions[0];
-        
-        // 4. If the freshest active game is different from cached, update to the new one
-        if (session.id !== cachedSessionId) {
-          await refreshActiveGame(session.id, session.event_id);
-        }
-      } else if (cachedSessionId) {
-        // No active games found but we had cached data - clear it
-        sessionStorage.removeItem('activeGame');
-        setActiveGameState(null);
-      }
-
-      isInitializedRef.current = true;
-    };
-
-    fetchActiveGames();
-  }, [user, refreshActiveGame]);
-
-  // Subscribe to global game_sessions changes for user's clubs
+  // Subscribe to global game_sessions changes
   useEffect(() => {
     if (!user) return;
 
@@ -254,26 +245,17 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
 
           // Handle based on status
           if (session.status === 'completed') {
-            // Game ended - clear if this was our active game OR if cached game matches
-            const stored = sessionStorage.getItem('activeGame');
-            if (stored) {
-              try {
-                const cached = JSON.parse(stored);
-                if (cached.sessionId === session.id) {
-                  sessionStorage.removeItem('activeGame');
-                  setActiveGameState(null);
-                }
-              } catch (e) {
-                // Ignore parse errors
-              }
-            }
-            // Also clear state if it matches
-            setActiveGameState(prev => 
-              prev?.sessionId === session.id ? null : prev
-            );
+            // Game ended - remove from active games
+            setAllActiveGames(prev => prev.filter(g => g.sessionId !== session.id));
           } else if (['pending', 'active', 'paused'].includes(session.status)) {
-            // Game started or updated - always refresh to get latest data
-            await refreshActiveGame(session.id, session.event_id);
+            // Game started or updated - refresh this game's data
+            const gameData = await buildGameData(session.id, session.event_id);
+            if (gameData) {
+              setAllActiveGames(prev => {
+                const filtered = prev.filter(g => g.sessionId !== session.id);
+                return [gameData, ...filtered];
+              });
+            }
           }
         }
       })
@@ -282,76 +264,83 @@ export function ActiveGameProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, refreshActiveGame]);
+  }, [user, buildGameData]);
 
-  // Subscribe to player and transaction updates for the active game
+  // Subscribe to player and transaction updates for all active games
   useEffect(() => {
-    if (!activeGame) return;
+    if (allActiveGames.length === 0) return;
 
-    const channel = supabase
-      .channel(`game-updates-${activeGame.sessionId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'game_players',
-        filter: `game_session_id=eq.${activeGame.sessionId}`,
-      }, async () => {
-        // Refetch player count
-        const { data: players } = await supabase
-          .from('game_players')
-          .select('id, status')
-          .eq('game_session_id', activeGame.sessionId);
+    const channels = allActiveGames.map(game => {
+      return supabase
+        .channel(`game-updates-${game.sessionId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'game_players',
+          filter: `game_session_id=eq.${game.sessionId}`,
+        }, async () => {
+          // Refetch player count
+          const { data: players } = await supabase
+            .from('game_players')
+            .select('id, status')
+            .eq('game_session_id', game.sessionId);
 
-        const activePlayers = players?.filter(p => p.status === 'active').length || 0;
+          const activePlayers = players?.filter(p => p.status === 'active').length || 0;
 
-        setActiveGameState(prev => {
-          if (!prev) return null;
-          const updated = { ...prev, playersRemaining: activePlayers };
-          sessionStorage.setItem('activeGame', JSON.stringify(updated));
-          return updated;
-        });
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'game_transactions',
-        filter: `game_session_id=eq.${activeGame.sessionId}`,
-      }, async () => {
-        // Refetch prize pool
-        const { data: transactions } = await supabase
-          .from('game_transactions')
-          .select('amount, transaction_type')
-          .eq('game_session_id', activeGame.sessionId);
+          setAllActiveGames(prev => prev.map(g => 
+            g.sessionId === game.sessionId 
+              ? { ...g, playersRemaining: activePlayers }
+              : g
+          ));
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'game_transactions',
+          filter: `game_session_id=eq.${game.sessionId}`,
+        }, async () => {
+          // Refetch prize pool
+          const { data: transactions } = await supabase
+            .from('game_transactions')
+            .select('amount, transaction_type')
+            .eq('game_session_id', game.sessionId);
 
-        const prizePool = transactions
-          ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
-          .reduce((sum, t) => sum + t.amount, 0) || 0;
+          const prizePool = transactions
+            ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+            .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-        setActiveGameState(prev => {
-          if (!prev) return null;
-          const updated = { ...prev, prizePool };
-          sessionStorage.setItem('activeGame', JSON.stringify(updated));
-          return updated;
-        });
-      })
-      .subscribe();
+          setAllActiveGames(prev => prev.map(g =>
+            g.sessionId === game.sessionId
+              ? { ...g, prizePool }
+              : g
+          ));
+        })
+        .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [activeGame?.sessionId]);
+  }, [allActiveGames.map(g => g.sessionId).join(',')]);
 
-  // Clear active game when user logs out
+  // Clear active games when user logs out
   useEffect(() => {
     if (!user) {
       clearActiveGame();
       isInitializedRef.current = false;
-      userClubIdsRef.current = [];
+      setCurrentClubId(null);
     }
   }, [user, clearActiveGame]);
 
   return (
-    <ActiveGameContext.Provider value={{ activeGame, setActiveGame, clearActiveGame }}>
+    <ActiveGameContext.Provider value={{ 
+      activeGame, 
+      allActiveGames,
+      setActiveGame, 
+      clearActiveGame,
+      setCurrentClubId,
+      currentClubId,
+    }}>
       {children}
     </ActiveGameContext.Provider>
   );
