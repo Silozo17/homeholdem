@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.admin-stripe-operations]
 verify_jwt = false
+
+[functions.process-pending-notifications]
+verify_jwt = false

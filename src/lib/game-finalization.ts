@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { notifyGameCompleted, notifyNewEventAvailable } from './push-notifications';
+import { notifyGameCompletedInApp, notifyNewEventAvailableInApp } from './in-app-notifications';
 
 interface GamePlayer {
   id: string;
@@ -203,6 +205,75 @@ export async function finalizeGame(
       .from('game_sessions')
       .update({ status: 'completed' })
       .eq('id', sessionId);
+
+    // 5. Send notifications to all club members about game completion
+    try {
+      // Get event details
+      const { data: sessionData } = await supabase
+        .from('game_sessions')
+        .select('event_id')
+        .eq('id', sessionId)
+        .single();
+
+      if (sessionData?.event_id) {
+        const { data: eventData } = await supabase
+          .from('events')
+          .select('title, club_id, created_at')
+          .eq('id', sessionData.event_id)
+          .single();
+
+        if (eventData) {
+          // Get all club members
+          const { data: members } = await supabase
+            .from('club_members')
+            .select('user_id')
+            .eq('club_id', eventData.club_id);
+
+          const memberIds = members?.map(m => m.user_id) || [];
+
+          if (memberIds.length > 0) {
+            // Get winners (position 1, 2, 3)
+            const winners = players
+              .filter(p => p.finish_position && p.finish_position <= 3)
+              .sort((a, b) => (a.finish_position || 99) - (b.finish_position || 99));
+            const winnerNames = winners.map(w => w.display_name);
+
+            // Send game completion notifications
+            await Promise.all([
+              notifyGameCompleted(memberIds, winnerNames, eventData.title, eventData.club_id, sessionId),
+              notifyGameCompletedInApp(memberIds, winnerNames, eventData.title, sessionData.event_id, eventData.club_id),
+            ]);
+
+            // Check if there's a next event to notify about
+            const { data: nextEvent } = await supabase
+              .from('events')
+              .select('id, title, is_unlocked')
+              .eq('club_id', eventData.club_id)
+              .gt('created_at', eventData.created_at)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+
+            if (nextEvent && !nextEvent.is_unlocked) {
+              // Auto-unlock the next event since this one is completed
+              await supabase
+                .from('events')
+                .update({ is_unlocked: true })
+                .eq('id', nextEvent.id);
+
+              // Notify about new event
+              await Promise.all([
+                notifyNewEventAvailable(memberIds, nextEvent.title, nextEvent.id),
+                notifyNewEventAvailableInApp(memberIds, nextEvent.title, nextEvent.id, eventData.club_id),
+              ]);
+            }
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Failed to send game completion notifications:', notificationError);
+      // Don't fail the game finalization if notifications fail
+    }
 
     return { success: true };
   } catch (error) {

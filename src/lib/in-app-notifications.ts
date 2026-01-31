@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface CreateNotificationParams {
   userId: string;
-  type: 'rsvp' | 'date_finalized' | 'waitlist_promotion' | 'host_confirmed' | 'chat_message' | 'event_created' | 'club_invite';
+  type: 'rsvp' | 'date_finalized' | 'waitlist_promotion' | 'host_confirmed' | 'chat_message' | 'event_created' | 'club_invite' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
   title: string;
   body: string;
   url?: string;
@@ -169,6 +169,59 @@ export async function notifyEventCreatedInApp(
     type: 'event_created',
     title: 'New Event',
     body: `${eventTitle} in ${clubName}`,
+    url: `/event/${eventId}`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyGameCompletedInApp(
+  userIds: string[],
+  winnerNames: string[],
+  eventTitle: string,
+  eventId: string,
+  clubId: string
+) {
+  const body = winnerNames.length > 0
+    ? `Winner: ${winnerNames[0]}${winnerNames.length > 1 ? ` | 2nd: ${winnerNames[1]}` : ''}${winnerNames.length > 2 ? ` | 3rd: ${winnerNames[2]}` : ''}`
+    : 'Tournament finished!';
+    
+  return createBulkNotifications(userIds, {
+    type: 'game_completed',
+    title: 'Game Complete',
+    body,
+    url: `/club/${clubId}`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyEventUnlockedInApp(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'event_unlocked',
+    title: 'Event Unlocked',
+    body: `Voting is now open for ${eventTitle}`,
+    url: `/event/${eventId}`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyNewEventAvailableInApp(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'event_unlocked',
+    title: 'New Event Available',
+    body: `Voting is now open for ${eventTitle}`,
     url: `/event/${eventId}`,
     eventId,
     clubId,

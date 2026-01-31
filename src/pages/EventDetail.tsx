@@ -50,6 +50,7 @@ import {
   notifyDateFinalizedInApp, 
   notifyHostConfirmedInApp 
 } from '@/lib/in-app-notifications';
+import { queueDelayedNotification } from '@/lib/delayed-notifications';
 
 interface Event {
   id: string;
@@ -406,9 +407,19 @@ export default function EventDetail() {
           return o;
         }));
         toast.error('Failed to add vote');
+      } else {
+        // Queue delayed notification for voting (3-min delay)
+        queueDelayedNotification({
+          clubId: event!.club_id,
+          eventId: event!.id,
+          type: 'vote',
+          action: 'added',
+          actorId: user.id,
+          actorName: userProfile?.display_name || 'Someone',
+        }).catch(console.error);
       }
     }
-  }, [user, dateOptions]);
+  }, [user, event, dateOptions, userProfile]);
 
   // Optimistic RSVP handler
   const handleRsvp = useCallback(async (status: 'going' | 'maybe' | 'not_going') => {
@@ -488,6 +499,16 @@ export default function EventDetail() {
 
     // Send confirmation email (fire and forget)
     sendRsvpConfirmation(status);
+    
+    // Queue delayed notification for all club members (3-min delay)
+    queueDelayedNotification({
+      clubId: event.club_id,
+      eventId: event.id,
+      type: 'rsvp',
+      action: status,
+      actorId: user.id,
+      actorName: userProfile.display_name,
+    }).catch(console.error);
     
     // Send in-app notification to event creator/admins when someone RSVPs going
     if (status === 'going' && !isWaitlisted && event.created_by && event.created_by !== user.id) {

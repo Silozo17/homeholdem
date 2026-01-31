@@ -7,7 +7,7 @@ interface SendPushParams {
   icon?: string;
   url?: string;
   tag?: string;
-  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up';
+  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
 }
 
 export async function sendPushNotification({
@@ -136,5 +136,56 @@ export async function notifyHostConfirmed(
     url: `/event/${eventId}`,
     tag: `host-${eventId}`,
     notificationType: 'rsvp_updates',
+  });
+}
+
+export async function notifyGameCompleted(
+  userIds: string[],
+  winnerNames: string[],
+  eventTitle: string,
+  clubId: string,
+  sessionId: string
+) {
+  const body = winnerNames.length > 0
+    ? `Winner: ${winnerNames[0]}${winnerNames.length > 1 ? ` | 2nd: ${winnerNames[1]}` : ''}${winnerNames.length > 2 ? ` | 3rd: ${winnerNames[2]}` : ''}`
+    : 'Tournament finished!';
+    
+  return sendPushNotification({
+    userIds,
+    title: 'Game Complete',
+    body,
+    url: `/club/${clubId}`,
+    tag: `game-complete-${sessionId}`,
+    notificationType: 'game_completed',
+  });
+}
+
+export async function notifyEventUnlocked(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title: 'Event Unlocked',
+    body: `Voting is now open for ${eventTitle}`,
+    url: `/event/${eventId}`,
+    tag: `event-unlocked-${eventId}`,
+    notificationType: 'event_unlocked',
+  });
+}
+
+export async function notifyNewEventAvailable(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title: 'New Event Available',
+    body: `Voting is now open for ${eventTitle}`,
+    url: `/event/${eventId}`,
+    tag: `event-available-${eventId}`,
+    notificationType: 'event_unlocked',
   });
 }
