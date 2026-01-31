@@ -21,6 +21,7 @@ import { ActivityFeed } from '@/components/game/ActivityFeed';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { useChipToCashRatio } from '@/hooks/useChipToCashRatio';
+import { useDisplayMode } from '@/hooks/useDisplayMode';
 import { getEventClubMemberIds, logGameActivity } from '@/lib/club-members';
 import { notifyGameStarted } from '@/lib/push-notifications';
 import { notifyGameStartedInApp } from '@/lib/in-app-notifications';
@@ -52,6 +53,7 @@ export default function GameMode() {
 
   const { symbol: currencySymbol } = useClubCurrency(clubId || '');
   const chipToCashRatio = useChipToCashRatio(clubId);
+  const { displayMode } = useDisplayMode(clubId);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -173,6 +175,7 @@ export default function GameMode() {
         onUpdateSession={updateSession}
         onRefresh={refetch}
         chipToCashRatio={chipToCashRatio}
+        blindsDisplayMode={displayMode}
       />
     );
   }
@@ -259,7 +262,7 @@ export default function GameMode() {
               onUpdate={updateSession}
               currencySymbol={currencySymbol}
               chipToCashRatio={chipToCashRatio}
-              displayBlindsAsCurrency={session.display_blinds_as_currency || false}
+              displayMode={displayMode}
             />
 
             {/* Stats Bar */}

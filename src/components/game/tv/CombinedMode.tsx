@@ -56,6 +56,7 @@ interface CombinedModeProps {
   onUpdateSession: (updates: Partial<GameSession>) => void;
   payouts?: PayoutStructure[];
   chipToCashRatio?: number;
+  blindsDisplayMode?: 'cash' | 'chips';
 }
 
 export function CombinedMode({
@@ -67,7 +68,8 @@ export function CombinedMode({
   currencySymbol,
   onUpdateSession,
   payouts = [],
-  chipToCashRatio = 0.01
+  chipToCashRatio = 0.01,
+  blindsDisplayMode = 'cash'
 }: CombinedModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -172,9 +174,9 @@ export function CombinedMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency) {
+    if (blindsDisplayMode === 'cash' && chipToCashRatio > 0) {
       const cashValue = chips * chipToCashRatio;
-      return `${currencySymbol}${cashValue.toFixed(2)}`;
+      return `${currencySymbol}${cashValue.toFixed(2).replace(/\.00$/, '')}`;
     }
     return chips.toLocaleString();
   };

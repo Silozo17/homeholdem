@@ -30,6 +30,7 @@ interface PortraitTimerModeProps {
   onUpdateSession: (updates: Partial<GameSession>) => void;
   isAdmin: boolean;
   chipToCashRatio?: number;
+  blindsDisplayMode?: 'cash' | 'chips';
 }
 
 export function PortraitTimerMode({
@@ -41,7 +42,8 @@ export function PortraitTimerMode({
   totalPlayers,
   onUpdateSession,
   isAdmin,
-  chipToCashRatio = 0.01
+  chipToCashRatio = 0.01,
+  blindsDisplayMode = 'cash'
 }: PortraitTimerModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -126,7 +128,7 @@ export function PortraitTimerMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency && chipToCashRatio > 0) {
+    if (blindsDisplayMode === 'cash' && chipToCashRatio > 0) {
       const value = chips * chipToCashRatio;
       if (value < 1) {
         return `${currencySymbol}${value.toFixed(2)}`;

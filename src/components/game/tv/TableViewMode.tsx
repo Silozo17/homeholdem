@@ -41,6 +41,7 @@ interface TableViewModeProps {
   totalPlayers: number;
   onUpdateSession: (updates: Partial<GameSession>) => void;
   chipToCashRatio?: number;
+  blindsDisplayMode?: 'cash' | 'chips';
 }
 
 export function TableViewMode({
@@ -52,7 +53,8 @@ export function TableViewMode({
   playersRemaining,
   totalPlayers,
   onUpdateSession,
-  chipToCashRatio = 0.01
+  chipToCashRatio = 0.01,
+  blindsDisplayMode = 'cash'
 }: TableViewModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -117,7 +119,7 @@ export function TableViewMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency && chipToCashRatio > 0) {
+    if (blindsDisplayMode === 'cash' && chipToCashRatio > 0) {
       const value = chips * chipToCashRatio;
       if (value < 1) {
         return `${currencySymbol}${value.toFixed(2)}`;

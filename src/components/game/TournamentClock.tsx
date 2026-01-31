@@ -23,7 +23,7 @@ interface GameSession {
   time_remaining_seconds: number | null;
 }
 
-interface TournamentClockProps {
+export interface TournamentClockProps {
   session: GameSession;
   blindStructure: BlindLevel[];
   isAdmin: boolean;
@@ -33,7 +33,7 @@ interface TournamentClockProps {
   isFinalTable?: boolean;
   currencySymbol?: string;
   chipToCashRatio?: number;
-  displayBlindsAsCurrency?: boolean;
+  displayMode?: 'cash' | 'chips';
 }
 
 export function TournamentClock({ 
@@ -46,7 +46,7 @@ export function TournamentClock({
   isFinalTable = false,
   currencySymbol = '£',
   chipToCashRatio = 0.01,
-  displayBlindsAsCurrency = false
+  displayMode = 'cash'
 }: TournamentClockProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -221,13 +221,15 @@ export function TournamentClock({
   };
 
   const formatBlind = (chips: number) => {
-    if (displayBlindsAsCurrency && chipToCashRatio > 0) {
+    // In cash mode, show currency values using chip-to-cash ratio
+    if (displayMode === 'cash' && chipToCashRatio > 0) {
       const value = chips * chipToCashRatio;
       if (value < 1) {
         return `${currencySymbol}${value.toFixed(2)}`;
       }
       return `${currencySymbol}${value.toFixed(2).replace(/\.00$/, '')}`;
     }
+    // In chips mode, show chip face values
     return chips.toLocaleString();
   };
 

@@ -25,6 +25,7 @@ import { UserAvatar } from '@/components/common/UserAvatar';
 import { getClubMemberIds, logGameActivity } from '@/lib/club-members';
 import { notifyRebuyAddon } from '@/lib/push-notifications';
 import { notifyRebuyAddonInApp } from '@/lib/in-app-notifications';
+import { CustomAddonDialog } from './CustomAddonDialog';
 
 interface GamePlayer {
   id: string;
@@ -88,6 +89,8 @@ export function BuyInTracker({
   const [pendingQuickAdd, setPendingQuickAdd] = useState<string | null>(null);
   const [showBulkBuyIn, setShowBulkBuyIn] = useState(false);
   const [bulkBuyInPending, setBulkBuyInPending] = useState(false);
+  const [showCustomAddon, setShowCustomAddon] = useState(false);
+  const [addonPlayer, setAddonPlayer] = useState<GamePlayer | null>(null);
 
   const getPlayerTransactions = useCallback((playerId: string) => {
     return transactions.filter(t => t.game_player_id === playerId);
@@ -106,6 +109,16 @@ export function BuyInTracker({
   const handleAddTransaction = async () => {
     if (!selectedPlayer || !user) return;
 
+    // For add-ons, open the custom dialog instead
+    if (transactionType === 'addon') {
+      const player = players.find(p => p.id === selectedPlayer);
+      if (player) {
+        setShowAddTransaction(false);
+        openCustomAddonDialog(player);
+      }
+      return;
+    }
+
     let amount = 0;
     let chips = 0;
 
@@ -117,10 +130,6 @@ export function BuyInTracker({
       case 'rebuy':
         amount = session.rebuy_amount;
         chips = session.rebuy_chips;
-        break;
-      case 'addon':
-        amount = session.addon_amount;
-        chips = session.addon_chips;
         break;
     }
 
@@ -143,8 +152,8 @@ export function BuyInTracker({
     const player = players.find(p => p.id === selectedPlayer);
     toast.success(`${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} added for ${player?.display_name}`);
     
-    // Send notifications for rebuys and addons
-    if ((transactionType === 'rebuy' || transactionType === 'addon') && player && clubId && eventId) {
+    // Send notifications for rebuys
+    if (transactionType === 'rebuy' && player && clubId && eventId) {
       const newPrizePool = totalBuyIns + totalRebuys + totalAddons + amount;
       getClubMemberIds(clubId).then(memberIds => {
         if (memberIds.length > 0) {
@@ -228,6 +237,56 @@ export function BuyInTracker({
     toast.success(`Buy-in added for ${playersWithoutBuyIn.length} players`);
     setShowBulkBuyIn(false);
     onRefresh();
+  };
+
+  // Handle custom addon with manual amount/chips input
+  const handleCustomAddon = async (amount: number, chips: number) => {
+    if (!addonPlayer || !user) return;
+
+    const { error } = await supabase
+      .from('game_transactions')
+      .insert({
+        game_session_id: session.id,
+        game_player_id: addonPlayer.id,
+        transaction_type: 'addon',
+        amount,
+        chips,
+        created_by: user.id,
+      });
+
+    if (error) {
+      toast.error('Failed to add add-on');
+      throw error;
+    }
+
+    toast.success(`Add-on (${currencySymbol}${amount}) added for ${addonPlayer.display_name}`);
+    
+    // Send notifications
+    if (clubId && eventId) {
+      const newPrizePool = totalBuyIns + totalRebuys + totalAddons + amount;
+      getClubMemberIds(clubId).then(memberIds => {
+        if (memberIds.length > 0) {
+          Promise.all([
+            notifyRebuyAddon(memberIds, addonPlayer.display_name, 'addon', newPrizePool, currencySymbol, eventId),
+            notifyRebuyAddonInApp(memberIds, addonPlayer.display_name, 'addon', newPrizePool, currencySymbol, eventId, clubId),
+            logGameActivity(session.id, 'addon', addonPlayer.id, addonPlayer.display_name, {
+              amount,
+              chips,
+              prizePool: newPrizePool,
+            }),
+          ]).catch(console.error);
+        }
+      });
+    }
+    
+    setShowCustomAddon(false);
+    setAddonPlayer(null);
+    onRefresh();
+  };
+
+  const openCustomAddonDialog = (player: GamePlayer) => {
+    setAddonPlayer(player);
+    setShowCustomAddon(true);
   };
 
   const canRebuy = session.allow_rebuys && 
@@ -485,6 +544,20 @@ export function BuyInTracker({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Custom Add-on Dialog */}
+      <CustomAddonDialog
+        isOpen={showCustomAddon}
+        onClose={() => {
+          setShowCustomAddon(false);
+          setAddonPlayer(null);
+        }}
+        player={addonPlayer}
+        defaultAmount={session.addon_amount}
+        defaultChips={session.addon_chips}
+        currencySymbol={currencySymbol}
+        onConfirm={handleCustomAddon}
+      />
     </>
   );
 }
