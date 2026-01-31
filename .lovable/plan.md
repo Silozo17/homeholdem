@@ -1,409 +1,290 @@
 
-## Plan: TV Display Mode Enhancement - Mobile Landscape, Wake Lock & Live Updates Widget
+
+## Plan: Fix TV Display Safe Areas, Mini Bar Position, and Multi-Device Responsiveness
 
 ### Overview
-This plan addresses three key improvements for the TV display feature:
-1. **Mobile Landscape Mode**: Force landscape orientation when entering TV mode on mobile, with responsive design
-2. **Screen Wake Lock**: Prevent phone from locking while in TV mode
-3. **Live Updates Widget**: Uber-style persistent floating notification showing timer and blinds when not in TV mode
+This plan addresses the four distinct issues:
+1. **TV Display header safe area** - Exit/Settings buttons overlapped by phone status bar (only affects TV mode)
+2. **Mini bar position** - Currently at bottom, hidden under navigation. Move to TOP of page, below header
+3. **TV mode landscape** - Better orientation handling with portrait fallback
+4. **Responsive TV layouts** - Dedicated portrait mode and improved landscape responsiveness for all devices
 
 ---
 
-### Part 1: Mobile Landscape Orientation for TV Mode
+### Part 1: Fix Mini Bar Position (Move to Top of Page)
 
 #### Problem
-Currently, when opening TV mode on a phone, the view displays in portrait mode and looks cramped. The timer and blinds are designed for landscape/TV screens.
+The `TournamentMiniBar` is positioned at `bottom-20` which places it UNDER the `BottomNav` (which also uses z-40), making it barely visible or completely hidden.
 
 #### Solution
-When entering TV mode:
-1. Request fullscreen (already implemented)
-2. Lock screen orientation to landscape using the Screen Orientation API
-3. Add responsive CSS for mobile landscape view
-4. On exit, unlock orientation
+Move the mini bar to the TOP of the page, directly below the header navigation. This makes it:
+- Always visible
+- Not competing with bottom navigation
+- Similar to how Uber shows delivery tracking at the top
 
-**Update `src/components/game/TVDisplay.tsx`:**
+**File: `src/components/game/TournamentMiniBar.tsx`**
+
+Change positioning from bottom to top:
+```typescript
+// Before:
+className="fixed bottom-20 left-2 right-2 z-40"
+
+// After:
+className="fixed top-[calc(4rem+env(safe-area-inset-top,0px))] left-3 right-3 z-40"
+```
+
+The mini bar will sit just below the standard header height (h-16 = 4rem) plus any safe area inset.
+
+Also improve the styling for better visibility:
+- Stronger gradient background
+- More prominent border and shadow
+- Display prize pool alongside timer
+
+---
+
+### Part 2: Fix TV Display Safe Area (Header Buttons)
+
+#### Problem
+In `TVDisplay.tsx`, the exit button and wake lock indicator are positioned at `top-4` which doesn't account for the device status bar on notched phones (iPhone, newer Android). This ONLY affects TV mode, not other pages.
+
+#### Solution
+Add safe area padding to all elements in the TV display header area.
+
+**File: `src/components/game/TVDisplay.tsx`**
 
 ```typescript
-// Add orientation lock on mount
+// Before:
+<Button
+  className="absolute top-4 left-4 z-50 ..."
+>
+
+// After - account for safe area:
+<Button
+  className="absolute top-[max(1rem,env(safe-area-inset-top,1rem))] left-[max(1rem,env(safe-area-inset-left,1rem))] z-50 ..."
+>
+```
+
+Apply same pattern to:
+- Exit button (top-left)
+- Wake lock indicator (top-left, after exit button)
+- Settings button (top-right)
+
+**Also update the TV mode display components** to add top padding for the stats bar:
+
+**File: `src/components/game/tv/ClassicTimerMode.tsx`**
+```typescript
+// Stats bar needs safe area padding
+<div className="flex flex-wrap items-center justify-between 
+  px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 
+  md:px-16 md:pt-[max(0.75rem,env(safe-area-inset-top,0px))] md:pb-3 
+  bg-black/40 ...">
+```
+
+Same for `DashboardMode.tsx`, `TableViewMode.tsx`, and `CombinedMode.tsx`.
+
+---
+
+### Part 3: Create Portrait TV Layout
+
+#### Problem
+The current TV modes are designed for landscape/TV screens. On a phone in portrait mode, they look cramped and unusable. Need a dedicated portrait layout.
+
+#### Solution
+Create a new `PortraitTimerMode` component optimized for portrait orientation on mobile:
+
+**New file: `src/components/game/tv/PortraitTimerMode.tsx`**
+
+Layout structure (top to bottom):
+```text
+┌─────────────────────────┐
+│      LEVEL 1            │  ← Badge (small)
+│                         │
+│        15:42            │  ← Large timer (fills width)
+│                         │
+│       SB: 100           │  ← Blinds stacked vertically
+│       BB: 200           │
+│      Ante: 25           │
+│                         │
+│   Next: 200/400         │  ← Next level preview
+│                         │
+│  ┌─────────┬─────────┐  │  ← Stats row
+│  │  8/10   │  £300   │  │
+│  │ Players │  Prize  │  │
+│  └─────────┴─────────┘  │
+│                         │
+│   ════════════════      │  ← Progress bar
+└─────────────────────────┘
+```
+
+Key styling:
+- Timer: `text-[clamp(4rem,22vw,8rem)]` - Large, width-constrained
+- Blinds: Stacked vertically, not side-by-side
+- Full width utilization
+- Simplified stats (no average stack in portrait)
+- No table visualization (too cramped)
+
+---
+
+### Part 4: Add Orientation Detection and Layout Switching
+
+#### Problem
+The Screen Orientation API's `lock()` method isn't supported on iOS Safari. Need to detect actual orientation and switch layouts accordingly.
+
+#### Solution
+Add orientation detection to `TVDisplay.tsx` and automatically switch to portrait layout when needed.
+
+**File: `src/components/game/TVDisplay.tsx`**
+
+```typescript
+const [isLandscape, setIsLandscape] = useState(true);
+
 useEffect(() => {
-  const lockOrientation = async () => {
-    try {
-      // First enter fullscreen (required for orientation lock on most browsers)
-      if (document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
-      }
-      
-      // Then lock to landscape
-      if (screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock('landscape');
-      }
-    } catch (err) {
-      console.log('Orientation lock not supported:', err);
-    }
+  const checkOrientation = () => {
+    // Use matchMedia for reliable orientation detection
+    const landscape = window.matchMedia('(orientation: landscape)').matches;
+    setIsLandscape(landscape);
   };
   
-  lockOrientation();
-
-  return () => {
-    // Unlock orientation on exit
-    if (screen.orientation && screen.orientation.unlock) {
-      screen.orientation.unlock();
-    }
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
+  checkOrientation();
+  
+  const mql = window.matchMedia('(orientation: landscape)');
+  mql.addEventListener('change', checkOrientation);
+  
+  return () => mql.removeEventListener('change', checkOrientation);
 }, []);
 ```
 
-**Add mobile-responsive styling to TV display modes:**
+Then in the render:
+```typescript
+// Portrait mode - use dedicated portrait layout
+if (!isLandscape) {
+  return (
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950">
+      {/* Exit button with safe area */}
+      <Button ... />
+      
+      <PortraitTimerMode
+        session={session}
+        blindStructure={blindStructure}
+        prizePool={prizePool}
+        currencySymbol={currencySymbol}
+        playersRemaining={activePlayers.length}
+        totalPlayers={players.length}
+        onUpdateSession={onUpdateSession}
+        isAdmin={isAdmin}
+        chipToCashRatio={chipToCashRatio}
+      />
+    </div>
+  );
+}
 
-The classic timer mode needs responsive font sizes:
-```css
-/* Mobile landscape adjustments */
-.tv-timer {
-  font-size: clamp(4rem, 15vw, 12rem);
-}
-.tv-blinds {
-  font-size: clamp(2rem, 8vw, 6rem);
-}
+// Landscape mode - use existing modes based on displayMode setting
+return (
+  <div className="fixed inset-0 z-50 ...">
+    {displayMode === 'classic' && <ClassicTimerMode ... />}
+    {/* etc */}
+  </div>
+);
 ```
 
 ---
 
-### Part 2: Screen Wake Lock - Prevent Phone from Locking
+### Part 5: Improve Landscape Responsiveness for All Devices
+
+#### Problem
+Even in landscape, the layouts don't adapt well to different screen sizes (phone landscape vs iPad landscape vs desktop/TV).
 
 #### Solution
-Use the Screen Wake Lock API to prevent the device from sleeping while in TV mode.
+Use viewport-relative units (`vw`, `vh`) with CSS `clamp()` more aggressively.
 
-**Create new hook `src/hooks/useWakeLock.ts`:**
-
-```typescript
-import { useState, useEffect, useCallback } from 'react';
-
-interface WakeLockState {
-  isSupported: boolean;
-  isActive: boolean;
-}
-
-export function useWakeLock() {
-  const [state, setState] = useState<WakeLockState>({
-    isSupported: false,
-    isActive: false,
-  });
-  const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null);
-
-  useEffect(() => {
-    setState(prev => ({
-      ...prev,
-      isSupported: 'wakeLock' in navigator,
-    }));
-  }, []);
-
-  const requestWakeLock = useCallback(async () => {
-    if (!('wakeLock' in navigator)) return false;
-
-    try {
-      const lock = await navigator.wakeLock.request('screen');
-      setWakeLock(lock);
-      setState(prev => ({ ...prev, isActive: true }));
-
-      lock.addEventListener('release', () => {
-        setState(prev => ({ ...prev, isActive: false }));
-      });
-
-      return true;
-    } catch (err) {
-      console.error('Wake Lock request failed:', err);
-      return false;
-    }
-  }, []);
-
-  const releaseWakeLock = useCallback(async () => {
-    if (wakeLock) {
-      await wakeLock.release();
-      setWakeLock(null);
-      setState(prev => ({ ...prev, isActive: false }));
-    }
-  }, [wakeLock]);
-
-  // Re-acquire wake lock when page becomes visible again
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (wakeLock !== null && document.visibilityState === 'visible') {
-        await requestWakeLock();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [wakeLock, requestWakeLock]);
-
-  return {
-    ...state,
-    requestWakeLock,
-    releaseWakeLock,
-  };
-}
-```
-
-**Integrate into TVDisplay.tsx:**
+**File: `src/components/game/tv/ClassicTimerMode.tsx`**
 
 ```typescript
-import { useWakeLock } from '@/hooks/useWakeLock';
+// Timer - scales from small phone landscape to large TV
+<div className={`text-[clamp(3rem,15vh,12rem)] font-mono font-black ...`}>
 
-// Inside component:
-const { requestWakeLock, releaseWakeLock, isActive: wakeLockActive } = useWakeLock();
+// Blinds - also viewport-relative
+<div className="text-[clamp(1.25rem,5vh,3.75rem)] font-bold text-blue-400">
 
-useEffect(() => {
-  requestWakeLock();
-  return () => {
-    releaseWakeLock();
-  };
-}, [requestWakeLock, releaseWakeLock]);
+// Stats bar values - responsive
+<div className="text-[clamp(1rem,3vh,2rem)] font-bold text-white">
 ```
 
-**Add visual indicator** (optional):
-Show a small icon in the TV display header indicating wake lock is active.
+**File: `src/components/game/tv/DashboardMode.tsx`**
+
+The right sidebar (fixed 400px width) is problematic on smaller screens:
+```typescript
+// Before:
+<div className="w-[400px] bg-black/40 ...">
+
+// After - responsive width:
+<div className="w-[min(400px,35vw)] bg-black/40 ...">
+```
+
+Timer sizing:
+```typescript
+// Before:
+<div className="text-[10rem] font-mono ...">
+
+// After:
+<div className="text-[clamp(4rem,12vh,10rem)] font-mono ...">
+```
+
+**File: `src/components/game/tv/TableViewMode.tsx`**
+
+The stats bar needs responsive padding:
+```typescript
+// Before:
+<div className="flex items-center justify-between pl-20 pr-20 py-4 ...">
+
+// After - responsive padding that accounts for overlay buttons:
+<div className="flex items-center justify-between 
+  px-[max(5rem,env(safe-area-inset-left,1rem)+4rem)] 
+  pt-[max(1rem,env(safe-area-inset-top,0.5rem))] pb-4 ...">
+```
+
+Table sizing - ensure it fills available space:
+```typescript
+// Before:
+<div className="relative w-full max-w-5xl aspect-[2.5/1]">
+
+// After - more flexible:
+<div className="relative w-full max-w-[90vw] max-h-[70vh] aspect-[2.5/1]">
+```
 
 ---
 
-### Part 3: Live Updates Widget (Uber-style Persistent Notification)
+### Part 6: Update AppLayout for Top-Positioned Mini Bar
 
-#### Solution
-Create a floating "mini player" widget that appears when the user navigates away from Game Mode. This uses the **Document Picture-in-Picture API** (Chrome 116+) with a fallback to a **persistent in-app mini widget**.
+Since the mini bar moves to the top, pages need padding at the top when the mini bar is shown:
 
-#### 3a. Document Picture-in-Picture Widget (Modern Browsers)
-
-**New Component: `src/components/game/LiveTournamentWidget.tsx`**
-
-This component creates a floating window with:
-- Current blind level timer countdown
-- Small/Big blind values
-- Players remaining
-- Tap to return to full game mode
+**File: `src/components/layout/AppLayout.tsx`**
 
 ```typescript
-import { useEffect, useState, useRef } from 'react';
-
-interface LiveTournamentWidgetProps {
-  session: GameSession;
-  blindStructure: BlindLevel[];
-  playersRemaining: number;
-  currencySymbol: string;
-  onReturnToGame: () => void;
-}
-
-export function LiveTournamentWidget({ ... }) {
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const openPipWindow = async () => {
-    if (!('documentPictureInPicture' in window)) {
-      return false;
-    }
-
-    try {
-      // Close existing PiP window if any
-      if ((window as any).documentPictureInPicture.window) {
-        (window as any).documentPictureInPicture.window.close();
-      }
-
-      const pip = await (window as any).documentPictureInPicture.requestWindow({
-        width: 320,
-        height: 180,
-      });
-
-      // Copy styles to PiP window
-      [...document.styleSheets].forEach((styleSheet) => {
-        try {
-          const cssRules = [...styleSheet.cssRules]
-            .map((rule) => rule.cssText)
-            .join('');
-          const style = pip.document.createElement('style');
-          style.textContent = cssRules;
-          pip.document.head.appendChild(style);
-        } catch (e) {
-          // External stylesheets may fail
-        }
-      });
-
-      // Move widget content to PiP
-      if (containerRef.current) {
-        pip.document.body.appendChild(containerRef.current);
-      }
-
-      setPipWindow(pip);
-      return true;
-    } catch (err) {
-      console.error('PiP failed:', err);
-      return false;
-    }
-  };
-
-  // Render widget content
-  return (
-    <div ref={containerRef} className="pip-widget bg-slate-900 p-4 rounded-lg">
-      <div className="text-3xl font-mono font-bold text-white">
-        {formatTime(timeRemaining)}
-      </div>
-      <div className="text-sm text-amber-400">
-        {currentLevel.small_blind}/{currentLevel.big_blind}
-      </div>
-      <div className="text-xs text-white/60">
-        {playersRemaining} players
-      </div>
-      <button onClick={onReturnToGame}>Return to Game</button>
-    </div>
-  );
-}
-```
-
-#### 3b. Fallback: Persistent In-App Mini Widget
-
-For browsers without Document PiP support, show a fixed mini-bar at the bottom of the screen (above bottom nav):
-
-**New Component: `src/components/game/TournamentMiniBar.tsx`**
-
-```typescript
-// Displays when:
-// 1. There's an active game session
-// 2. User navigates away from GameMode page
-// 3. Game status is 'active' or 'paused'
-
-export function TournamentMiniBar({ 
-  session, 
-  blindStructure, 
-  eventId,
-  onNavigate 
-}) {
-  // Shows:
-  // [▶ 15:42] [100/200] [8 players] [Tap to view]
-  
-  return (
-    <div className="fixed bottom-20 left-2 right-2 z-40 bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 rounded-full px-4 py-2 shadow-2xl shadow-emerald-500/20">
-      <button onClick={() => onNavigate(`/game/${eventId}`)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              session.status === 'active' ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-            )} />
-            <span className="font-mono text-lg text-white font-bold">
-              {formatTime(timeRemaining)}
-            </span>
-            <span className="text-amber-400 text-sm font-medium">
-              {currentLevel.small_blind}/{currentLevel.big_blind}
-            </span>
-          </div>
-          <ChevronRight className="w-5 h-5 text-white/60" />
-        </div>
-      </button>
-    </div>
-  );
-}
-```
-
-#### 3c. Active Game Session Context
-
-Create a context to track active game sessions globally:
-
-**New File: `src/contexts/ActiveGameContext.tsx`**
-
-```typescript
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './AuthContext';
-
-interface ActiveGame {
-  sessionId: string;
-  eventId: string;
-  status: string;
-  currentLevel: number;
-  timeRemainingSeconds: number;
-  blindStructure: BlindLevel[];
-}
-
-interface ActiveGameContextType {
-  activeGame: ActiveGame | null;
-  setActiveGame: (game: ActiveGame | null) => void;
-}
-
-const ActiveGameContext = createContext<ActiveGameContextType>({
-  activeGame: null,
-  setActiveGame: () => {},
-});
-
-export function ActiveGameProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
-
-  // Subscribe to realtime updates for active game
-  useEffect(() => {
-    if (!activeGame) return;
-
-    const channel = supabase
-      .channel(`game-${activeGame.sessionId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'game_sessions',
-        filter: `id=eq.${activeGame.sessionId}`,
-      }, (payload) => {
-        setActiveGame(prev => prev ? {
-          ...prev,
-          status: payload.new.status,
-          currentLevel: payload.new.current_level,
-          timeRemainingSeconds: payload.new.time_remaining_seconds,
-        } : null);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeGame?.sessionId]);
-
-  return (
-    <ActiveGameContext.Provider value={{ activeGame, setActiveGame }}>
-      {children}
-    </ActiveGameContext.Provider>
-  );
-}
-
-export const useActiveGame = () => useContext(ActiveGameContext);
-```
-
-#### 3d. Integrate Mini Bar into App Layout
-
-**Update `src/components/layout/AppLayout.tsx`:**
-
-```typescript
-import { TournamentMiniBar } from '@/components/game/TournamentMiniBar';
-import { useActiveGame } from '@/contexts/ActiveGameContext';
-
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const { activeGame } = useActiveGame();
-  
-  // Don't show mini bar on game mode page itself
+
+  // ... existing logic ...
+
   const showMiniBar = activeGame && 
-    activeGame.status !== 'completed' &&
-    !location.pathname.includes('/game');
+    activeGame.status !== 'completed' && 
+    !isOnGamePage && 
+    showBottomNav;
 
   return (
     <div className="min-h-screen safe-area-top">
-      <div className={showBottomNav ? 'pb-20' : ''}>
+      {/* Mini bar at top, only when there's an active game */}
+      {showMiniBar && <TournamentMiniBar />}
+      
+      {/* Main content - add top padding when mini bar is shown */}
+      <div className={cn(
+        showBottomNav ? 'pb-20' : '',
+        showMiniBar ? 'pt-16' : '' // Space for mini bar
+      )}>
         {children}
       </div>
-      {showMiniBar && (
-        <TournamentMiniBar 
-          session={activeGame}
-          eventId={activeGame.eventId}
-        />
-      )}
+      
       {showBottomNav && <BottomNav />}
     </div>
   );
@@ -412,156 +293,67 @@ export function AppLayout({ children }: AppLayoutProps) {
 
 ---
 
-### Part 4: Responsive TV Display for Mobile
+### Summary of File Changes
 
-Update the classic timer mode with responsive styling:
+| File | Change |
+|------|--------|
+| `src/components/game/TournamentMiniBar.tsx` | Move to top position, improve styling |
+| `src/components/layout/AppLayout.tsx` | Move mini bar render to top, add content padding |
+| `src/components/game/TVDisplay.tsx` | Add safe area to buttons, add orientation detection, portrait layout |
+| `src/components/game/tv/PortraitTimerMode.tsx` | **New file** - Portrait-optimized TV layout |
+| `src/components/game/tv/ClassicTimerMode.tsx` | Add safe area to stats bar, improve responsive sizing |
+| `src/components/game/tv/DashboardMode.tsx` | Responsive sidebar width, safe area padding |
+| `src/components/game/tv/TableViewMode.tsx` | Safe area padding, responsive table sizing |
+| `src/components/game/tv/CombinedMode.tsx` | Safe area padding, responsive sizing |
 
-**Update `src/components/game/tv/ClassicTimerMode.tsx`:**
+---
 
+### Device Support Matrix
+
+| Device | Orientation | Layout Used |
+|--------|-------------|-------------|
+| iPhone (portrait) | Portrait | PortraitTimerMode |
+| iPhone (landscape) | Landscape | ClassicTimerMode (or selected mode) |
+| iPad (portrait) | Portrait | PortraitTimerMode (larger text) |
+| iPad (landscape) | Landscape | Selected mode (Classic/Dashboard/Table/Combined) |
+| Desktop browser | Landscape | Selected mode, full size |
+| TV via AirPlay/HDMI | Landscape | Full landscape, large text |
+
+---
+
+### Technical Details
+
+#### Safe Area CSS Pattern for Fixed Elements
+```css
+/* For buttons in TV display */
+top: max(1rem, env(safe-area-inset-top, 1rem));
+left: max(1rem, env(safe-area-inset-left, 1rem));
+right: max(1rem, env(safe-area-inset-right, 1rem));
+```
+
+#### Orientation Detection
 ```typescript
-// Replace fixed font sizes with responsive classes
+const mql = window.matchMedia('(orientation: landscape)');
+mql.addEventListener('change', (e) => setIsLandscape(e.matches));
+```
 
-// Timer: text-[12rem] → use clamp for mobile
-<div className={cn(
-  "font-mono font-black tracking-tight leading-none drop-shadow-2xl",
-  "text-[clamp(4rem,20vw,12rem)]", // Scales based on viewport
-  getTimerColor()
-)}>
-  {formatTime(timeRemaining)}
-</div>
-
-// Blinds: text-6xl → responsive
-<div className="text-[clamp(1.5rem,6vw,3.75rem)] font-bold text-blue-400">
-  {formatBlind(currentLevel.small_blind)}
-</div>
-
-// Stats bar - stack on mobile landscape
-<div className="flex flex-wrap items-center justify-between pl-4 pr-4 py-2 
-  md:pl-16 md:pr-16 md:py-3 gap-2">
-  ...
-</div>
+#### Viewport-Relative Typography
+```css
+/* clamp(min, preferred, max) */
+font-size: clamp(3rem, 15vh, 12rem);
+/* - Never smaller than 3rem
+   - Prefers 15% of viewport height
+   - Never larger than 12rem */
 ```
 
 ---
 
-### Part 5: TypeScript Type Declaration for Wake Lock API
+### User Experience After Fix
 
-**Update `src/vite-env.d.ts`:**
+1. **Mini Bar**: Visible at TOP of screen when tournament is active, below header navigation
+2. **TV Mode on Phone (Portrait)**: Clean, stacked layout optimized for vertical screen
+3. **TV Mode on Phone (Landscape)**: Responsive layout that fills the screen
+4. **TV Mode on iPad**: Works in both orientations with appropriate layouts
+5. **TV Mode on TV (via casting)**: Full-size landscape layout with large, readable text
+6. **Safe Areas**: All buttons and content respect device notches and status bars
 
-```typescript
-/// <reference types="vite/client" />
-
-interface WakeLockSentinel extends EventTarget {
-  readonly released: boolean;
-  readonly type: 'screen';
-  release(): Promise<void>;
-}
-
-interface WakeLock {
-  request(type: 'screen'): Promise<WakeLockSentinel>;
-}
-
-interface Navigator {
-  wakeLock: WakeLock;
-}
-
-interface DocumentPictureInPicture {
-  requestWindow(options?: { width?: number; height?: number }): Promise<Window>;
-  window: Window | null;
-}
-
-interface Window {
-  documentPictureInPicture?: DocumentPictureInPicture;
-}
-```
-
----
-
-### Part 6: Translation Updates
-
-**English (`src/i18n/locales/en.json`):**
-```json
-{
-  "game": {
-    "wake_lock_active": "Screen will stay on",
-    "wake_lock_failed": "Could not prevent screen lock",
-    "live_tournament": "Live Tournament",
-    "return_to_game": "Return to Game",
-    "tap_to_view": "Tap to view",
-    "landscape_required": "Rotate to landscape for best view"
-  }
-}
-```
-
-**Polish (`src/i18n/locales/pl.json`):**
-```json
-{
-  "game": {
-    "wake_lock_active": "Ekran pozostanie włączony",
-    "wake_lock_failed": "Nie można zapobiec blokowaniu ekranu",
-    "live_tournament": "Turniej na żywo",
-    "return_to_game": "Wróć do gry",
-    "tap_to_view": "Dotknij, aby zobaczyć",
-    "landscape_required": "Obróć do pozycji poziomej dla lepszego widoku"
-  }
-}
-```
-
----
-
-### Summary of Changes
-
-| Category | File | Change |
-|----------|------|--------|
-| **Orientation** | `TVDisplay.tsx` | Add landscape lock on mount, unlock on exit |
-| **Wake Lock** | `useWakeLock.ts` (new) | Hook for Screen Wake Lock API |
-| **Wake Lock** | `TVDisplay.tsx` | Integrate wake lock |
-| **Live Widget** | `ActiveGameContext.tsx` (new) | Context for tracking active game globally |
-| **Live Widget** | `TournamentMiniBar.tsx` (new) | Floating mini bar component |
-| **Live Widget** | `AppLayout.tsx` | Show mini bar when game is active |
-| **Responsive** | `ClassicTimerMode.tsx` | Responsive font sizes for mobile |
-| **Responsive** | All TV modes | Mobile landscape optimizations |
-| **Types** | `vite-env.d.ts` | Wake Lock + PiP type declarations |
-| **i18n** | `en.json`, `pl.json` | New translation keys |
-
----
-
-### Browser Support
-
-| Feature | Chrome | Safari | Firefox |
-|---------|--------|--------|---------|
-| Screen Orientation Lock | Yes (fullscreen) | Yes (fullscreen) | Yes (fullscreen) |
-| Wake Lock API | Yes (84+) | Yes (16.4+) | No |
-| Document PiP | Yes (116+) | No | No |
-| Fallback Mini Bar | All | All | All |
-
----
-
-### User Experience Flow
-
-```text
-User taps TV button on phone
-        │
-        ▼
-  Enter fullscreen + lock to landscape
-        │
-        ▼
-  Request wake lock (phone won't sleep)
-        │
-        ├── User watches on phone in landscape
-        │
-        ├── User connects to TV via Chromecast/AirPlay
-        │   └── Large view displays on TV
-        │
-        └── User exits TV mode
-                │
-                ▼
-          Unlock orientation + release wake lock
-                │
-                ▼
-          Mini bar appears at bottom showing live timer
-                │
-                ├── Tap mini bar → Return to game
-                │
-                └── Game completes → Mini bar disappears
-```
