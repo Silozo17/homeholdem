@@ -30,6 +30,8 @@ const CURRENCIES = [
   { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
 ];
 
+type DisplayMode = 'cash' | 'chips';
+
 interface ClubDefaults {
   default_event_time: string;
   default_max_tables: number;
@@ -74,14 +76,16 @@ export function ClubSettings({
   const [name, setName] = useState(clubName);
   const [description, setDescription] = useState(clubDescription || '');
   const [currency, setCurrency] = useState(clubCurrency || 'GBP');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('cash');
   const [defaults, setDefaults] = useState<ClubDefaults>(DEFAULT_VALUES);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [eventDefaultsOpen, setEventDefaultsOpen] = useState(false);
   const [tournamentDefaultsOpen, setTournamentDefaultsOpen] = useState(false);
   const [originalDefaults, setOriginalDefaults] = useState<ClubDefaults>(DEFAULT_VALUES);
+  const [originalDisplayMode, setOriginalDisplayMode] = useState<DisplayMode>('cash');
 
-  // Fetch club defaults
+  // Fetch club defaults including display_mode
   useEffect(() => {
     const fetchDefaults = async () => {
       const { data } = await supabase
@@ -108,6 +112,13 @@ export function ClubSettings({
         };
         setDefaults(clubDefaults);
         setOriginalDefaults(clubDefaults);
+        
+        // Set display mode from database
+        const mode = (data as any).display_mode;
+        if (mode === 'cash' || mode === 'chips') {
+          setDisplayMode(mode);
+          setOriginalDisplayMode(mode);
+        }
       }
     };
 
@@ -125,12 +136,13 @@ export function ClubSettings({
     const basicChanged = 
       name !== clubName || 
       description !== (clubDescription || '') || 
-      currency !== (clubCurrency || 'GBP');
+      currency !== (clubCurrency || 'GBP') ||
+      displayMode !== originalDisplayMode;
     
     const defaultsChanged = JSON.stringify(defaults) !== JSON.stringify(originalDefaults);
     
     setHasChanges(basicChanged || defaultsChanged);
-  }, [name, description, currency, clubName, clubDescription, clubCurrency, defaults, originalDefaults]);
+  }, [name, description, currency, clubName, clubDescription, clubCurrency, defaults, originalDefaults, displayMode, originalDisplayMode]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -146,8 +158,9 @@ export function ClubSettings({
           name: name.trim(),
           description: description.trim() || null,
           currency,
+          display_mode: displayMode,
           ...defaults,
-        })
+        } as any)
         .eq('id', clubId);
 
       if (error) throw error;
@@ -258,6 +271,36 @@ export function ClubSettings({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">{t('club.currency_description')}</p>
+          </div>
+
+          {/* Display Mode Setting */}
+          <div className="space-y-2">
+            <Label>{t('club.display_mode', 'Display Mode')}</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={displayMode === 'cash' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDisplayMode('cash')}
+                className="flex-1"
+              >
+                {currencySymbol} {t('club.cash_mode', 'Cash')}
+              </Button>
+              <Button
+                type="button"
+                variant={displayMode === 'chips' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDisplayMode('chips')}
+                className="flex-1"
+              >
+                🪙 {t('club.chips_mode', 'Chips')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {displayMode === 'cash' 
+                ? t('club.cash_mode_description', 'Shows real money values (e.g., £20 buy-in)')
+                : t('club.chips_mode_description', 'Shows tournament chip values (e.g., 10,000 chips)')}
+            </p>
           </div>
         </div>
 

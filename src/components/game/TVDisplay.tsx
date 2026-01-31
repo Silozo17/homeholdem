@@ -59,7 +59,8 @@ interface PayoutStructure {
   amount: number | null;
 }
 
-type DisplayMode = 'classic' | 'dashboard' | 'table' | 'combined';
+type TVLayoutMode = 'classic' | 'dashboard' | 'table' | 'combined';
+type BlindsDisplayMode = 'cash' | 'chips';
 
 interface TVDisplayProps {
   session: GameSession;
@@ -74,6 +75,7 @@ interface TVDisplayProps {
   onUpdateSession: (updates: Partial<GameSession>) => void;
   onRefresh: () => void;
   chipToCashRatio?: number;
+  blindsDisplayMode?: BlindsDisplayMode;
 }
 
 export function TVDisplay({
@@ -88,9 +90,10 @@ export function TVDisplay({
   onExit,
   onUpdateSession,
   onRefresh,
-  chipToCashRatio = 0.01
+  chipToCashRatio = 0.01,
+  blindsDisplayMode = 'cash'
 }: TVDisplayProps) {
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('classic');
+  const [layoutMode, setLayoutMode] = useState<TVLayoutMode>('classic');
   const [showControls, setShowControls] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [idleTime, setIdleTime] = useState(0);
@@ -287,7 +290,7 @@ export function TVDisplay({
         )}
 
         {/* Display Modes */}
-        {displayMode === 'classic' && (
+        {layoutMode === 'classic' && (
           <ClassicTimerMode
             session={session}
             blindStructure={blindStructure}
@@ -299,10 +302,11 @@ export function TVDisplay({
             onUpdateSession={onUpdateSession}
             isAdmin={isAdmin}
             chipToCashRatio={chipToCashRatio}
+            blindsDisplayMode={blindsDisplayMode}
           />
         )}
 
-        {displayMode === 'dashboard' && (
+        {layoutMode === 'dashboard' && (
           <DashboardMode
             session={session}
             blindStructure={blindStructure}
@@ -313,10 +317,11 @@ export function TVDisplay({
             onUpdateSession={onUpdateSession}
             payouts={payouts}
             chipToCashRatio={chipToCashRatio}
+            blindsDisplayMode={blindsDisplayMode}
           />
         )}
 
-        {displayMode === 'table' && (
+        {layoutMode === 'table' && (
           <TableViewMode
             session={session}
             blindStructure={blindStructure}
@@ -327,10 +332,11 @@ export function TVDisplay({
             totalPlayers={players.length}
             onUpdateSession={onUpdateSession}
             chipToCashRatio={chipToCashRatio}
+            blindsDisplayMode={blindsDisplayMode}
           />
         )}
 
-        {displayMode === 'combined' && (
+        {layoutMode === 'combined' && (
           <CombinedMode
             session={session}
             blindStructure={blindStructure}
@@ -341,6 +347,7 @@ export function TVDisplay({
             onUpdateSession={onUpdateSession}
             payouts={payouts}
             chipToCashRatio={chipToCashRatio}
+            blindsDisplayMode={blindsDisplayMode}
           />
         )}
       </div>
@@ -352,8 +359,8 @@ export function TVDisplay({
           blindStructure={blindStructure}
           players={players}
           currencySymbol={currencySymbol}
-          displayMode={displayMode}
-          onDisplayModeChange={setDisplayMode}
+          displayMode={layoutMode}
+          onDisplayModeChange={setLayoutMode}
           onUpdateSession={onUpdateSession}
           onClose={() => setShowControls(false)}
           onRefresh={onRefresh}

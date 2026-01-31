@@ -53,6 +53,7 @@ interface DashboardModeProps {
   onUpdateSession: (updates: Partial<GameSession>) => void;
   payouts?: PayoutStructure[];
   chipToCashRatio?: number;
+  blindsDisplayMode?: 'cash' | 'chips';
 }
 
 export function DashboardMode({
@@ -64,7 +65,8 @@ export function DashboardMode({
   currencySymbol,
   onUpdateSession,
   payouts = [],
-  chipToCashRatio = 0.01
+  chipToCashRatio = 0.01,
+  blindsDisplayMode = 'cash'
 }: DashboardModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const { playAnnouncement } = useTournamentSounds();
@@ -158,7 +160,7 @@ export function DashboardMode({
   };
 
   const formatBlind = (chips: number) => {
-    if (session.display_blinds_as_currency && chipToCashRatio > 0) {
+    if (blindsDisplayMode === 'cash' && chipToCashRatio > 0) {
       const value = chips * chipToCashRatio;
       if (value < 1) {
         return `${currencySymbol}${value.toFixed(2)}`;

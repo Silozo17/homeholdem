@@ -351,6 +351,7 @@ export type Database = {
           default_seats_per_table: number | null
           default_starting_chips: number | null
           description: string | null
+          display_mode: string | null
           id: string
           invite_code: string
           name: string
@@ -373,6 +374,7 @@ export type Database = {
           default_seats_per_table?: number | null
           default_starting_chips?: number | null
           description?: string | null
+          display_mode?: string | null
           id?: string
           invite_code: string
           name: string
@@ -395,6 +397,7 @@ export type Database = {
           default_seats_per_table?: number | null
           default_starting_chips?: number | null
           description?: string | null
+          display_mode?: string | null
           id?: string
           invite_code?: string
           name?: string
