@@ -164,7 +164,7 @@ export function DashboardMode({
   return (
     <div className="flex h-full bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950">
       {/* Left Side - Timer */}
-      <div className="flex-1 flex flex-col p-8 pt-16">
+      <div className="flex-1 flex flex-col p-6 pt-[max(4rem,calc(3rem+env(safe-area-inset-top,0px)))] pl-[max(2rem,env(safe-area-inset-left,1rem))]">
         {/* Level Badge */}
         <div className="mb-4">
           {currentLevel.is_break ? (
@@ -178,19 +178,19 @@ export function DashboardMode({
           )}
         </div>
 
-        {/* Timer */}
-        <div className={`text-[10rem] font-mono font-black tracking-tight leading-none ${getTimerColor()}`}>
+        {/* Timer - Responsive scaling */}
+        <div className={`text-[clamp(4rem,12vh,10rem)] font-mono font-black tracking-tight leading-none ${getTimerColor()}`}>
           {formatTime(timeRemaining)}
         </div>
 
-        {/* Blinds */}
+        {/* Blinds - Responsive sizing */}
         {!currentLevel.is_break && (
-          <div className="mt-6 flex items-baseline gap-4">
-            <span className="text-5xl font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</span>
-            <span className="text-4xl text-white/30">/</span>
-            <span className="text-5xl font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</span>
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="text-[clamp(2rem,5vh,4rem)] font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</span>
+            <span className="text-[clamp(1.5rem,3vh,2.5rem)] text-white/30">/</span>
+            <span className="text-[clamp(2rem,5vh,4rem)] font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</span>
             {currentLevel.ante > 0 && (
-              <span className="text-2xl text-rose-400 ml-4">(ante {formatBlind(currentLevel.ante)})</span>
+              <span className="text-[clamp(1rem,2vh,1.5rem)] text-rose-400 ml-2">(ante {formatBlind(currentLevel.ante)})</span>
             )}
           </div>
         )}
@@ -223,8 +223,8 @@ export function DashboardMode({
         </div>
       </div>
 
-      {/* Right Side - Stats */}
-      <div className="w-[400px] bg-black/40 backdrop-blur-sm border-l border-white/10 flex flex-col">
+      {/* Right Side - Stats - Responsive width */}
+      <div className="w-[min(400px,35vw)] bg-black/40 backdrop-blur-sm border-l border-white/10 flex flex-col pr-[env(safe-area-inset-right,0px)]">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-3 p-4 border-b border-white/10">
           <div className="bg-white/5 rounded-xl p-4">

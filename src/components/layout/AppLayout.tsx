@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { TournamentMiniBar } from '@/components/game/TournamentMiniBar';
 import { useActiveGame } from '@/contexts/ActiveGameContext';
+import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,10 +40,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen safe-area-top">
-      <div className={showBottomNav ? 'pb-20' : ''}>
+      {/* Mini bar at top when there's an active game */}
+      {showMiniBar && <TournamentMiniBar />}
+      
+      {/* Main content with padding for mini bar and bottom nav */}
+      <div className={cn(
+        showBottomNav ? 'pb-20' : '',
+        showMiniBar ? 'pt-16' : ''
+      )}>
         {children}
       </div>
-      {showMiniBar && <TournamentMiniBar />}
+      
       {showBottomNav && <BottomNav />}
     </div>
   );

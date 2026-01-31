@@ -185,8 +185,8 @@ export function CombinedMode({
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between px-16 py-3 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30">
+      {/* Header Bar - with safe area padding */}
+      <div className="flex items-center justify-between px-[max(4rem,calc(3rem+env(safe-area-inset-left,0px)))] pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-3 bg-black/40 backdrop-blur-sm border-b border-emerald-900/30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
@@ -226,19 +226,19 @@ export function CombinedMode({
             )}
           </div>
 
-          {/* Timer */}
-          <div className={`text-7xl font-mono font-black tracking-tight leading-none ${getTimerColor()}`}>
+          {/* Timer - Responsive */}
+          <div className={`text-[clamp(3rem,10vh,5rem)] font-mono font-black tracking-tight leading-none ${getTimerColor()}`}>
             {formatTime(timeRemaining)}
           </div>
 
-          {/* Blinds */}
+          {/* Blinds - Responsive */}
           {!currentLevel.is_break && (
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</span>
-              <span className="text-2xl text-white/30">/</span>
-              <span className="text-3xl font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</span>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-[clamp(1.5rem,4vh,2.5rem)] font-bold text-blue-400">{formatBlind(currentLevel.small_blind)}</span>
+              <span className="text-[clamp(1rem,2vh,1.5rem)] text-white/30">/</span>
+              <span className="text-[clamp(1.5rem,4vh,2.5rem)] font-bold text-amber-400">{formatBlind(currentLevel.big_blind)}</span>
               {currentLevel.ante > 0 && (
-                <span className="text-lg text-rose-400 ml-2">(ante {formatBlind(currentLevel.ante)})</span>
+                <span className="text-[clamp(0.75rem,1.5vh,1rem)] text-rose-400 ml-2">(ante {formatBlind(currentLevel.ante)})</span>
               )}
             </div>
           )}
@@ -328,8 +328,8 @@ export function CombinedMode({
           </div>
         </div>
 
-        {/* Right Column - Players & Payouts */}
-        <div className="w-[25%] flex flex-col p-4 border-l border-white/10 overflow-hidden">
+        {/* Right Column - Players & Payouts - with safe area */}
+        <div className="w-[25%] flex flex-col p-4 border-l border-white/10 overflow-hidden pr-[max(1rem,env(safe-area-inset-right,0px))]">
           {/* Active Players */}
           <div className="flex-1 overflow-hidden">
             <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-2">

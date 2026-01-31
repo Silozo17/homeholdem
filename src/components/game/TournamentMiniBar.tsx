@@ -59,15 +59,15 @@ export function TournamentMiniBar() {
     <button
       onClick={handleClick}
       className={cn(
-        "fixed bottom-20 left-2 right-2 z-40",
-        "bg-slate-900/95 backdrop-blur-xl",
-        "border rounded-full px-4 py-3",
-        "shadow-2xl",
+        "fixed top-[calc(4rem+env(safe-area-inset-top,0px))] left-3 right-3 z-40",
+        "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900",
+        "border-2 rounded-2xl px-5 py-3",
+        "shadow-lg backdrop-blur-xl",
         "transition-all duration-300",
-        "hover:scale-[1.02] active:scale-[0.98]",
+        "hover:scale-[1.01] active:scale-[0.99]",
         isActive 
-          ? "border-emerald-500/40 shadow-emerald-500/20" 
-          : "border-amber-500/40 shadow-amber-500/20"
+          ? "border-emerald-400/50 shadow-emerald-500/30" 
+          : "border-amber-400/50 shadow-amber-500/30"
       )}
     >
       <div className="flex items-center justify-between">
