@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Trophy, Calculator, Check, DollarSign, Flag, Handshake, Users } from 'lucide-react';
+import { Trophy, Calculator, Check, DollarSign, Flag, Handshake, Users, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { finalizeGame } from '@/lib/game-finalization';
+
+type InputMode = 'percentage' | 'currency';
 
 interface GamePlayer {
   id: string;
@@ -61,15 +64,26 @@ export function PayoutCalculator({
   isAdmin, 
   onRefresh 
 }: PayoutCalculatorProps) {
+  const { t } = useTranslation();
   const [paidPositions, setPaidPositions] = useState(3);
   const [customPayouts, setCustomPayouts] = useState<number[]>([50, 30, 20]);
   const [useCustom, setUseCustom] = useState(false);
   const [markedPaid, setMarkedPaid] = useState<number[]>([]);
   const [finalizing, setFinalizing] = useState(false);
   
+  // Input mode state - percentage or currency
+  const [inputMode, setInputMode] = useState<InputMode>('percentage');
+  const [currencyPayouts, setCurrencyPayouts] = useState<number[]>([]);
+  
   // Chop deal state
   const [showChopDialog, setShowChopDialog] = useState(false);
   const [chopAmounts, setChopAmounts] = useState<Record<string, number>>({});
+
+  // Initialize currency payouts from percentages
+  useEffect(() => {
+    const amounts = customPayouts.slice(0, paidPositions).map(p => Math.round((prizePool * p) / 100));
+    setCurrencyPayouts(amounts);
+  }, [customPayouts, prizePool, paidPositions]);
 
   // Get finished players sorted by position
   const finishedPlayers = players
@@ -98,6 +112,22 @@ export function PayoutCalculator({
     newPayouts[index] = parseInt(value) || 0;
     setCustomPayouts(newPayouts);
   };
+
+  const handleUpdateCurrencyPayout = (index: number, value: string) => {
+    const newAmounts = [...currencyPayouts];
+    newAmounts[index] = parseInt(value) || 0;
+    setCurrencyPayouts(newAmounts);
+    
+    // Also update custom payouts with derived percentages
+    const newPercentages = newAmounts.map(amount => 
+      prizePool > 0 ? Math.round((amount / prizePool) * 100) : 0
+    );
+    setCustomPayouts(newPercentages);
+    setUseCustom(true);
+  };
+
+  const currencyTotal = currencyPayouts.slice(0, paidPositions).reduce((sum, v) => sum + v, 0);
+  const isCurrencyValid = currencyTotal === prizePool;
 
   const handleMarkPaid = async (player: GamePlayer) => {
     const payout = calculatePayout(player.finish_position || 0);
@@ -200,22 +230,44 @@ export function PayoutCalculator({
 
   const handleFinalizeGame = async () => {
     if (activePlayers.length > 1) {
-      toast.error('Cannot finalize: more than 1 player still active');
+      toast.error(t('game.cannot_finalize_active_players'));
+      return;
+    }
+
+    // Validate based on input mode
+    if (inputMode === 'currency' && !isCurrencyValid) {
+      toast.error(t('game.currency_must_equal_pool'));
+      return;
+    }
+
+    if (inputMode === 'percentage' && !isValidPercentage) {
+      toast.error(t('game.percentage_must_equal_100'));
       return;
     }
 
     setFinalizing(true);
     
-    const payoutsData = currentPayouts.map((percentage, index) => {
-      const position = index + 1;
-      const player = finishedPlayers.find(p => p.finish_position === position);
-      return {
-        position,
-        percentage,
-        amount: calculatePayout(position),
-        playerId: player?.id || null,
-      };
-    });
+    const payoutsData = inputMode === 'currency'
+      ? currencyPayouts.slice(0, paidPositions).map((amount, index) => {
+          const position = index + 1;
+          const player = finishedPlayers.find(p => p.finish_position === position);
+          return {
+            position,
+            percentage: prizePool > 0 ? Math.round((amount / prizePool) * 100) : 0,
+            amount,
+            playerId: player?.id || null,
+          };
+        })
+      : currentPayouts.slice(0, paidPositions).map((percentage, index) => {
+          const position = index + 1;
+          const player = finishedPlayers.find(p => p.finish_position === position);
+          return {
+            position,
+            percentage,
+            amount: calculatePayout(position),
+            playerId: player?.id || null,
+          };
+        });
 
     const result = await finalizeGame(
       session.id,
@@ -228,10 +280,10 @@ export function PayoutCalculator({
     setFinalizing(false);
 
     if (result.success) {
-      toast.success('Game finalized! Settlements created and season points updated.');
+      toast.success(t('game.game_finalized_success'));
       onRefresh();
     } else {
-      toast.error(result.error || 'Failed to finalize game');
+      toast.error(result.error || t('game.finalize_failed'));
     }
   };
 
@@ -280,41 +332,97 @@ export function PayoutCalculator({
             </div>
           </div>
 
+          {/* Input Mode Toggle */}
+          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+            <Label className="text-sm text-muted-foreground">{t('game.input_mode')}:</Label>
+            <div className="flex gap-1 flex-1 justify-end">
+              <Button
+                variant={inputMode === 'percentage' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setInputMode('percentage')}
+                className="gap-1"
+              >
+                <Percent className="h-3 w-3" />
+                %
+              </Button>
+              <Button
+                variant={inputMode === 'currency' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setInputMode('currency')}
+                className="gap-1"
+              >
+                <DollarSign className="h-3 w-3" />
+                {currencySymbol}
+              </Button>
+            </div>
+          </div>
+
           {/* Payout Structure Selection */}
           <Tabs 
             defaultValue="preset" 
             onValueChange={(v) => setUseCustom(v === 'custom')}
           >
             <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="preset">Preset</TabsTrigger>
-              <TabsTrigger value="custom">Custom %</TabsTrigger>
+              <TabsTrigger value="preset">{t('game.preset')}</TabsTrigger>
+              <TabsTrigger value="custom">{t('game.custom')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="preset" className="mt-4">
               <div className="text-sm text-muted-foreground text-center py-2">
-                Using {PAYOUT_PRESETS[paidPositions].join('/')}% split
+                {t('game.using_split', { split: PAYOUT_PRESETS[paidPositions].join('/') })}
               </div>
             </TabsContent>
 
             <TabsContent value="custom" className="mt-4 space-y-3">
-              {customPayouts.slice(0, paidPositions).map((payout, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Label className="w-16 text-sm">{index + 1}{getOrdinalSuffix(index + 1)}</Label>
-                  <Input
-                    type="number"
-                    value={payout}
-                    onChange={(e) => handleUpdateCustom(index, e.target.value)}
-                    className="flex-1"
-                  />
-                  <span className="text-sm text-muted-foreground w-12">
-                    {currencySymbol}{Math.round((prizePool * payout) / 100)}
-                  </span>
-                </div>
-              ))}
-              {!isValidPercentage && (
-                <p className="text-sm text-destructive">
-                  Total must equal 100% (currently {totalPercentage}%)
-                </p>
+              {inputMode === 'percentage' ? (
+                <>
+                  {customPayouts.slice(0, paidPositions).map((payout, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Label className="w-16 text-sm">{index + 1}{getOrdinalSuffix(index + 1)}</Label>
+                      <Input
+                        type="number"
+                        value={payout}
+                        onChange={(e) => handleUpdateCustom(index, e.target.value)}
+                        className="flex-1"
+                      />
+                      <span className="text-sm text-muted-foreground w-16 text-right">
+                        {currencySymbol}{Math.round((prizePool * payout) / 100)}
+                      </span>
+                    </div>
+                  ))}
+                  {!isValidPercentage && (
+                    <p className="text-sm text-destructive">
+                      {t('game.total_must_equal_100', { total: totalPercentage })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {currencyPayouts.slice(0, paidPositions).map((amount, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Label className="w-16 text-sm">{index + 1}{getOrdinalSuffix(index + 1)}</Label>
+                      <span className="text-muted-foreground">{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        value={amount}
+                        onChange={(e) => handleUpdateCurrencyPayout(index, e.target.value)}
+                        className="flex-1"
+                      />
+                      <span className="text-sm text-muted-foreground w-12 text-right">
+                        {prizePool > 0 ? Math.round((amount / prizePool) * 100) : 0}%
+                      </span>
+                    </div>
+                  ))}
+                  {!isCurrencyValid && (
+                    <p className="text-sm text-destructive">
+                      {t('game.total_must_equal_pool', { 
+                        symbol: currencySymbol, 
+                        pool: prizePool, 
+                        total: currencyTotal 
+                      })}
+                    </p>
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>
@@ -397,22 +505,22 @@ export function PayoutCalculator({
           {activePlayers.length > 0 ? (
             <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
-              {activePlayers.length} player(s) still in the game
+              {t('game.players_still_in_game', { count: activePlayers.length })}
             </div>
           ) : session.status !== 'completed' && isAdmin ? (
             <Button 
               className="w-full glow-gold mt-4" 
               onClick={handleFinalizeGame}
-              disabled={finalizing || !isValidPercentage}
+              disabled={finalizing || (inputMode === 'percentage' ? !isValidPercentage : !isCurrencyValid)}
             >
               <Flag className="h-4 w-4 mr-2" />
-              {finalizing ? 'Finalizing...' : 'Finalize Game & Create Settlements'}
+              {finalizing ? t('game.finalizing') : t('game.finalize_game')}
             </Button>
           ) : session.status === 'completed' ? (
             <div className="text-center py-4">
               <Badge variant="default" className="bg-success">
                 <Check className="h-3 w-3 mr-1" />
-                Game Completed
+                {t('game.game_completed')}
               </Badge>
             </div>
           ) : null}

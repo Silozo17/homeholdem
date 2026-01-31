@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveGame } from '@/contexts/ActiveGameContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -100,6 +101,7 @@ export default function ClubDetail() {
   const { t } = useTranslation();
   const { clubId } = useParams<{ clubId: string }>();
   const { user, loading } = useAuth();
+  const { setCurrentClubId } = useActiveGame();
   const { isActive, loading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const [club, setClub] = useState<Club | null>(null);
@@ -128,6 +130,14 @@ export default function ClubDetail() {
   useEffect(() => {
     if (user) setWasAuthenticated(true);
   }, [user]);
+
+  // Set current club context for mini-bar
+  useEffect(() => {
+    if (clubId) {
+      setCurrentClubId(clubId);
+    }
+    return () => setCurrentClubId(null);
+  }, [clubId, setCurrentClubId]);
 
   // Only redirect if NEVER authenticated, not on temporary auth failures
   useEffect(() => {
