@@ -227,3 +227,83 @@ export async function notifyNewEventAvailableInApp(
     clubId,
   });
 }
+
+// Game notifications
+
+function getOrdinalSuffix(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+export async function notifyGameStartedInApp(
+  userIds: string[],
+  eventTitle: string,
+  eventId: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'event_created',
+    title: 'Tournament Started',
+    body: `${eventTitle} is now underway!`,
+    url: `/event/${eventId}/game`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyPlayerEliminatedInApp(
+  userIds: string[],
+  playerName: string,
+  position: number,
+  playersRemaining: number,
+  eventId: string,
+  clubId: string
+) {
+  const suffix = getOrdinalSuffix(position);
+  return createBulkNotifications(userIds, {
+    type: 'game_completed',
+    title: 'Player Out',
+    body: `${playerName} finished ${position}${suffix} • ${playersRemaining} remaining`,
+    url: `/event/${eventId}/game`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyRebuyAddonInApp(
+  userIds: string[],
+  playerName: string,
+  type: 'rebuy' | 'addon',
+  prizePool: number,
+  currencySymbol: string,
+  eventId: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'game_completed',
+    title: type === 'rebuy' ? 'Rebuy Added' : 'Add-on Added',
+    body: `${playerName} ${type === 'rebuy' ? 'rebought' : 'added on'} • Pool: ${currencySymbol}${prizePool}`,
+    url: `/event/${eventId}/game`,
+    eventId,
+    clubId,
+  });
+}
+
+export async function notifyBlindsUpInApp(
+  userIds: string[],
+  smallBlind: number,
+  bigBlind: number,
+  ante: number,
+  eventId: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'game_completed',
+    title: 'Blinds Up',
+    body: `${smallBlind}/${bigBlind}${ante ? ` (ante ${ante})` : ''}`,
+    url: `/event/${eventId}/game`,
+    eventId,
+    clubId,
+  });
+}

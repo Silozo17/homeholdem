@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
-import { ArrowLeft, Tv, Settings, Coins } from 'lucide-react';
+import { ArrowLeft, Tv, Settings, Coins, Activity } from 'lucide-react';
 import { TournamentClock } from '@/components/game/TournamentClock';
 import { TVDisplay } from '@/components/game/TVDisplay';
 import { PlayerList } from '@/components/game/PlayerList';
@@ -16,9 +16,14 @@ import { BuyInTracker } from '@/components/game/BuyInTracker';
 import { PayoutCalculator } from '@/components/game/PayoutCalculator';
 import { GameSettings } from '@/components/game/GameSettings';
 import { ChipCounter } from '@/components/game/ChipCounter';
+import { ActivityFeed } from '@/components/game/ActivityFeed';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useClubCurrency } from '@/hooks/useClubCurrency';
 import { useChipToCashRatio } from '@/hooks/useChipToCashRatio';
+import { getEventClubMemberIds, logGameActivity } from '@/lib/club-members';
+import { notifyGameStarted } from '@/lib/push-notifications';
+import { notifyGameStartedInApp } from '@/lib/in-app-notifications';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function GameMode() {
   const { t } = useTranslation();
@@ -78,8 +83,30 @@ export default function GameMode() {
   }, [session, eventId, blindStructure, players, transactions, currencySymbol, setActiveGame, clearActiveGame]);
 
   const handleStartGame = async () => {
-    if (!session) {
-      await createSession();
+    if (!session && eventId) {
+      const newSession = await createSession();
+      if (newSession) {
+        // Fetch event title for notifications
+        const { data: eventData } = await supabase
+          .from('events')
+          .select('title')
+          .eq('id', eventId)
+          .single();
+        
+        const eventTitle = eventData?.title || 'Poker Night';
+        
+        // Get club member IDs and send notifications
+        const { memberIds, clubId: eventClubId } = await getEventClubMemberIds(eventId);
+        
+        if (memberIds.length > 0 && eventClubId) {
+          // Send notifications and log activity in parallel
+          await Promise.all([
+            notifyGameStarted(memberIds, eventTitle, eventId),
+            notifyGameStartedInApp(memberIds, eventTitle, eventId, eventClubId),
+            logGameActivity(newSession.id, 'game_started', null, null, { eventTitle }),
+          ]);
+        }
+      }
     }
   };
 
@@ -240,11 +267,15 @@ export default function GameMode() {
                 <TabsTrigger value="players" className="text-xs px-2 py-2">{t('game.players')}</TabsTrigger>
                 <TabsTrigger value="seats" className="text-xs px-2 py-2">{t('game.seats')}</TabsTrigger>
                 <TabsTrigger value="buyins" className="text-xs px-2 py-2">{t('game.buyins')}</TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs px-2 py-2 flex items-center justify-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  {t('game.live_activity')}
+                </TabsTrigger>
                 <TabsTrigger value="cashout" className="text-xs px-2 py-2 flex items-center justify-center gap-1">
                   <Coins className="h-3 w-3" />
                   {t('game.cash_out')}
                 </TabsTrigger>
-                <TabsTrigger value="payouts" className="col-span-2 text-xs px-2 py-2">{t('game.payouts')}</TabsTrigger>
+                <TabsTrigger value="payouts" className="text-xs px-2 py-2">{t('game.payouts')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="players">
@@ -252,8 +283,10 @@ export default function GameMode() {
                   players={players}
                   session={session}
                   clubId={clubId || ''}
+                  eventId={eventId || ''}
                   maxTables={eventSettings.maxTables}
                   isAdmin={isAdmin}
+                  currencySymbol={currencySymbol}
                   onRefresh={refetch}
                 />
               </TabsContent>
@@ -273,9 +306,18 @@ export default function GameMode() {
                   players={players}
                   transactions={transactions}
                   session={session}
+                  eventId={eventId || ''}
+                  clubId={clubId || ''}
                   currencySymbol={currencySymbol}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
+                />
+              </TabsContent>
+
+              <TabsContent value="activity">
+                <ActivityFeed 
+                  sessionId={session.id} 
+                  currencySymbol={currencySymbol}
                 />
               </TabsContent>
 

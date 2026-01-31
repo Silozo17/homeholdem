@@ -23,7 +23,7 @@ interface PushRequest {
   icon?: string;
   url?: string;
   tag?: string;
-  notification_type?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
+  notification_type?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'game_started' | 'player_eliminated' | 'rebuy_addon';
 }
 
 /**
