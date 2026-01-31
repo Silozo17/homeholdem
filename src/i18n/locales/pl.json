@@ -340,7 +340,15 @@
     "confirm_change_vote": "Zmienić głos?",
     "change_vote_description": "Czy na pewno chcesz zmienić swój głos? Twój wybór zostanie zaktualizowany.",
     "confirm_change_rsvp": "Zmienić odpowiedź?",
-    "change_rsvp_description": "Zamierzasz zmienić swój status obecności. Czy na pewno?"
+    "change_rsvp_description": "Zamierzasz zmienić swój status obecności. Czy na pewno?",
+    "event_locked_title": "Wydarzenie zablokowane",
+    "event_locked_description": "\"{{title}}\" jest zablokowane. Zakończ lub usuń poprzednie wydarzenie, aby odblokować głosowanie i rezerwacje.",
+    "event_locked_member_hint": "Skontaktuj się z administratorem, jeśli potrzebujesz wcześniejszego odblokowania.",
+    "unlock_event": "Odblokuj",
+    "unlock_confirm_title": "Potwierdź odblokowanie",
+    "unlock_confirm_description": "Czy na pewno chcesz odblokować to wydarzenie? Wszyscy członkowie będą mogli natychmiast głosować i rezerwować miejsca.",
+    "unlocked_success": "Wydarzenie odblokowane pomyślnie",
+    "event_locked_actions_disabled": "Głosowanie i rezerwacje są wyłączone do momentu odblokowania tego wydarzenia"
   },
   "game": {
     "game_mode": "Tryb gry",

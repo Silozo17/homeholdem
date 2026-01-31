@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Logo } from '@/components/layout/Logo';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   ArrowLeft, 
   Users, 
@@ -25,7 +35,8 @@ import {
   Coins,
   Mail,
   AlertTriangle,
-  Settings
+  Settings,
+  Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -80,6 +91,7 @@ interface EventWithCounts {
   going_count: number;
   maybe_count: number;
   created_at: string;
+  is_unlocked: boolean;
 }
 
 export default function ClubDetail() {
@@ -99,6 +111,14 @@ export default function ClubDetail() {
   const [inviteEmailOpen, setInviteEmailOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  
+  // Locked event dialog state
+  const [lockedEventDialogOpen, setLockedEventDialogOpen] = useState(false);
+  const [selectedLockedEvent, setSelectedLockedEvent] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
   
   // Track if user was ever authenticated to prevent redirect on transient auth failures
   const [wasAuthenticated, setWasAuthenticated] = useState(false);
@@ -191,7 +211,7 @@ export default function ClubDetail() {
     // Fetch events with RSVP counts
     const { data: eventsData } = await supabase
       .from('events')
-      .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table, created_at')
+      .select('id, title, description, location, final_date, is_finalized, max_tables, seats_per_table, created_at, is_unlocked')
       .eq('club_id', clubId)
       .order('created_at', { ascending: true });
 
@@ -219,6 +239,7 @@ export default function ClubDetail() {
 
           return {
             ...event,
+            is_unlocked: event.is_unlocked ?? false,
             going_count: going,
             maybe_count: maybe,
           };
@@ -244,6 +265,37 @@ export default function ClubDetail() {
       case 'owner': return <Crown className="h-4 w-4 text-primary" />;
       case 'admin': return <Shield className="h-4 w-4 text-accent" />;
       default: return <User className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  // Handle unlock event
+  const handleUnlockEvent = async () => {
+    if (!selectedLockedEvent) return;
+    
+    const { error } = await supabase
+      .from('events')
+      .update({ is_unlocked: true })
+      .eq('id', selectedLockedEvent.id);
+    
+    if (!error) {
+      toast.success(t('event.unlocked_success'));
+      setUnlockConfirmOpen(false);
+      setLockedEventDialogOpen(false);
+      // Refresh events to update is_unlocked status
+      fetchClubData();
+      navigate(`/event/${selectedLockedEvent.id}`);
+    } else {
+      toast.error(t('common.error'));
+    }
+  };
+
+  // Handle event click - show modal if locked
+  const handleEventClick = (event: EventWithCounts, isLocked: boolean) => {
+    if (isLocked && !event.is_unlocked) {
+      setSelectedLockedEvent({ id: event.id, title: event.title });
+      setLockedEventDialogOpen(true);
+    } else {
+      navigate(`/event/${event.id}`);
     }
   };
 
@@ -420,21 +472,38 @@ export default function ClubDetail() {
                   });
                   
                   // Determine if an event is locked (after the current incomplete event)
+                  // Check: is_unlocked, previous event date passed, or previous event completed
                   const isEventLocked = (eventId: string) => {
                     if (currentEventIndex === -1) return false; // All events completed, nothing locked
+                    
                     const eventIndex = sortedUpcoming.findIndex(e => e.id === eventId);
-                    return eventIndex > currentEventIndex;
+                    if (eventIndex <= currentEventIndex) return false;
+                    
+                    // Check if manually unlocked
+                    const event = sortedUpcoming.find(e => e.id === eventId);
+                    if (event?.is_unlocked) return false;
+                    
+                    // Check if previous event's date has passed
+                    const prevEvent = sortedUpcoming[eventIndex - 1];
+                    if (prevEvent?.final_date && new Date(prevEvent.final_date) < new Date()) {
+                      return false;
+                    }
+                    
+                    return true;
                   };
                   
                   return sortedUpcoming.length > 0 ? (
-                    sortedUpcoming.map((event) => (
-                      <EventCard 
-                        key={event.id}
-                        event={event}
-                        onClick={() => navigate(`/event/${event.id}`)}
-                        isLocked={isEventLocked(event.id)}
-                      />
-                    ))
+                    sortedUpcoming.map((event) => {
+                      const locked = isEventLocked(event.id);
+                      return (
+                        <EventCard 
+                          key={event.id}
+                          event={event}
+                          onClick={() => handleEventClick(event, locked)}
+                          isLocked={locked}
+                        />
+                      );
+                    })
                   ) : (
                     <Card className="bg-card/50 border-border/50 border-dashed">
                       <CardContent className="py-8 text-center">
@@ -592,6 +661,47 @@ export default function ClubDetail() {
           inviteCode={club.invite_code}
         />
       )}
+
+      {/* Locked Event Dialog */}
+      <AlertDialog open={lockedEventDialogOpen} onOpenChange={setLockedEventDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              {t('event.event_locked_title')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('event.event_locked_description', { title: selectedLockedEvent?.title })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.close')}</AlertDialogCancel>
+            {isAdmin && (
+              <AlertDialogAction onClick={() => setUnlockConfirmOpen(true)}>
+                {t('event.unlock_event')}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unlock Confirmation Dialog */}
+      <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('event.unlock_confirm_title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('event.unlock_confirm_description')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnlockEvent}>
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
