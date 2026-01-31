@@ -941,6 +941,70 @@ export type Database = {
           },
         ]
       }
+      pending_notifications: {
+        Row: {
+          action: string
+          actor_id: string
+          actor_name: string
+          club_id: string
+          created_at: string
+          event_id: string | null
+          id: string
+          is_processed: boolean
+          scheduled_for: string
+          superseded_by: string | null
+          type: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          actor_name: string
+          club_id: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          is_processed?: boolean
+          scheduled_for: string
+          superseded_by?: string | null
+          type: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          actor_name?: string
+          club_id?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          is_processed?: boolean
+          scheduled_for?: string
+          superseded_by?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_notifications_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_notifications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_notifications_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "pending_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       placeholder_players: {
         Row: {
           club_id: string
@@ -1263,6 +1327,10 @@ export type Database = {
           push_blinds_up: boolean | null
           push_chat_messages: boolean | null
           push_date_finalized: boolean | null
+          push_event_unlocked: boolean
+          push_game_completed: boolean
+          push_member_rsvp: boolean
+          push_member_vote: boolean
           push_rsvp_updates: boolean | null
           push_waitlist_promotion: boolean | null
           show_stats_publicly: boolean | null
@@ -1283,6 +1351,10 @@ export type Database = {
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
+          push_event_unlocked?: boolean
+          push_game_completed?: boolean
+          push_member_rsvp?: boolean
+          push_member_vote?: boolean
           push_rsvp_updates?: boolean | null
           push_waitlist_promotion?: boolean | null
           show_stats_publicly?: boolean | null
@@ -1303,6 +1375,10 @@ export type Database = {
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
+          push_event_unlocked?: boolean
+          push_game_completed?: boolean
+          push_member_rsvp?: boolean
+          push_member_vote?: boolean
           push_rsvp_updates?: boolean | null
           push_waitlist_promotion?: boolean | null
           show_stats_publicly?: boolean | null

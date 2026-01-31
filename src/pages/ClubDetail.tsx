@@ -58,6 +58,8 @@ import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 import { ClubSettings } from '@/components/clubs/ClubSettings';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { notifyEventUnlocked } from '@/lib/push-notifications';
+import { notifyEventUnlockedInApp } from '@/lib/in-app-notifications';
 
 interface ClubMember {
   id: string;
@@ -270,7 +272,7 @@ export default function ClubDetail() {
 
   // Handle unlock event
   const handleUnlockEvent = async () => {
-    if (!selectedLockedEvent) return;
+    if (!selectedLockedEvent || !clubId) return;
     
     const { error } = await supabase
       .from('events')
@@ -279,6 +281,20 @@ export default function ClubDetail() {
     
     if (!error) {
       toast.success(t('event.unlocked_success'));
+      
+      // Send notifications to all club members (except current user)
+      const otherMemberIds = members
+        .filter(m => m.user_id !== user?.id)
+        .map(m => m.user_id);
+      
+      if (otherMemberIds.length > 0) {
+        // Fire and forget - don't block navigation
+        Promise.all([
+          notifyEventUnlocked(otherMemberIds, selectedLockedEvent.title, selectedLockedEvent.id),
+          notifyEventUnlockedInApp(otherMemberIds, selectedLockedEvent.title, selectedLockedEvent.id, clubId),
+        ]).catch(console.error);
+      }
+      
       setUnlockConfirmOpen(false);
       setLockedEventDialogOpen(false);
       // Refresh events to update is_unlocked status
