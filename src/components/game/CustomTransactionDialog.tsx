@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UserAvatar } from '@/components/common/UserAvatar';
+import { useTranslation } from 'react-i18next';
 
 interface GamePlayer {
   id: string;
@@ -17,39 +18,41 @@ interface GamePlayer {
   avatar_url?: string | null;
 }
 
-interface CustomAddonDialogProps {
+type TransactionType = 'buyin' | 'rebuy' | 'addon';
+
+interface CustomTransactionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   player: GamePlayer | null;
   defaultAmount: number;
   defaultChips: number;
   currencySymbol: string;
+  transactionType: TransactionType;
   onConfirm: (amount: number, chips: number) => Promise<void>;
 }
 
-export function CustomAddonDialog({
+export function CustomTransactionDialog({
   isOpen,
   onClose,
   player,
   defaultAmount,
   defaultChips,
   currencySymbol,
+  transactionType,
   onConfirm,
-}: CustomAddonDialogProps) {
+}: CustomTransactionDialogProps) {
+  const { t } = useTranslation();
   const [amount, setAmount] = useState(defaultAmount);
   const [chips, setChips] = useState(defaultChips);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset values when dialog opens with new player
-  const handleOpenChange = (open: boolean) => {
-    if (open) {
+  // Reset values when dialog opens with new defaults
+  useEffect(() => {
+    if (isOpen) {
       setAmount(defaultAmount);
       setChips(defaultChips);
     }
-    if (!open) {
-      onClose();
-    }
-  };
+  }, [isOpen, defaultAmount, defaultChips]);
 
   const handleConfirm = async () => {
     if (amount <= 0) return;
@@ -59,7 +62,7 @@ export function CustomAddonDialog({
       await onConfirm(amount, chips);
       onClose();
     } catch (error) {
-      console.error('Failed to add addon:', error);
+      console.error('Failed to add transaction:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -67,12 +70,39 @@ export function CustomAddonDialog({
 
   if (!player) return null;
 
+  const getTitle = () => {
+    switch (transactionType) {
+      case 'buyin':
+        return t('game.buy_in');
+      case 'rebuy':
+        return t('game.rebuy');
+      case 'addon':
+        return t('game.addon');
+      default:
+        return 'Transaction';
+    }
+  };
+
+  const getButtonText = () => {
+    if (isSubmitting) return `${t('common.adding')}...`;
+    switch (transactionType) {
+      case 'buyin':
+        return `${t('common.add')} ${t('game.buy_in')}`;
+      case 'rebuy':
+        return `${t('common.add')} ${t('game.rebuy')}`;
+      case 'addon':
+        return `${t('common.add')} ${t('game.addon')}`;
+      default:
+        return t('common.add');
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Add Add-on for {player.display_name}
+          <DialogTitle>
+            {getTitle()} - {player.display_name}
           </DialogTitle>
         </DialogHeader>
         
@@ -88,7 +118,7 @@ export function CustomAddonDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Amount ({currencySymbol})</Label>
+              <Label>{t('game.amount')} ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={amount}
@@ -97,7 +127,7 @@ export function CustomAddonDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Chips</Label>
+              <Label>{t('game.chips')}</Label>
               <Input
                 type="number"
                 value={chips}
@@ -109,11 +139,11 @@ export function CustomAddonDialog({
 
           <div className="p-3 bg-primary/10 rounded-lg text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cost:</span>
+              <span className="text-muted-foreground">{t('game.cost')}:</span>
               <span className="font-bold">{currencySymbol}{amount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Chips received:</span>
+              <span className="text-muted-foreground">{t('game.chips_received')}:</span>
               <span className="font-bold">{chips.toLocaleString()}</span>
             </div>
           </div>
@@ -121,13 +151,13 @@ export function CustomAddonDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button 
             onClick={handleConfirm} 
             disabled={amount <= 0 || isSubmitting}
           >
-            {isSubmitting ? 'Adding...' : 'Add Add-on'}
+            {getButtonText()}
           </Button>
         </DialogFooter>
       </DialogContent>

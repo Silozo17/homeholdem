@@ -25,7 +25,8 @@ import { UserAvatar } from '@/components/common/UserAvatar';
 import { getClubMemberIds, logGameActivity } from '@/lib/club-members';
 import { notifyRebuyAddon } from '@/lib/push-notifications';
 import { notifyRebuyAddonInApp } from '@/lib/in-app-notifications';
-import { CustomAddonDialog } from './CustomAddonDialog';
+import { CustomTransactionDialog } from './CustomTransactionDialog';
+import { DisplayMode } from '@/hooks/useDisplayMode';
 
 interface GamePlayer {
   id: string;
@@ -68,6 +69,8 @@ interface BuyInTrackerProps {
   currencySymbol: string;
   isAdmin: boolean;
   onRefresh: () => void;
+  displayMode?: DisplayMode;
+  chipToCashRatio?: number;
 }
 
 type TransactionType = 'buyin' | 'rebuy' | 'addon';
@@ -80,7 +83,9 @@ export function BuyInTracker({
   clubId,
   currencySymbol,
   isAdmin, 
-  onRefresh 
+  onRefresh,
+  displayMode = 'cash',
+  chipToCashRatio = 0,
 }: BuyInTrackerProps) {
   const { user } = useAuth();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
@@ -89,8 +94,26 @@ export function BuyInTracker({
   const [pendingQuickAdd, setPendingQuickAdd] = useState<string | null>(null);
   const [showBulkBuyIn, setShowBulkBuyIn] = useState(false);
   const [bulkBuyInPending, setBulkBuyInPending] = useState(false);
-  const [showCustomAddon, setShowCustomAddon] = useState(false);
-  const [addonPlayer, setAddonPlayer] = useState<GamePlayer | null>(null);
+  const [showCustomTransaction, setShowCustomTransaction] = useState(false);
+  const [customTransactionPlayer, setCustomTransactionPlayer] = useState<GamePlayer | null>(null);
+  const [customTransactionType, setCustomTransactionType] = useState<TransactionType>('buyin');
+
+  // Format value based on display mode
+  const formatValue = useCallback((amount: number, chips: number) => {
+    if (displayMode === 'chips') {
+      return `${chips.toLocaleString()} chips`;
+    }
+    return `${currencySymbol}${amount}`;
+  }, [displayMode, currencySymbol]);
+
+  // Format total chips to value based on display mode  
+  const formatChipsTotal = useCallback((chips: number) => {
+    if (displayMode === 'cash' && chipToCashRatio > 0) {
+      const cashValue = chips * chipToCashRatio;
+      return `${currencySymbol}${cashValue.toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return chips.toLocaleString();
+  }, [displayMode, chipToCashRatio, currencySymbol]);
 
   const getPlayerTransactions = useCallback((playerId: string) => {
     return transactions.filter(t => t.game_player_id === playerId);
@@ -103,42 +126,68 @@ export function BuyInTracker({
       rebuys: playerTxns.filter(t => t.transaction_type === 'rebuy').length,
       addons: playerTxns.filter(t => t.transaction_type === 'addon').length,
       totalSpent: playerTxns.reduce((sum, t) => sum + t.amount, 0),
+      totalChips: playerTxns.reduce((sum, t) => sum + (t.chips || 0), 0),
     };
   }, [getPlayerTransactions]);
+
+  const canRebuy = session.allow_rebuys && 
+    (!session.rebuy_until_level || session.current_level <= session.rebuy_until_level);
+
+  const totalBuyIns = transactions
+    .filter(t => t.transaction_type === 'buyin')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalRebuys = transactions
+    .filter(t => t.transaction_type === 'rebuy')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalAddons = transactions
+    .filter(t => t.transaction_type === 'addon')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalBuyInsChips = transactions
+    .filter(t => t.transaction_type === 'buyin')
+    .reduce((sum, t) => sum + (t.chips || 0), 0);
+  const totalRebuysChips = transactions
+    .filter(t => t.transaction_type === 'rebuy')
+    .reduce((sum, t) => sum + (t.chips || 0), 0);
+  const totalAddonsChips = transactions
+    .filter(t => t.transaction_type === 'addon')
+    .reduce((sum, t) => sum + (t.chips || 0), 0);
 
   const handleAddTransaction = async () => {
     if (!selectedPlayer || !user) return;
 
-    // For add-ons, open the custom dialog instead
-    if (transactionType === 'addon') {
-      const player = players.find(p => p.id === selectedPlayer);
-      if (player) {
-        setShowAddTransaction(false);
-        openCustomAddonDialog(player);
-      }
-      return;
+    // Open custom dialog for all transaction types
+    const player = players.find(p => p.id === selectedPlayer);
+    if (player) {
+      setCustomTransactionPlayer(player);
+      setCustomTransactionType(transactionType);
+      setShowAddTransaction(false);
+      setShowCustomTransaction(true);
     }
+  };
 
-    let amount = 0;
-    let chips = 0;
-
-    switch (transactionType) {
+  // Get default amount and chips based on transaction type
+  const getDefaultsForType = (type: TransactionType) => {
+    switch (type) {
       case 'buyin':
-        amount = session.buy_in_amount;
-        chips = session.starting_chips;
-        break;
+        return { amount: session.buy_in_amount, chips: session.starting_chips };
       case 'rebuy':
-        amount = session.rebuy_amount;
-        chips = session.rebuy_chips;
-        break;
+        return { amount: session.rebuy_amount, chips: session.rebuy_chips };
+      case 'addon':
+        return { amount: session.addon_amount, chips: session.addon_chips };
     }
+  };
+
+  // Handle custom transaction with manual amount/chips input
+  const handleCustomTransaction = async (amount: number, chips: number) => {
+    if (!customTransactionPlayer || !user) return;
 
     const { error } = await supabase
       .from('game_transactions')
       .insert({
         game_session_id: session.id,
-        game_player_id: selectedPlayer,
-        transaction_type: transactionType,
+        game_player_id: customTransactionPlayer.id,
+        transaction_type: customTransactionType,
         amount,
         chips,
         created_by: user.id,
@@ -146,22 +195,22 @@ export function BuyInTracker({
 
     if (error) {
       toast.error('Failed to add transaction');
-      return;
+      throw error;
     }
 
-    const player = players.find(p => p.id === selectedPlayer);
-    toast.success(`${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} added for ${player?.display_name}`);
+    toast.success(`${customTransactionType.charAt(0).toUpperCase() + customTransactionType.slice(1)} (${currencySymbol}${amount}) added for ${customTransactionPlayer.display_name}`);
     
-    // Send notifications for rebuys
-    if (transactionType === 'rebuy' && player && clubId && eventId) {
+    // Send notifications for rebuys/addons
+    if ((customTransactionType === 'rebuy' || customTransactionType === 'addon') && clubId && eventId) {
       const newPrizePool = totalBuyIns + totalRebuys + totalAddons + amount;
       getClubMemberIds(clubId).then(memberIds => {
         if (memberIds.length > 0) {
           Promise.all([
-            notifyRebuyAddon(memberIds, player.display_name, transactionType, newPrizePool, currencySymbol, eventId),
-            notifyRebuyAddonInApp(memberIds, player.display_name, transactionType, newPrizePool, currencySymbol, eventId, clubId),
-            logGameActivity(session.id, transactionType, player.id, player.display_name, {
+            notifyRebuyAddon(memberIds, customTransactionPlayer.display_name, customTransactionType, newPrizePool, currencySymbol, eventId),
+            notifyRebuyAddonInApp(memberIds, customTransactionPlayer.display_name, customTransactionType, newPrizePool, currencySymbol, eventId, clubId),
+            logGameActivity(session.id, customTransactionType, customTransactionPlayer.id, customTransactionPlayer.display_name, {
               amount,
+              chips,
               prizePool: newPrizePool,
             }),
           ]).catch(console.error);
@@ -169,7 +218,8 @@ export function BuyInTracker({
       });
     }
     
-    setShowAddTransaction(false);
+    setShowCustomTransaction(false);
+    setCustomTransactionPlayer(null);
     setSelectedPlayer('');
     onRefresh();
   };
@@ -239,69 +289,6 @@ export function BuyInTracker({
     onRefresh();
   };
 
-  // Handle custom addon with manual amount/chips input
-  const handleCustomAddon = async (amount: number, chips: number) => {
-    if (!addonPlayer || !user) return;
-
-    const { error } = await supabase
-      .from('game_transactions')
-      .insert({
-        game_session_id: session.id,
-        game_player_id: addonPlayer.id,
-        transaction_type: 'addon',
-        amount,
-        chips,
-        created_by: user.id,
-      });
-
-    if (error) {
-      toast.error('Failed to add add-on');
-      throw error;
-    }
-
-    toast.success(`Add-on (${currencySymbol}${amount}) added for ${addonPlayer.display_name}`);
-    
-    // Send notifications
-    if (clubId && eventId) {
-      const newPrizePool = totalBuyIns + totalRebuys + totalAddons + amount;
-      getClubMemberIds(clubId).then(memberIds => {
-        if (memberIds.length > 0) {
-          Promise.all([
-            notifyRebuyAddon(memberIds, addonPlayer.display_name, 'addon', newPrizePool, currencySymbol, eventId),
-            notifyRebuyAddonInApp(memberIds, addonPlayer.display_name, 'addon', newPrizePool, currencySymbol, eventId, clubId),
-            logGameActivity(session.id, 'addon', addonPlayer.id, addonPlayer.display_name, {
-              amount,
-              chips,
-              prizePool: newPrizePool,
-            }),
-          ]).catch(console.error);
-        }
-      });
-    }
-    
-    setShowCustomAddon(false);
-    setAddonPlayer(null);
-    onRefresh();
-  };
-
-  const openCustomAddonDialog = (player: GamePlayer) => {
-    setAddonPlayer(player);
-    setShowCustomAddon(true);
-  };
-
-  const canRebuy = session.allow_rebuys && 
-    (!session.rebuy_until_level || session.current_level <= session.rebuy_until_level);
-
-  const totalBuyIns = transactions
-    .filter(t => t.transaction_type === 'buyin')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalRebuys = transactions
-    .filter(t => t.transaction_type === 'rebuy')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalAddons = transactions
-    .filter(t => t.transaction_type === 'addon')
-    .reduce((sum, t) => sum + t.amount, 0);
-
   return (
     <>
       <Card className="bg-card/50 border-border/50">
@@ -337,19 +324,25 @@ export function BuyInTracker({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Summary */}
+          {/* Summary - respects display mode */}
           <div className="grid grid-cols-3 gap-2 text-center pb-4 border-b border-border/30">
             <div>
               <div className="text-xs text-muted-foreground">Buy-ins</div>
-              <div className="font-bold text-primary">{currencySymbol}{totalBuyIns}</div>
+              <div className="font-bold text-primary">
+                {displayMode === 'chips' ? `${totalBuyInsChips.toLocaleString()}` : `${currencySymbol}${totalBuyIns}`}
+              </div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Rebuys</div>
-              <div className="font-bold">{currencySymbol}{totalRebuys}</div>
+              <div className="font-bold">
+                {displayMode === 'chips' ? `${totalRebuysChips.toLocaleString()}` : `${currencySymbol}${totalRebuys}`}
+              </div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Add-ons</div>
-              <div className="font-bold">{currencySymbol}{totalAddons}</div>
+              <div className="font-bold">
+                {displayMode === 'chips' ? `${totalAddonsChips.toLocaleString()}` : `${currencySymbol}${totalAddons}`}
+              </div>
             </div>
           </div>
 
@@ -380,7 +373,10 @@ export function BuyInTracker({
                   <div className="flex items-center gap-2">
                     {totals.buyins > 0 && (
                       <Badge variant="default" className="text-xs">
-                        {currencySymbol}{totals.totalSpent}
+                        {displayMode === 'chips' 
+                          ? `${totals.totalChips.toLocaleString()}`
+                          : `${currencySymbol}${totals.totalSpent}`
+                        }
                       </Badge>
                     )}
                     <div className="flex gap-1 text-xs text-muted-foreground">
@@ -468,16 +464,16 @@ export function BuyInTracker({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="buyin">
-                    Buy-in ({currencySymbol}{session.buy_in_amount} → {session.starting_chips.toLocaleString()} chips)
+                    Buy-in ({formatValue(session.buy_in_amount, session.starting_chips)})
                   </SelectItem>
                   {session.allow_rebuys && canRebuy && (
                     <SelectItem value="rebuy">
-                      Rebuy ({currencySymbol}{session.rebuy_amount} → {session.rebuy_chips.toLocaleString()} chips)
+                      Rebuy ({formatValue(session.rebuy_amount, session.rebuy_chips)})
                     </SelectItem>
                   )}
                   {session.allow_addons && (
                     <SelectItem value="addon">
-                      Add-on ({currencySymbol}{session.addon_amount} → {session.addon_chips.toLocaleString()} chips)
+                      Add-on ({formatValue(session.addon_amount, session.addon_chips)})
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -507,17 +503,16 @@ export function BuyInTracker({
             </p>
             <div className="bg-primary/10 rounded-lg p-4 space-y-2">
               <div className="flex justify-between">
-                <span>Buy-in per player:</span>
-                <span className="font-bold">{currencySymbol}{session.buy_in_amount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Chips per player:</span>
-                <span className="font-bold">{session.starting_chips.toLocaleString()}</span>
+                <span>Per player:</span>
+                <span className="font-bold">{formatValue(session.buy_in_amount, session.starting_chips)}</span>
               </div>
               <div className="border-t border-border/30 pt-2 flex justify-between">
                 <span className="font-bold">Total:</span>
                 <span className="font-bold text-primary">
-                  {currencySymbol}{session.buy_in_amount * playersWithoutBuyIn.length}
+                  {displayMode === 'chips' 
+                    ? `${(session.starting_chips * playersWithoutBuyIn.length).toLocaleString()} chips`
+                    : `${currencySymbol}${session.buy_in_amount * playersWithoutBuyIn.length}`
+                  }
                 </span>
               </div>
             </div>
@@ -545,18 +540,19 @@ export function BuyInTracker({
         </DialogContent>
       </Dialog>
 
-      {/* Custom Add-on Dialog */}
-      <CustomAddonDialog
-        isOpen={showCustomAddon}
+      {/* Custom Transaction Dialog */}
+      <CustomTransactionDialog
+        isOpen={showCustomTransaction}
         onClose={() => {
-          setShowCustomAddon(false);
-          setAddonPlayer(null);
+          setShowCustomTransaction(false);
+          setCustomTransactionPlayer(null);
         }}
-        player={addonPlayer}
-        defaultAmount={session.addon_amount}
-        defaultChips={session.addon_chips}
+        player={customTransactionPlayer}
+        defaultAmount={getDefaultsForType(customTransactionType).amount}
+        defaultChips={getDefaultsForType(customTransactionType).chips}
         currencySymbol={currencySymbol}
-        onConfirm={handleCustomAddon}
+        transactionType={customTransactionType}
+        onConfirm={handleCustomTransaction}
       />
     </>
   );

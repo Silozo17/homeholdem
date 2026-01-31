@@ -278,10 +278,15 @@ export default function GameMode() {
               <div className="bg-card/50 rounded-lg p-3 border border-border/30">
                 <div className="text-xs text-muted-foreground">{t('game.avg_stack')}</div>
                 <div className="text-lg font-bold">
-                  {activePlayers > 0 
-                    ? Math.round((players.filter(p => p.status === 'active').length * (session.starting_chips || 10000)) / activePlayers).toLocaleString()
-                    : 0
-                  }
+                  {(() => {
+                    if (activePlayers === 0) return '0';
+                    const avgChips = Math.round((players.filter(p => p.status === 'active').length * (session.starting_chips || 10000)) / activePlayers);
+                    if (displayMode === 'cash' && chipToCashRatio > 0) {
+                      const cashValue = avgChips * chipToCashRatio;
+                      return `${currencySymbol}${cashValue.toFixed(2).replace(/\.00$/, '')}`;
+                    }
+                    return avgChips.toLocaleString();
+                  })()}
                 </div>
               </div>
             </div>
@@ -335,6 +340,8 @@ export default function GameMode() {
                   currencySymbol={currencySymbol}
                   isAdmin={isAdmin}
                   onRefresh={refetch}
+                  displayMode={displayMode}
+                  chipToCashRatio={chipToCashRatio}
                 />
               </TabsContent>
 
