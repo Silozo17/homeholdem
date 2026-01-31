@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveGame } from '@/contexts/ActiveGameContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +24,7 @@ export default function GameMode() {
   const { t } = useTranslation();
   const { eventId } = useParams<{ eventId: string }>();
   const { user, loading } = useAuth();
+  const { setActiveGame, clearActiveGame } = useActiveGame();
   const navigate = useNavigate();
   const [tvMode, setTvMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -49,6 +51,30 @@ export default function GameMode() {
       navigate('/');
     }
   }, [user, loading, navigate]);
+
+  // Update active game context when session changes
+  useEffect(() => {
+    if (session && eventId && session.status !== 'completed') {
+      const activePlayers = players.filter(p => p.status === 'active').length;
+      const prizePool = transactions
+        .filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      setActiveGame({
+        sessionId: session.id,
+        eventId,
+        status: session.status,
+        currentLevel: session.current_level,
+        timeRemainingSeconds: session.time_remaining_seconds,
+        blindStructure,
+        prizePool,
+        playersRemaining: activePlayers,
+        currencySymbol,
+      });
+    } else if (session?.status === 'completed') {
+      clearActiveGame();
+    }
+  }, [session, eventId, blindStructure, players, transactions, currencySymbol, setActiveGame, clearActiveGame]);
 
   const handleStartGame = async () => {
     if (!session) {

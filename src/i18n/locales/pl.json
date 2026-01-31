@@ -460,7 +460,14 @@
     "display_blinds_as_currency": "Wyświetlaj blindy jako walutę",
     "rebuy_cost": "Koszt rebuy",
     "addon_cost": "Koszt add-on",
-    "until_level": "Do poziomu"
+    "until_level": "Do poziomu",
+    "wake_lock_active": "Ekran pozostanie włączony",
+    "wake_lock_failed": "Nie można zapobiec blokowaniu ekranu",
+    "live_tournament": "Turniej na żywo",
+    "return_to_game": "Wróć do gry",
+    "tap_to_view": "Dotknij, aby zobaczyć",
+    "landscape_required": "Obróć do pozycji poziomej dla lepszego widoku",
+    "screen_on": "Ekran włączony"
   },
   "settings": {
     "title": "Ustawienia",

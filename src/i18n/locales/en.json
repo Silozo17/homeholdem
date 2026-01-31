@@ -460,7 +460,14 @@
     "display_blinds_as_currency": "Display Blinds as Currency",
     "rebuy_cost": "Rebuy Cost",
     "addon_cost": "Add-on Cost",
-    "until_level": "Until Level"
+    "until_level": "Until Level",
+    "wake_lock_active": "Screen will stay on",
+    "wake_lock_failed": "Could not prevent screen lock",
+    "live_tournament": "Live Tournament",
+    "return_to_game": "Return to Game",
+    "tap_to_view": "Tap to view",
+    "landscape_required": "Rotate to landscape for best view",
+    "screen_on": "Screen on"
   },
   "settings": {
     "title": "Settings",
