@@ -1,297 +1,375 @@
 
 
-## Plan: Fix Timer Drift and Add Bulk Buy-In Feature
+## Plan: Global Tournament Synchronization for All Club Members
 
 ### Overview
-This plan addresses two critical issues:
-1. **Timer drift when screen is locked/app backgrounded** - The current `setInterval` approach doesn't work reliably when the device sleeps
-2. **Bulk buy-in for all players** - No option to add buy-ins to all players at tournament start
+The current implementation only shows the tournament mini bar for the user who navigated to the game page and has the active game stored in their local context. This plan implements a **global synchronized tournament system** where ALL club members (players AND spectators) see the live tournament mini bar when any game is in progress.
 
 ---
 
-## Issue 1: Timer Drift - Root Cause Analysis
+### Current Problem Analysis
 
-### The Problem
-The current timer implementation in `TournamentClock.tsx`, `ClassicTimerMode.tsx`, `PortraitTimerMode.tsx`, and other TV modes uses `setInterval` to decrement a counter every second:
+**How it works now:**
+1. User A (admin) goes to `/event/{eventId}/game` and starts the tournament
+2. The `GameMode.tsx` page calls `setActiveGame()` which stores the game in:
+   - Local React state (`ActiveGameContext`)
+   - Browser `sessionStorage` (persists across page navigation within same tab)
+3. User B (club member/spectator) **never navigates** to the game page
+4. User B's `ActiveGameContext` is empty → no mini bar appears
 
-```typescript
-const interval = setInterval(() => {
-  setTimeRemaining(prev => prev - 1);
-}, 1000);
-```
-
-**Why this fails:**
-- When the screen locks or the app goes to background, JavaScript execution is paused/throttled
-- `setInterval` doesn't run while suspended
-- When the user returns, the timer shows incorrect time (it "paused" while the real clock continued)
-- Example: If 5 minutes pass while phone is locked, the timer still shows the old value
-
-### The Solution: Timestamp-Based Timer
-Instead of decrementing a counter, calculate time remaining based on:
-1. `level_started_at` - When the current level started (stored in DB)
-2. `time_remaining_seconds` - The initial time for this level
-3. Current time - Calculate elapsed time since level started
-
-**Formula:**
-```typescript
-const elapsedSeconds = Math.floor((Date.now() - new Date(level_started_at).getTime()) / 1000);
-const actualTimeRemaining = Math.max(0, initialTimeRemaining - elapsedSeconds);
-```
-
-**Benefits:**
-- Works correctly even when app is backgrounded
-- When user returns, timer immediately shows correct time
-- Uses `level_started_at` timestamp as source of truth (already stored in DB)
+**The fundamental issue:** 
+The active game state is **per-device/per-session**, not **per-club**. There's no mechanism to:
+1. Detect active games for clubs the user belongs to
+2. Push this state to all club members automatically
 
 ---
 
-### Files to Update
+### Solution Architecture
 
-#### 1. `src/components/game/TournamentClock.tsx`
-- Replace interval-based decrement with timestamp calculation
-- On each tick, calculate: `timeRemaining = initialTime - elapsed`
-- Handle `visibilitychange` event to recalculate immediately when app returns to foreground
-- Only sync to DB when admin pauses (save `time_remaining_seconds` for resume)
+Implement a **club-wide active game detection system** that:
+1. On app load, queries for any active game sessions in the user's clubs
+2. Subscribes to real-time updates for these game sessions
+3. Automatically populates the `ActiveGameContext` for all club members
+4. Shows the synchronized mini bar to everyone
+
+---
+
+### Implementation Steps
+
+#### Part 1: Modify ActiveGameContext to Auto-Detect Active Games
+
+**File: `src/contexts/ActiveGameContext.tsx`**
+
+Add logic to automatically fetch and subscribe to active games across all clubs the user belongs to:
 
 ```typescript
-// NEW: Calculate time from timestamps
-const calculateTimeRemaining = useCallback(() => {
-  if (!currentLevel) return 0;
-  
-  if (session.status !== 'active') {
-    // When paused, use stored time_remaining_seconds
-    return session.time_remaining_seconds || currentLevel.duration_minutes * 60;
-  }
-  
-  if (!session.level_started_at) {
-    return currentLevel.duration_minutes * 60;
-  }
-  
-  const startTime = new Date(session.level_started_at).getTime();
-  const initialSeconds = session.time_remaining_seconds || currentLevel.duration_minutes * 60;
-  const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-  
-  return Math.max(0, initialSeconds - elapsedSeconds);
-}, [session, currentLevel]);
-
-// Listen for visibility changes (app returns from background)
+// On mount or user login:
 useEffect(() => {
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible' && session.status === 'active') {
-      setTimeRemaining(calculateTimeRemaining());
+  if (!user) return;
+  
+  const fetchActiveGames = async () => {
+    // 1. Get all clubs the user is a member of
+    const { data: memberships } = await supabase
+      .from('club_members')
+      .select('club_id')
+      .eq('user_id', user.id);
+    
+    if (!memberships || memberships.length === 0) return;
+    
+    const clubIds = memberships.map(m => m.club_id);
+    
+    // 2. Find active game sessions in any of these clubs
+    const { data: activeSessions } = await supabase
+      .from('game_sessions')
+      .select(`
+        id,
+        event_id,
+        status,
+        current_level,
+        time_remaining_seconds,
+        level_started_at,
+        events!inner (
+          id,
+          club_id
+        )
+      `)
+      .in('events.club_id', clubIds)
+      .in('status', ['pending', 'active', 'paused'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (activeSessions && activeSessions.length > 0) {
+      const session = activeSessions[0];
+      
+      // 3. Fetch blind structure for this session
+      const { data: blinds } = await supabase
+        .from('blind_structures')
+        .select('*')
+        .eq('game_session_id', session.id)
+        .order('level');
+      
+      // 4. Get player count and prize pool
+      const { data: players } = await supabase
+        .from('game_players')
+        .select('id, status')
+        .eq('game_session_id', session.id);
+      
+      const { data: transactions } = await supabase
+        .from('game_transactions')
+        .select('amount, transaction_type')
+        .eq('game_session_id', session.id);
+      
+      // 5. Get currency from club
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('currency')
+        .eq('id', session.events.club_id)
+        .single();
+      
+      const activePlayers = players?.filter(p => p.status === 'active').length || 0;
+      const prizePool = transactions
+        ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      
+      setActiveGame({
+        sessionId: session.id,
+        eventId: session.event_id,
+        status: session.status,
+        currentLevel: session.current_level,
+        timeRemainingSeconds: session.time_remaining_seconds,
+        levelStartedAt: session.level_started_at,
+        blindStructure: blinds || [],
+        prizePool,
+        playersRemaining: activePlayers,
+        currencySymbol: CURRENCY_SYMBOLS[clubData?.currency || 'GBP'] || '£',
+      });
     }
   };
   
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-}, [calculateTimeRemaining, session.status]);
+  fetchActiveGames();
+}, [user]);
 ```
 
-#### 2. `src/components/game/tv/ClassicTimerMode.tsx`
-- Same timestamp-based calculation
-- Add `visibilitychange` listener
+#### Part 2: Subscribe to Club-Wide Game Session Changes
 
-#### 3. `src/components/game/tv/PortraitTimerMode.tsx`
-- Same timestamp-based calculation
-- Add `visibilitychange` listener
+Add a realtime subscription that listens for **any game session changes** in the user's clubs:
 
-#### 4. `src/components/game/tv/DashboardMode.tsx`
-- Same timestamp-based calculation
-- Add `visibilitychange` listener
-
-#### 5. `src/components/game/tv/CombinedMode.tsx`
-- Same timestamp-based calculation
-- Add `visibilitychange` listener
-
-#### 6. `src/components/game/TournamentMiniBar.tsx`
-- Already uses local countdown, but should also use timestamp-based calculation for accuracy
-
-#### 7. Database behavior changes
-- When **starting/resuming**: Set `level_started_at` to current timestamp
-- When **pausing**: Save current `time_remaining_seconds` (calculated from elapsed time)
-- When **advancing level**: Set new `level_started_at`, new `time_remaining_seconds` for new level
-
----
-
-## Issue 2: Bulk Buy-In for All Players
-
-### The Problem
-Currently, admins must click "Add Buy-in" for each player individually. For a 10-player tournament, this requires 10 separate clicks.
-
-### The Solution
-Add a "Buy-In All" button that:
-1. Identifies all active players WITHOUT a buy-in transaction
-2. Creates buy-in transactions for all of them in one batch
-3. Shows a confirmation dialog with player count and total amount
-
----
-
-### Files to Update
-
-#### `src/components/game/BuyInTracker.tsx`
-
-**Add new state and handler:**
 ```typescript
-const [showBulkBuyIn, setShowBulkBuyIn] = useState(false);
-const [bulkBuyInPending, setBulkBuyInPending] = useState(false);
+// Subscribe to game_sessions changes for user's clubs
+useEffect(() => {
+  if (!user) return;
+  
+  // Subscribe to ALL game_session changes (we'll filter client-side)
+  const channel = supabase
+    .channel('global-game-sessions')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'game_sessions',
+    }, async (payload) => {
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        const session = payload.new as any;
+        
+        // Check if this session is in one of user's clubs
+        const { data: eventData } = await supabase
+          .from('events')
+          .select('club_id')
+          .eq('id', session.event_id)
+          .single();
+        
+        if (!eventData) return;
+        
+        // Check if user is a member of this club
+        const { data: membership } = await supabase
+          .from('club_members')
+          .select('id')
+          .eq('club_id', eventData.club_id)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!membership) return; // Not a member, ignore
+        
+        // Handle based on status
+        if (session.status === 'completed') {
+          // Game ended - clear if this was our active game
+          setActiveGameState(prev => 
+            prev?.sessionId === session.id ? null : prev
+          );
+          sessionStorage.removeItem('activeGame');
+        } else if (['pending', 'active', 'paused'].includes(session.status)) {
+          // Game started or updated - fetch full data and set
+          await refreshActiveGame(session.id, session.event_id);
+        }
+      }
+    })
+    .subscribe();
+  
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user]);
+```
 
-// Get players who need buy-in
-const playersWithoutBuyIn = activePlayers.filter(player => {
-  return !transactions.some(
-    t => t.game_player_id === player.id && t.transaction_type === 'buyin'
-  );
-});
+#### Part 3: Add Helper Function to Refresh Active Game Data
 
-const handleBulkBuyIn = async () => {
-  if (!user || playersWithoutBuyIn.length === 0) return;
+```typescript
+const refreshActiveGame = useCallback(async (sessionId: string, eventId: string) => {
+  // Fetch all required data for the mini bar
+  const { data: session } = await supabase
+    .from('game_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
   
-  setBulkBuyInPending(true);
+  if (!session) return;
   
-  // Create buy-in transactions for all players without one
-  const transactionsToInsert = playersWithoutBuyIn.map(player => ({
-    game_session_id: session.id,
-    game_player_id: player.id,
-    transaction_type: 'buyin',
-    amount: session.buy_in_amount,
-    chips: session.starting_chips,
-    created_by: user.id,
-  }));
+  const { data: blinds } = await supabase
+    .from('blind_structures')
+    .select('*')
+    .eq('game_session_id', sessionId)
+    .order('level');
   
-  const { error } = await supabase
+  const { data: players } = await supabase
+    .from('game_players')
+    .select('id, status')
+    .eq('game_session_id', sessionId);
+  
+  const { data: transactions } = await supabase
     .from('game_transactions')
-    .insert(transactionsToInsert);
+    .select('amount, transaction_type')
+    .eq('game_session_id', sessionId);
   
-  setBulkBuyInPending(false);
+  const { data: eventData } = await supabase
+    .from('events')
+    .select('club_id')
+    .eq('id', eventId)
+    .single();
   
-  if (error) {
-    toast.error('Failed to add buy-ins');
-    return;
-  }
+  const { data: clubData } = await supabase
+    .from('clubs')
+    .select('currency')
+    .eq('id', eventData?.club_id)
+    .single();
   
-  toast.success(`Buy-in added for ${playersWithoutBuyIn.length} players`);
-  setShowBulkBuyIn(false);
-  onRefresh();
-};
+  const activePlayers = players?.filter(p => p.status === 'active').length || 0;
+  const prizePool = transactions
+    ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+    .reduce((sum, t) => sum + t.amount, 0) || 0;
+  
+  const currencySymbols: Record<string, string> = {
+    'GBP': '£', 'USD': '$', 'EUR': '€', 'PLN': 'zł',
+  };
+  
+  const gameData = {
+    sessionId,
+    eventId,
+    status: session.status,
+    currentLevel: session.current_level,
+    timeRemainingSeconds: session.time_remaining_seconds,
+    levelStartedAt: session.level_started_at,
+    blindStructure: blinds || [],
+    prizePool,
+    playersRemaining: activePlayers,
+    currencySymbol: currencySymbols[clubData?.currency || 'GBP'] || '£',
+  };
+  
+  setActiveGameState(gameData);
+  sessionStorage.setItem('activeGame', JSON.stringify(gameData));
+}, []);
 ```
 
-**Add UI button and confirmation dialog:**
-```typescript
-{/* Bulk Buy-In Button - shown when there are players without buy-in */}
-{isAdmin && playersWithoutBuyIn.length > 0 && (
-  <Button
-    variant="default"
-    size="sm"
-    onClick={() => setShowBulkBuyIn(true)}
-    className="glow-gold"
-  >
-    <Users className="h-4 w-4 mr-1" />
-    Buy-In All ({playersWithoutBuyIn.length})
-  </Button>
-)}
+#### Part 4: Subscribe to Player/Transaction Updates for Prize Pool Sync
 
-{/* Bulk Buy-In Confirmation Dialog */}
-<Dialog open={showBulkBuyIn} onOpenChange={setShowBulkBuyIn}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Buy-In All Players</DialogTitle>
-    </DialogHeader>
-    <div className="py-4 space-y-4">
-      <p className="text-muted-foreground">
-        Add buy-in for <span className="font-bold text-foreground">{playersWithoutBuyIn.length} players</span>?
-      </p>
-      <div className="bg-primary/10 rounded-lg p-4 space-y-2">
-        <div className="flex justify-between">
-          <span>Buy-in per player:</span>
-          <span className="font-bold">{currencySymbol}{session.buy_in_amount}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Chips per player:</span>
-          <span className="font-bold">{session.starting_chips.toLocaleString()}</span>
-        </div>
-        <div className="border-t border-border/30 pt-2 flex justify-between">
-          <span className="font-bold">Total:</span>
-          <span className="font-bold text-primary">
-            {currencySymbol}{session.buy_in_amount * playersWithoutBuyIn.length}
-          </span>
-        </div>
-      </div>
-      <div className="text-sm text-muted-foreground">
-        Players to buy-in:
-        <div className="flex flex-wrap gap-1 mt-1">
-          {playersWithoutBuyIn.map(p => (
-            <Badge key={p.id} variant="secondary">{p.display_name}</Badge>
-          ))}
-        </div>
-      </div>
-    </div>
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setShowBulkBuyIn(false)}>
-        Cancel
-      </Button>
-      <Button 
-        onClick={handleBulkBuyIn} 
-        disabled={bulkBuyInPending}
-        className="glow-gold"
-      >
-        {bulkBuyInPending ? 'Processing...' : `Buy-In ${playersWithoutBuyIn.length} Players`}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+Add additional subscriptions to keep the prize pool and player count synchronized:
+
+```typescript
+// When we have an active game, subscribe to its players and transactions
+useEffect(() => {
+  if (!activeGame) return;
+  
+  const channel = supabase
+    .channel(`game-updates-${activeGame.sessionId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'game_players',
+      filter: `game_session_id=eq.${activeGame.sessionId}`,
+    }, async () => {
+      // Refetch player count
+      const { data: players } = await supabase
+        .from('game_players')
+        .select('id, status')
+        .eq('game_session_id', activeGame.sessionId);
+      
+      const activePlayers = players?.filter(p => p.status === 'active').length || 0;
+      
+      setActiveGameState(prev => prev ? {
+        ...prev,
+        playersRemaining: activePlayers,
+      } : null);
+    })
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'game_transactions',
+      filter: `game_session_id=eq.${activeGame.sessionId}`,
+    }, async () => {
+      // Refetch prize pool
+      const { data: transactions } = await supabase
+        .from('game_transactions')
+        .select('amount, transaction_type')
+        .eq('game_session_id', activeGame.sessionId);
+      
+      const prizePool = transactions
+        ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      
+      setActiveGameState(prev => prev ? {
+        ...prev,
+        prizePool,
+      } : null);
+    })
+    .subscribe();
+  
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [activeGame?.sessionId]);
+```
+
+#### Part 5: Update GameMode.tsx to Not Duplicate Logic
+
+The `GameMode.tsx` still updates the context when on the game page. This is fine and will work alongside the global detection. The global detection ensures the mini bar shows even when the user hasn't visited the game page.
+
+**File: `src/pages/GameMode.tsx`**
+
+No major changes needed - the existing `setActiveGame` call will continue to work. However, we can add a minor optimization to avoid duplicate subscriptions:
+
+```typescript
+// The existing useEffect that updates activeGame is fine
+// The global subscription in ActiveGameContext will handle sync for other users
 ```
 
 ---
 
-## Summary of Changes
+### Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/components/game/TournamentClock.tsx` | Replace interval decrement with timestamp calculation, add visibility listener |
-| `src/components/game/tv/ClassicTimerMode.tsx` | Same timestamp-based timer fix |
-| `src/components/game/tv/PortraitTimerMode.tsx` | Same timestamp-based timer fix |
-| `src/components/game/tv/DashboardMode.tsx` | Same timestamp-based timer fix |
-| `src/components/game/tv/CombinedMode.tsx` | Same timestamp-based timer fix |
-| `src/components/game/TournamentMiniBar.tsx` | Timestamp-based calculation for accuracy |
-| `src/components/game/BuyInTracker.tsx` | Add "Buy-In All" button with confirmation dialog |
+| `src/contexts/ActiveGameContext.tsx` | Add auto-detection of active games on mount, global realtime subscription, player/transaction sync |
 
 ---
 
-## Technical Details
+### How It Works After Implementation
 
-### Timer Calculation Logic
-```typescript
-// When game is ACTIVE:
-// 1. level_started_at = timestamp when timer started/resumed
-// 2. time_remaining_seconds = initial time when level started
-// 3. actualRemaining = time_remaining_seconds - elapsed since level_started_at
+1. **User A (Admin)** starts a tournament on `/event/{eventId}/game`
+2. The `game_sessions` table gets a new row with status `'pending'` or `'active'`
+3. **All club members** have the `ActiveGameContext` subscribed to `game_sessions` changes
+4. The realtime event triggers for **all club members**
+5. Each member's app checks if they're in the same club and fetches the game data
+6. The `TournamentMiniBar` appears for **everyone** - synchronized!
 
-// When game is PAUSED:
-// 1. time_remaining_seconds = saved remaining time at pause moment
-// 2. Display this directly (no calculation needed)
+**Timer Sync:**
+- The mini bar uses the timestamp-based calculation (already implemented)
+- All users calculate time from the same `level_started_at` and `time_remaining_seconds`
+- Result: Perfectly synchronized timers across all devices
 
-// When RESUMING:
-// 1. Update level_started_at to NOW
-// 2. Keep time_remaining_seconds as the starting point
-```
-
-### Handling Level Advancement
-When a level ends automatically:
-1. Set `current_level` to next level
-2. Set `level_started_at` to current timestamp
-3. Set `time_remaining_seconds` to new level's duration
+**Spectator Support:**
+- Spectators don't need to be on the game page
+- The mini bar links to `/event/{eventId}/game` so they can tap to view
+- On the game page, they see the full tournament but can't control it (non-admin)
 
 ---
 
-## User Experience After Fix
+### Edge Cases Handled
 
-1. **Timer accuracy**: Timer will show correct time even after:
-   - Locking phone screen
-   - Switching to another app
-   - Minimizing browser
-   - Phone going to sleep
+1. **Multiple clubs with active games**: The system picks the most recent one. In practice, users rarely have overlapping tournaments.
 
-2. **Bulk buy-in**: At tournament start, admin can:
-   - Tap "Buy-In All" button
-   - See confirmation with player list and total amount
-   - One tap to add buy-ins for everyone
+2. **User joins mid-tournament**: On app load, the `fetchActiveGames` query finds the in-progress game.
+
+3. **Game completes**: The realtime subscription detects `status = 'completed'` and clears the mini bar.
+
+4. **Network reconnection**: Supabase realtime automatically reconnects. The `sessionStorage` fallback shows the last known state until sync.
+
+5. **User is not a club member**: The membership check prevents showing games from clubs the user doesn't belong to.
 
