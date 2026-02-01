@@ -45,14 +45,48 @@ export function CustomTransactionDialog({
   const [amount, setAmount] = useState(defaultAmount);
   const [chips, setChips] = useState(defaultChips);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // String states for input fields (allows empty while typing)
+  const [amountInput, setAmountInput] = useState('');
+  const [chipsInput, setChipsInput] = useState('');
 
   // Reset values when dialog opens with new defaults
   useEffect(() => {
     if (isOpen) {
       setAmount(defaultAmount);
       setChips(defaultChips);
+      setAmountInput(defaultAmount.toString());
+      setChipsInput(defaultChips.toString());
     }
   }, [isOpen, defaultAmount, defaultChips]);
+
+  const handleAmountChange = (value: string) => {
+    if (value === '' || /^\d*$/.test(value)) {
+      setAmountInput(value);
+      setAmount(value === '' ? 0 : parseInt(value));
+    }
+  };
+
+  const handleChipsChange = (value: string) => {
+    if (value === '' || /^\d*$/.test(value)) {
+      setChipsInput(value);
+      setChips(value === '' ? 0 : parseInt(value));
+    }
+  };
+
+  const handleAmountBlur = () => {
+    if (amountInput === '') {
+      setAmountInput('0');
+      setAmount(0);
+    }
+  };
+
+  const handleChipsBlur = () => {
+    if (chipsInput === '') {
+      setChipsInput('0');
+      setChips(0);
+    }
+  };
 
   const handleConfirm = async () => {
     if (amount <= 0) return;
@@ -120,19 +154,23 @@ export function CustomTransactionDialog({
             <div className="space-y-2">
               <Label>{t('game.amount')} ({currencySymbol})</Label>
               <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={amountInput}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                onBlur={handleAmountBlur}
               />
             </div>
             <div className="space-y-2">
               <Label>{t('game.chips')}</Label>
               <Input
-                type="number"
-                value={chips}
-                onChange={(e) => setChips(parseInt(e.target.value) || 0)}
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={chipsInput}
+                onChange={(e) => handleChipsChange(e.target.value)}
+                onBlur={handleChipsBlur}
               />
             </div>
           </div>
