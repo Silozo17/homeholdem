@@ -103,6 +103,11 @@ export function EndGameDialog({
   const [inputMode, setInputMode] = useState<'percentage' | 'currency'>('percentage');
   const [percentagePayouts, setPercentagePayouts] = useState<number[]>([50, 30, 20, 0, 0]);
   const [currencyPayouts, setCurrencyPayouts] = useState<number[]>([0, 0, 0, 0, 0]);
+  
+  // String states for input fields (allows empty while typing)
+  const [percentageInputs, setPercentageInputs] = useState<string[]>(['50', '30', '20', '0', '0']);
+  const [currencyInputs, setCurrencyInputs] = useState<string[]>(['0', '0', '0', '0', '0']);
+  const [customPrizePoolInput, setCustomPrizePoolInput] = useState<string>('');
 
   // State for selected players per position
   const [selectedPlayers, setSelectedPlayers] = useState<(string | null)[]>([null, null, null, null, null]);
@@ -127,6 +132,9 @@ export function EndGameDialog({
       const preset = PAYOUT_PRESETS[defaultPositions] || [100];
       const paddedPreset = [...preset, 0, 0, 0, 0, 0].slice(0, 5);
       setPercentagePayouts(paddedPreset);
+      setPercentageInputs(paddedPreset.map(n => n.toString()));
+      setCurrencyInputs(['0', '0', '0', '0', '0']);
+      setCustomPrizePoolInput(calculatedPrizePool.toString());
 
       // Pre-select players based on elimination order (if any)
       const eliminatedByPosition = players
@@ -197,27 +205,80 @@ export function EndGameDialog({
     const preset = PAYOUT_PRESETS[count] || [100];
     const paddedPreset = [...preset, 0, 0, 0, 0, 0].slice(0, 5);
     setPercentagePayouts(paddedPreset);
+    setPercentageInputs(paddedPreset.map(n => n.toString()));
   };
 
-  const handlePercentageChange = (index: number, value: string) => {
-    const numValue = parseInt(value) || 0;
-    const newPayouts = [...percentagePayouts];
-    newPayouts[index] = numValue;
-    setPercentagePayouts(newPayouts);
+  const handlePercentageInputChange = (index: number, value: string) => {
+    // Allow empty string or valid numbers only
+    if (value === '' || /^\d*$/.test(value)) {
+      const newInputs = [...percentageInputs];
+      newInputs[index] = value;
+      setPercentageInputs(newInputs);
+      
+      // Update numeric state for calculations
+      const numValue = value === '' ? 0 : parseInt(value);
+      const newPayouts = [...percentagePayouts];
+      newPayouts[index] = numValue;
+      setPercentagePayouts(newPayouts);
+    }
   };
 
-  const handleCurrencyChange = (index: number, value: string) => {
-    const numValue = parseInt(value) || 0;
-    const newPayouts = [...currencyPayouts];
-    newPayouts[index] = numValue;
-    setCurrencyPayouts(newPayouts);
-    
-    // Update percentages based on currency
-    if (effectivePrizePool > 0) {
-      const newPercentages = newPayouts.map(amt => 
-        Math.round((amt / effectivePrizePool) * 100)
-      );
-      setPercentagePayouts(newPercentages);
+  const handleCurrencyInputChange = (index: number, value: string) => {
+    // Allow empty string or valid numbers only
+    if (value === '' || /^\d*$/.test(value)) {
+      const newInputs = [...currencyInputs];
+      newInputs[index] = value;
+      setCurrencyInputs(newInputs);
+      
+      const numValue = value === '' ? 0 : parseInt(value);
+      const newPayouts = [...currencyPayouts];
+      newPayouts[index] = numValue;
+      setCurrencyPayouts(newPayouts);
+      
+      // Update percentages based on currency
+      if (effectivePrizePool > 0) {
+        const newPercentages = newPayouts.map(amt => 
+          Math.round((amt / effectivePrizePool) * 100)
+        );
+        setPercentagePayouts(newPercentages);
+        setPercentageInputs(newPercentages.map(n => n.toString()));
+      }
+    }
+  };
+
+  const handleInputBlur = (index: number, mode: 'percentage' | 'currency') => {
+    if (mode === 'percentage') {
+      const newInputs = [...percentageInputs];
+      if (newInputs[index] === '') {
+        newInputs[index] = '0';
+        const newPayouts = [...percentagePayouts];
+        newPayouts[index] = 0;
+        setPercentagePayouts(newPayouts);
+      }
+      setPercentageInputs(newInputs);
+    } else {
+      const newInputs = [...currencyInputs];
+      if (newInputs[index] === '') {
+        newInputs[index] = '0';
+        const newPayouts = [...currencyPayouts];
+        newPayouts[index] = 0;
+        setCurrencyPayouts(newPayouts);
+      }
+      setCurrencyInputs(newInputs);
+    }
+  };
+
+  const handleCustomPrizePoolChange = (value: string) => {
+    if (value === '' || /^\d*$/.test(value)) {
+      setCustomPrizePoolInput(value);
+      setCustomPrizePool(value === '' ? 0 : parseInt(value));
+    }
+  };
+
+  const handleCustomPrizePoolBlur = () => {
+    if (customPrizePoolInput === '') {
+      setCustomPrizePoolInput('0');
+      setCustomPrizePool(0);
     }
   };
 
@@ -393,9 +454,12 @@ export function EndGameDialog({
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{currencySymbol}</span>
                     <Input
-                      type="number"
-                      value={customPrizePool}
-                      onChange={(e) => setCustomPrizePool(parseInt(e.target.value) || 0)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={customPrizePoolInput}
+                      onChange={(e) => handleCustomPrizePoolChange(e.target.value)}
+                      onBlur={handleCustomPrizePoolBlur}
                       className="w-32"
                     />
                     <span className="text-xs text-muted-foreground">
@@ -492,12 +556,13 @@ export function EndGameDialog({
                             {inputMode === 'percentage' ? (
                               <>
                                 <Input
-                                  type="number"
-                                  value={percentagePayouts[index]}
-                                  onChange={(e) => handlePercentageChange(index, e.target.value)}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={percentageInputs[index]}
+                                  onChange={(e) => handlePercentageInputChange(index, e.target.value)}
+                                  onBlur={() => handleInputBlur(index, 'percentage')}
                                   className="w-16 h-8 text-center"
-                                  min={0}
-                                  max={100}
                                 />
                                 <span className="text-muted-foreground">%</span>
                               </>
@@ -505,11 +570,13 @@ export function EndGameDialog({
                               <>
                                 <span className="text-muted-foreground">{currencySymbol}</span>
                                 <Input
-                                  type="number"
-                                  value={currencyPayouts[index]}
-                                  onChange={(e) => handleCurrencyChange(index, e.target.value)}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={currencyInputs[index]}
+                                  onChange={(e) => handleCurrencyInputChange(index, e.target.value)}
+                                  onBlur={() => handleInputBlur(index, 'currency')}
                                   className="w-20 h-8 text-center"
-                                  min={0}
                                 />
                               </>
                             )}
