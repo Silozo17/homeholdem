@@ -45,7 +45,7 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
-import { notifyHostConfirmed } from '@/lib/push-notifications';
+import { notifyHostConfirmed, notifyWaitlistPromotion } from '@/lib/push-notifications';
 import { 
   notifyEventRsvpInApp, 
   notifyDateFinalizedInApp, 
@@ -529,6 +529,69 @@ export default function EventDetail() {
         event.id,
         user.id
       ).catch(console.error);
+    }
+
+    // Check if we need to promote from waitlist when a "going" user changes status
+    const wasGoingNotWaitlisted = previousRsvp === 'going' && 
+      previousRsvps.find(r => r.user_id === user.id && !r.is_waitlisted);
+    
+    if (wasGoingNotWaitlisted && status !== 'going') {
+      // A "going" spot just opened up - check for waitlist
+      const { data: existingRsvps } = await supabase
+        .from('event_rsvps')
+        .select('user_id, is_waitlisted, waitlist_position')
+        .eq('event_id', event.id)
+        .eq('status', 'going');
+
+      const goingCount = existingRsvps?.filter(r => !r.is_waitlisted).length || 0;
+
+      // If we're under capacity and there's someone waitlisted
+      if (goingCount < totalCapacity) {
+        const waitlistUsers = existingRsvps
+          ?.filter(r => r.is_waitlisted)
+          .sort((a, b) => (a.waitlist_position || 999) - (b.waitlist_position || 999));
+
+        if (waitlistUsers && waitlistUsers.length > 0) {
+          const promotedUser = waitlistUsers[0];
+
+          // Promote the first waitlisted user
+          await supabase
+            .from('event_rsvps')
+            .update({ 
+              is_waitlisted: false, 
+              waitlist_position: null 
+            })
+            .eq('event_id', event.id)
+            .eq('user_id', promotedUser.user_id);
+
+          // Reposition remaining waitlist
+          for (let i = 1; i < waitlistUsers.length; i++) {
+            await supabase
+              .from('event_rsvps')
+              .update({ waitlist_position: i })
+              .eq('event_id', event.id)
+              .eq('user_id', waitlistUsers[i].user_id);
+          }
+
+          // Call edge function to send email + in-app notification
+          supabase.functions.invoke('promote-waitlist', {
+            body: { 
+              event_id: event.id, 
+              promoted_user_id: promotedUser.user_id 
+            }
+          }).catch(console.error);
+
+          // Send push notification
+          notifyWaitlistPromotion(
+            promotedUser.user_id,
+            event.title,
+            event.id
+          ).catch(console.error);
+        }
+      }
+
+      // Refetch to ensure UI is up-to-date
+      await fetchRsvps();
     }
   }, [user, event, userProfile, rsvps, userRsvp]);
 
