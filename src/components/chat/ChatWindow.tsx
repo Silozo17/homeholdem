@@ -9,6 +9,7 @@ import { ChatMessage } from './ChatMessage';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyNewChatMessageInApp } from '@/lib/in-app-notifications';
+import { notifyNewChatMessage } from '@/lib/push-notifications';
 
 interface Message {
   id: string;
@@ -179,13 +180,13 @@ export function ChatWindow({ clubId, eventId, className }: ChatWindowProps) {
         .single();
       
       const userIds = members.map(m => m.user_id);
-      notifyNewChatMessageInApp(
-        userIds,
-        profile?.display_name || 'Someone',
-        clubId,
-        user!.id,
-        eventId
-      ).catch(console.error);
+      const senderName = profile?.display_name || 'Someone';
+      
+      // Send both in-app and push notifications in parallel
+      Promise.allSettled([
+        notifyNewChatMessageInApp(userIds, senderName, clubId, user!.id, eventId),
+        notifyNewChatMessage(userIds, senderName, clubId, eventId),
+      ]).catch(console.error);
     } catch (err) {
       console.error('Failed to send chat notifications:', err);
     }
