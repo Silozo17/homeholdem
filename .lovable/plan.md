@@ -1,130 +1,196 @@
 
-# Plan: Prevent Unwanted Button Focus/Highlight on Navigation and Modal Open
+# Plan: Fix Prize Pool Override, Season Standings, and Completed Game Locking
 
-## Problem
+## Summary of Issues Found
 
-When navigating to a new page or when a modal/dialog/drawer opens, buttons are getting unexpectedly highlighted (focused). This creates a visually jarring experience where random buttons appear selected.
+Based on my investigation, I've identified **four distinct bugs**:
 
-## Root Cause Analysis
+### 1. Prize Pool Override Not Being Saved
+**Root Cause:** The `EndGameDialog.tsx` allows admin to check "Override prize pool" and enter a custom value (e.g., £480), but this value is **never saved to the database**. The `prize_pool_override` column in `game_sessions` remains `null`.
 
-1. **Radix UI Auto-Focus Behavior**: All Radix dialog primitives (Dialog, Sheet, Drawer) automatically focus the first focusable element when opened for accessibility. This causes buttons to show their focus ring.
+**Database Evidence:**
+- Styczen 2026 session has `prize_pool_override: null`
+- But payout transactions total to £480 (stored as -480)
+- Buy-ins only total £360
 
-2. **Focus-Visible Ring Styling**: The button component uses `focus-visible:ring-2 focus-visible:ring-ring` which shows a gold ring when focused.
-
-3. **Browser Navigation Behavior**: When navigating between pages, browsers may auto-focus interactive elements.
-
-## Solution
-
-### Part 1: Prevent Dialog/Sheet/Drawer Auto-Focus
-
-Add `onOpenAutoFocus` event handlers to prevent automatic focus when modals open. This is done by calling `e.preventDefault()` on the event.
-
-**Files to modify:**
-- `src/components/ui/dialog.tsx`
-- `src/components/ui/sheet.tsx`
-- `src/components/ui/drawer.tsx`
-
-Example change for DialogContent:
+### 2. Season 3 Shows No Standings Despite Jan 2026 Being Completed
+**Root Cause:** The `game-finalization.ts` uses `today` (current date: Feb 1, 2026) to find the season, but the game was finalized on **Jan 31, 2026**. The season lookup query:
 ```typescript
-<DialogPrimitive.Content
-  ref={ref}
-  onOpenAutoFocus={(e) => e.preventDefault()}
-  className={...}
-  {...props}
->
+const today = new Date().toISOString().split('T')[0]; // This is WRONG
 ```
+Should use the **event date** instead of `today` because finalization might happen on a different day than the game.
 
-### Part 2: Add Global Focus Reset on Navigation
+**Additional Issue:** Season 3 runs Jan 1 - Dec 31 2026. The Jan 31 event falls within this range, so standings should be there. This suggests the season lookup failed during finalization.
 
-Update the `ScrollToTop` component to blur any focused element when the route changes:
+### 3. Timer Controls Should Be Disabled for Completed Games
+**Current State:** When a game is completed (`status: 'completed'`), users can still access GameMode and see the timer/controls. While the "End Game" button is correctly hidden, the timer controls (play/pause, prev/next level) are still visible to admins.
+
+**Required Behavior:**
+- Completed games should show read-only results (timer frozen, no controls)
+- Only club owner can make edits to historical data
+- Non-admins should see results only (no edit capability)
+
+### 4. Data Fix Needed for Jan 2026 Event
+The prize_pool_override for session `a346a603-8648-4355-967e-4baa8eccf18e` needs to be set to £480, and season standings need to be populated for Season 3.
+
+---
+
+## Technical Solution
+
+### Part A: Save Prize Pool Override in EndGameDialog
+
+**File:** `src/components/game/EndGameDialog.tsx`
+
+Add database update to save `prize_pool_override` before calling `finalizeGame`:
 
 ```typescript
-useEffect(() => {
-  window.scrollTo(0, 0);
-  // Remove focus from any element to prevent highlight
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-}, [pathname]);
-```
-
-### Part 3: CSS Enhancement for Touch Devices (Optional)
-
-Add a CSS rule to only show focus rings for keyboard navigation, not touch/mouse:
-
-```css
-/* Only show focus rings for keyboard users */
-@media (pointer: coarse) {
-  *:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-    ring: none !important;
-  }
+// Before finalizing, save the prize pool override if set
+if (overridePrizePool && customPrizePool !== calculatedPrizePool) {
+  await supabase
+    .from('game_sessions')
+    .update({ prize_pool_override: customPrizePool })
+    .eq('id', sessionId);
 }
 ```
 
-However, this may impact accessibility. A better approach is to let components handle focus themselves.
+This should be inserted around line 378, before the payout transactions are recorded.
+
+---
+
+### Part B: Fix Season Date Lookup in game-finalization.ts
+
+**File:** `src/lib/game-finalization.ts`
+
+**Problem:** Uses `today` instead of the actual game date.
+
+**Solution:** Get the event's `final_date` and use that for season lookup.
+
+```typescript
+// Current (WRONG):
+const today = new Date().toISOString().split('T')[0];
+
+// Fixed:
+// Get the event's final_date for accurate season attribution
+const { data: eventData } = await supabase
+  .from('events')
+  .select('final_date')
+  .eq('id', sessionData.event_id)
+  .single();
+
+const gameDate = eventData?.final_date 
+  ? new Date(eventData.final_date).toISOString().split('T')[0]
+  : new Date().toISOString().split('T')[0]; // Fallback to today
+
+// Then use gameDate instead of today in the season query
+```
+
+Update the season query to use `gameDate`:
+```typescript
+const { data: activeSeason } = await supabase
+  .from('seasons')
+  .select('*')
+  .eq('club_id', clubId)
+  .lte('start_date', gameDate)
+  .gte('end_date', gameDate)
+  .single();
+```
+
+---
+
+### Part C: Lock Timer for Completed Games
+
+**File:** `src/components/game/TournamentClock.tsx`
+
+**Change:** Disable all controls when session status is 'completed':
+
+```typescript
+// Add check for completed status
+const isCompleted = session.status === 'completed';
+
+// In the controls section (around line 329):
+{isAdmin && !tvMode && !isCompleted && (
+  <div className="flex items-center justify-center gap-2">
+    {/* existing controls */}
+  </div>
+)}
+
+// For completed games, show a "Game Completed" badge instead
+{isCompleted && !tvMode && (
+  <div className="flex justify-center">
+    <Badge variant="default" className="text-sm">
+      Game Completed
+    </Badge>
+  </div>
+)}
+```
+
+**File:** `src/pages/GameMode.tsx`
+
+**Changes:**
+1. Hide "Start Tournament" button if game is already completed
+2. Disable settings changes for completed games (except for club owner)
+3. Show results-only view for completed sessions
+
+```typescript
+// Around line 237, check for completed status
+{!session ? (
+  // Start tournament UI
+) : session.status === 'completed' ? (
+  // Show completed game summary - read only
+  <CompletedGameView ... />
+) : (
+  // Active game UI with controls
+)}
+```
+
+---
+
+### Part D: Database Corrections (One-Time Fix)
+
+**1. Fix Jan 2026 Prize Pool Override:**
+```sql
+UPDATE game_sessions 
+SET prize_pool_override = 480
+WHERE id = 'a346a603-8648-4355-967e-4baa8eccf18e';
+```
+
+**2. Populate Season 3 Standings:**
+Run a script to recalculate standings for games played within Season 3's date range. This involves:
+- Finding all completed game_sessions for events with final_date between 2026-01-01 and 2026-12-31
+- For each, calculate player points and insert into season_standings
+
+---
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/ui/dialog.tsx` | Add `onOpenAutoFocus={(e) => e.preventDefault()}` to DialogContent |
-| `src/components/ui/sheet.tsx` | Add `onOpenAutoFocus={(e) => e.preventDefault()}` to SheetContent |
-| `src/components/ui/drawer.tsx` | Add `onOpenAutoFocus={(e) => e.preventDefault()}` to DrawerContent |
-| `src/components/layout/ScrollToTop.tsx` | Add `document.activeElement.blur()` on route change |
+| File | Change Description |
+|------|---------------------|
+| `src/components/game/EndGameDialog.tsx` | Save `prize_pool_override` to database when admin overrides |
+| `src/lib/game-finalization.ts` | Use event's `final_date` for season lookup instead of current date |
+| `src/components/game/TournamentClock.tsx` | Disable controls when game is completed |
+| `src/pages/GameMode.tsx` | Show read-only view for completed games, hide start button if completed |
+| Database | One-time update to fix Jan 2026 prize pool and regenerate Season 3 standings |
 
-## Technical Details
+---
 
-### Dialog Component Change
-```typescript
-// In DialogContent:
-<DialogPrimitive.Content
-  ref={ref}
-  onOpenAutoFocus={(e) => e.preventDefault()}
-  className={cn(...)}
-  {...props}
->
-```
+## Implementation Order
 
-### Sheet Component Change
-```typescript
-// In SheetContent:
-<SheetPrimitive.Content 
-  ref={ref} 
-  onOpenAutoFocus={(e) => e.preventDefault()}
-  className={cn(sheetVariants({ side }), className)} 
-  {...props}
->
-```
+1. **Fix EndGameDialog** - Save prize_pool_override (prevents future issues)
+2. **Fix game-finalization.ts** - Correct season attribution logic
+3. **Lock completed games** - Add read-only mode for TournamentClock and GameMode
+4. **Database corrections** - Fix Jan 2026 data and regenerate Season 3 standings
 
-### Drawer Component Change
-```typescript
-// In DrawerContent:
-<DrawerPrimitive.Content
-  ref={ref}
-  onOpenAutoFocus={(e) => e.preventDefault()}
-  className={cn(...)}
-  {...props}
->
-```
-
-### ScrollToTop Change
-```typescript
-useEffect(() => {
-  window.scrollTo(0, 0);
-  // Blur any focused element to prevent unwanted highlights
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-}, [pathname]);
-```
+---
 
 ## Testing Recommendations
 
 After implementation:
-1. Navigate between Dashboard, Events, Stats, and Profile pages - no buttons should be highlighted
-2. Open the Quick Create modal from the bottom nav - no button inside should be pre-selected
-3. Open the Paywall drawer - no button should be highlighted
-4. Open any dialog (Create Club, Join Club, etc.) - no unexpected focus
-5. Verify keyboard navigation still works (Tab to focus elements should still show focus ring)
+1. Create a test game, override the prize pool to a different value, end the game
+2. Verify the `prize_pool_override` is saved in the database
+3. Check that Game History shows the overridden value
+4. Verify Season 3 standings now show the Jan 2026 game results
+5. Navigate to a completed game and verify:
+   - Timer controls are disabled
+   - Settings are read-only (except for owner)
+   - Results are displayed properly
+   - "Start Tournament" button is not shown
