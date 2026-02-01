@@ -132,14 +132,34 @@ export async function finalizeGame(
       }
     }
 
-    // 3. Update season standings - find season by date range, not is_active flag
-    const today = new Date().toISOString().split('T')[0];
+    // 3. Update season standings - find season by event date, not current date
+    // First, get the session's event to find the actual game date
+    const { data: sessionForSeason } = await supabase
+      .from('game_sessions')
+      .select('event_id')
+      .eq('id', sessionId)
+      .single();
+
+    let gameDate = new Date().toISOString().split('T')[0]; // Fallback to today
+    
+    if (sessionForSeason?.event_id) {
+      const { data: eventForSeason } = await supabase
+        .from('events')
+        .select('final_date')
+        .eq('id', sessionForSeason.event_id)
+        .single();
+      
+      if (eventForSeason?.final_date) {
+        gameDate = new Date(eventForSeason.final_date).toISOString().split('T')[0];
+      }
+    }
+
     const { data: activeSeason } = await supabase
       .from('seasons')
       .select('*')
       .eq('club_id', clubId)
-      .lte('start_date', today)
-      .gte('end_date', today)
+      .lte('start_date', gameDate)
+      .gte('end_date', gameDate)
       .single();
 
     if (activeSeason) {

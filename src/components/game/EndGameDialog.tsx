@@ -377,6 +377,14 @@ export function EndGameDialog({
         });
       }
 
+      // Save prize pool override to database if set
+      if (overridePrizePool && customPrizePool !== calculatedPrizePool) {
+        await supabase
+          .from('game_sessions')
+          .update({ prize_pool_override: customPrizePool })
+          .eq('id', sessionId);
+      }
+
       // Record payout transactions
       for (const payout of payouts) {
         if (payout.playerId && payout.amount > 0) {
