@@ -1,10 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
-// VAPID public key - read from environment variable
-// This must match the private key stored in backend secrets
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 interface PushNotificationState {
   isSupported: boolean;
@@ -34,8 +30,29 @@ const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(naviga
 const isSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent) && !/CriOS/.test(navigator.userAgent);
 const isIOSNonSafari = isIOS && !isSafari;
 
+// Cache for VAPID public key
+let vapidPublicKeyCache: string | null = null;
+
+async function getVapidPublicKey(): Promise<string | null> {
+  if (vapidPublicKeyCache) return vapidPublicKeyCache;
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('get-vapid-public-key');
+    if (error) {
+      console.error('Failed to fetch VAPID public key:', error);
+      return null;
+    }
+    vapidPublicKeyCache = data?.publicKey || null;
+    return vapidPublicKeyCache;
+  } catch (err) {
+    console.error('Error fetching VAPID public key:', err);
+    return null;
+  }
+}
+
 export function usePushNotifications() {
   const { user } = useAuth();
+  const vapidKeyRef = useRef<string | null>(null);
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
     isSubscribed: false,
@@ -95,14 +112,22 @@ export function usePushNotifications() {
   }, [checkSubscription]);
 
   const subscribe = useCallback(async () => {
-    if (!user || !VAPID_PUBLIC_KEY) {
-      setState(prev => ({ ...prev, error: 'Push notifications not configured' }));
+    if (!user) {
+      setState(prev => ({ ...prev, error: 'User not authenticated' }));
       return false;
     }
 
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
+      // Fetch VAPID public key if not cached
+      const vapidKey = vapidKeyRef.current || await getVapidPublicKey();
+      if (!vapidKey) {
+        setState(prev => ({ ...prev, loading: false, error: 'Push notifications not configured' }));
+        return false;
+      }
+      vapidKeyRef.current = vapidKey;
+
       // Request permission
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
@@ -114,7 +139,7 @@ export function usePushNotifications() {
       const registration = await navigator.serviceWorker.ready;
       
       // Subscribe to push
-      const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      const applicationServerKey = urlBase64ToUint8Array(vapidKey);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKey as BufferSource,
@@ -195,7 +220,7 @@ export function usePushNotifications() {
 
   // Silent subscribe for auto-prompt - doesn't show errors to users
   const subscribeQuietly = useCallback(async () => {
-    if (!user || !VAPID_PUBLIC_KEY || !state.isSupported) {
+    if (!user || !state.isSupported) {
       return false;
     }
 
