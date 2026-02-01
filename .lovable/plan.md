@@ -1,202 +1,264 @@
 
-# Plan: Fix Native Web Push Notifications with VAPID
+# Plan: Club Owner Broadcast Notifications
 
-## Problem Summary
+## Overview
 
-The push notification system is failing due to incorrect VAPID key conversion. The edge function tries to manually convert base64url keys to JWK format using `base64UrlToJwk()`, which produces an `invalid b64 coordinate` error when the library attempts to import them.
-
-## Root Cause
-
-The `@negrel/webpush` library's `importVapidKeys()` expects keys already in JWK format, but we're:
-1. Storing keys as raw base64url strings (`VAPID_PRIVATE_KEY`, `VITE_VAPID_PUBLIC_KEY`)
-2. Manually slicing bytes and converting to JWK - this is fragile and failing
-
-## Solution
-
-Store VAPID keys in native JWK format as a single JSON secret, then parse it directly - no manual conversion needed.
+Add a feature that allows club owners to send broadcast push and in-app notifications to all club members. This will be accessible from the club detail page, giving owners a simple way to communicate important announcements to their poker group.
 
 ---
 
-## Changes Required
+## Feature Scope
 
-### 1. Add New Secret: `VAPID_KEYS_JSON`
-
-Store the full JWK keypair as a JSON string. This replaces the fragile conversion logic.
-
-**Format:**
-```json
-{
-  "publicKey": {
-    "kty": "EC",
-    "crv": "P-256", 
-    "x": "...",
-    "y": "...",
-    "ext": true
-  },
-  "privateKey": {
-    "kty": "EC",
-    "crv": "P-256",
-    "x": "...",
-    "y": "...",
-    "d": "...",
-    "ext": true
-  }
-}
-```
-
-You'll generate these keys using the `@negrel/webpush` library's `generateVapidKeys()` and `exportVapidKeys()` functions.
+| Capability | Description |
+|------------|-------------|
+| Target audience | All club members (excluding the sender) |
+| Notification types | Push notification + In-app notification |
+| Access control | Owner only (not admins) |
+| Message customization | Custom title and message body |
+| Character limits | Title: 50 chars, Body: 280 chars |
 
 ---
 
-### 2. Update Edge Function
+## User Interface
 
-**File:** `supabase/functions/send-push-notification/index.ts`
+### Location
+The broadcast feature will be added to the **Settings tab** on the club detail page, visible only to club owners. It will appear as a new collapsible section with a "megaphone" icon.
 
-**Changes:**
-- Remove `VAPID_PRIVATE_KEY` env variable
-- Add `VAPID_KEYS_JSON` env variable
-- Remove all manual conversion functions (`base64UrlToJwk`, `base64UrlDecode`, `bytesToBase64Url`)
-- Parse the JSON and pass directly to `importVapidKeys()`
+### UI Components
 
-```typescript
-// Before (broken)
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-const VAPID_PUBLIC_KEY = Deno.env.get("VITE_VAPID_PUBLIC_KEY")!;
-const jwkKeys = base64UrlToJwk(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-// After (simple)
-const VAPID_KEYS_JSON = Deno.env.get("VAPID_KEYS_JSON")!;
-const jwkKeys = JSON.parse(VAPID_KEYS_JSON);
-const vapidKeys = await importVapidKeys(jwkKeys);
-```
+1. **Collapsible Section** - "Broadcast Message" with Megaphone icon
+2. **Title Input** - Short title (max 50 chars)
+3. **Message Textarea** - Body text (max 280 chars) with character counter
+4. **Send Button** - With confirmation before sending
+5. **Confirmation Dialog** - Shows member count and prevents accidental sends
 
 ---
 
-### 3. Update Frontend Hook
+## Files to Create
 
-**File:** `src/hooks/usePushNotifications.ts`
+### 1. New Component: `BroadcastMessageDialog.tsx`
 
-**Changes:**
-- Read public key from environment instead of hardcoding
-- Add validation for missing key
+**Path:** `src/components/clubs/BroadcastMessageDialog.tsx`
 
-```typescript
-// Before (hardcoded)
-const VAPID_PUBLIC_KEY = 'BHzqX_L6AG...';
-
-// After (from environment)
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-```
-
----
-
-### 4. Create Key Generator (Temporary Edge Function)
-
-**File:** `supabase/functions/generate-vapid-keys/index.ts` (NEW - temporary)
-
-A one-time function to generate properly formatted VAPID keys:
-
-```typescript
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { 
-  generateVapidKeys, 
-  exportVapidKeys, 
-  exportApplicationServerKey 
-} from "jsr:@negrel/webpush@0.5.0";
-
-serve(async () => {
-  const keys = await generateVapidKeys({ extractable: true });
-  const exported = await exportVapidKeys(keys);
-  const publicKeyB64 = await exportApplicationServerKey(keys);
-
-  return new Response(JSON.stringify({
-    VAPID_KEYS_JSON: JSON.stringify(exported),
-    VITE_VAPID_PUBLIC_KEY: publicKeyB64,
-  }, null, 2), {
-    headers: { "Content-Type": "application/json" }
-  });
-});
-```
-
-**Usage:** Call this function once, copy the output to your secrets, then delete the function.
-
----
-
-## Service Worker (Already Correct)
-
-The `public/sw.js` is already properly configured:
-- Listens for `push` event
-- Parses JSON payload
-- Calls `self.registration.showNotification()`
-- Handles notification clicks
-
-No changes needed.
-
----
-
-## Frontend Hook (Already Mostly Correct)
-
-The `src/hooks/usePushNotifications.ts` already:
-- Registers the service worker
-- Requests notification permission
-- Subscribes using `pushManager.subscribe({ applicationServerKey })`
-- Saves subscription to database with `p256dh_key` and `auth_key`
-
-Only change: Read public key from environment.
-
----
-
-## Migration Steps
-
-1. **Create key generator function** - Deploy temporary edge function
-2. **Generate new keys** - Call the function to get properly formatted JWK keys
-3. **Update secrets:**
-   - Add `VAPID_KEYS_JSON` (the full JWK JSON string)
-   - Update `VITE_VAPID_PUBLIC_KEY` (the new base64url public key)
-4. **Update edge function** - Remove conversion code, use `JSON.parse()`
-5. **Update frontend hook** - Read from environment
-6. **Test** - Subscribe and verify push arrives
-7. **Clean up** - Delete generator function, optionally delete old `VAPID_PRIVATE_KEY`
-
----
-
-## Existing Subscriptions
-
-Changing VAPID keys will invalidate existing subscriptions. The edge function already handles this - failed sends are detected and those subscriptions are deleted from the database. Users will be re-prompted to subscribe when they next open the app.
+A dialog component with:
+- Text input for notification title
+- Textarea for message body
+- Character counters for both fields
+- Confirmation step showing recipient count
+- Loading state during send
+- Success/error feedback
 
 ---
 
 ## Files to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/generate-vapid-keys/index.ts` | CREATE | Temporary key generator |
-| `supabase/functions/send-push-notification/index.ts` | MODIFY | Remove conversion, use JSON.parse |
-| `src/hooks/usePushNotifications.ts` | MODIFY | Read VAPID key from env |
+### 2. Update Notification Libraries
+
+**File:** `src/lib/push-notifications.ts`
+
+Add new function:
+```typescript
+export async function sendBroadcastPush(
+  userIds: string[],
+  title: string,
+  body: string,
+  clubId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title,
+    body,
+    url: `/club/${clubId}`,
+    tag: `broadcast-${clubId}-${Date.now()}`,
+    notificationType: 'rsvp_updates', // Re-use existing type
+  });
+}
+```
+
+**File:** `src/lib/in-app-notifications.ts`
+
+Add new notification type 'club_broadcast' and function:
+```typescript
+export async function sendBroadcastInApp(
+  userIds: string[],
+  title: string,
+  body: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'club_broadcast',
+    title,
+    body,
+    url: `/club/${clubId}`,
+    clubId,
+  });
+}
+```
+
+### 3. Update Type Definition
+
+**File:** `src/lib/in-app-notifications.ts`
+
+Update the `CreateNotificationParams` type to include the new notification type:
+```typescript
+type: 'rsvp' | 'date_finalized' | ... | 'club_broadcast';
+```
+
+### 4. Integrate into Club Settings
+
+**File:** `src/components/clubs/ClubSettings.tsx`
+
+Add a new collapsible section at the bottom (before save button) that contains the broadcast dialog trigger:
+- Only visible when `isAdmin` is true AND user role is 'owner'
+- Requires passing `members` list and `clubId` as props
+
+### 5. Update ClubDetail Page
+
+**File:** `src/pages/ClubDetail.tsx`
+
+Pass the members list and owner status to ClubSettings component so it can render the broadcast section.
+
+### 6. Add Translations
+
+**File:** `src/i18n/locales/en.json`
+
+```json
+{
+  "club": {
+    "broadcast": "Broadcast Message",
+    "broadcast_description": "Send a notification to all club members",
+    "broadcast_title": "Title",
+    "broadcast_title_placeholder": "e.g., Important Update",
+    "broadcast_message": "Message",
+    "broadcast_message_placeholder": "Write your announcement...",
+    "broadcast_send": "Send to All Members",
+    "broadcast_confirm_title": "Send Broadcast?",
+    "broadcast_confirm_description": "This will send a push notification and in-app message to {{count}} members.",
+    "broadcast_sent": "Broadcast sent successfully",
+    "broadcast_error": "Failed to send broadcast"
+  }
+}
+```
+
+**File:** `src/i18n/locales/pl.json`
+
+Equivalent Polish translations.
 
 ---
 
-## Verification Checklist
+## Technical Details
 
-After implementation:
+### Component Structure
 
-| Check | How to verify |
-|-------|---------------|
-| Service worker active | DevTools → Application → Service Workers |
-| Permission granted | `Notification.permission` returns `"granted"` |
-| Subscription saved | Row appears in `push_subscriptions` table |
-| Edge function returns 200 | Check logs after sending chat message |
-| Push notification arrives | See visible notification on device |
+```text
+BroadcastMessageDialog
+├── Dialog (from shadcn/ui)
+│   ├── Trigger (Megaphone button)
+│   └── Content
+│       ├── Title Input (max 50 chars)
+│       ├── Message Textarea (max 280 chars)
+│       ├── Character counters
+│       └── Footer
+│           ├── Cancel button
+│           └── Send button → Opens confirmation
+├── Confirmation AlertDialog
+│   ├── Shows member count
+│   └── Confirm/Cancel actions
+└── Toast feedback on success/error
+```
+
+### Send Logic
+
+```typescript
+async function handleSend() {
+  // Get all member IDs except current user
+  const recipientIds = members
+    .filter(m => m.user_id !== currentUserId)
+    .map(m => m.user_id);
+
+  if (recipientIds.length === 0) return;
+
+  // Send both push and in-app notifications
+  await Promise.all([
+    sendBroadcastPush(recipientIds, title, message, clubId),
+    sendBroadcastInApp(recipientIds, title, message, clubId),
+  ]);
+}
+```
+
+### Props for BroadcastMessageDialog
+
+```typescript
+interface BroadcastMessageDialogProps {
+  clubId: string;
+  clubName: string;
+  members: Array<{ user_id: string; role: string }>;
+  currentUserId: string;
+}
+```
 
 ---
 
-## No OneSignal
+## User Flow
 
-This plan uses only:
-- Native Web Push API
-- `@negrel/webpush` library for server-side sending
-- Custom service worker (`public/sw.js`)
-- Supabase Edge Functions
-- VAPID authentication
+```text
+1. Owner opens Club → Settings tab
+2. Expands "Broadcast Message" section
+3. Enters title (max 50 chars)
+4. Enters message (max 280 chars)
+5. Clicks "Send to All Members"
+6. Sees confirmation: "Send to 8 members?"
+7. Confirms → notifications sent
+8. Success toast appears
+9. Form resets
+```
 
-No OneSignal SDK, keys, or configuration required.
+---
+
+## Validation Rules
+
+| Field | Rule |
+|-------|------|
+| Title | Required, 1-50 characters |
+| Message | Required, 1-280 characters |
+| Recipients | At least 1 other member |
+
+---
+
+## Access Control
+
+- **Owner only**: The broadcast feature is restricted to club owners
+- Admins cannot send broadcasts (they handle day-to-day operations; announcements are owner responsibility)
+- This is enforced in the UI by conditionally rendering the component
+
+---
+
+## Edge Cases
+
+| Scenario | Handling |
+|----------|----------|
+| No other members | Show disabled state with "No members to notify" |
+| Send fails | Show error toast, keep form data |
+| User navigates away mid-send | Promise continues, no issue |
+| Very long club name | Title is independent, no truncation needed |
+
+---
+
+## Implementation Order
+
+1. Add translations to both locale files
+2. Create `BroadcastMessageDialog` component
+3. Add helper functions to `push-notifications.ts` and `in-app-notifications.ts`
+4. Update `ClubSettings.tsx` to include broadcast section
+5. Update `ClubDetail.tsx` to pass required props
+6. Test end-to-end flow
+
+---
+
+## No Database Changes Required
+
+The feature uses existing infrastructure:
+- `notifications` table for in-app notifications
+- `push_subscriptions` table for push delivery
+- `sendPushNotification` edge function already handles bulk sends
+- No new tables or columns needed
