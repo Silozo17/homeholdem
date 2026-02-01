@@ -228,7 +228,18 @@
     "tournament_defaults": "Domyślne ustawienia turnieju",
     "tournament_defaults_description": "Domyślne ustawienia dla sesji gry",
     "level_duration": "Czas trwania poziomu blindów",
-    "level_duration_description": "Domyślny czas trwania każdego poziomu blindów"
+    "level_duration_description": "Domyślny czas trwania każdego poziomu blindów",
+    "broadcast": "Wiadomość do wszystkich",
+    "broadcast_description": "Wyślij powiadomienie do wszystkich członków klubu",
+    "broadcast_title": "Tytuł",
+    "broadcast_title_placeholder": "np. Ważna informacja",
+    "broadcast_message": "Wiadomość",
+    "broadcast_message_placeholder": "Napisz swoje ogłoszenie...",
+    "broadcast_send": "Wyślij do wszystkich",
+    "broadcast_confirm_title": "Wysłać wiadomość?",
+    "broadcast_confirm_description": "Ta wiadomość zostanie wysłana jako powiadomienie push i wiadomość w aplikacji do {{count}} członków.",
+    "broadcast_sent": "Wiadomość wysłana pomyślnie",
+    "broadcast_error": "Nie udało się wysłać wiadomości"
   },
   "roles": {
     "owner": "Właściciel",

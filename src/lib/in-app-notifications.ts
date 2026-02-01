@@ -17,7 +17,7 @@ async function getSenderId(explicit?: string): Promise<string | null> {
 
 interface CreateNotificationParams {
   userId: string;
-  type: 'rsvp' | 'date_finalized' | 'waitlist_promotion' | 'host_confirmed' | 'chat_message' | 'event_created' | 'club_invite' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
+  type: 'rsvp' | 'date_finalized' | 'waitlist_promotion' | 'host_confirmed' | 'chat_message' | 'event_created' | 'club_invite' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'club_broadcast';
   title: string;
   body: string;
   url?: string;
@@ -331,6 +331,22 @@ export async function notifyBlindsUpInApp(
     body: `${smallBlind}/${bigBlind}${ante ? ` (ante ${ante})` : ''}`,
     url: `/event/${eventId}/game`,
     eventId,
+    clubId,
+  });
+}
+
+// Broadcast notification from club owner
+export async function sendBroadcastInApp(
+  userIds: string[],
+  title: string,
+  body: string,
+  clubId: string
+) {
+  return createBulkNotifications(userIds, {
+    type: 'club_broadcast',
+    title,
+    body,
+    url: `/club/${clubId}`,
     clubId,
   });
 }

@@ -228,7 +228,18 @@
     "tournament_defaults": "Tournament Defaults",
     "tournament_defaults_description": "Default settings for game sessions",
     "level_duration": "Blind Level Duration",
-    "level_duration_description": "Default duration for each blind level"
+    "level_duration_description": "Default duration for each blind level",
+    "broadcast": "Broadcast Message",
+    "broadcast_description": "Send a notification to all club members",
+    "broadcast_title": "Title",
+    "broadcast_title_placeholder": "e.g., Important Update",
+    "broadcast_message": "Message",
+    "broadcast_message_placeholder": "Write your announcement...",
+    "broadcast_send": "Send to All Members",
+    "broadcast_confirm_title": "Send Broadcast?",
+    "broadcast_confirm_description": "This will send a push notification and in-app message to {{count}} members.",
+    "broadcast_sent": "Broadcast sent successfully",
+    "broadcast_error": "Failed to send broadcast"
   },
   "roles": {
     "owner": "Owner",
