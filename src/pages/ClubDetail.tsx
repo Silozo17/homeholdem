@@ -116,6 +116,7 @@ export default function ClubDetail() {
   const [inviteEmailOpen, setInviteEmailOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('events');
   
   // Locked event dialog state
   const [lockedEventDialogOpen, setLockedEventDialogOpen] = useState(false);
@@ -420,7 +421,7 @@ export default function ClubDetail() {
         </Card>
 
         {/* Tabs for different sections */}
-        <Tabs defaultValue="events" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 h-auto gap-0.5">
             <TabsTrigger value="events" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0">
               <Calendar className="h-4 w-4 shrink-0" />
