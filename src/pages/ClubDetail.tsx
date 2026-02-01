@@ -577,6 +577,9 @@ export default function ClubDetail() {
               clubDescription={club.description}
               clubCurrency={club.currency || 'GBP'}
               isAdmin={isAdmin}
+              isOwner={userRole === 'owner'}
+              members={members.map(m => ({ user_id: m.user_id, role: m.role }))}
+              currentUserId={currentUserId || ''}
               onUpdate={fetchClubData}
             />
           </TabsContent>

@@ -244,3 +244,20 @@ export async function notifyRebuyAddon(
     notificationType: 'rebuy_addon',
   });
 }
+
+// Broadcast notification from club owner
+export async function sendBroadcastPush(
+  userIds: string[],
+  title: string,
+  body: string,
+  clubId: string
+) {
+  return sendPushNotification({
+    userIds,
+    title,
+    body,
+    url: `/club/${clubId}`,
+    tag: `broadcast-${clubId}-${Date.now()}`,
+    notificationType: 'rsvp_updates',
+  });
+}

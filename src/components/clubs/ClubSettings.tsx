@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Settings, Save, Loader2, ChevronDown, Calendar, Coins } from 'lucide-react';
+import { Settings, Save, Loader2, ChevronDown, Calendar, Coins, Megaphone } from 'lucide-react';
+import { BroadcastMessageDialog } from './BroadcastMessageDialog';
 
 interface ClubSettingsProps {
   clubId: string;
@@ -18,6 +19,9 @@ interface ClubSettingsProps {
   clubDescription: string | null;
   clubCurrency: string;
   isAdmin: boolean;
+  isOwner: boolean;
+  members: Array<{ user_id: string; role: string }>;
+  currentUserId: string;
   onUpdate: () => void;
 }
 
@@ -69,7 +73,10 @@ export function ClubSettings({
   clubName, 
   clubDescription, 
   clubCurrency,
-  isAdmin, 
+  isAdmin,
+  isOwner,
+  members,
+  currentUserId,
   onUpdate 
 }: ClubSettingsProps) {
   const { t } = useTranslation();
@@ -498,6 +505,18 @@ export function ClubSettings({
             </div>
           </CollapsibleContent>
         </Collapsible>
+
+        {/* Broadcast Message - Owner Only */}
+        {isOwner && (
+          <div className="pt-2 border-t border-border/50">
+            <BroadcastMessageDialog
+              clubId={clubId}
+              clubName={clubName}
+              members={members}
+              currentUserId={currentUserId}
+            />
+          </div>
+        )}
 
         <Button 
           onClick={handleSave} 
