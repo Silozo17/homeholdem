@@ -1,279 +1,166 @@
 
+# Plan: Fix Automatic Waitlist Promotion
 
-# Comprehensive Plan: Push Notifications, Settings, Live Event Sync, and Data Fixes
+## Problem Identified
 
-## Executive Summary
+When a user changes from "Going" to "Can't Go" or "Maybe":
+- Their RSVP is updated in the database correctly
+- **BUT** the first person on the waitlist is NOT automatically promoted to fill the open spot
+- Matt R is still showing `is_waitlisted: true` even though only 9/10 spots are filled
 
-This plan addresses multiple interconnected issues:
-1. **Chat push notifications** - already implemented but need verification
-2. **Push notification settings** - need to add missing settings in the UI
-3. **Live event notifications** - ensure all game events trigger push notifications
-4. **Live tournament mini-bar** - verify global synchronization (already working)
-5. **Winnings rounding** - round values to nearest 10
-6. **Admin panel negative amounts** - fix stats calculation bug
+**Database evidence:**
+- Kuba: `status: not_going` (correctly updated)
+- Matt R: `is_waitlisted: true, waitlist_position: 1` (should have been promoted)
+
+## Root Cause
+
+The `handleRsvp` function in `EventDetail.tsx` (lines 435-533) handles RSVP changes but has **no logic to promote waitlisted users** when a spot opens up.
 
 ---
 
-## Issue Analysis
+## Solution
 
-### 1. Admin Panel Negative Winnings Bug
+Add waitlist promotion logic to the `handleRsvp` function that triggers when:
+1. A user changes FROM "going" (non-waitlisted) to another status
+2. There are people on the waitlist
 
-**Root Cause Found:** The `game_transactions` table stores payouts as **negative values** (see line 139 in `PayoutCalculator.tsx`):
-```typescript
-amount: -payout,  // <-- Stored as negative!
+### Logic Flow
+
+```text
+User changes RSVP from "going" → "not_going"
+         │
+         ▼
+Check: Was user "going" and NOT on waitlist?
+         │ Yes
+         ▼
+Find first waitlisted user (lowest position)
+         │ Found
+         ▼
+Update their record:
+  - is_waitlisted: false
+  - waitlist_position: null
+         │
+         ▼
+Reposition remaining waitlist (decrement positions)
+         │
+         ▼
+Call promote-waitlist edge function (sends email + in-app notification)
+         │
+         ▼
+Send push notification
+         │
+         ▼
+Refetch RSVPs to update UI
 ```
-
-Current database data shows:
-- Kryniu: payout amount = **-259** (should show as £259 won)
-- Puchar: payout amount = **-221** (should show as £221 won)
-
-The admin panel's `UserDetailSheet.tsx` (line 188) sums payout amounts directly:
-```typescript
-totalWinnings = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-```
-This results in negative totals because payouts are stored as negative values.
-
-**Fix:** Use `Math.abs()` when summing payout transactions, OR correct the data model to store payouts as positive values going forward.
-
----
-
-### 2. Missing Push Notification Settings in UI
-
-**Current Database Columns (from types.ts):**
-- `push_blinds_up` ✅ (in UI)
-- `push_chat_messages` ✅ (in UI)
-- `push_date_finalized` ✅ (in UI)
-- `push_event_unlocked` ❌ (NOT in UI)
-- `push_game_completed` ❌ (NOT in UI)
-- `push_game_started` ✅ (in UI)
-- `push_member_rsvp` ❌ (NOT in UI)
-- `push_member_vote` ❌ (NOT in UI)
-- `push_player_eliminated` ✅ (in UI)
-- `push_rebuy_addon` ✅ (in UI)
-- `push_rsvp_updates` ✅ (in UI)
-- `push_waitlist_promotion` ✅ (in UI)
-
-**Missing in UI but exist in DB:**
-1. `push_event_unlocked` - When voting opens for new events
-2. `push_game_completed` - When tournament finishes with winners
-3. `push_member_rsvp` - When other members RSVP
-4. `push_member_vote` - When other members vote on dates
-
----
-
-### 3. Chat Notifications Status
-
-**Already Implemented:** Chat messages trigger both in-app and push notifications in `ChatWindow.tsx` (lines 186-189):
-```typescript
-Promise.allSettled([
-  notifyNewChatMessageInApp(...),
-  notifyNewChatMessage(...),  // <-- Push notification!
-]).catch(console.error);
-```
-
-The system uses a 5-minute throttle to prevent notification spam.
-
----
-
-### 4. Live Tournament Mini-Bar Global Sync
-
-**Already Working:** The `TournamentMiniBar.tsx` and `ActiveGameContext.tsx` implement proper global synchronization:
-- Uses Supabase Realtime to subscribe to `game_sessions` changes (line 217)
-- Timer uses drift-resistant calculation from `level_started_at` timestamp
-- Recalculates on visibility change when app returns from background
-
----
-
-### 5. Winnings Rounding
-
-Need to round values like 351 → 350, 378 → 380 (to nearest 10).
 
 ---
 
 ## Files to Modify
 
-### Part A: Fix Admin Panel Stats (Negative Winnings Bug)
+### 1. `src/pages/EventDetail.tsx`
 
-**File:** `src/components/admin/UserDetailSheet.tsx`
+After the database update in `handleRsvp`, add waitlist promotion logic:
 
-Update `fetchUserStats` function (lines 182-188):
 ```typescript
-// Change from:
-totalWinnings = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+// After successful RSVP update, check if we need to promote from waitlist
+if (previousRsvp === 'going' && status !== 'going') {
+  // A "going" spot just opened up - check for waitlist
+  const { data: existingRsvps } = await supabase
+    .from('event_rsvps')
+    .select('user_id, is_waitlisted, waitlist_position')
+    .eq('event_id', event.id)
+    .eq('status', 'going');
 
-// Change to:
-totalWinnings = transactions?.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
-```
+  const goingCount = existingRsvps?.filter(r => !r.is_waitlisted).length || 0;
+  const totalCapacity = event.max_tables * event.seats_per_table;
 
----
+  // If we're under capacity and there's someone waitlisted
+  if (goingCount < totalCapacity) {
+    const waitlistUsers = existingRsvps
+      ?.filter(r => r.is_waitlisted)
+      .sort((a, b) => (a.waitlist_position || 999) - (b.waitlist_position || 999));
 
-### Part B: Add Missing Push Notification Settings
+    if (waitlistUsers && waitlistUsers.length > 0) {
+      const promotedUser = waitlistUsers[0];
 
-**File:** `src/hooks/useUserPreferences.ts`
+      // Promote the first waitlisted user
+      await supabase
+        .from('event_rsvps')
+        .update({ 
+          is_waitlisted: false, 
+          waitlist_position: null 
+        })
+        .eq('event_id', event.id)
+        .eq('user_id', promotedUser.user_id);
 
-Add missing preference fields to the interface and defaults:
-```typescript
-export interface UserPreferences {
-  // ... existing fields ...
-  push_event_unlocked: boolean;
-  push_game_completed: boolean;
-  push_member_rsvp: boolean;
-  push_member_vote: boolean;
-}
+      // Reposition remaining waitlist
+      for (let i = 1; i < waitlistUsers.length; i++) {
+        await supabase
+          .from('event_rsvps')
+          .update({ waitlist_position: i })
+          .eq('event_id', event.id)
+          .eq('user_id', waitlistUsers[i].user_id);
+      }
 
-const defaultPreferences = {
-  // ... existing ...
-  push_event_unlocked: true,
-  push_game_completed: true,
-  push_member_rsvp: true,
-  push_member_vote: true,
-};
-```
+      // Call edge function to send email + in-app notification
+      await supabase.functions.invoke('promote-waitlist', {
+        body: { 
+          event_id: event.id, 
+          promoted_user_id: promotedUser.user_id 
+        }
+      });
 
-**File:** `src/components/settings/PushNotificationPreferences.tsx`
-
-Add settings rows for the missing notification types:
-```typescript
-<SettingRow
-  id="push_game_completed"
-  label={t('settings.game_completed')}
-  description={t('settings.game_completed_description')}
-  checked={preferences.push_game_completed ?? true}
-  onCheckedChange={(v) => handleToggle('push_game_completed', v)}
-/>
-<SettingRow
-  id="push_event_unlocked"
-  label={t('settings.event_unlocked')}
-  description={t('settings.event_unlocked_description')}
-  checked={preferences.push_event_unlocked ?? true}
-  onCheckedChange={(v) => handleToggle('push_event_unlocked', v)}
-/>
-<SettingRow
-  id="push_member_rsvp"
-  label={t('settings.member_rsvp')}
-  description={t('settings.member_rsvp_description')}
-  checked={preferences.push_member_rsvp ?? true}
-  onCheckedChange={(v) => handleToggle('push_member_rsvp', v)}
-/>
-<SettingRow
-  id="push_member_vote"
-  label={t('settings.member_vote')}
-  description={t('settings.member_vote_description')}
-  checked={preferences.push_member_vote ?? true}
-  onCheckedChange={(v) => handleToggle('push_member_vote', v)}
-/>
-```
-
-**File:** `src/i18n/locales/en.json`
-
-Add translation strings for new settings:
-```json
-{
-  "settings": {
-    "game_completed": "Game Results",
-    "game_completed_description": "When a tournament finishes and winners are announced",
-    "event_unlocked": "Event Unlocked",
-    "event_unlocked_description": "When voting opens for a new event",
-    "member_rsvp": "Member RSVPs",
-    "member_rsvp_description": "When club members RSVP to events",
-    "member_vote": "Member Votes",
-    "member_vote_description": "When club members vote on event dates"
+      // Send push notification
+      notifyWaitlistPromotion(
+        promotedUser.user_id,
+        event.title,
+        event.id
+      ).catch(console.error);
+    }
   }
+
+  // Always refetch to ensure UI is up-to-date
+  await fetchRsvps();
 }
 ```
 
 ---
 
-### Part C: Round Winnings to Nearest 10
+## Immediate Data Fix
 
-**File:** `src/components/clubs/Leaderboard.tsx`
+The current data for "Luty 2026" event needs a one-time fix to promote Matt R:
 
-Add rounding helper and apply to winnings display (line 331):
-```typescript
-// Helper function
-const roundToNearest10 = (value: number) => Math.round(value / 10) * 10;
-
-// In render:
-{symbol}{roundToNearest10(player.total_winnings)}
+```sql
+-- Promote Matt R from waitlist
+UPDATE event_rsvps 
+SET is_waitlisted = false, waitlist_position = null
+WHERE event_id = '004fe7cf-b645-479e-9d2b-d3a978813986'
+  AND user_id = '7e5a9aef-d68b-4bf8-aab4-137fbd170d60';
 ```
 
-**File:** `src/pages/Stats.tsx`
+This will be done after the code fix is implemented.
 
-Apply same rounding to financial display (multiple locations):
+---
+
+## Additional Considerations
+
+### Also Check When User Changes FROM Waitlist
+
+If a waitlisted user changes to "not_going", the remaining waitlist positions should be decremented. This is a secondary edge case but should also be handled.
+
+### Import Required Functions
+
+Need to import `notifyWaitlistPromotion` from push-notifications:
 ```typescript
-// Lines 389, 392, 403, 429
-£{roundToNearest10(overallStats.totalWinnings)}
+import { notifyWaitlistPromotion } from '@/lib/push-notifications';
 ```
 
-**File:** `src/components/admin/UserDetailSheet.tsx`
-
-Apply rounding in admin panel stats display.
-
 ---
 
-## Complete Push Notification Coverage
+## Testing After Implementation
 
-After reviewing all notification types, here's the complete matrix:
-
-| Notification Type | Push | In-App | Settings UI |
-|-------------------|------|--------|-------------|
-| RSVP Updates | ✅ | ✅ | ✅ |
-| Date Finalized | ✅ | ✅ | ✅ |
-| Waitlist Promotion | ✅ | ✅ | ✅ |
-| Chat Messages | ✅ | ✅ | ✅ |
-| Blinds Up | ✅ | ❌ | ✅ |
-| Host Confirmed | ✅ | ✅ | via RSVP |
-| Game Completed | ✅ | ✅ | ❌ (add) |
-| Event Unlocked | ✅ | ✅ | ❌ (add) |
-| Game Started | ✅ | ✅ | ✅ |
-| Player Eliminated | ✅ | ✅ | ✅ |
-| Rebuy/Add-on | ✅ | ✅ | ✅ |
-| Member RSVP | ✅ | ✅ | ❌ (add) |
-| Member Vote | ✅ | ✅ | ❌ (add) |
-| Broadcast | ✅ | ✅ | via RSVP |
-
----
-
-## Technical Details
-
-### Live Event Sync Verification
-
-The current implementation in `ActiveGameContext.tsx` provides proper global synchronization:
-
-1. **Real-time subscription** (line 217-262):
-   - Subscribes to `game_sessions` table changes
-   - Filters by user's club membership
-   - Updates all clients when game status changes
-
-2. **Drift-resistant timer** (`TournamentMiniBar.tsx` lines 12-31):
-   - Uses `level_started_at` timestamp as source of truth
-   - Calculates elapsed time on each render
-   - Recalculates when app returns from background
-
-3. **Multi-user sync** (lines 269-324):
-   - Subscribes to `game_players` and `game_transactions` changes
-   - Updates player count and prize pool in real-time
-
----
-
-## Implementation Order
-
-1. **Fix admin panel negative winnings** (critical bug fix)
-2. **Add missing push notification settings to UI**
-3. **Add translations for new settings**
-4. **Add winnings rounding**
-5. **Verify live event sync** (already working, just needs testing)
-
----
-
-## Testing Recommendations
-
-After implementation:
-1. View a user in admin panel to verify positive winnings display
-2. Toggle each notification setting and verify saves correctly
-3. Start a game and verify:
-   - Mini-bar appears for all club members
-   - Timer syncs across devices
-   - Push notifications fire for game events
-4. Check leaderboards show rounded values
-
+1. Verify Matt R is promoted and visible in "Going" list
+2. Test: Have a waitlisted user, then have a "going" user change to "not going"
+3. Confirm the waitlisted user is automatically promoted
+4. Confirm push notification is sent to promoted user
+5. Confirm remaining waitlist positions are decremented
