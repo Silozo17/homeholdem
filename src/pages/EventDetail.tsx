@@ -690,6 +690,30 @@ export default function EventDetail() {
     }
   };
 
+  const handleUnfinalizeDate = async () => {
+    if (!event) return;
+
+    const previousDate = event.final_date;
+    
+    // Optimistic update
+    setEvent(prev => prev ? { ...prev, final_date: null, is_finalized: false } : null);
+
+    const { error } = await supabase
+      .from('events')
+      .update({ 
+        final_date: null,
+        is_finalized: false 
+      })
+      .eq('id', event.id);
+
+    if (error) {
+      setEvent(prev => prev ? { ...prev, final_date: previousDate, is_finalized: true } : null);
+      toast.error('Failed to unfinalize date');
+    } else {
+      toast.success('Date unfinalized - voting reopened');
+    }
+  };
+
   const handleConfirmHost = async (hostUserId: string) => {
     if (!event) return;
 
@@ -949,11 +973,18 @@ export default function EventDetail() {
             <Card className="bg-card/50 border-border/50">
               <CardContent className="py-4 space-y-3">
                 {event.final_date && (
-                  <div className="flex items-center gap-2 text-foreground">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <span className="font-medium">
-                      {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a", { locale: dateLocale })}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-foreground">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      <span className="font-medium">
+                        {format(new Date(event.final_date), "EEEE, MMMM d 'at' h:mm a", { locale: dateLocale })}
+                      </span>
+                    </div>
+                    {userRole === 'owner' && (
+                      <Button variant="ghost" size="sm" onClick={handleUnfinalizeDate} className="text-xs">
+                        {t('common.change')}
+                      </Button>
+                    )}
                   </div>
                 )}
                 {event.location && (
