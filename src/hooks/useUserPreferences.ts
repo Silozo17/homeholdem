@@ -21,6 +21,10 @@ export interface UserPreferences {
   push_game_started: boolean;
   push_player_eliminated: boolean;
   push_rebuy_addon: boolean;
+  push_event_unlocked: boolean;
+  push_game_completed: boolean;
+  push_member_rsvp: boolean;
+  push_member_vote: boolean;
   // Other preferences
   show_stats_publicly: boolean;
   language: string;
@@ -44,6 +48,10 @@ const defaultPreferences: Omit<UserPreferences, 'id' | 'user_id' | 'created_at' 
   push_game_started: true,
   push_player_eliminated: true,
   push_rebuy_addon: true,
+  push_event_unlocked: true,
+  push_game_completed: true,
+  push_member_rsvp: true,
+  push_member_vote: true,
   show_stats_publicly: true,
   language: 'en',
   currency: 'GBP',

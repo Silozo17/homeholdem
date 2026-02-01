@@ -185,7 +185,7 @@ export function UserDetailSheet({ user, onClose, onUserUpdated }: UserDetailShee
           .in('game_player_id', playerIds)
           .eq('transaction_type', 'payout');
         
-        totalWinnings = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+        totalWinnings = transactions?.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
       }
 
       setStats({

@@ -123,6 +123,34 @@ export function PushNotificationPreferences({ isEnabled }: PushNotificationPrefe
         checked={preferences.push_rebuy_addon ?? true}
         onCheckedChange={(v) => handleToggle('push_rebuy_addon', v)}
       />
+      <SettingRow
+        id="push_game_completed"
+        label={t('settings.game_completed')}
+        description={t('settings.game_completed_description')}
+        checked={preferences.push_game_completed ?? true}
+        onCheckedChange={(v) => handleToggle('push_game_completed', v)}
+      />
+      <SettingRow
+        id="push_event_unlocked"
+        label={t('settings.event_unlocked')}
+        description={t('settings.event_unlocked_description')}
+        checked={preferences.push_event_unlocked ?? true}
+        onCheckedChange={(v) => handleToggle('push_event_unlocked', v)}
+      />
+      <SettingRow
+        id="push_member_rsvp"
+        label={t('settings.member_rsvp')}
+        description={t('settings.member_rsvp_description')}
+        checked={preferences.push_member_rsvp ?? true}
+        onCheckedChange={(v) => handleToggle('push_member_rsvp', v)}
+      />
+      <SettingRow
+        id="push_member_vote"
+        label={t('settings.member_vote')}
+        description={t('settings.member_vote_description')}
+        checked={preferences.push_member_vote ?? true}
+        onCheckedChange={(v) => handleToggle('push_member_vote', v)}
+      />
     </div>
   );
 }
