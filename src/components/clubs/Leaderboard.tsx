@@ -328,7 +328,7 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
                     variant="default"
                     className="font-mono"
                   >
-                    {symbol}{player.total_winnings}
+                    {symbol}{Math.round(player.total_winnings / 10) * 10}
                   </Badge>
                 </div>
               </div>

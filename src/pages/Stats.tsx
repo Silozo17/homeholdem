@@ -385,11 +385,11 @@ export default function Stats() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('stats.total_buyins')}</span>
-                  <span className="font-medium">£{overallStats.totalBuyIns.toFixed(2)}</span>
+                  <span className="font-medium">£{Math.round(overallStats.totalBuyIns / 10) * 10}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('stats.total_winnings')}</span>
-                  <span className="font-medium text-success">£{overallStats.totalWinnings.toFixed(2)}</span>
+                  <span className="font-medium text-success">£{Math.round(overallStats.totalWinnings / 10) * 10}</span>
                 </div>
                 <div className="border-t border-border pt-3 flex justify-between items-center">
                   <span className="font-medium">{t('stats.net_profit')}</span>
@@ -400,7 +400,7 @@ export default function Stats() {
                       <TrendingDown className="h-4 w-4 text-destructive" />
                     )}
                     <span className={`font-bold text-lg ${overallStats.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {overallStats.netProfit >= 0 ? '+' : ''}£{overallStats.netProfit.toFixed(2)}
+                      {overallStats.netProfit >= 0 ? '+' : ''}£{Math.round(overallStats.netProfit / 10) * 10}
                     </span>
                   </div>
                 </div>
@@ -426,7 +426,7 @@ export default function Stats() {
                       <div className="flex justify-between items-start mb-2">
                         <span className="font-medium">{club.clubName}</span>
                         <span className={`text-sm font-medium ${club.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {club.netProfit >= 0 ? '+' : ''}£{club.netProfit.toFixed(2)}
+                          {club.netProfit >= 0 ? '+' : ''}£{Math.round(club.netProfit / 10) * 10}
                         </span>
                       </div>
                       <div className="flex gap-4 text-xs text-muted-foreground">
