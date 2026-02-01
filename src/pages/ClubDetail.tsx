@@ -580,7 +580,7 @@ export default function ClubDetail() {
 
           {/* Rules Tab */}
           <TabsContent value="rules" className="mt-4 space-y-4">
-            <HouseRules clubId={clubId!} isAdmin={isAdmin} />
+            <HouseRules clubId={clubId!} isOwner={userRole === 'owner'} />
             <PokerHandRankings />
           </TabsContent>
 

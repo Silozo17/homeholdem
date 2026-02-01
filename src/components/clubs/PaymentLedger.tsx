@@ -57,7 +57,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
   const [showAdd, setShowAdd] = useState(false);
   const [fromUserId, setFromUserId] = useState('');
   const [toUserId, setToUserId] = useState('');
-  const [amount, setAmount] = useState('');
+  const [amountInput, setAmountInput] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -100,7 +100,13 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
   };
 
   const handleAddSettlement = async () => {
-    if (!fromUserId || !toUserId || !amount || fromUserId === toUserId) {
+    if (!fromUserId || !toUserId || !amountInput || fromUserId === toUserId) {
+      toast.error(t('settlements_section.fill_fields'));
+      return;
+    }
+
+    const parsedAmount = parseInt(amountInput) || 0;
+    if (parsedAmount <= 0) {
       toast.error(t('settlements_section.fill_fields'));
       return;
     }
@@ -111,7 +117,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
         club_id: clubId,
         from_user_id: fromUserId,
         to_user_id: toUserId,
-        amount: parseInt(amount),
+        amount: parsedAmount,
         notes: notes || null,
       });
 
@@ -124,7 +130,7 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
     setShowAdd(false);
     setFromUserId('');
     setToUserId('');
-    setAmount('');
+    setAmountInput('');
     setNotes('');
     fetchData();
   };
@@ -337,9 +343,19 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
             <div className="space-y-2">
               <Label>{t('settlements_section.amount')} ({symbol})</Label>
               <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={amountInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || /^\d*$/.test(value)) {
+                    setAmountInput(value);
+                  }
+                }}
+                onBlur={() => {
+                  if (amountInput === '') setAmountInput('');
+                }}
                 placeholder="0"
               />
             </div>

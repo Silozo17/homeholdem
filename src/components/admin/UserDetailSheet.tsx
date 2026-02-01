@@ -898,11 +898,17 @@ export function UserDetailSheet({ user, onClose, onUserUpdated }: UserDetailShee
             <div className="py-2">
               <Label className="text-sm">Refund Amount (leave empty for full refund)</Label>
               <Input 
-                type="number" 
-                step="0.01"
+                type="text" 
+                inputMode="decimal"
+                pattern="[0-9.]*"
                 placeholder={`Full: £${((selectedCharge?.amount || 0) - (selectedCharge?.amount_refunded || 0)) / 100}`}
                 value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                    setRefundAmount(value);
+                  }
+                }}
                 className="mt-1"
               />
             </div>

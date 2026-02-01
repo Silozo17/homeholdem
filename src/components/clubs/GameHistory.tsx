@@ -81,13 +81,15 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
           .select('*', { count: 'exact', head: true })
           .eq('game_session_id', session.id);
 
-        // Get prize pool (sum of all transactions)
+        // Get prize pool (sum of buy-in, rebuy, addon transactions only - not payouts)
         const { data: transactions } = await supabase
           .from('game_transactions')
-          .select('amount')
+          .select('amount, transaction_type')
           .eq('game_session_id', session.id);
 
-        const prizePool = transactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
+        const prizePool = transactions
+          ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
+          .reduce((sum, t) => sum + t.amount, 0) || 0;
 
         // Get winner (player with finish_position = 1)
         const { data: winner } = await supabase

@@ -131,12 +131,14 @@ export async function finalizeGame(
       }
     }
 
-    // 3. Update season standings
+    // 3. Update season standings - find season by date range, not is_active flag
+    const today = new Date().toISOString().split('T')[0];
     const { data: activeSeason } = await supabase
       .from('seasons')
       .select('*')
       .eq('club_id', clubId)
-      .eq('is_active', true)
+      .lte('start_date', today)
+      .gte('end_date', today)
       .single();
 
     if (activeSeason) {
