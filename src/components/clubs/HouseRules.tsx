@@ -29,10 +29,10 @@ interface Rule {
 
 interface HouseRulesProps {
   clubId: string;
-  isAdmin: boolean;
+  isOwner: boolean;
 }
 
-export function HouseRules({ clubId, isAdmin }: HouseRulesProps) {
+export function HouseRules({ clubId, isOwner }: HouseRulesProps) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -166,7 +166,7 @@ export function HouseRules({ clubId, isAdmin }: HouseRulesProps) {
             <ScrollText className="h-5 w-5 text-primary" />
             House Rules
           </CardTitle>
-          {isAdmin && (
+          {isOwner && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" onClick={openAddDialog}>
@@ -208,7 +208,7 @@ export function HouseRules({ clubId, isAdmin }: HouseRulesProps) {
           <div className="text-center py-6">
             <div className="text-3xl mb-2 opacity-30">📜</div>
             <p className="text-sm text-muted-foreground">
-              {isAdmin ? 'No house rules yet. Add your first rule!' : 'No house rules defined for this club.'}
+              {isOwner ? 'No house rules yet. Add your first rule!' : 'No house rules defined for this club.'}
             </p>
           </div>
         ) : (
@@ -223,7 +223,7 @@ export function HouseRules({ clubId, isAdmin }: HouseRulesProps) {
                 <AccordionContent>
                   <div className="space-y-3">
                     <p className="text-muted-foreground whitespace-pre-wrap">{rule.content}</p>
-                    {isAdmin && (
+                    {isOwner && (
                       <div className="flex gap-2">
                         <Button 
                           size="sm" 
