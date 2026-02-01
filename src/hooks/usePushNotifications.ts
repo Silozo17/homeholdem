@@ -25,6 +25,20 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+// Helper to convert ArrayBuffer to base64url (not standard base64)
+function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  // Convert to base64, then to base64url
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 // Detect iOS and Safari
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent) && !/CriOS/.test(navigator.userAgent);
@@ -153,9 +167,9 @@ export function usePushNotifications() {
         throw new Error('Failed to get push subscription keys');
       }
 
-      // Convert to base64
-      const p256dhBase64 = btoa(String.fromCharCode(...new Uint8Array(p256dh)));
-      const authBase64 = btoa(String.fromCharCode(...new Uint8Array(auth)));
+      // Convert to base64url (required by webpush library)
+      const p256dhBase64 = arrayBufferToBase64Url(p256dh);
+      const authBase64 = arrayBufferToBase64Url(auth);
 
       // Save to database
       const { error } = await supabase.from('push_subscriptions').upsert({
