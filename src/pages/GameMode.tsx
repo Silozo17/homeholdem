@@ -252,6 +252,87 @@ export default function GameMode() {
               <p className="text-muted-foreground">{t('game.waiting_host')}</p>
             )}
           </div>
+        ) : session.status === 'completed' ? (
+          // Read-only view for completed games
+          <>
+            {/* Tournament Clock - read only, controls hidden via session.status check */}
+            <TournamentClock
+              session={session}
+              blindStructure={blindStructure}
+              isAdmin={false} // Force non-admin to hide controls for completed games
+              onUpdate={updateSession}
+              currencySymbol={currencySymbol}
+              chipToCashRatio={chipToCashRatio}
+              displayMode={displayMode}
+            />
+
+            {/* Stats Bar */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-card/50 rounded-lg p-3 border border-border/30">
+                <div className="text-xs text-muted-foreground">{t('game.players')}</div>
+                <div className="text-lg font-bold text-primary">{activePlayers}/{players.length}</div>
+              </div>
+              <div className="bg-card/50 rounded-lg p-3 border border-border/30">
+                <div className="text-xs text-muted-foreground">{t('game.prize_pool')}</div>
+                <div className="text-lg font-bold text-gold-gradient">{currencySymbol}{prizePool}</div>
+              </div>
+              <div className="bg-card/50 rounded-lg p-3 border border-border/30">
+                <div className="text-xs text-muted-foreground">{t('game.avg_stack')}</div>
+                <div className="text-lg font-bold">—</div>
+              </div>
+            </div>
+
+            {/* Completed game info */}
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t('game.game_completed_view_only', 'This game has ended. Results are now read-only.')}
+              </p>
+            </div>
+
+            <Tabs defaultValue="players" className="space-y-4">
+              <TabsList className="grid grid-cols-3 gap-1 h-auto p-1">
+                <TabsTrigger value="players" className="text-xs px-2 py-2">{t('game.players')}</TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs px-2 py-2 flex items-center justify-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  {t('game.live_activity')}
+                </TabsTrigger>
+                <TabsTrigger value="payouts" className="text-xs px-2 py-2">{t('game.payouts')}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="players">
+                <PlayerList
+                  players={players}
+                  session={session}
+                  clubId={clubId || ''}
+                  eventId={eventId || ''}
+                  maxTables={eventSettings.maxTables}
+                  isAdmin={false} // Read-only for completed games
+                  currencySymbol={currencySymbol}
+                  onRefresh={refetch}
+                />
+              </TabsContent>
+
+              <TabsContent value="activity">
+                <ActivityFeed 
+                  sessionId={session.id} 
+                  currencySymbol={currencySymbol}
+                />
+              </TabsContent>
+
+              <TabsContent value="payouts">
+                <PayoutCalculator
+                  players={players}
+                  prizePool={prizePool}
+                  session={session}
+                  transactions={transactions}
+                  clubId={clubId || ''}
+                  currencySymbol={currencySymbol}
+                  isAdmin={false} // Read-only for completed games
+                  onRefresh={refetch}
+                />
+              </TabsContent>
+            </Tabs>
+          </>
         ) : (
           <>
             {/* Tournament Clock */}

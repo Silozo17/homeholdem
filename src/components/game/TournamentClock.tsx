@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTournamentSounds, AnnouncementType } from '@/hooks/useTournamentSounds';
 
@@ -325,8 +326,8 @@ export function TournamentClock({
             </div>
           )}
 
-          {/* Controls */}
-          {isAdmin && !tvMode && (
+          {/* Controls - only show for admin on active (non-completed) games */}
+          {isAdmin && !tvMode && session.status !== 'completed' && (
             <div className="flex items-center justify-center gap-2">
               <Button
                 variant="ghost"
@@ -366,6 +367,16 @@ export function TournamentClock({
               >
                 <SkipForward className="h-5 w-5" />
               </Button>
+            </div>
+          )}
+
+          {/* Completed game badge */}
+          {session.status === 'completed' && !tvMode && (
+            <div className="flex justify-center">
+              <Badge variant="default" className="text-sm gap-1.5 py-1.5 px-3">
+                <CheckCircle2 className="h-4 w-4" />
+                Game Completed
+              </Badge>
             </div>
           )}
         </CardContent>
