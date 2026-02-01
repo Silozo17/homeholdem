@@ -778,6 +778,7 @@ export type Database = {
           event_id: string
           id: string
           level_started_at: string | null
+          prize_pool_override: number | null
           rebuy_amount: number
           rebuy_chips: number
           rebuy_until_level: number | null
@@ -798,6 +799,7 @@ export type Database = {
           event_id: string
           id?: string
           level_started_at?: string | null
+          prize_pool_override?: number | null
           rebuy_amount?: number
           rebuy_chips?: number
           rebuy_until_level?: number | null
@@ -818,6 +820,7 @@ export type Database = {
           event_id?: string
           id?: string
           level_started_at?: string | null
+          prize_pool_override?: number | null
           rebuy_amount?: number
           rebuy_chips?: number
           rebuy_until_level?: number | null

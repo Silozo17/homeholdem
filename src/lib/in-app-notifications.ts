@@ -1,5 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
+let cachedSenderId: string | null | undefined;
+
+async function getSenderId(explicit?: string): Promise<string | null> {
+  if (explicit) return explicit;
+  if (cachedSenderId !== undefined) return cachedSenderId;
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.error('Failed to get current user for notifications:', error);
+    cachedSenderId = null;
+    return null;
+  }
+  cachedSenderId = data.user?.id ?? null;
+  return cachedSenderId;
+}
+
 interface CreateNotificationParams {
   userId: string;
   type: 'rsvp' | 'date_finalized' | 'waitlist_promotion' | 'host_confirmed' | 'chat_message' | 'event_created' | 'club_invite' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote';
@@ -25,6 +40,12 @@ export async function createInAppNotification({
   clubId,
   senderId,
 }: CreateNotificationParams) {
+  const resolvedSenderId = await getSenderId(senderId);
+  if (!resolvedSenderId) {
+    console.error('Cannot create notification without an authenticated sender');
+    return { error: new Error('Not authenticated') };
+  }
+
   const { error } = await supabase.from('notifications').insert({
     user_id: userId,
     type,
@@ -33,7 +54,7 @@ export async function createInAppNotification({
     url: url || null,
     event_id: eventId || null,
     club_id: clubId || null,
-    sender_id: senderId || null,
+    sender_id: resolvedSenderId,
   });
 
   if (error) {
@@ -52,6 +73,12 @@ export async function createBulkNotifications(
 ) {
   if (userIds.length === 0) return { error: null };
 
+  const resolvedSenderId = await getSenderId(params.senderId);
+  if (!resolvedSenderId) {
+    console.error('Cannot create bulk notifications without an authenticated sender');
+    return { error: new Error('Not authenticated') };
+  }
+
   const notifications = userIds.map(userId => ({
     user_id: userId,
     type: params.type,
@@ -60,7 +87,7 @@ export async function createBulkNotifications(
     url: params.url || null,
     event_id: params.eventId || null,
     club_id: params.clubId || null,
-    sender_id: params.senderId || null,
+    sender_id: resolvedSenderId,
   }));
 
   const { error } = await supabase.from('notifications').insert(notifications);
