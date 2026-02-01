@@ -8,8 +8,7 @@ import {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-const VAPID_PUBLIC_KEY = Deno.env.get("VITE_VAPID_PUBLIC_KEY")!;
+const VAPID_KEYS_JSON = Deno.env.get("VAPID_KEYS_JSON")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,72 +25,15 @@ interface PushRequest {
   notification_type?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'game_started' | 'player_eliminated' | 'rebuy_addon';
 }
 
-/**
- * Convert base64 URL-safe VAPID keys to JWK format for the webpush library.
- * VAPID public key is 65 bytes (uncompressed P-256 point: 0x04 || x || y)
- * VAPID private key is 32 bytes (EC private key d value)
- */
-function base64UrlToJwk(publicKeyB64: string, privateKeyB64: string): { publicKey: JsonWebKey; privateKey: JsonWebKey } {
-  // Decode base64url to bytes
-  const publicKeyBytes = base64UrlDecode(publicKeyB64);
-  const privateKeyBytes = base64UrlDecode(privateKeyB64);
-  
-  // Public key is 65 bytes: 0x04 prefix + 32 bytes X + 32 bytes Y
-  const x = publicKeyBytes.slice(1, 33);
-  const y = publicKeyBytes.slice(33, 65);
-  const d = privateKeyBytes;
-  
-  const publicKey: JsonWebKey = {
-    kty: "EC",
-    crv: "P-256",
-    x: bytesToBase64Url(x),
-    y: bytesToBase64Url(y),
-    ext: true,
-  };
-  
-  const privateKey: JsonWebKey = {
-    kty: "EC",
-    crv: "P-256",
-    x: bytesToBase64Url(x),
-    y: bytesToBase64Url(y),
-    d: bytesToBase64Url(d),
-    ext: true,
-  };
-  
-  return { publicKey, privateKey };
-}
-
-function base64UrlDecode(str: string): Uint8Array {
-  // Add padding if needed
-  let padded = str;
-  while (padded.length % 4 !== 0) {
-    padded += "=";
-  }
-  // Convert base64url to base64
-  const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  const binary = String.fromCharCode(...bytes);
-  const base64 = btoa(binary);
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 // Initialize VAPID application server lazily
 let appServer: ApplicationServer | null = null;
 
 async function getAppServer(): Promise<ApplicationServer> {
   if (!appServer) {
-    // Convert base64 URL VAPID keys to JWK format
-    const jwkKeys = base64UrlToJwk(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    // Parse the JWK keys directly from the JSON secret
+    const jwkKeys = JSON.parse(VAPID_KEYS_JSON);
     
-    // Import VAPID keys
+    // Import VAPID keys from JWK format
     const vapidKeys = await importVapidKeys(jwkKeys);
     
     appServer = await ApplicationServer.new({
@@ -142,8 +84,8 @@ serve(async (req) => {
     }
 
     // Validate VAPID keys are configured
-    if (!VAPID_PRIVATE_KEY || !VAPID_PUBLIC_KEY) {
-      console.error("VAPID keys not configured");
+    if (!VAPID_KEYS_JSON) {
+      console.error("VAPID_KEYS_JSON not configured");
       return new Response(
         JSON.stringify({ error: "Push notifications not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

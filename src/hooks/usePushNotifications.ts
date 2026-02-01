@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-// VAPID public key - safe to expose publicly (like an SSL public certificate)
+// VAPID public key - read from environment variable
 // This must match the private key stored in backend secrets
-const VAPID_PUBLIC_KEY = 'BHzqX_L6AGFv6oq2pQh8ZSLpBxDMi3wOkl9FZ_9nRrBs0HZJVL6FvDhAZTmNKP9IUGdhAttS_P2VohvvYAigeRk';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 interface PushNotificationState {
   isSupported: boolean;
