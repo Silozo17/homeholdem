@@ -61,6 +61,7 @@ import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { notifyEventUnlocked } from '@/lib/push-notifications';
 import { notifyEventUnlockedInApp } from '@/lib/in-app-notifications';
+import { sendEventUnlockedEmails } from '@/lib/email-notifications';
 
 interface ClubMember {
   id: string;
@@ -298,10 +299,11 @@ export default function ClubDetail() {
         .map(m => m.user_id);
       
       if (otherMemberIds.length > 0) {
-        // Fire and forget - don't block navigation
+        // Fire and forget - don't block navigation (push + in-app + email)
         Promise.all([
           notifyEventUnlocked(otherMemberIds, selectedLockedEvent.title, selectedLockedEvent.id),
           notifyEventUnlockedInApp(otherMemberIds, selectedLockedEvent.title, selectedLockedEvent.id, clubId),
+          sendEventUnlockedEmails(selectedLockedEvent.id, clubId),
         ]).catch(console.error);
       }
       

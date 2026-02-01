@@ -135,6 +135,11 @@ export function eventCreatedTemplate({ eventTitle, clubName, description, dateOp
   return emailWrapper(`<div style="${baseStyles.content}"><div style="${baseStyles.iconWrapper}">${icons.dice}</div><h1 style="${baseStyles.headline}">New poker night</h1><p style="${baseStyles.subtext}"><strong style="color: #ffffff;">${eventTitle}</strong> was created in ${clubName}.${description ? `<br><br>${description}` : ''}</p><div style="${baseStyles.infoCard}"><p style="margin: 0 0 12px; color: #8fb5a5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Vote on a date</p><ul style="margin: 0; padding-left: 0; list-style: none;">${dateList}</ul></div><a href="${eventUrl}" style="${baseStyles.button}">Vote & RSVP</a></div>`);
 }
 
+export function eventUnlockedTemplate({ eventTitle, clubName, dateOptions, eventUrl }: { eventTitle: string; clubName: string; dateOptions: string[]; eventUrl: string }): string {
+  const dateList = dateOptions.map(date => `<li style="margin-bottom: 10px; color: #ffffff; padding: 8px 12px; background: rgba(212, 175, 55, 0.08); border-radius: 6px; border-left: 3px solid #d4af37;">${icons.calendarSmall}${date}</li>`).join('');
+  return emailWrapper(`<div style="${baseStyles.content}"><div style="${baseStyles.iconWrapper}">${icons.sparkles}</div><h1 style="${baseStyles.headline}">Event now open!</h1><p style="${baseStyles.subtext}"><strong style="color: #ffffff;">${eventTitle}</strong> in ${clubName} is now open for voting and RSVP.</p><div style="${baseStyles.infoCard}"><p style="margin: 0 0 12px; color: #8fb5a5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Vote on a date</p><ul style="margin: 0; padding-left: 0; list-style: none;">${dateList}</ul></div><a href="${eventUrl}" style="${baseStyles.button}">Vote & RSVP</a></div>`);
+}
+
 export function rsvpConfirmationTemplate({ eventTitle, status, eventDate, location, eventUrl }: { eventTitle: string; status: 'going' | 'maybe' | 'not_going'; eventDate?: string; location?: string; eventUrl: string }): string {
   const config = { 
     going: { icon: icons.checkCircle, headline: "You're in!", message: 'Your seat is confirmed.' }, 

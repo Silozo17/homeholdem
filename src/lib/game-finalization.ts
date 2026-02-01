@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { notifyGameCompleted, notifyNewEventAvailable } from './push-notifications';
 import { notifyGameCompletedInApp, notifyNewEventAvailableInApp } from './in-app-notifications';
+import { sendEventUnlockedEmails } from './email-notifications';
 
 interface GamePlayer {
   id: string;
@@ -263,10 +264,11 @@ export async function finalizeGame(
                 .update({ is_unlocked: true })
                 .eq('id', nextEvent.id);
 
-              // Notify about new event
+              // Notify about new event (push + in-app + email)
               await Promise.all([
                 notifyNewEventAvailable(memberIds, nextEvent.title, nextEvent.id),
                 notifyNewEventAvailableInApp(memberIds, nextEvent.title, nextEvent.id, eventData.club_id),
+                sendEventUnlockedEmails(nextEvent.id, eventData.club_id),
               ]);
             }
           }

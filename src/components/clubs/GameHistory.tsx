@@ -81,15 +81,25 @@ export function GameHistory({ clubId, clubName }: GameHistoryProps) {
           .select('*', { count: 'exact', head: true })
           .eq('game_session_id', session.id);
 
+        // Get session details (including prize_pool_override)
+        const { data: sessionDetails } = await supabase
+          .from('game_sessions')
+          .select('prize_pool_override')
+          .eq('id', session.id)
+          .single();
+
         // Get prize pool (sum of buy-in, rebuy, addon transactions only - not payouts)
         const { data: transactions } = await supabase
           .from('game_transactions')
           .select('amount, transaction_type')
           .eq('game_session_id', session.id);
 
-        const prizePool = transactions
+        const calculatedPool = transactions
           ?.filter(t => ['buyin', 'rebuy', 'addon'].includes(t.transaction_type))
           .reduce((sum, t) => sum + t.amount, 0) || 0;
+
+        // Use prize_pool_override if set, otherwise use calculated pool
+        const prizePool = sessionDetails?.prize_pool_override ?? calculatedPool;
 
         // Get winner (player with finish_position = 1)
         const { data: winner } = await supabase
