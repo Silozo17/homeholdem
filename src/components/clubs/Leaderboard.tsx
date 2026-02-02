@@ -100,18 +100,35 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
 
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-    // Get payouts
+    // Get payouts from payout_structures (historical data)
     const { data: payouts } = await supabase
       .from('payout_structures')
       .select('player_id, amount')
       .in('game_session_id', sessionIds)
       .not('player_id', 'is', null);
 
+    // ALSO get payouts from game_transactions (live games)
+    const { data: transactionPayouts } = await supabase
+      .from('game_transactions')
+      .select('game_player_id, amount')
+      .in('game_session_id', sessionIds)
+      .eq('transaction_type', 'payout');
+
     // Create a map from game_player.id to payout amount
     const payoutMap = new Map<string, number>();
+    
+    // Add from payout_structures (historical)
     payouts?.forEach(p => {
       if (p.player_id && p.amount) {
         payoutMap.set(p.player_id, (payoutMap.get(p.player_id) || 0) + p.amount);
+      }
+    });
+
+    // Add from game_transactions (live games) - amounts are negative
+    transactionPayouts?.forEach(t => {
+      if (t.game_player_id && t.amount) {
+        const payoutAmount = Math.abs(t.amount);
+        payoutMap.set(t.game_player_id, (payoutMap.get(t.game_player_id) || 0) + payoutAmount);
       }
     });
 
