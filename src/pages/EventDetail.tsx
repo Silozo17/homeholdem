@@ -32,7 +32,8 @@ import {
   MessageCircle,
   Info,
   Trash2,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DateVoting } from '@/components/events/DateVoting';
@@ -64,6 +65,7 @@ interface Event {
   final_date: string | null;
   host_user_id: string | null;
   is_finalized: boolean;
+  is_unlocked: boolean;
   created_by: string;
 }
 
@@ -117,6 +119,7 @@ export default function EventDetail() {
   const [deleting, setDeleting] = useState(false);
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [volunteerLoading, setVolunteerLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -270,6 +273,42 @@ export default function EventDetail() {
     }
 
     setEvent(eventData);
+
+    // Calculate if event is locked
+    let eventIsLocked = false;
+    if (!eventData.is_unlocked && !eventData.is_finalized) {
+      // Fetch all events for this club to determine position
+      const { data: allEvents } = await supabase
+        .from('events')
+        .select('id, final_date, is_finalized, is_unlocked, created_at')
+        .eq('club_id', eventData.club_id)
+        .order('created_at', { ascending: true });
+      
+      if (allEvents) {
+        const eventIndex = allEvents.findIndex(e => e.id === eventData.id);
+        if (eventIndex > 0) {
+          // Not the first event - check previous event
+          const prevEvent = allEvents[eventIndex - 1];
+          
+          // Check if previous event's date has passed
+          const prevDatePassed = prevEvent.final_date && new Date(prevEvent.final_date) < new Date();
+          
+          if (!prevDatePassed) {
+            // Check if previous event's game is completed
+            const { data: prevSession } = await supabase
+              .from('game_sessions')
+              .select('status')
+              .eq('event_id', prevEvent.id)
+              .maybeSingle();
+            
+            if (prevSession?.status !== 'completed') {
+              eventIsLocked = true;
+            }
+          }
+        }
+      }
+    }
+    setIsLocked(eventIsLocked);
 
     // Fetch user's profile for optimistic updates
     const { data: profileData } = await supabase
@@ -986,6 +1025,12 @@ export default function EventDetail() {
         <div className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold text-gold-gradient flex-1">{event.title}</h1>
+            {isLocked && (
+              <Badge variant="outline" className="border-amber-500/50 text-amber-500">
+                <Lock className="h-3 w-3 mr-1" />
+                {t('event.locked')}
+              </Badge>
+            )}
             {event.is_finalized ? (
               <Badge variant="default">{t('event.confirmed')}</Badge>
             ) : (
@@ -1007,10 +1052,22 @@ export default function EventDetail() {
           )}
         </div>
 
+        {/* Locked Event Notice */}
+        {isLocked && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-start gap-3">
+            <Lock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-500">{t('event.locked_title')}</p>
+              <p className="text-sm text-muted-foreground">{t('event.locked_description')}</p>
+            </div>
+          </div>
+        )}
+
         {/* RSVP Buttons */}
         <RsvpButtons 
           currentStatus={userRsvp}
           onRsvp={handleRsvp}
+          disabled={isLocked}
         />
 
         {/* Tabs for different sections */}
@@ -1093,6 +1150,7 @@ export default function EventDetail() {
                 options={dateOptions}
                 onVote={handleVote}
                 onFinalize={isAdmin ? handleFinalizeDate : undefined}
+                disabled={isLocked}
               />
             )}
 

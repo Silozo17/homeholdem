@@ -270,6 +270,8 @@
     "voting": "Głosowanie",
     "confirmed": "Potwierdzone",
     "locked": "Zablokowane",
+    "locked_title": "Wydarzenie zablokowane",
+    "locked_description": "Głosowanie i potwierdzenie udziału będą dostępne po zakończeniu poprzedniego wydarzenia.",
     "date_tbd": "Data do ustalenia",
     "waiting_previous": "Oczekiwanie na poprzednie wydarzenie",
     "spots_left": "Zostało {{count}} miejsc",

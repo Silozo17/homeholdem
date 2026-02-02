@@ -26,9 +26,10 @@ interface DateVotingProps {
   options: DateOption[];
   onVote: (optionId: string) => void;
   onFinalize?: (optionId: string) => void;
+  disabled?: boolean;
 }
 
-export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
+export function DateVoting({ options, onVote, onFinalize, disabled = false }: DateVotingProps) {
   const { t, i18n } = useTranslation();
   const maxVotes = Math.max(...options.map(o => o.vote_count), 1);
   const [expandedOption, setExpandedOption] = useState<string | null>(null);
@@ -52,12 +53,16 @@ export function DateVoting({ options, onVote, onFinalize }: DateVotingProps) {
           <div key={option.id} className="space-y-2">
             <div 
               className={cn(
-                "relative flex flex-col gap-3 p-4 rounded-lg border transition-all cursor-pointer",
+                "relative flex flex-col gap-3 p-4 rounded-lg border transition-all",
+                disabled 
+                  ? "opacity-60 cursor-not-allowed"
+                  : "cursor-pointer",
                 option.user_voted 
                   ? "border-primary bg-primary/10" 
-                  : "border-border/50 bg-secondary/30 hover:border-primary/50"
+                  : "border-border/50 bg-secondary/30",
+                !disabled && !option.user_voted && "hover:border-primary/50"
               )}
-              onClick={() => onVote(option.id)}
+              onClick={() => !disabled && onVote(option.id)}
             >
               {/* Vote bar background */}
               <div 
