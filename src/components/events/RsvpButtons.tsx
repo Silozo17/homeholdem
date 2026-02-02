@@ -17,9 +17,10 @@ import {
 interface RsvpButtonsProps {
   currentStatus: 'going' | 'maybe' | 'not_going' | null;
   onRsvp: (status: 'going' | 'maybe' | 'not_going') => void;
+  disabled?: boolean;
 }
 
-export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
+export function RsvpButtons({ currentStatus, onRsvp, disabled = false }: RsvpButtonsProps) {
   const { t } = useTranslation();
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -65,7 +66,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
             pendingStatus === 'going' && "opacity-70"
           )}
           onClick={() => handleClick('going')}
-          disabled={pendingStatus !== null}
+          disabled={disabled || pendingStatus !== null}
         >
           <Check className="h-5 w-5" />
           <span className="text-xs">{t('event.going')}</span>
@@ -78,7 +79,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
             pendingStatus === 'maybe' && "opacity-70"
           )}
           onClick={() => handleClick('maybe')}
-          disabled={pendingStatus !== null}
+          disabled={disabled || pendingStatus !== null}
         >
           <HelpCircle className="h-5 w-5" />
           <span className="text-xs">{t('event.maybe')}</span>
@@ -91,7 +92,7 @@ export function RsvpButtons({ currentStatus, onRsvp }: RsvpButtonsProps) {
             pendingStatus === 'not_going' && "opacity-70"
           )}
           onClick={() => handleClick('not_going')}
-          disabled={pendingStatus !== null}
+          disabled={disabled || pendingStatus !== null}
         >
           <X className="h-5 w-5" />
           <span className="text-xs">{t('event.cant_go')}</span>

@@ -270,6 +270,8 @@
     "voting": "Voting",
     "confirmed": "Confirmed",
     "locked": "Locked",
+    "locked_title": "Event Locked",
+    "locked_description": "Voting and RSVP will open once the previous event is complete.",
     "date_tbd": "Date TBD",
     "waiting_previous": "Waiting for previous event",
     "spots_left": "{{count}} spots left",
