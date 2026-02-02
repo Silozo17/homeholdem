@@ -1,68 +1,126 @@
 
+# Plan: Fix Event Locking Bug and Clean March 2026 Data
 
-# Plan: Fix Jan 2026 Season 3 Winnings Data
+## Problem Summary
 
-## Problem
+The EventDetail page does **not check if an event is locked** before allowing voting and RSVP actions. Users can bypass the lock by directly navigating to a locked event's URL (e.g., `/event/march-event-id`).
 
-The Season 3 standings are showing £0 for winnings because the data was manually inserted with incorrect values. The correct amounts are:
+The locking logic currently only exists in `ClubDetail.tsx` for display purposes - it shows a "Locked" badge on EventCards and shows a confirmation dialog when clicked. However, once inside EventDetail, there are no restrictions.
 
-- **Kryniu** (1st place): £260 won
-- **Puchar** (2nd place): £220 won
-- **Total**: £480 (matches the prize pool override)
+## What Needs to Change
 
-The game_transactions table also has slightly incorrect payout values (£259 and £221 instead of £260 and £220).
+### 1. Add Lock Check to EventDetail.tsx
 
-## Solution
+The EventDetail page needs to:
 
-### Database Updates Required
+1. Fetch the event's `is_unlocked` field (currently not included in the Event interface)
+2. Calculate whether the event is locked by checking if the **previous event** is completed or its date has passed
+3. Disable voting and RSVP controls when the event is locked
+4. Show a visual indicator that the event is locked
 
-**1. Fix Season Standings Winnings:**
+### 2. Implementation Details
 
-| Player | Standing ID | Correct Winnings |
-|--------|-------------|------------------|
-| Kryniu | e98bbeef-f41a-47c9-af1c-f11d5e3d215b | £260 |
-| Puchar | 7177a47d-feb2-49ca-83e0-b487b6db94b8 | £220 |
+**Update Event Interface** (line 56-68):
+Add `is_unlocked` field to the interface
 
+**Update fetchEventData** (around line 260):
+After fetching the event, also fetch the previous event to determine lock status:
+- Get all events for this club ordered by creation date
+- Find this event's position in the sequence
+- Check if the previous event has `final_date` passed OR has a completed game session
+- If neither condition is met and `is_unlocked` is false, the event is locked
+
+**Disable Controls When Locked**:
+- Hide or disable the DateVoting component
+- Hide or disable the RsvpButtons component
+- Show a "This event is locked" message explaining why
+
+### 3. Database Cleanup
+
+Delete Wuzet's vote on March 2026:
 ```sql
--- Fix Kryniu's winnings (1st place: £260)
-UPDATE season_standings 
-SET total_winnings = 260
-WHERE id = 'e98bbeef-f41a-47c9-af1c-f11d5e3d215b';
-
--- Fix Puchar's winnings (2nd place: £220)
-UPDATE season_standings 
-SET total_winnings = 220
-WHERE id = '7177a47d-feb2-49ca-83e0-b487b6db94b8';
+DELETE FROM event_date_votes 
+WHERE id = 'b1bc165e-bc8a-4819-912f-68ca3f07bd9d';
 ```
 
-**2. (Optional) Fix Game Transactions:**
+No RSVPs exist for March 2026 (already clean).
 
-If you want the transaction history to be accurate as well:
+---
 
-```sql
--- Fix Kryniu's payout transaction (£260)
-UPDATE game_transactions
-SET amount = -260
-WHERE id = '73387edd-8f34-4938-814d-234f9883747c';
+## Technical Implementation
 
--- Fix Puchar's payout transaction (£220)
-UPDATE game_transactions
-SET amount = -221
-WHERE id = '0fd44276-4af5-4434-b270-5f1f9a106681';
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/pages/EventDetail.tsx` | Add `is_unlocked` to Event interface, add lock calculation logic, conditionally disable voting/RSVP |
+| `src/components/events/DateVoting.tsx` | Add `disabled` prop to prevent interactions |
+| `src/components/events/RsvpButtons.tsx` | Add `disabled` prop to prevent interactions |
+| Database | Delete invalid vote record |
+
+### Lock Calculation Logic
+
+```typescript
+// After fetching the event, determine if it's locked
+const calculateIsLocked = async (event: Event): Promise<boolean> => {
+  // If manually unlocked, not locked
+  if (event.is_unlocked) return false;
+  
+  // If finalized, not locked (date has been set)
+  if (event.is_finalized) return false;
+  
+  // Fetch all events for this club
+  const { data: allEvents } = await supabase
+    .from('events')
+    .select('id, final_date, is_finalized, is_unlocked, created_at')
+    .eq('club_id', event.club_id)
+    .order('created_at', { ascending: true });
+  
+  if (!allEvents) return false;
+  
+  // Find current event's position
+  const eventIndex = allEvents.findIndex(e => e.id === event.id);
+  if (eventIndex <= 0) return false; // First event, not locked
+  
+  // Get previous event
+  const prevEvent = allEvents[eventIndex - 1];
+  
+  // If previous event's date has passed, not locked
+  if (prevEvent.final_date && new Date(prevEvent.final_date) < new Date()) {
+    return false;
+  }
+  
+  // Check if previous event's game is completed
+  const { data: prevSession } = await supabase
+    .from('game_sessions')
+    .select('status')
+    .eq('event_id', prevEvent.id)
+    .single();
+  
+  if (prevSession?.status === 'completed') {
+    return false;
+  }
+  
+  // Event is locked
+  return true;
+};
 ```
 
-## Files to Modify
+### UI When Locked
 
-None - this is a data-only fix.
+When an event is locked, the EventDetail page will:
 
-## Expected Results
+1. Show a prominent "Event Locked" badge next to the title
+2. Replace the DateVoting section with a message: "Voting will open once the previous event is complete"
+3. Replace the RSVP buttons with a disabled state or message
+4. Keep the event viewable (attendees list, chat) but not interactive for voting/RSVP
 
-After the fix, Season 3 standings will show:
+---
 
-| Player | Points | Winnings |
-|--------|--------|----------|
-| Kryniu | 11 pts | £260 won |
-| Puchar | 8 pts | £220 won |
-| Breku | 6 pts | £0 won |
-| Others | 1-4 pts | £0 won |
+## Verification Steps
 
+After implementation:
+1. Navigate directly to a locked event URL and confirm voting/RSVP is disabled
+2. Verify the "Event Locked" indicator is visible
+3. Complete the previous event and confirm the next event unlocks automatically
+4. Check that manually unlocking still works from ClubDetail
