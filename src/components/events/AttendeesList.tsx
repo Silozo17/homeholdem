@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, HelpCircle } from 'lucide-react';
+import { Users, Clock, HelpCircle, X } from 'lucide-react';
 import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface Attendee {
@@ -19,10 +19,11 @@ interface AttendeesListProps {
   going: Attendee[];
   waitlist: Attendee[];
   maybe: Attendee[];
+  notGoing: Attendee[];
   capacity: number;
 }
 
-export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesListProps) {
+export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: AttendeesListProps) {
   const { t } = useTranslation();
 
   return (
@@ -110,7 +111,32 @@ export function AttendeesList({ going, waitlist, maybe, capacity }: AttendeesLis
           </div>
         )}
 
-        {going.length === 0 && waitlist.length === 0 && maybe.length === 0 && (
+        {/* Can't Go */}
+        {notGoing.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <X className="h-3 w-3" />
+              {t('event.cant_go')} ({notGoing.length})
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {notGoing.map((attendee) => (
+                <div
+                  key={attendee.user_id}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border border-destructive/30 rounded-full"
+                >
+                  <UserAvatar 
+                    name={attendee.profile.display_name} 
+                    avatarUrl={attendee.profile.avatar_url}
+                    size="xs"
+                  />
+                  <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {going.length === 0 && waitlist.length === 0 && maybe.length === 0 && notGoing.length === 0 && (
           <p className="text-center text-muted-foreground py-4">
             {t('event.no_rsvps')} {t('event.be_first')}
           </p>

@@ -920,11 +920,12 @@ export default function EventDetail() {
   };
 
   // Memoized computed values
-  const { goingList, waitlist, maybeList, totalCapacity, isAdmin } = useMemo(() => ({
+  const { goingList, waitlist, maybeList, notGoingList, totalCapacity, isAdmin } = useMemo(() => ({
     goingList: rsvps.filter(r => r.status === 'going' && !r.is_waitlisted),
     waitlist: rsvps.filter(r => r.is_waitlisted).sort((a, b) => 
       (a.waitlist_position || 0) - (b.waitlist_position || 0)),
     maybeList: rsvps.filter(r => r.status === 'maybe'),
+    notGoingList: rsvps.filter(r => r.status === 'not_going'),
     totalCapacity: event ? event.max_tables * event.seats_per_table : 0,
     isAdmin: userRole === 'owner' || userRole === 'admin'
   }), [rsvps, event, userRole]);
@@ -1176,6 +1177,7 @@ export default function EventDetail() {
               going={goingList}
               waitlist={waitlist}
               maybe={maybeList}
+              notGoing={notGoingList}
               capacity={totalCapacity}
             />
           </TabsContent>
