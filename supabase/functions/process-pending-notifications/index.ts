@@ -176,7 +176,8 @@ serve(async (req) => {
           totalSent += recipientIds.length;
         }
 
-        // Create in-app notifications
+        // Create in-app notifications - use the first actor as sender_id for RLS compliance
+        const senderId = notifications[0].actor_id;
         const inAppNotifications = recipientIds.map(userId => ({
           user_id: userId,
           type: firstNotification.type === 'rsvp' ? 'rsvp' : 'date_finalized',
@@ -185,6 +186,7 @@ serve(async (req) => {
           url: firstNotification.event_id ? `/event/${firstNotification.event_id}` : `/club/${firstNotification.club_id}`,
           event_id: firstNotification.event_id,
           club_id: firstNotification.club_id,
+          sender_id: senderId,
         }));
 
         const { error: insertError } = await supabase
