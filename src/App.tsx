@@ -23,6 +23,7 @@ import Rules from "./pages/Rules";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
+import PlayPoker from "./pages/PlayPoker";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +61,7 @@ const App = () => (
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/install" element={<Install />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/play-poker" element={<PlayPoker />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

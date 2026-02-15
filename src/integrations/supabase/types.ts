@@ -1088,6 +1088,65 @@ export type Database = {
           },
         ]
       }
+      poker_play_results: {
+        Row: {
+          best_hand_name: string | null
+          best_hand_rank: number | null
+          biggest_pot: number | null
+          bot_count: number
+          club_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          final_chips: number
+          game_mode: string
+          hands_played: number
+          hands_won: number
+          id: string
+          starting_chips: number
+          user_id: string
+        }
+        Insert: {
+          best_hand_name?: string | null
+          best_hand_rank?: number | null
+          biggest_pot?: number | null
+          bot_count?: number
+          club_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          final_chips?: number
+          game_mode?: string
+          hands_played?: number
+          hands_won?: number
+          id?: string
+          starting_chips?: number
+          user_id?: string
+        }
+        Update: {
+          best_hand_name?: string | null
+          best_hand_rank?: number | null
+          biggest_pot?: number | null
+          bot_count?: number
+          club_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          final_chips?: number
+          game_mode?: string
+          hands_played?: number
+          hands_won?: number
+          id?: string
+          starting_chips?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_play_results_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

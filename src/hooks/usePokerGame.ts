@@ -1,0 +1,539 @@
+import { useReducer, useCallback, useRef, useEffect } from 'react';
+import {
+  Card, PokerPlayer, GameState, GamePhase, GameAction, LobbySettings,
+  HAND_RANK_NAMES,
+} from '@/lib/poker/types';
+import { createDeck, shuffle, deal } from '@/lib/poker/deck';
+import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
+import { decideBotAction } from '@/lib/poker/bot-ai';
+
+// --- Action types ---
+type Action =
+  | { type: 'START_GAME'; settings: LobbySettings }
+  | { type: 'DEAL_HAND' }
+  | { type: 'PLAYER_ACTION'; action: GameAction }
+  | { type: 'BOT_ACTION' }
+  | { type: 'ADVANCE_PHASE' }
+  | { type: 'SHOWDOWN' }
+  | { type: 'NEXT_HAND' }
+  | { type: 'QUIT' };
+
+const BOT_NAMES = ['Alex', 'Blake', 'Casey', 'Drew', 'Ellis', 'Frankie', 'Gray', 'Harper'];
+
+function createInitialState(): GameState {
+  return {
+    phase: 'idle',
+    players: [],
+    communityCards: [],
+    deck: [],
+    pot: 0,
+    currentPlayerIndex: 0,
+    dealerIndex: 0,
+    smallBlind: 50,
+    bigBlind: 100,
+    minRaise: 100,
+    handNumber: 0,
+    lastRaiserIndex: null,
+    handsPlayed: 0,
+    handsWon: 0,
+    biggestPot: 0,
+    bestHandRank: 0,
+    bestHandName: '',
+    startTime: Date.now(),
+    startingChips: 10000,
+  };
+}
+
+function getActivePlayers(players: PokerPlayer[]): PokerPlayer[] {
+  return players.filter(p => p.status === 'active' || p.status === 'all-in');
+}
+
+function getActionablePlayers(players: PokerPlayer[]): PokerPlayer[] {
+  return players.filter(p => p.status === 'active');
+}
+
+function nextActivePlayerIndex(players: PokerPlayer[], fromIndex: number): number {
+  let idx = (fromIndex + 1) % players.length;
+  let attempts = 0;
+  while (attempts < players.length) {
+    if (players[idx].status === 'active') return idx;
+    idx = (idx + 1) % players.length;
+    attempts++;
+  }
+  return -1;
+}
+
+function reducer(state: GameState, action: Action): GameState {
+  switch (action.type) {
+    case 'START_GAME': {
+      const { botCount, startingChips, smallBlind, bigBlind } = action.settings;
+      const players: PokerPlayer[] = [];
+
+      // Human player at seat 0
+      players.push({
+        id: 'human',
+        name: 'You',
+        chips: startingChips,
+        holeCards: [],
+        status: 'active',
+        currentBet: 0,
+        totalBetThisHand: 0,
+        isBot: false,
+        isDealer: false,
+        seatIndex: 0,
+      });
+
+      for (let i = 0; i < botCount; i++) {
+        players.push({
+          id: `bot-${i}`,
+          name: BOT_NAMES[i] || `Bot ${i + 1}`,
+          chips: startingChips,
+          holeCards: [],
+          status: 'active',
+          currentBet: 0,
+          totalBetThisHand: 0,
+          isBot: true,
+          isDealer: false,
+          seatIndex: i + 1,
+        });
+      }
+
+      players[0].isDealer = true;
+
+      return {
+        ...state,
+        phase: 'dealing',
+        players,
+        dealerIndex: 0,
+        smallBlind,
+        bigBlind,
+        minRaise: bigBlind,
+        startingChips: startingChips,
+        startTime: Date.now(),
+        handsPlayed: 0,
+        handsWon: 0,
+        biggestPot: 0,
+        bestHandRank: 0,
+        bestHandName: '',
+      };
+    }
+
+    case 'DEAL_HAND': {
+      // Reset for new hand
+      let deck = shuffle(createDeck());
+      const players: PokerPlayer[] = state.players.map(p => ({
+        ...p,
+        holeCards: [] as Card[],
+        status: (p.chips > 0 ? 'active' : 'eliminated') as PokerPlayer['status'],
+        currentBet: 0,
+        totalBetThisHand: 0,
+        lastAction: undefined,
+      }));
+
+      // Deal 2 cards to each active player
+      for (const p of players) {
+        if (p.status === 'active') {
+          const [cards, remaining] = deal(deck, 2);
+          p.holeCards = cards;
+          deck = remaining;
+        }
+      }
+
+      // Post blinds
+      const activePlayers = players.filter(p => p.status === 'active');
+      if (activePlayers.length < 2) {
+        return { ...state, phase: 'game_over', players };
+      }
+
+      const sbIndex = nextActivePlayerIndex(players, state.dealerIndex);
+      const bbIndex = nextActivePlayerIndex(players, sbIndex);
+
+      const sbAmount = Math.min(state.smallBlind, players[sbIndex].chips);
+      players[sbIndex].chips -= sbAmount;
+      players[sbIndex].currentBet = sbAmount;
+      players[sbIndex].totalBetThisHand = sbAmount;
+
+      const bbAmount = Math.min(state.bigBlind, players[bbIndex].chips);
+      players[bbIndex].chips -= bbAmount;
+      players[bbIndex].currentBet = bbAmount;
+      players[bbIndex].totalBetThisHand = bbAmount;
+
+      // Check if SB/BB went all-in
+      if (players[sbIndex].chips === 0) (players[sbIndex] as any).status = 'all-in';
+      if (players[bbIndex].chips === 0) (players[bbIndex] as any).status = 'all-in';
+
+      const pot = sbAmount + bbAmount;
+      const firstToAct = nextActivePlayerIndex(players, bbIndex);
+
+      return {
+        ...state,
+        phase: 'preflop',
+        players,
+        deck,
+        communityCards: [],
+        pot,
+        currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
+        minRaise: state.bigBlind,
+        handNumber: state.handNumber + 1,
+        lastRaiserIndex: bbIndex, // BB is the "raiser" preflop
+      };
+    }
+
+    case 'PLAYER_ACTION': {
+      const { action: gameAction } = action;
+      const players = [...state.players.map(p => ({ ...p }))];
+      const player = players[state.currentPlayerIndex];
+      let pot = state.pot;
+      let minRaise = state.minRaise;
+      let lastRaiserIndex = state.lastRaiserIndex;
+
+      const maxBet = Math.max(...players.map(p => p.currentBet));
+      const amountToCall = maxBet - player.currentBet;
+
+      switch (gameAction.type) {
+        case 'fold':
+          player.status = 'folded';
+          player.lastAction = 'Fold';
+          break;
+
+        case 'check':
+          player.lastAction = 'Check';
+          break;
+
+        case 'call': {
+          const callAmount = Math.min(amountToCall, player.chips);
+          player.chips -= callAmount;
+          player.currentBet += callAmount;
+          player.totalBetThisHand += callAmount;
+          pot += callAmount;
+          if (player.chips === 0) player.status = 'all-in';
+          player.lastAction = `Call ${callAmount}`;
+          break;
+        }
+
+        case 'raise': {
+          const raiseTotal = gameAction.amount || (maxBet + minRaise);
+          const raiseAmount = Math.min(raiseTotal - player.currentBet, player.chips);
+          player.chips -= raiseAmount;
+          player.currentBet += raiseAmount;
+          player.totalBetThisHand += raiseAmount;
+          pot += raiseAmount;
+          minRaise = Math.max(minRaise, player.currentBet - maxBet);
+          lastRaiserIndex = state.currentPlayerIndex;
+          if (player.chips === 0) player.status = 'all-in';
+          player.lastAction = `Raise ${raiseAmount}`;
+          break;
+        }
+
+        case 'all-in': {
+          const allInAmount = player.chips;
+          player.currentBet += allInAmount;
+          player.totalBetThisHand += allInAmount;
+          pot += allInAmount;
+          player.chips = 0;
+          player.status = 'all-in';
+          if (player.currentBet > maxBet) {
+            minRaise = Math.max(minRaise, player.currentBet - maxBet);
+            lastRaiserIndex = state.currentPlayerIndex;
+          }
+          player.lastAction = `All-in ${allInAmount}`;
+          break;
+        }
+      }
+
+      // Check if betting round is over
+      const actionable = getActionablePlayers(players);
+      const nextIdx = nextActivePlayerIndex(players, state.currentPlayerIndex);
+
+      // Round ends when we've gone around to the last raiser or all players have acted
+      const allEqualBets = getActivePlayers(players).every(
+        p => p.currentBet === maxBet || p.status === 'all-in' || p.status === 'folded'
+      );
+
+      const activeCnt = players.filter(p => p.status === 'active' || p.status === 'all-in').length;
+      const foldedOut = players.filter(p => p.status !== 'folded' && p.status !== 'eliminated').length <= 1;
+
+      if (foldedOut) {
+        // Everyone folded except one
+        return { ...state, phase: 'showdown', players, pot, deck: state.deck, minRaise, lastRaiserIndex };
+      }
+
+      if (actionable.length <= 1 || (allEqualBets && nextIdx === lastRaiserIndex)) {
+        // Advance to next phase
+        return advancePhase({ ...state, players, pot, minRaise, lastRaiserIndex });
+      }
+
+      return {
+        ...state,
+        players,
+        pot,
+        currentPlayerIndex: nextIdx === -1 ? 0 : nextIdx,
+        minRaise,
+        lastRaiserIndex,
+      };
+    }
+
+    case 'ADVANCE_PHASE':
+      return advancePhase(state);
+
+    case 'SHOWDOWN': {
+      const players = [...state.players.map(p => ({ ...p }))];
+      let pot = state.pot;
+      const remaining = players.filter(p => p.status === 'active' || p.status === 'all-in');
+      let handsWon = state.handsWon;
+      let biggestPot = Math.max(state.biggestPot, pot);
+      let bestHandRank = state.bestHandRank;
+      let bestHandName = state.bestHandName;
+
+      if (remaining.length === 1) {
+        // Everyone else folded
+        remaining[0].chips += pot;
+        remaining[0].lastAction = 'Winner!';
+        if (remaining[0].id === 'human') handsWon++;
+      } else {
+        // Evaluate hands
+        const results = remaining.map(p => ({
+          player: p,
+          hand: evaluateHand([...p.holeCards, ...state.communityCards]),
+        }));
+
+        results.sort((a, b) => compareHands(b.hand, a.hand));
+        const bestScore = results[0].hand.score;
+        const winners = results.filter(r => r.hand.score === bestScore);
+
+        // Capped betting: refund excess and split pot among winners
+        const share = Math.floor(pot / winners.length);
+        const remainder = pot - (share * winners.length);
+
+        for (const w of winners) {
+          w.player.chips += share;
+          w.player.lastAction = `${w.hand.name}!`;
+          if (w.player.id === 'human') {
+            handsWon++;
+            if (w.hand.rank > bestHandRank) {
+              bestHandRank = w.hand.rank;
+              bestHandName = w.hand.name;
+            }
+          }
+        }
+
+        // Give remainder to first winner (closest to dealer)
+        if (remainder > 0) winners[0].player.chips += remainder;
+
+        // Update human best hand even if they didn't win
+        const humanResult = results.find(r => r.player.id === 'human');
+        if (humanResult && humanResult.hand.rank > bestHandRank) {
+          bestHandRank = humanResult.hand.rank;
+          bestHandName = humanResult.hand.name;
+        }
+      }
+
+      return {
+        ...state,
+        phase: 'hand_complete',
+        players,
+        pot: 0,
+        handsPlayed: state.handsPlayed + 1,
+        handsWon,
+        biggestPot,
+        bestHandRank,
+        bestHandName,
+      };
+    }
+
+    case 'NEXT_HAND': {
+      const alivePlayers = state.players.filter(p => p.chips > 0);
+      if (alivePlayers.length <= 1) {
+        return { ...state, phase: 'game_over' };
+      }
+
+      // Rotate dealer
+      let newDealerIndex = (state.dealerIndex + 1) % state.players.length;
+      while (state.players[newDealerIndex].chips <= 0) {
+        newDealerIndex = (newDealerIndex + 1) % state.players.length;
+      }
+
+      const players = state.players.map((p, i) => ({
+        ...p,
+        isDealer: i === newDealerIndex,
+      }));
+
+      return { ...state, phase: 'dealing', players, dealerIndex: newDealerIndex };
+    }
+
+    case 'QUIT':
+      return { ...state, phase: 'game_over' };
+
+    default:
+      return state;
+  }
+}
+
+function advancePhase(state: GameState): GameState {
+  let deck = [...state.deck];
+  let communityCards = [...state.communityCards];
+  let nextPhase: GamePhase;
+  const players = state.players.map(p => ({
+    ...p,
+    currentBet: 0,
+    lastAction: undefined,
+  }));
+
+  switch (state.phase) {
+    case 'preflop': {
+      const [flop, remaining] = deal(deck, 3);
+      communityCards = flop;
+      deck = remaining;
+      nextPhase = 'flop';
+      break;
+    }
+    case 'flop': {
+      const [turn, remaining] = deal(deck, 1);
+      communityCards = [...communityCards, ...turn];
+      deck = remaining;
+      nextPhase = 'turn';
+      break;
+    }
+    case 'turn': {
+      const [river, remaining] = deal(deck, 1);
+      communityCards = [...communityCards, ...river];
+      deck = remaining;
+      nextPhase = 'river';
+      break;
+    }
+    case 'river':
+      nextPhase = 'showdown';
+      return { ...state, phase: nextPhase, players, deck, communityCards };
+    default:
+      return state;
+  }
+
+  // Check if only 1 or 0 players can still act
+  const actionable = getActionablePlayers(players);
+  if (actionable.length <= 1) {
+    // Skip to showdown if no more betting possible
+    if (nextPhase as string !== 'showdown') {
+      // Deal remaining community cards
+      while (communityCards.length < 5) {
+        const [card, rem] = deal(deck, 1);
+        communityCards = [...communityCards, ...card];
+        deck = rem;
+      }
+      return { ...state, phase: 'showdown', players, deck, communityCards };
+    }
+  }
+
+  // First to act postflop: first active after dealer
+  const firstToAct = nextActivePlayerIndex(players, state.dealerIndex);
+
+  return {
+    ...state,
+    phase: nextPhase,
+    players,
+    deck,
+    communityCards,
+    currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
+    minRaise: state.bigBlind,
+    lastRaiserIndex: null,
+  };
+}
+
+// --- Hook ---
+export function usePokerGame() {
+  const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
+  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current);
+    };
+  }, []);
+
+  // Auto-handle bot actions and phase transitions
+  useEffect(() => {
+    if (botTimeoutRef.current) {
+      clearTimeout(botTimeoutRef.current);
+      botTimeoutRef.current = null;
+    }
+
+    // Auto-deal on 'dealing' phase
+    if (state.phase === 'dealing') {
+      botTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'DEAL_HAND' });
+      }, 500);
+      return;
+    }
+
+    // Auto-showdown
+    if (state.phase === 'showdown') {
+      botTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'SHOWDOWN' });
+      }, 1000);
+      return;
+    }
+
+    // Bot's turn
+    if (
+      (state.phase === 'preflop' || state.phase === 'flop' ||
+       state.phase === 'turn' || state.phase === 'river') &&
+      state.players[state.currentPlayerIndex]?.isBot &&
+      state.players[state.currentPlayerIndex]?.status === 'active'
+    ) {
+      const player = state.players[state.currentPlayerIndex];
+      const maxBet = Math.max(...state.players.map(p => p.currentBet));
+
+      botTimeoutRef.current = setTimeout(() => {
+        const botAction = decideBotAction(
+          player,
+          state.communityCards,
+          state.pot,
+          maxBet,
+          state.minRaise,
+          state.bigBlind,
+        );
+        dispatch({ type: 'PLAYER_ACTION', action: botAction });
+      }, 800 + Math.random() * 700); // 0.8-1.5s delay
+    }
+  }, [state.phase, state.currentPlayerIndex, state.handNumber]);
+
+  const startGame = useCallback((settings: LobbySettings) => {
+    dispatch({ type: 'START_GAME', settings });
+  }, []);
+
+  const playerAction = useCallback((action: GameAction) => {
+    dispatch({ type: 'PLAYER_ACTION', action });
+  }, []);
+
+  const nextHand = useCallback(() => {
+    dispatch({ type: 'NEXT_HAND' });
+  }, []);
+
+  const quitGame = useCallback(() => {
+    dispatch({ type: 'QUIT' });
+  }, []);
+
+  const isHumanTurn = 
+    (state.phase === 'preflop' || state.phase === 'flop' ||
+     state.phase === 'turn' || state.phase === 'river') &&
+    !state.players[state.currentPlayerIndex]?.isBot &&
+    state.players[state.currentPlayerIndex]?.status === 'active';
+
+  const humanPlayer = state.players.find(p => p.id === 'human');
+  const maxBet = Math.max(0, ...state.players.map(p => p.currentBet));
+  const amountToCall = humanPlayer ? maxBet - humanPlayer.currentBet : 0;
+  const canCheck = amountToCall === 0;
+
+  return {
+    state,
+    startGame,
+    playerAction,
+    nextHand,
+    quitGame,
+    isHumanTurn,
+    humanPlayer,
+    amountToCall,
+    canCheck,
+    maxBet,
+  };
+}
