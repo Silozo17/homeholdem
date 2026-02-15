@@ -246,11 +246,11 @@ function reducer(state: GameState, action: Action): GameState {
       const nextIdx = nextActivePlayerIndex(players, state.currentPlayerIndex);
 
       // Round ends when we've gone around to the last raiser or all players have acted
+      const currentMaxBet = Math.max(...players.map(p => p.currentBet));
       const allEqualBets = getActivePlayers(players).every(
-        p => p.currentBet === maxBet || p.status === 'all-in' || p.status === 'folded'
+        p => p.currentBet === currentMaxBet || p.status === 'all-in' || p.status === 'folded'
       );
 
-      const activeCnt = players.filter(p => p.status === 'active' || p.status === 'all-in').length;
       const foldedOut = players.filter(p => p.status !== 'folded' && p.status !== 'eliminated').length <= 1;
 
       if (foldedOut) {
@@ -258,7 +258,20 @@ function reducer(state: GameState, action: Action): GameState {
         return { ...state, phase: 'showdown', players, pot, deck: state.deck, minRaise, lastRaiserIndex };
       }
 
-      if (actionable.length <= 1 || (allEqualBets && nextIdx === lastRaiserIndex)) {
+      // Round complete check:
+      // 1. If there's a raiser and we've come back to them
+      // 2. If no raiser (all checks) and we've gone full circle back to first actor
+      const roundComplete = allEqualBets && (
+        (lastRaiserIndex !== null && nextIdx === lastRaiserIndex) ||
+        (lastRaiserIndex === null && actionable.length <= 1) ||
+        (lastRaiserIndex === null && nextIdx !== -1 && (() => {
+          // Check if all actionable players have acted this round (lastAction is set)
+          const allActed = getActionablePlayers(players).every(p => p.lastAction !== undefined);
+          return allActed;
+        })())
+      );
+
+      if (actionable.length <= 1 || roundComplete) {
         // Advance to next phase
         return advancePhase({ ...state, players, pot, minRaise, lastRaiserIndex });
       }
@@ -470,6 +483,14 @@ export function usePokerGame() {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'SHOWDOWN' });
       }, 1000);
+      return;
+    }
+
+    // Auto-advance after hand_complete (no more "Next Hand" button needed)
+    if (state.phase === 'hand_complete') {
+      botTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'NEXT_HAND' });
+      }, 2500);
       return;
     }
 
