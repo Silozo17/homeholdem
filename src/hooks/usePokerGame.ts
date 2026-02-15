@@ -6,6 +6,7 @@ import {
 import { createDeck, shuffle, deal } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
 import { decideBotAction } from '@/lib/poker/bot-ai';
+import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
 
 // --- Action types ---
 type Action =
@@ -291,7 +292,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'SHOWDOWN': {
       const players = [...state.players.map(p => ({ ...p }))];
-      let pot = state.pot;
+      const pot = state.pot;
       const remaining = players.filter(p => p.status === 'active' || p.status === 'all-in');
       let handsWon = state.handsWon;
       let biggestPot = Math.max(state.biggestPot, pot);
@@ -304,37 +305,47 @@ function reducer(state: GameState, action: Action): GameState {
         remaining[0].lastAction = 'Winner!';
         if (remaining[0].id === 'human') handsWon++;
       } else {
-        // Evaluate hands
+        // Build contributors for side pot calculation
+        const contributors: PotContributor[] = players.map(p => ({
+          playerId: p.id,
+          totalBet: p.totalBetThisHand,
+          status: p.status,
+        }));
+
+        const sidePots = calculateSidePots(contributors);
+
+        // Evaluate all remaining players' hands
         const results = remaining.map(p => ({
-          player: p,
+          playerId: p.id,
           hand: evaluateHand([...p.holeCards, ...state.communityCards]),
         }));
 
-        results.sort((a, b) => compareHands(b.hand, a.hand));
-        const bestScore = results[0].hand.score;
-        const winners = results.filter(r => r.hand.score === bestScore);
+        // Build rankings sorted best to worst
+        const rankings = [...results].sort((a, b) => b.hand.score - a.hand.score)
+          .map(r => ({ playerId: r.playerId, score: r.hand.score }));
 
-        // Capped betting: refund excess and split pot among winners
-        const share = Math.floor(pot / winners.length);
-        const remainder = pot - (share * winners.length);
+        // Distribute winnings across all side pots
+        const winnings = distributeSidePots(sidePots, rankings);
 
-        for (const w of winners) {
-          w.player.chips += share;
-          w.player.lastAction = `${w.hand.name}!`;
-          if (w.player.id === 'human') {
-            handsWon++;
-            if (w.hand.rank > bestHandRank) {
-              bestHandRank = w.hand.rank;
-              bestHandName = w.hand.name;
+        // Apply winnings to players
+        for (const p of players) {
+          const won = winnings[p.id] || 0;
+          if (won > 0) {
+            p.chips += won;
+            const hand = results.find(r => r.playerId === p.id)?.hand;
+            p.lastAction = hand ? `${hand.name}!` : 'Winner!';
+            if (p.id === 'human') {
+              handsWon++;
+              if (hand && hand.rank > bestHandRank) {
+                bestHandRank = hand.rank;
+                bestHandName = hand.name;
+              }
             }
           }
         }
 
-        // Give remainder to first winner (closest to dealer)
-        if (remainder > 0) winners[0].player.chips += remainder;
-
         // Update human best hand even if they didn't win
-        const humanResult = results.find(r => r.player.id === 'human');
+        const humanResult = results.find(r => r.playerId === 'human');
         if (humanResult && humanResult.hand.rank > bestHandRank) {
           bestHandRank = humanResult.hand.rank;
           bestHandName = humanResult.hand.name;

@@ -1,6 +1,6 @@
 import { HandResult as HandResultType } from '@/lib/poker/types';
 import { useEffect, useState } from 'react';
-import { Trophy, Play, LogOut, Star } from 'lucide-react';
+import { Trophy, Play, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WinnerOverlayProps {
@@ -30,7 +30,7 @@ function AnimatedChips({ target }: { target: number }) {
     }, 35);
     return () => clearInterval(id);
   }, [target]);
-  return <span>{display.toLocaleString()}</span>;
+  return <span className="tabular-nums">{display.toLocaleString()}</span>;
 }
 
 export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }: WinnerOverlayProps) {
@@ -40,28 +40,64 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
     return `${mins}m ${secs}s`;
   };
 
-  // Inline banner for hand_complete (non-blocking, auto-dismissed by game engine)
+  // Inline banner for hand_complete — gold serif hand name + particles
   if (!isGameOver) {
     return (
       <div className="absolute left-1/2 -translate-x-1/2 z-30 animate-winner-banner pointer-events-none"
-        style={{ top: '25%' }}
+        style={{ top: '22%' }}
       >
-        <div className="rounded-xl px-5 py-3 text-center"
+        <div className="relative rounded-xl px-6 py-3 text-center"
           style={{
             background: 'linear-gradient(180deg, hsl(160 25% 14% / 0.95), hsl(160 30% 8% / 0.95))',
             border: '1px solid hsl(43 74% 49% / 0.4)',
             boxShadow: '0 0 40px hsl(43 74% 49% / 0.2), 0 10px 40px rgba(0,0,0,0.5)',
           }}
         >
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Trophy className="w-4 h-4 text-primary" style={{ filter: 'drop-shadow(0 0 6px hsl(43 74% 49% / 0.6))' }} />
-            <span className="text-xs font-black text-shimmer">Winner</span>
+          {/* Gold particle shimmer */}
+          <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-1 h-1 rounded-full animate-particle-float"
+                style={{
+                  left: `${10 + Math.random() * 80}%`,
+                  bottom: '0%',
+                  background: 'radial-gradient(circle, hsl(43 74% 70%), hsl(43 74% 49% / 0))',
+                  animationDelay: `${i * 0.15}s`,
+                  boxShadow: '0 0 3px hsl(43 74% 49% / 0.5)',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Hand name in gold serif */}
+          {winners[0] && winners[0].hand.name !== 'N/A' && (
+            <div className="mb-1">
+              <span
+                className="text-lg font-black uppercase tracking-wider animate-hand-name-reveal"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  background: 'linear-gradient(135deg, hsl(43 74% 60%), hsl(43 90% 75%), hsl(43 74% 50%))',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  filter: 'drop-shadow(0 2px 8px hsl(43 74% 49% / 0.5))',
+                }}
+              >
+                {winners[0].hand.name}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+            <Trophy className="w-3.5 h-3.5 text-primary" style={{ filter: 'drop-shadow(0 0 6px hsl(43 74% 49% / 0.6))' }} />
+            <span className="text-[10px] font-black text-shimmer tracking-wide">Winner</span>
           </div>
           {winners.map((w, i) => (
             <div key={i}>
               <p className="font-bold text-sm text-foreground">{w.name}</p>
               <p className="text-[10px] text-primary font-semibold" style={{ textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
-                {w.hand.name} — <AnimatedChips target={w.chips} /> chips
+                <AnimatedChips target={w.chips} /> chips
               </p>
             </div>
           ))}
@@ -85,13 +121,27 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
           boxShadow: '0 0 60px hsl(43 74% 49% / 0.15), 0 20px 60px rgba(0,0,0,0.5)',
         }}
       >
-        {/* Trophy */}
-        <div className="flex justify-center">
+        {/* Trophy with shimmer */}
+        <div className="relative flex justify-center">
           <div className="w-20 h-20 rounded-full flex items-center justify-center animate-winner-glow"
             style={{ background: 'radial-gradient(circle, hsl(43 74% 49% / 0.2), transparent)' }}
           >
             <Trophy className="w-10 h-10 text-primary" style={{ filter: 'drop-shadow(0 0 12px hsl(43 74% 49% / 0.6))' }} />
           </div>
+          {/* Particles around trophy */}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
+              style={{
+                left: `${25 + Math.random() * 50}%`,
+                bottom: '10%',
+                background: 'radial-gradient(circle, hsl(43 74% 65%), hsl(43 74% 49% / 0))',
+                animationDelay: `${i * 0.3}s`,
+                boxShadow: '0 0 4px hsl(43 74% 49% / 0.5)',
+              }}
+            />
+          ))}
         </div>
 
         <h2 className="text-2xl font-black text-shimmer">Game Over</h2>
@@ -104,7 +154,17 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
               border: '1px solid hsl(43 74% 49% / 0.2)',
             }}>
               <p className="font-bold text-foreground">{w.name}</p>
-              <p className="text-xs text-primary font-semibold">{w.hand.name}</p>
+              {w.hand.name !== 'N/A' && (
+                <p className="text-xs font-semibold"
+                  style={{
+                    fontFamily: 'Georgia, serif',
+                    background: 'linear-gradient(135deg, hsl(43 74% 60%), hsl(43 90% 70%))',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >{w.hand.name}</p>
+              )}
               <p className="text-lg font-black text-foreground">
                 <AnimatedChips target={w.chips} /> chips
               </p>
@@ -146,7 +206,7 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
         {/* Actions */}
         <div className="flex gap-3">
           <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
-            active:scale-95 transition-transform"
+            active:scale-[0.92] transition-transform"
             style={{
               background: 'linear-gradient(180deg, hsl(160 20% 20%), hsl(160 25% 15%))',
               color: 'hsl(0 0% 80%)',
@@ -158,7 +218,7 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
             Quit
           </button>
           <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
-            shimmer-btn text-primary-foreground active:scale-95 transition-transform"
+            shimmer-btn text-primary-foreground active:scale-[0.92] transition-transform"
             style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
             onClick={onQuit}
           >

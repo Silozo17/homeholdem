@@ -25,7 +25,19 @@ interface PokerTableProProps {
   onQuit: () => void;
 }
 
-const SEAT_POSITIONS: Record<number, { x: number; y: number }[]> = {
+function useIsLandscape() {
+  const [isLandscape, setIsLandscape] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
+  );
+  useEffect(() => {
+    const handler = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isLandscape;
+}
+
+const SEAT_POSITIONS_PORTRAIT: Record<number, { x: number; y: number }[]> = {
   2: [
     { x: 50, y: 86 },
     { x: 50, y: 8 },
@@ -85,6 +97,69 @@ const SEAT_POSITIONS: Record<number, { x: number; y: number }[]> = {
     { x: 10, y: 35 },
     { x: 12, y: 70 },
     { x: 25, y: 86 },
+  ],
+};
+
+const SEAT_POSITIONS_LANDSCAPE: Record<number, { x: number; y: number }[]> = {
+  2: [
+    { x: 50, y: 85 },
+    { x: 50, y: 8 },
+  ],
+  3: [
+    { x: 50, y: 85 },
+    { x: 10, y: 40 },
+    { x: 90, y: 40 },
+  ],
+  4: [
+    { x: 50, y: 85 },
+    { x: 92, y: 50 },
+    { x: 50, y: 8 },
+    { x: 8, y: 50 },
+  ],
+  5: [
+    { x: 50, y: 85 },
+    { x: 92, y: 55 },
+    { x: 78, y: 8 },
+    { x: 22, y: 8 },
+    { x: 8, y: 55 },
+  ],
+  6: [
+    { x: 50, y: 85 },
+    { x: 92, y: 60 },
+    { x: 82, y: 8 },
+    { x: 50, y: 3 },
+    { x: 18, y: 8 },
+    { x: 8, y: 60 },
+  ],
+  7: [
+    { x: 50, y: 85 },
+    { x: 93, y: 62 },
+    { x: 90, y: 20 },
+    { x: 65, y: 3 },
+    { x: 35, y: 3 },
+    { x: 10, y: 20 },
+    { x: 7, y: 62 },
+  ],
+  8: [
+    { x: 50, y: 85 },
+    { x: 93, y: 62 },
+    { x: 92, y: 22 },
+    { x: 68, y: 3 },
+    { x: 32, y: 3 },
+    { x: 8, y: 22 },
+    { x: 7, y: 62 },
+    { x: 72, y: 85 },
+  ],
+  9: [
+    { x: 50, y: 85 },
+    { x: 93, y: 68 },
+    { x: 94, y: 30 },
+    { x: 75, y: 3 },
+    { x: 50, y: 0 },
+    { x: 25, y: 3 },
+    { x: 6, y: 30 },
+    { x: 7, y: 68 },
+    { x: 28, y: 85 },
   ],
 };
 
@@ -170,8 +245,10 @@ export function PokerTablePro({
     onAction(action);
   }, [onAction, play]);
 
+  const isLandscape = useIsLandscape();
+  const seatMap = isLandscape ? SEAT_POSITIONS_LANDSCAPE : SEAT_POSITIONS_PORTRAIT;
   const playerCount = state.players.length;
-  const positions = SEAT_POSITIONS[Math.min(Math.max(playerCount, 2), 9)] || SEAT_POSITIONS[9];
+  const positions = seatMap[Math.min(Math.max(playerCount, 2), 9)] || seatMap[9];
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
