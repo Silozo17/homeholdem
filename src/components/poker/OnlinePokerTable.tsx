@@ -11,6 +11,7 @@ import { DealerCharacter } from './DealerCharacter';
 import { TableFelt } from './TableFelt';
 import { TurnTimer } from './TurnTimer';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
+import { ConnectionOverlay } from './ConnectionOverlay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -69,6 +70,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
+  const [isDisconnected, setIsDisconnected] = useState(false);
 
   // Sound triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
@@ -101,6 +103,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   useEffect(() => {
     if (isMyTurn) play('yourTurn');
   }, [isMyTurn, play]);
+
+  // Track connection status
+  useEffect(() => {
+    if (error && (error.includes('fetch') || error.includes('network') || error.includes('Failed'))) {
+      setIsDisconnected(true);
+    } else if (tableState) {
+      setIsDisconnected(false);
+    }
+  }, [error, tableState]);
+
+  const handleReconnect = useCallback(() => {
+    window.location.reload();
+  }, []);
 
   if (loading) {
     return (
@@ -554,6 +569,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Connection lost overlay */}
+      <ConnectionOverlay isDisconnected={isDisconnected} onReconnect={handleReconnect} />
     </div>
   );
 }

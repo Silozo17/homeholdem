@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -13,7 +14,7 @@ interface PlayerSeatProps {
   isShowdown: boolean;
 }
 
-export function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShowdown }: PlayerSeatProps) {
+export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShowdown }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
 
   return (
@@ -99,4 +100,4 @@ export function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShow
       )}
     </div>
   );
-}
+});

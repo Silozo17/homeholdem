@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, RANK_NAMES, SUIT_SYMBOLS } from '@/lib/poker/types';
 import { cn } from '@/lib/utils';
 import cardBackPremium from '@/assets/poker/card-back-premium.png';
@@ -17,7 +18,7 @@ const sizeClasses = {
   lg: 'w-12 h-[68px]',
 };
 
-export function CardDisplay({ card, faceDown = false, size = 'md', className, dealDelay = 0, isWinner }: CardDisplayProps) {
+export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, size = 'md', className, dealDelay = 0, isWinner }: CardDisplayProps) {
   const isRed = card?.suit === 'hearts' || card?.suit === 'diamonds';
 
   if (faceDown || !card) {
@@ -90,4 +91,4 @@ export function CardDisplay({ card, faceDown = false, size = 'md', className, de
       />
     </div>
   );
-}
+});
