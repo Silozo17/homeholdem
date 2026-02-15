@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOnlinePokerTable } from '@/hooks/useOnlinePokerTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { CardDisplay } from './CardDisplay';
@@ -6,17 +6,34 @@ import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
 import { PlayerAvatar } from './PlayerAvatar';
 import { DealerButton } from './DealerButton';
+import { DealerCharacter } from './DealerCharacter';
+import { TableFelt } from './TableFelt';
+import { TurnTimer } from './TurnTimer';
+import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Play, LogOut, Users, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
+import leatherBg from '@/assets/leather-bg.jpg';
 
 interface OnlinePokerTableProps {
   tableId: string;
   onLeave: () => void;
 }
+
+// Seat positions matching PokerTablePro layout
+const SEAT_POSITIONS: Record<number, { x: number; y: number }[]> = {
+  2: [{ x: 50, y: 86 }, { x: 50, y: 8 }],
+  3: [{ x: 50, y: 86 }, { x: 15, y: 30 }, { x: 85, y: 30 }],
+  4: [{ x: 50, y: 86 }, { x: 85, y: 50 }, { x: 50, y: 8 }, { x: 15, y: 50 }],
+  5: [{ x: 50, y: 86 }, { x: 88, y: 55 }, { x: 75, y: 8 }, { x: 25, y: 8 }, { x: 12, y: 55 }],
+  6: [{ x: 50, y: 86 }, { x: 88, y: 60 }, { x: 80, y: 8 }, { x: 50, y: 3 }, { x: 20, y: 8 }, { x: 12, y: 60 }],
+  7: [{ x: 50, y: 86 }, { x: 88, y: 65 }, { x: 85, y: 25 }, { x: 62, y: 3 }, { x: 38, y: 3 }, { x: 15, y: 25 }, { x: 12, y: 65 }],
+  8: [{ x: 50, y: 86 }, { x: 88, y: 65 }, { x: 88, y: 25 }, { x: 65, y: 3 }, { x: 35, y: 3 }, { x: 12, y: 25 }, { x: 12, y: 65 }, { x: 75, y: 86 }],
+  9: [{ x: 50, y: 86 }, { x: 88, y: 70 }, { x: 90, y: 35 }, { x: 72, y: 3 }, { x: 50, y: 0 }, { x: 28, y: 3 }, { x: 10, y: 35 }, { x: 12, y: 70 }, { x: 25, y: 86 }],
+};
 
 export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { user } = useAuth();
@@ -28,10 +45,34 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [buyInAmount, setBuyInAmount] = useState('');
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
+  const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
+  const [prevPhase, setPrevPhase] = useState<string | null>(null);
+
+  // Sound triggers on phase changes
+  const currentPhase = tableState?.current_hand?.phase ?? null;
+  useEffect(() => {
+    if (currentPhase && currentPhase !== prevPhase) {
+      if (currentPhase === 'preflop' && !prevPhase) play('shuffle');
+      if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') play('flip');
+      if (currentPhase === 'showdown' || currentPhase === 'complete') {
+        play('win');
+        setDealerExpression('smile');
+        setTimeout(() => setDealerExpression('neutral'), 2500);
+      }
+      setPrevPhase(currentPhase);
+    }
+    if (!currentPhase) setPrevPhase(null);
+  }, [currentPhase, prevPhase, play]);
+
+  // Your turn sound
+  useEffect(() => {
+    if (isMyTurn) play('yourTurn');
+  }, [isMyTurn, play]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[100dvh] poker-felt-bg">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-muted-foreground animate-pulse">Loading table...</div>
       </div>
     );
@@ -39,7 +80,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   if (error || !tableState) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] poker-felt-bg gap-4">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-4">
         <p className="text-destructive">{error || 'Table not found'}</p>
         <Button variant="outline" onClick={onLeave}>Go Back</Button>
       </div>
@@ -79,99 +120,190 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
+  const handleAction = (action: any) => {
+    if (action.type === 'check') play('check');
+    else if (action.type === 'call') play('chipClink');
+    else if (action.type === 'raise') play('chipStack');
+    else if (action.type === 'all-in') play('allIn');
+    const actionType = action.type === 'all-in' ? 'all_in' : action.type;
+    sendAction(actionType, action.amount);
+  };
+
+  // Build seat array for all positions
   const allSeats: (OnlineSeatInfo | null)[] = Array.from({ length: table.max_seats }, (_, i) => {
     return seats.find(s => s.seat === i) || null;
   });
 
-  const otherSeats = allSeats.map((seat, i) => ({ seat, index: i })).filter(({ index }) => index !== mySeatNumber);
+  const positions = SEAT_POSITIONS[Math.min(Math.max(table.max_seats, 2), 9)] || SEAT_POSITIONS[9];
 
   return (
-    <div className="flex flex-col h-[100dvh] relative overflow-hidden poker-felt-bg">
+    <div className="fixed inset-0 flex flex-col overflow-hidden">
+      {/* Leather background */}
+      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />
+      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 z-10 safe-area-top">
-        <Button variant="ghost" size="icon" onClick={isSeated ? handleLeave : onLeave}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="text-center">
-          <p className="text-sm font-bold text-foreground">{table.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {hand ? `Hand #${hand.hand_number} • ${hand.phase}` : 'Waiting'}
-            {' • '}{table.small_blind}/{table.big_blind}
-          </p>
+      <div className="flex items-center justify-between px-3 h-9 z-20 safe-area-top shrink-0 relative"
+        style={{
+          background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.5), hsl(0 0% 0% / 0.3))',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid hsl(43 74% 49% / 0.15)',
+        }}
+      >
+        <button onClick={isSeated ? handleLeave : onLeave}
+          className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-foreground/80 truncate max-w-[120px]">{table.name}</span>
+          {hand && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+              style={{
+                background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 40%))',
+                color: 'hsl(160 30% 8%)',
+                boxShadow: '0 1px 4px rgba(200,160,40,0.3)',
+              }}
+            >
+              #{hand.hand_number}
+            </span>
+          )}
+          <span className="text-[10px] text-foreground/60 font-medium">{table.small_blind}/{table.big_blind}</span>
         </div>
+
         <div className="flex items-center gap-1">
           {table.invite_code && (
-            <Button variant="ghost" size="icon" onClick={copyInviteCode} className="h-8 w-8">
-              {codeCopied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-            </Button>
+            <button onClick={copyInviteCode}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+            >
+              {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
+            </button>
           )}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="h-3.5 w-3.5" />
+          <button onClick={toggleSound}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+          >
+            {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
+          </button>
+          <div className="flex items-center gap-0.5 text-[10px] text-foreground/50">
+            <Users className="h-3 w-3" />
             <span>{activeSeats.length}/{table.max_seats}</span>
           </div>
         </div>
       </div>
 
-      {/* Other players - arc layout */}
-      <div className="flex flex-wrap justify-center gap-1 px-2 pt-1 pb-2 z-10">
-        {otherSeats.map(({ seat: seatData, index }) => (
-          <OnlineSeatDisplay
-            key={index}
-            seatNumber={index}
-            seatData={seatData}
-            hand={hand}
-            isCurrentActor={hand?.current_actor_seat === index}
-            isDealer={hand?.dealer_seat === index}
-            onJoin={!isSeated && !seatData?.player_id ? () => handleJoinSeat(index) : undefined}
-          />
-        ))}
-      </div>
+      {/* Main table area */}
+      <div className="flex-1 relative z-10">
+        <TableFelt className="absolute inset-0">
+          {/* Dealer character */}
+          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '12%' }}>
+            <DealerCharacter expression={dealerExpression} />
+          </div>
 
-      {/* Table felt - center */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-2.5 mx-3 rounded-[2rem] border border-border/30 p-4 min-h-[180px] relative"
-        style={{
-          background: 'radial-gradient(ellipse 90% 70% at 50% 50%, hsl(160 50% 20%) 0%, hsl(160 40% 14%) 50%, hsl(160 30% 10%) 100%)',
-          boxShadow: 'inset 0 2px 20px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.4)',
-        }}
-      >
-        {totalPot > 0 && <PotDisplay pot={totalPot} />}
+          {/* Pot display */}
+          {totalPot > 0 && (
+            <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '38%' }}>
+              <PotDisplay pot={totalPot} />
+            </div>
+          )}
 
-        {/* Community cards */}
-        <div className="flex gap-1.5 min-h-[68px] items-center">
-          {(hand?.community_cards || []).map((card, i) => (
-            <CardDisplay key={i} card={card} size="md" dealDelay={i * 0.12} />
-          ))}
-          {Array.from({ length: 5 - (hand?.community_cards?.length || 0) }).map((_, i) => (
-            <div key={`empty-${i}`} className="w-11 h-16 rounded-lg border border-border/20 bg-secondary/10" />
-          ))}
-        </div>
+          {/* Community cards */}
+          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex gap-1.5 items-center" style={{ top: '48%' }}>
+            {(hand?.community_cards || []).map((card, i) => (
+              <CardDisplay key={i} card={card} size="md" dealDelay={i * 0.12} />
+            ))}
+            {Array.from({ length: 5 - (hand?.community_cards?.length || 0) }).map((_, i) => (
+              <div key={`empty-${i}`} className="w-10 h-14 rounded-lg border border-border/10 bg-black/10" />
+            ))}
+          </div>
 
-        {hand && (
-          <span className={cn(
-            'text-[10px] text-muted-foreground/70 uppercase tracking-[0.15em] font-medium',
-            (hand.phase === 'flop' || hand.phase === 'turn' || hand.phase === 'river') && 'animate-phase-flash',
-          )}>
-            {hand.phase === 'preflop' ? 'Pre-Flop' : hand.phase}
-          </span>
-        )}
-
-        {!hand && isSeated && (
-          <div className="text-center space-y-2">
-            {canStartHand ? (
-              <Button onClick={startHand} size="sm" className="gap-2 shimmer-btn text-primary-foreground font-bold">
-                <Play className="h-4 w-4" /> Deal Hand
-              </Button>
+          {/* Phase indicator */}
+          <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '62%' }}>
+            {hand ? (
+              <span className={cn(
+                'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
+                (hand.phase === 'flop' || hand.phase === 'turn' || hand.phase === 'river') && 'animate-phase-flash',
+              )} style={{ textShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
+                {hand.phase === 'preflop' ? 'Pre-Flop' : hand.phase === 'complete' ? 'Showdown' : hand.phase}
+              </span>
             ) : (
-              <p className="text-xs text-muted-foreground">Waiting for more players...</p>
+              <span className="text-[9px] text-foreground/20 italic font-medium"
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+              >
+                {canStartHand ? 'Ready to deal' : 'Waiting for players...'}
+              </span>
             )}
           </div>
-        )}
+
+          {/* Deal button when no active hand */}
+          {!hand && canStartHand && (
+            <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '70%' }}>
+              <button onClick={startHand}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full font-bold text-xs active:scale-90 transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))',
+                  color: 'hsl(160 30% 8%)',
+                  boxShadow: '0 3px 12px rgba(200,160,40,0.4), 0 0 20px hsl(43 74% 49% / 0.2)',
+                  border: '1px solid hsl(43 70% 55%)',
+                }}
+              >
+                <Play className="h-3.5 w-3.5" /> Deal Hand
+              </button>
+            </div>
+          )}
+
+          {/* Player seats around the table */}
+          {allSeats.map((seatData, seatIndex) => {
+            const pos = positions[seatIndex] || { x: 50, y: 50 };
+            const isMe = seatData?.player_id === user?.id;
+            const isCurrentActor = hand?.current_actor_seat === seatIndex;
+            const isDealer = hand?.dealer_seat === seatIndex;
+            const isFolded = seatData?.status === 'folded';
+            const isEmpty = !seatData?.player_id;
+            const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete';
+
+            // Skip my seat in perimeter (shown at bottom)
+            if (isMe) return null;
+
+            return (
+              <div
+                key={seatIndex}
+                className={cn(
+                  'absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300',
+                  !isEmpty && !isCurrentActor && hand && !isShowdown ? 'seat-dimmed' : 'seat-active',
+                )}
+                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+              >
+                {isEmpty ? (
+                  <EmptySeatDisplay
+                    seatNumber={seatIndex}
+                    canJoin={!isSeated}
+                    onJoin={() => handleJoinSeat(seatIndex)}
+                  />
+                ) : (
+                  <OnlineSeatDisplay
+                    seatData={seatData!}
+                    seatNumber={seatIndex}
+                    isCurrentActor={isCurrentActor && !isFolded}
+                    isDealer={!!isDealer}
+                    isFolded={!!isFolded}
+                    hasCards={!!seatData?.has_cards && !!hand}
+                    isShowdown={!!isShowdown}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </TableFelt>
       </div>
 
-      {/* My seat - bottom */}
+      {/* My seat at bottom */}
       {isSeated && mySeat ? (
-        <div className="px-3 py-2 space-y-2 z-10 safe-area-bottom">
-          <div className="flex items-center justify-center gap-4">
+        <div className="px-3 py-2 z-20 safe-area-bottom shrink-0 relative"
+          style={{ background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))' }}
+        >
+          <div className="flex items-center justify-center gap-4 mb-1.5">
+            {/* My hole cards */}
             <div className="flex gap-1.5">
               {myCards && myCards.length > 0 ? (
                 myCards.map((card, i) => <CardDisplay key={i} card={card} size="lg" dealDelay={i * 0.15} />)
@@ -182,8 +314,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 </>
               ) : null}
             </div>
+
+            {/* My info */}
             <div className="text-center">
-              <div className="flex items-center gap-1.5 justify-center">
+              <div className="relative flex items-center gap-1.5 justify-center">
                 <PlayerAvatar
                   name="You"
                   index={0}
@@ -191,17 +325,28 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   isCurrentPlayer={isMyTurn}
                   size="sm"
                 />
-                {hand?.dealer_seat === mySeatNumber && <DealerButton />}
+                {hand?.dealer_seat === mySeatNumber && <DealerButton className="scale-75" />}
+                {isMyTurn && <TurnTimer active={true} size={40} strokeWidth={2.5} />}
               </div>
-              <p className="text-lg font-bold text-foreground mt-0.5">{mySeat.stack.toLocaleString()}</p>
+              <p className="text-sm font-black text-primary mt-0.5 tabular-nums"
+                style={{ textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}
+              >
+                {mySeat.stack.toLocaleString()}
+              </p>
               {mySeat.last_action && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-secondary/50 text-muted-foreground">
+                <span className={cn(
+                  'text-[8px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in',
+                  mySeat.last_action.startsWith('Fold') ? 'bg-muted/80 text-muted-foreground' :
+                  mySeat.last_action.includes('Raise') || mySeat.last_action.includes('All')
+                    ? 'bg-destructive/30 text-destructive' : 'bg-secondary/80 text-secondary-foreground',
+                )} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                   {mySeat.last_action}
                 </span>
               )}
             </div>
           </div>
 
+          {/* Betting controls */}
           {isMyTurn && (
             <BettingControls
               canCheck={canCheck}
@@ -210,111 +355,175 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               maxBet={hand?.current_bet ?? 0}
               playerChips={mySeat.stack}
               bigBlind={table.big_blind}
-              pot={hand?.pots?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) ?? 0}
-              onAction={(action) => {
-                const actionType = action.type === 'all-in' ? 'all_in' : action.type;
-                sendAction(actionType, action.amount);
-              }}
+              pot={totalPot}
+              onAction={handleAction}
             />
+          )}
+
+          {/* Leave table button when no hand active */}
+          {!hand && (
+            <button
+              onClick={handleLeave}
+              className="flex items-center justify-center gap-1.5 w-full mt-2 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))',
+                color: 'hsl(0 0% 60%)',
+                border: '1px solid hsl(0 0% 20%)',
+              }}
+            >
+              <LogOut className="h-3.5 w-3.5" /> Leave Table
+            </button>
           )}
         </div>
       ) : !isSeated ? (
-        <div className="px-4 py-4 space-y-3 border-t border-border/30 safe-area-bottom">
-          <p className="text-sm text-center text-muted-foreground">Tap an empty seat to join</p>
+        <div className="px-4 py-3 z-20 safe-area-bottom shrink-0 relative"
+          style={{ background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))' }}
+        >
+          <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
+            Tap an empty seat to join
+          </p>
           <div className="flex items-center gap-2 max-w-xs mx-auto">
             <Input
               type="number"
               placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
               value={buyInAmount}
               onChange={(e) => setBuyInAmount(e.target.value)}
-              className="text-center"
+              className="text-center text-sm bg-black/30 border-border/30"
             />
           </div>
         </div>
       ) : null}
 
-      {isSeated && !hand && (
-        <div className="px-4 pb-4 safe-area-bottom">
-          <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLeave}>
-            <LogOut className="h-4 w-4" /> Leave Table
-          </Button>
+      {/* YOUR TURN indicator */}
+      {isMyTurn && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30">
+          <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
+            style={{
+              background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
+              color: 'hsl(43 74% 60%)',
+              border: '1px solid hsl(43 74% 49% / 0.4)',
+              textShadow: '0 0 8px hsl(43 74% 49% / 0.5)',
+            }}
+          >
+            YOUR TURN
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-function OnlineSeatDisplay({
-  seatNumber, seatData, hand, isCurrentActor, isDealer, onJoin,
-}: {
-  seatNumber: number;
-  seatData: OnlineSeatInfo | null;
-  hand: any;
-  isCurrentActor: boolean;
-  isDealer?: boolean;
-  onJoin?: () => void;
-}) {
-  const isEmpty = !seatData?.player_id;
-  const isFolded = seatData?.status === 'folded';
-  const isAllIn = seatData?.status === 'all-in';
+// ─── Sub-components ──────────────────────────────────────────
 
-  if (isEmpty) {
-    return (
-      <button
-        onClick={onJoin}
-        disabled={!onJoin}
-        className={cn(
-          'flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[64px] min-h-[76px] transition-all',
-          'border border-dashed border-border/30',
-          onJoin ? 'hover:bg-secondary/30 hover:border-primary/40 cursor-pointer animate-pulse-border' : 'opacity-30',
-        )}
+function EmptySeatDisplay({ seatNumber, canJoin, onJoin }: { seatNumber: number; canJoin: boolean; onJoin: () => void }) {
+  return (
+    <button
+      onClick={canJoin ? onJoin : undefined}
+      disabled={!canJoin}
+      className={cn(
+        'flex flex-col items-center justify-center gap-0.5 p-1.5 rounded-lg min-w-[52px] min-h-[52px] transition-all',
+        canJoin ? 'hover:bg-white/5 cursor-pointer' : 'opacity-20',
+      )}
+    >
+      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold"
+        style={{
+          background: 'linear-gradient(135deg, hsl(160 20% 15%), hsl(160 25% 10%))',
+          border: canJoin ? '1.5px dashed hsl(43 74% 49% / 0.4)' : '1px dashed hsl(0 0% 20%)',
+          color: canJoin ? 'hsl(43 74% 49% / 0.7)' : 'hsl(0 0% 30%)',
+        }}
       >
-        <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center text-xs text-muted-foreground">
-          {seatNumber + 1}
-        </div>
-        {onJoin && <span className="text-[10px] text-primary font-medium">Sit</span>}
-      </button>
-    );
-  }
+        {seatNumber + 1}
+      </div>
+      {canJoin && (
+        <span className="text-[7px] text-primary/70 font-bold uppercase tracking-wider"
+          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Sit
+        </span>
+      )}
+    </button>
+  );
+}
+
+function OnlineSeatDisplay({
+  seatData, seatNumber, isCurrentActor, isDealer, isFolded, hasCards, isShowdown,
+}: {
+  seatData: OnlineSeatInfo;
+  seatNumber: number;
+  isCurrentActor: boolean;
+  isDealer: boolean;
+  isFolded: boolean;
+  hasCards: boolean;
+  isShowdown: boolean;
+}) {
+  const isAllIn = seatData.status === 'all-in';
 
   return (
     <div className={cn(
-      'flex flex-col items-center gap-0.5 p-2 rounded-lg min-w-[64px] transition-all',
+      'flex flex-col items-center gap-0.5 transition-all duration-300',
       isFolded && 'opacity-40',
     )}>
+      {/* Avatar + dealer + timer */}
       <div className="relative">
         <PlayerAvatar
           name={seatData.display_name}
           index={seatNumber}
           status={isFolded ? 'folded' : isAllIn ? 'all-in' : 'active'}
-          isCurrentPlayer={isCurrentActor && !isFolded}
+          isCurrentPlayer={isCurrentActor}
+          size="sm"
         />
-        {isDealer && <DealerButton className="absolute -top-1 -right-1" />}
+        {isDealer && <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />}
+        {isCurrentActor && <TurnTimer active={true} size={40} strokeWidth={2.5} />}
       </div>
 
-      {/* Cards */}
-      <div className="flex gap-0.5">
-        {hand && seatData?.has_cards && !isFolded ? (
-          <>
-            <CardDisplay faceDown size="sm" dealDelay={0} />
-            <CardDisplay faceDown size="sm" dealDelay={0.1} />
-          </>
-        ) : <div className="h-10 w-8" />}
-      </div>
+      {/* Face-down cards */}
+      {hasCards && !isFolded && (
+        <div className="flex gap-0.5 mt-0.5">
+          <CardDisplay faceDown size="sm" dealDelay={0} />
+          <CardDisplay faceDown size="sm" dealDelay={0.1} />
+        </div>
+      )}
+      {(!hasCards || isFolded) && <div className="h-[40px]" />}
 
-      <p className="text-[10px] font-semibold text-foreground/80 truncate max-w-[64px]">{seatData.display_name}</p>
-      <p className="text-[10px] text-muted-foreground">{seatData.stack.toLocaleString()}</p>
+      {/* Name */}
+      <p className="text-[9px] font-bold text-foreground/90 truncate max-w-[56px] leading-tight"
+        style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
+      >
+        {seatData.display_name}
+      </p>
 
+      {/* Stack */}
+      <p className="text-[9px] text-primary/80 font-semibold leading-none tabular-nums"
+        style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
+      >
+        {seatData.stack.toLocaleString()}
+      </p>
+
+      {/* Action badge */}
       {seatData.last_action && (
         <span className={cn(
-          'text-[9px] px-1.5 py-0.5 rounded-full font-medium animate-fade-in',
-          seatData.last_action.startsWith('Fold') ? 'bg-muted text-muted-foreground' :
-          seatData.last_action.includes('Raise') || seatData.last_action.includes('All')
-            ? 'bg-destructive/20 text-destructive'
-            : 'bg-secondary text-secondary-foreground',
-        )}>
+          'text-[8px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in leading-tight',
+          seatData.last_action.startsWith('Fold') && 'bg-muted/80 text-muted-foreground',
+          (seatData.last_action.includes('Raise') || seatData.last_action.includes('All')) && 'bg-destructive/30 text-destructive border border-destructive/30',
+          (seatData.last_action.startsWith('Call') || seatData.last_action.startsWith('Check')) && 'bg-secondary/80 text-secondary-foreground',
+        )} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
           {seatData.last_action}
         </span>
+      )}
+
+      {/* Current bet */}
+      {(seatData.current_bet ?? 0) > 0 && !isShowdown && (
+        <div className="flex items-center gap-0.5 mt-0.5 animate-fade-in">
+          <div className="w-2.5 h-2.5 rounded-full"
+            style={{
+              background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 35%))',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+            }}
+          />
+          <span className="text-[8px] font-bold text-primary" style={{ textShadow: '0 0 4px hsl(43 74% 49% / 0.4)' }}>
+            {(seatData.current_bet ?? 0).toLocaleString()}
+          </span>
+        </div>
       )}
     </div>
   );
