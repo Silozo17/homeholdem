@@ -72,6 +72,7 @@ export function PokerTable({
             isCurrentPlayer={state.currentPlayerIndex === bot.seatIndex}
             showCards={isShowdown && (bot.status === 'active' || bot.status === 'all-in')}
             isHuman={false}
+            isShowdown={isShowdown}
           />
         ))}
       </div>

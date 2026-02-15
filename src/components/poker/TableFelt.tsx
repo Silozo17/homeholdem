@@ -8,8 +8,8 @@ interface TableFeltProps {
 
 export function TableFelt({ children, className }: TableFeltProps) {
   return (
-    <div className={`relative flex-1 flex flex-col items-center justify-center mx-2 my-1 ${className ?? ''}`}>
-      {/* Table image */}
+    <div className={`relative w-full h-full ${className ?? ''}`}>
+      {/* Table image fills entire area */}
       <img
         src={tableFelt}
         alt=""
@@ -30,10 +30,15 @@ export function TableFelt({ children, className }: TableFeltProps) {
           background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.6) 100%)',
         }}
       />
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center gap-1.5 w-full h-full p-3">
-        {children}
-      </div>
+      {/* Gold betting line */}
+      <div
+        className="absolute inset-[15%] rounded-[2rem] pointer-events-none"
+        style={{
+          border: '1px dashed hsl(43 74% 49% / 0.15)',
+        }}
+      />
+      {/* Content — positioned children */}
+      {children}
     </div>
   );
 }

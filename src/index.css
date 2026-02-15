@@ -513,3 +513,27 @@
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* Winner inline banner animation */
+@keyframes winner-banner-in {
+  0% { opacity: 0; transform: translate(-50%, -20px) scale(0.8); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes winner-banner-out {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(0.95); }
+}
+
+.animate-winner-banner {
+  animation: winner-banner-in 0.4s ease-out, winner-banner-out 0.4s ease-in 2s forwards;
+}
+
+/* Card deal from deck animation */
+@keyframes card-deal-from-deck {
+  0% { opacity: 0; transform: translate(0, -80px) scale(0.4) rotateZ(-20deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translate(0, 0) scale(1) rotateZ(0deg); }
+}
+
+.animate-card-deal-deck { animation: card-deal-from-deck 0.5s ease-out both; }
