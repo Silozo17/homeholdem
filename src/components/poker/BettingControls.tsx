@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { QuickBetButtons } from './QuickBetButtons';
 import { cn } from '@/lib/utils';
 
 interface BettingControlsProps {
@@ -10,6 +11,7 @@ interface BettingControlsProps {
   maxBet: number;
   playerChips: number;
   bigBlind: number;
+  pot: number;
   onAction: (action: { type: 'fold' | 'check' | 'call' | 'raise' | 'all-in'; amount?: number }) => void;
 }
 
@@ -20,20 +22,32 @@ export function BettingControls({
   maxBet,
   playerChips,
   bigBlind,
+  pot,
   onAction,
 }: BettingControlsProps) {
   const minRaiseTotal = maxBet + minRaise;
-  const maxRaiseTotal = maxBet + playerChips; // going all-in
+  const maxRaiseTotal = maxBet + playerChips;
   const [raiseAmount, setRaiseAmount] = useState(minRaiseTotal);
 
   const canRaise = playerChips > amountToCall && minRaiseTotal <= maxRaiseTotal;
 
   return (
-    <div className="flex flex-col gap-3 w-full">
-      {/* Raise slider (only if can raise) */}
+    <div className="flex flex-col gap-2 w-full animate-fade-in">
+      {/* Quick bet presets */}
       {canRaise && (
-        <div className="flex items-center gap-3 px-2">
-          <span className="text-xs text-muted-foreground w-10">{minRaiseTotal}</span>
+        <QuickBetButtons
+          pot={pot}
+          minRaise={minRaise}
+          maxBet={maxBet}
+          playerChips={playerChips}
+          onSetAmount={(v) => setRaiseAmount(Math.min(Math.max(v, minRaiseTotal), maxRaiseTotal))}
+        />
+      )}
+
+      {/* Raise slider */}
+      {canRaise && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-[10px] text-muted-foreground w-10 text-right">{minRaiseTotal}</span>
           <Slider
             value={[raiseAmount]}
             min={minRaiseTotal}
@@ -42,7 +56,7 @@ export function BettingControls({
             onValueChange={([v]) => setRaiseAmount(v)}
             className="flex-1"
           />
-          <span className="text-xs text-muted-foreground w-14 text-right">
+          <span className="text-[10px] text-muted-foreground w-14 text-right font-medium">
             {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
           </span>
         </div>
@@ -51,9 +65,9 @@ export function BettingControls({
       {/* Action buttons */}
       <div className="flex gap-2 w-full">
         <Button
-          variant="destructive"
-          size="sm"
-          className="flex-1"
+          size="lg"
+          className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold
+            active:scale-95 transition-transform"
           onClick={() => onAction({ type: 'fold' })}
         >
           Fold
@@ -61,18 +75,18 @@ export function BettingControls({
 
         {canCheck ? (
           <Button
-            variant="secondary"
-            size="sm"
-            className="flex-1"
+            size="lg"
+            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold
+              active:scale-95 transition-transform"
             onClick={() => onAction({ type: 'check' })}
           >
             Check
           </Button>
         ) : (
           <Button
-            variant="secondary"
-            size="sm"
-            className="flex-1"
+            size="lg"
+            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold
+              active:scale-95 transition-transform"
             onClick={() => {
               if (amountToCall >= playerChips) {
                 onAction({ type: 'all-in' });
@@ -89,9 +103,13 @@ export function BettingControls({
 
         {canRaise && (
           <Button
-            variant="default"
-            size="sm"
-            className="flex-1"
+            size="lg"
+            className={cn(
+              'flex-1 font-bold active:scale-95 transition-transform',
+              raiseAmount >= maxRaiseTotal
+                ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                : 'bg-primary hover:bg-primary/90 text-primary-foreground',
+            )}
             onClick={() => {
               if (raiseAmount >= maxRaiseTotal) {
                 onAction({ type: 'all-in' });

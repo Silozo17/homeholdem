@@ -1,6 +1,6 @@
 import { usePokerGame } from '@/hooks/usePokerGame';
 import { PlayPokerLobby } from '@/components/poker/PlayPokerLobby';
-import { PokerTable } from '@/components/poker/PokerTable';
+import { PokerTablePro } from '@/components/poker/PokerTablePro';
 
 export default function PlayPoker() {
   const {
@@ -20,7 +20,7 @@ export default function PlayPoker() {
   }
 
   return (
-    <PokerTable
+    <PokerTablePro
       state={state}
       isHumanTurn={isHumanTurn}
       amountToCall={amountToCall}
