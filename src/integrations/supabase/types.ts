@@ -1088,6 +1088,173 @@ export type Database = {
           },
         ]
       }
+      poker_actions: {
+        Row: {
+          action_type: Database["public"]["Enums"]["poker_action_type"]
+          amount: number | null
+          hand_id: string
+          id: string
+          phase: Database["public"]["Enums"]["poker_hand_phase"]
+          player_id: string
+          seat_number: number
+          sequence: number
+          server_timestamp: string
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["poker_action_type"]
+          amount?: number | null
+          hand_id: string
+          id?: string
+          phase: Database["public"]["Enums"]["poker_hand_phase"]
+          player_id: string
+          seat_number: number
+          sequence: number
+          server_timestamp?: string
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["poker_action_type"]
+          amount?: number | null
+          hand_id?: string
+          id?: string
+          phase?: Database["public"]["Enums"]["poker_hand_phase"]
+          player_id?: string
+          seat_number?: number
+          sequence?: number
+          server_timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_actions_hand_id_fkey"
+            columns: ["hand_id"]
+            isOneToOne: false
+            referencedRelation: "poker_hands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poker_actions_hand_id_fkey"
+            columns: ["hand_id"]
+            isOneToOne: false
+            referencedRelation: "poker_hands_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_hands: {
+        Row: {
+          action_deadline: string | null
+          bb_seat: number
+          community_cards: Json
+          completed_at: string | null
+          current_actor_seat: number | null
+          current_bet: number
+          dealer_seat: number
+          deck_seed_commitment: string | null
+          deck_seed_internal: string | null
+          deck_seed_revealed: string | null
+          hand_number: number
+          id: string
+          min_raise: number
+          phase: Database["public"]["Enums"]["poker_hand_phase"]
+          pots: Json
+          results: Json | null
+          sb_seat: number
+          started_at: string
+          state_version: number
+          table_id: string
+        }
+        Insert: {
+          action_deadline?: string | null
+          bb_seat: number
+          community_cards?: Json
+          completed_at?: string | null
+          current_actor_seat?: number | null
+          current_bet?: number
+          dealer_seat: number
+          deck_seed_commitment?: string | null
+          deck_seed_internal?: string | null
+          deck_seed_revealed?: string | null
+          hand_number: number
+          id?: string
+          min_raise?: number
+          phase?: Database["public"]["Enums"]["poker_hand_phase"]
+          pots?: Json
+          results?: Json | null
+          sb_seat: number
+          started_at?: string
+          state_version?: number
+          table_id: string
+        }
+        Update: {
+          action_deadline?: string | null
+          bb_seat?: number
+          community_cards?: Json
+          completed_at?: string | null
+          current_actor_seat?: number | null
+          current_bet?: number
+          dealer_seat?: number
+          deck_seed_commitment?: string | null
+          deck_seed_internal?: string | null
+          deck_seed_revealed?: string | null
+          hand_number?: number
+          id?: string
+          min_raise?: number
+          phase?: Database["public"]["Enums"]["poker_hand_phase"]
+          pots?: Json
+          results?: Json | null
+          sb_seat?: number
+          started_at?: string
+          state_version?: number
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_hands_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_hole_cards: {
+        Row: {
+          cards: Json
+          hand_id: string
+          id: string
+          player_id: string
+          seat_number: number
+        }
+        Insert: {
+          cards: Json
+          hand_id: string
+          id?: string
+          player_id: string
+          seat_number: number
+        }
+        Update: {
+          cards?: Json
+          hand_id?: string
+          id?: string
+          player_id?: string
+          seat_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_hole_cards_hand_id_fkey"
+            columns: ["hand_id"]
+            isOneToOne: false
+            referencedRelation: "poker_hands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poker_hole_cards_hand_id_fkey"
+            columns: ["hand_id"]
+            isOneToOne: false
+            referencedRelation: "poker_hands_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poker_play_results: {
         Row: {
           best_hand_name: string | null
@@ -1140,6 +1307,250 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "poker_play_results_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_seats: {
+        Row: {
+          consecutive_timeouts: number
+          id: string
+          joined_at: string
+          last_action_at: string | null
+          player_id: string | null
+          seat_number: number
+          stack: number
+          status: Database["public"]["Enums"]["poker_seat_status"]
+          table_id: string
+        }
+        Insert: {
+          consecutive_timeouts?: number
+          id?: string
+          joined_at?: string
+          last_action_at?: string | null
+          player_id?: string | null
+          seat_number: number
+          stack?: number
+          status?: Database["public"]["Enums"]["poker_seat_status"]
+          table_id: string
+        }
+        Update: {
+          consecutive_timeouts?: number
+          id?: string
+          joined_at?: string
+          last_action_at?: string | null
+          player_id?: string | null
+          seat_number?: number
+          stack?: number
+          status?: Database["public"]["Enums"]["poker_seat_status"]
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_seats_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_tables: {
+        Row: {
+          ante: number
+          big_blind: number
+          club_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string | null
+          max_buy_in: number
+          max_seats: number
+          min_buy_in: number
+          name: string
+          small_blind: number
+          status: Database["public"]["Enums"]["poker_table_status"]
+          table_type: Database["public"]["Enums"]["poker_table_type"]
+          tournament_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ante?: number
+          big_blind?: number
+          club_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          invite_code?: string | null
+          max_buy_in?: number
+          max_seats?: number
+          min_buy_in?: number
+          name: string
+          small_blind?: number
+          status?: Database["public"]["Enums"]["poker_table_status"]
+          table_type?: Database["public"]["Enums"]["poker_table_type"]
+          tournament_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ante?: number
+          big_blind?: number
+          club_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          invite_code?: string | null
+          max_buy_in?: number
+          max_seats?: number
+          min_buy_in?: number
+          name?: string
+          small_blind?: number
+          status?: Database["public"]["Enums"]["poker_table_status"]
+          table_type?: Database["public"]["Enums"]["poker_table_type"]
+          tournament_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_tables_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poker_tables_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_tournament_players: {
+        Row: {
+          eliminated_at: string | null
+          finish_position: number | null
+          id: string
+          payout_amount: number | null
+          player_id: string
+          registered_at: string
+          seat_number: number | null
+          stack: number
+          status: string
+          table_id: string | null
+          tournament_id: string
+        }
+        Insert: {
+          eliminated_at?: string | null
+          finish_position?: number | null
+          id?: string
+          payout_amount?: number | null
+          player_id: string
+          registered_at?: string
+          seat_number?: number | null
+          stack?: number
+          status?: string
+          table_id?: string | null
+          tournament_id: string
+        }
+        Update: {
+          eliminated_at?: string | null
+          finish_position?: number | null
+          id?: string
+          payout_amount?: number | null
+          player_id?: string
+          registered_at?: string
+          seat_number?: number | null
+          stack?: number
+          status?: string
+          table_id?: string | null
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_tournament_players_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poker_tournament_players_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poker_tournaments: {
+        Row: {
+          blind_schedule: Json
+          club_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          current_level: number
+          id: string
+          invite_code: string | null
+          late_reg_levels: number
+          level_started_at: string | null
+          max_players: number
+          name: string
+          payout_structure: Json | null
+          players_per_table: number
+          started_at: string | null
+          starting_stack: number
+          status: Database["public"]["Enums"]["poker_tournament_status"]
+          tournament_type: string
+        }
+        Insert: {
+          blind_schedule?: Json
+          club_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_level?: number
+          id?: string
+          invite_code?: string | null
+          late_reg_levels?: number
+          level_started_at?: string | null
+          max_players?: number
+          name: string
+          payout_structure?: Json | null
+          players_per_table?: number
+          started_at?: string | null
+          starting_stack?: number
+          status?: Database["public"]["Enums"]["poker_tournament_status"]
+          tournament_type?: string
+        }
+        Update: {
+          blind_schedule?: Json
+          club_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_level?: number
+          id?: string
+          invite_code?: string | null
+          late_reg_levels?: number
+          level_started_at?: string | null
+          max_players?: number
+          name?: string
+          payout_structure?: Json | null
+          players_per_table?: number
+          started_at?: string | null
+          starting_stack?: number
+          status?: Database["public"]["Enums"]["poker_tournament_status"]
+          tournament_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_tournaments_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
@@ -1508,10 +1919,102 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      poker_hands_public: {
+        Row: {
+          action_deadline: string | null
+          bb_seat: number | null
+          community_cards: Json | null
+          completed_at: string | null
+          current_actor_seat: number | null
+          current_bet: number | null
+          dealer_seat: number | null
+          deck_seed_commitment: string | null
+          deck_seed_revealed: string | null
+          hand_number: number | null
+          id: string | null
+          min_raise: number | null
+          phase: Database["public"]["Enums"]["poker_hand_phase"] | null
+          pots: Json | null
+          results: Json | null
+          sb_seat: number | null
+          started_at: string | null
+          state_version: number | null
+          table_id: string | null
+        }
+        Insert: {
+          action_deadline?: string | null
+          bb_seat?: number | null
+          community_cards?: Json | null
+          completed_at?: string | null
+          current_actor_seat?: number | null
+          current_bet?: number | null
+          dealer_seat?: number | null
+          deck_seed_commitment?: string | null
+          deck_seed_revealed?: never
+          hand_number?: number | null
+          id?: string | null
+          min_raise?: number | null
+          phase?: Database["public"]["Enums"]["poker_hand_phase"] | null
+          pots?: Json | null
+          results?: Json | null
+          sb_seat?: number | null
+          started_at?: string | null
+          state_version?: number | null
+          table_id?: string | null
+        }
+        Update: {
+          action_deadline?: string | null
+          bb_seat?: number | null
+          community_cards?: Json | null
+          completed_at?: string | null
+          current_actor_seat?: number | null
+          current_bet?: number | null
+          dealer_seat?: number | null
+          deck_seed_commitment?: string | null
+          deck_seed_revealed?: never
+          hand_number?: number | null
+          id?: string | null
+          min_raise?: number | null
+          phase?: Database["public"]["Enums"]["poker_hand_phase"] | null
+          pots?: Json | null
+          results?: Json | null
+          sb_seat?: number | null
+          started_at?: string | null
+          state_version?: number | null
+          table_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_hands_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cleanup_expired_verifications: { Args: never; Returns: undefined }
+      commit_poker_state: {
+        Args: {
+          _action_deadline: string
+          _action_record: Json
+          _community_cards: Json
+          _completed_at: string
+          _current_actor_seat: number
+          _current_bet: number
+          _deck_seed_revealed: string
+          _expected_version: number
+          _hand_id: string
+          _min_raise: number
+          _new_phase: string
+          _pots: Json
+          _results: Json
+          _seat_updates: Json
+        }
+        Returns: Json
+      }
       generate_invite_code: { Args: never; Returns: string }
       get_club_member_profiles: {
         Args: { _club_id: string }
@@ -1564,10 +2067,39 @@ export type Database = {
           name: string
         }[]
       }
+      read_poker_hand_state: {
+        Args: { _hand_id: string; _table_id: string }
+        Returns: Json
+      }
+      read_showdown_cards: { Args: { _hand_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "superadmin" | "support"
       club_role: "owner" | "admin" | "member"
+      poker_action_type:
+        | "fold"
+        | "check"
+        | "call"
+        | "raise"
+        | "all_in"
+        | "post_blind"
+        | "post_ante"
+      poker_hand_phase:
+        | "preflop"
+        | "flop"
+        | "turn"
+        | "river"
+        | "showdown"
+        | "complete"
+      poker_seat_status: "active" | "sitting_out" | "disconnected"
+      poker_table_status: "waiting" | "playing" | "paused" | "closed"
+      poker_table_type: "friends" | "club" | "public"
+      poker_tournament_status:
+        | "registering"
+        | "running"
+        | "paused"
+        | "completed"
+        | "cancelled"
       rsvp_status: "going" | "maybe" | "not_going"
     }
     CompositeTypes: {
@@ -1698,6 +2230,33 @@ export const Constants = {
     Enums: {
       app_role: ["superadmin", "support"],
       club_role: ["owner", "admin", "member"],
+      poker_action_type: [
+        "fold",
+        "check",
+        "call",
+        "raise",
+        "all_in",
+        "post_blind",
+        "post_ante",
+      ],
+      poker_hand_phase: [
+        "preflop",
+        "flop",
+        "turn",
+        "river",
+        "showdown",
+        "complete",
+      ],
+      poker_seat_status: ["active", "sitting_out", "disconnected"],
+      poker_table_status: ["waiting", "playing", "paused", "closed"],
+      poker_table_type: ["friends", "club", "public"],
+      poker_tournament_status: [
+        "registering",
+        "running",
+        "paused",
+        "completed",
+        "cancelled",
+      ],
       rsvp_status: ["going", "maybe", "not_going"],
     },
   },
