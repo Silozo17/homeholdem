@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { OnlinePokerTable } from '@/components/poker/OnlinePokerTable';
@@ -6,6 +7,7 @@ import { OnlinePokerLobby } from '@/components/poker/OnlinePokerLobby';
 
 export default function OnlinePoker() {
   const { user, loading } = useAuth();
+  const { clubId } = useParams<{ clubId?: string }>();
   const navigate = useNavigate();
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
 
@@ -34,6 +36,7 @@ export default function OnlinePoker() {
   return (
     <OnlinePokerLobby
       onJoinTable={(tableId) => setActiveTableId(tableId)}
+      clubId={clubId}
     />
   );
 }

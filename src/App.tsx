@@ -66,6 +66,7 @@ const App = () => (
                   <Route path="/poker" element={<PokerHub />} />
                   <Route path="/play-poker" element={<PlayPoker />} />
                   <Route path="/online-poker" element={<OnlinePoker />} />
+                  <Route path="/club/:clubId/poker" element={<OnlinePoker />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
