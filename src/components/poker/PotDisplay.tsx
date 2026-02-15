@@ -14,7 +14,6 @@ export function PotDisplay({ pot, className }: PotDisplayProps) {
   useEffect(() => {
     if (pot !== prevPotRef.current) {
       setIsAnimating(true);
-      // Animate count
       const start = prevPotRef.current;
       const diff = pot - start;
       const steps = 12;
@@ -37,20 +36,32 @@ export function PotDisplay({ pot, className }: PotDisplayProps) {
 
   return (
     <div className={cn(
-      'flex items-center gap-1.5 px-3 py-1 rounded-full',
-      'bg-background/40 backdrop-blur-sm border border-primary/30',
+      'flex items-center gap-2 px-3 py-1 rounded-full',
       isAnimating && 'animate-counter-pulse',
       className,
-    )}>
-      <div className="relative w-4 h-4">
-        <div className="absolute bottom-0 left-0 w-4 h-1.5 rounded-full bg-primary/80 border border-primary" />
-        <div className="absolute bottom-1 left-0 w-4 h-1.5 rounded-full bg-primary/60 border border-primary/80" />
-        <div className="absolute bottom-2 left-0 w-4 h-1.5 rounded-full bg-primary/40 border border-primary/60" />
+    )} style={{
+      background: 'linear-gradient(180deg, hsl(160 25% 15% / 0.8), hsl(160 30% 10% / 0.9))',
+      backdropFilter: 'blur(8px)',
+      border: '1px solid hsl(43 74% 49% / 0.3)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+    }}>
+      {/* Chip stack graphic */}
+      <div className="relative w-4 h-5 flex-shrink-0">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="absolute left-0 w-4 h-2 rounded-full" style={{
+            bottom: `${i * 3}px`,
+            background: i === 2 ? 'hsl(43 74% 49%)' : i === 1 ? 'hsl(0 70% 50%)' : 'hsl(200 70% 50%)',
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3)`,
+            border: '0.5px solid rgba(0,0,0,0.2)',
+          }} />
+        ))}
       </div>
       <span className={cn(
-        'font-bold text-xs text-primary',
-        isAnimating && 'text-primary',
-      )}>
+        'font-black text-xs',
+        isAnimating ? 'text-primary' : 'text-primary',
+      )} style={{
+        textShadow: '0 0 8px hsl(43 74% 49% / 0.5)',
+      }}>
         {displayPot.toLocaleString()}
       </span>
     </div>

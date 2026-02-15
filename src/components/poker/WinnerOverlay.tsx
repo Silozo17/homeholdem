@@ -2,6 +2,7 @@ import { HandResult as HandResultType } from '@/lib/poker/types';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { Trophy, Play, LogOut, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface WinnerOverlayProps {
   winners: Array<{ name: string; hand: HandResultType; chips: number }>;
@@ -17,15 +18,19 @@ interface WinnerOverlayProps {
   onQuit: () => void;
 }
 
-function Sparkle({ delay, x, y }: { delay: number; x: number; y: number }) {
+function GoldParticle({ delay, x, y }: { delay: number; x: number; y: number }) {
   return (
     <div
-      className="absolute w-2 h-2 rounded-full bg-primary animate-confetti pointer-events-none"
+      className="absolute rounded-full pointer-events-none animate-confetti"
       style={{
         left: `${x}%`,
         top: `${y}%`,
+        width: `${3 + Math.random() * 5}px`,
+        height: `${3 + Math.random() * 5}px`,
+        background: `hsl(${40 + Math.random() * 10} ${70 + Math.random() * 20}% ${50 + Math.random() * 20}%)`,
         animationDelay: `${delay}s`,
-        animationDuration: `${0.8 + Math.random() * 0.5}s`,
+        animationDuration: `${0.8 + Math.random() * 0.7}s`,
+        boxShadow: '0 0 6px hsl(43 74% 49% / 0.6)',
       }}
     />
   );
@@ -48,10 +53,10 @@ function AnimatedChips({ target }: { target: number }) {
 }
 
 export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }: WinnerOverlayProps) {
-  const sparkles = Array.from({ length: 20 }, (_, i) => ({
-    delay: i * 0.06,
+  const particles = Array.from({ length: 30 }, (_, i) => ({
+    delay: i * 0.04,
     x: 5 + Math.random() * 90,
-    y: 5 + Math.random() * 50,
+    y: 5 + Math.random() * 60,
   }));
 
   const formatTime = (ms: number) => {
@@ -61,23 +66,38 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-lg flex items-center justify-center p-4">
-      {/* Sparkles */}
-      {sparkles.map((s, i) => <Sparkle key={i} {...s} />)}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 40%, hsl(160 30% 8% / 0.85), hsl(0 0% 0% / 0.95))',
+        backdropFilter: 'blur(16px)',
+      }}
+    >
+      {/* Gold particles */}
+      {particles.map((s, i) => <GoldParticle key={i} {...s} />)}
 
-      <div className="glass-card border-primary/30 rounded-2xl p-6 max-w-sm w-full text-center space-y-5 animate-scale-in shadow-2xl">
+      <div className="rounded-2xl p-6 max-w-sm w-full text-center space-y-5 animate-scale-in"
+        style={{
+          background: 'linear-gradient(180deg, hsl(160 25% 14% / 0.9), hsl(160 30% 8% / 0.95))',
+          border: '1px solid hsl(43 74% 49% / 0.3)',
+          boxShadow: '0 0 60px hsl(43 74% 49% / 0.15), 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+        }}
+      >
         {/* Trophy */}
         <div className="flex justify-center">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center animate-winner-glow">
-              <Trophy className="w-10 h-10 text-primary" />
+            <div className="w-20 h-20 rounded-full flex items-center justify-center animate-winner-glow"
+              style={{
+                background: 'radial-gradient(circle, hsl(43 74% 49% / 0.2), transparent)',
+              }}
+            >
+              <Trophy className="w-10 h-10 text-primary" style={{ filter: 'drop-shadow(0 0 12px hsl(43 74% 49% / 0.6))' }} />
             </div>
-            {/* Orbiting stars */}
             {[0, 1, 2].map(i => (
               <Star key={i} className="absolute w-3 h-3 text-primary animate-confetti" style={{
                 top: `${20 + i * 20}%`,
                 left: i === 1 ? '85%' : `${-5 + i * 10}%`,
                 animationDelay: `${i * 0.2}s`,
+                filter: 'drop-shadow(0 0 4px hsl(43 74% 49% / 0.8))',
               }} />
             ))}
           </div>
@@ -90,9 +110,15 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
         {/* Winners */}
         <div className="space-y-2">
           {winners.map((w, i) => (
-            <div key={i} className="glass-card rounded-xl p-3 border-primary/20">
+            <div key={i} className="rounded-xl p-3" style={{
+              background: 'linear-gradient(135deg, hsl(160 25% 16% / 0.8), hsl(160 30% 12% / 0.9))',
+              border: '1px solid hsl(43 74% 49% / 0.2)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+            }}>
               <p className="font-bold text-foreground">{w.name}</p>
-              <p className="text-xs text-primary font-semibold">{w.hand.name}</p>
+              <p className="text-xs text-primary font-semibold" style={{ textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
+                {w.hand.name}
+              </p>
               <p className="text-lg font-black text-foreground">
                 <AnimatedChips target={w.chips} /> chips
               </p>
@@ -103,23 +129,28 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
         {/* Game Over Stats */}
         {isGameOver && stats && (
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="glass-card rounded-lg p-2.5">
-              <p className="text-muted-foreground">Hands</p>
-              <p className="font-bold text-foreground text-lg">{stats.handsPlayed}</p>
-            </div>
-            <div className="glass-card rounded-lg p-2.5">
-              <p className="text-muted-foreground">Won</p>
-              <p className="font-bold text-primary text-lg">{stats.handsWon}</p>
-            </div>
-            <div className="glass-card rounded-lg p-2.5">
-              <p className="text-muted-foreground">Best Hand</p>
-              <p className="font-bold text-primary text-[11px]">{stats.bestHandName || 'N/A'}</p>
-            </div>
-            <div className="glass-card rounded-lg p-2.5">
-              <p className="text-muted-foreground">Biggest Pot</p>
-              <p className="font-bold text-foreground">{stats.biggestPot.toLocaleString()}</p>
-            </div>
-            <div className="col-span-2 glass-card rounded-lg p-2.5">
+            {[
+              { label: 'Hands', value: stats.handsPlayed },
+              { label: 'Won', value: stats.handsWon, highlight: true },
+              { label: 'Best Hand', value: stats.bestHandName || 'N/A', highlight: true, small: true },
+              { label: 'Biggest Pot', value: stats.biggestPot.toLocaleString() },
+            ].map((s, i) => (
+              <div key={i} className="rounded-lg p-2.5" style={{
+                background: 'hsl(160 25% 14% / 0.6)',
+                border: '1px solid hsl(160 20% 22% / 0.5)',
+              }}>
+                <p className="text-muted-foreground">{s.label}</p>
+                <p className={cn(
+                  'font-bold',
+                  s.highlight ? 'text-primary' : 'text-foreground',
+                  s.small ? 'text-[11px]' : 'text-lg',
+                )}>{s.value}</p>
+              </div>
+            ))}
+            <div className="col-span-2 rounded-lg p-2.5" style={{
+              background: 'hsl(160 25% 14% / 0.6)',
+              border: '1px solid hsl(160 20% 22% / 0.5)',
+            }}>
               <p className="text-muted-foreground">Duration</p>
               <p className="font-bold text-foreground">{formatTime(stats.duration)}</p>
             </div>
@@ -128,21 +159,37 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button variant="outline" className="flex-1 gap-1.5 border-border/50" onClick={onQuit}>
+          <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
+            active:scale-95 transition-transform"
+            style={{
+              background: 'linear-gradient(180deg, hsl(160 20% 20%), hsl(160 25% 15%))',
+              color: 'hsl(0 0% 80%)',
+              border: '1px solid hsl(160 20% 28%)',
+            }}
+            onClick={onQuit}
+          >
             <LogOut className="w-4 h-4" />
             Quit
-          </Button>
+          </button>
           {!isGameOver && (
-            <Button className="flex-1 gap-1.5 shimmer-btn text-primary-foreground font-bold" onClick={onNextHand}>
+            <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
+              shimmer-btn text-primary-foreground active:scale-95 transition-transform"
+              style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
+              onClick={onNextHand}
+            >
               <Play className="w-4 h-4" />
               Next Hand
-            </Button>
+            </button>
           )}
           {isGameOver && (
-            <Button className="flex-1 gap-1.5 shimmer-btn text-primary-foreground font-bold" onClick={onQuit}>
+            <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
+              shimmer-btn text-primary-foreground active:scale-95 transition-transform"
+              style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
+              onClick={onQuit}
+            >
               <Play className="w-4 h-4" />
               Play Again
-            </Button>
+            </button>
           )}
         </div>
       </div>
