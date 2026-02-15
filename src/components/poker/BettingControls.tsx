@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { PokerChip } from './PokerChip';
 
 interface BettingControlsProps {
   canCheck: boolean;
@@ -39,58 +38,78 @@ export function BettingControls({
   };
 
   const quickBets = [
-    { label: '½ Pot', amount: Math.round(pot / 2), color: 'hsl(200 70% 50%)' },
-    { label: 'Pot', amount: pot, color: 'hsl(43 74% 49%)' },
-    { label: 'All-in', amount: maxRaiseTotal, color: 'hsl(0 70% 50%)' },
+    { label: '2×BB', amount: Math.max(minRaiseTotal, maxBet + bigBlind * 2) },
+    { label: '3×BB', amount: Math.max(minRaiseTotal, maxBet + bigBlind * 3) },
+    { label: '½ Pot', amount: Math.max(minRaiseTotal, Math.round(pot / 2) + maxBet) },
+    { label: 'Pot', amount: Math.max(minRaiseTotal, pot + maxBet) },
+    { label: 'All-in', amount: maxRaiseTotal },
   ];
 
   return (
     <div className="flex flex-col gap-1.5 w-full animate-fade-in">
-      {/* Raise slider — only visible after tapping Raise */}
+      {/* Raise slider + quick-bet chips */}
       {showRaiseSlider && canRaise && (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl animate-fade-in"
+        <div className="flex flex-col gap-1.5 px-2 py-2 rounded-xl animate-fade-in"
           style={{
             background: 'linear-gradient(180deg, hsl(160 25% 12% / 0.9), hsl(160 30% 8% / 0.95))',
             backdropFilter: 'blur(12px)',
             border: '1px solid hsl(43 74% 49% / 0.2)',
           }}
         >
-          {quickBets.map((qb) => (
-            <button
-              key={qb.label}
-              className="flex items-center gap-0.5 text-[9px] px-2 py-1 rounded-full font-bold 
-                active:scale-90 transition-all duration-150"
-              style={{
-                background: `linear-gradient(135deg, ${qb.color}, color-mix(in srgb, ${qb.color} 70%, black))`,
-                color: 'white',
-                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                boxShadow: `0 2px 6px color-mix(in srgb, ${qb.color} 40%, transparent)`,
-              }}
-              onClick={() => setRaiseAmount(Math.min(Math.max(qb.amount, minRaiseTotal), maxRaiseTotal))}
+          {/* Quick-bet chips row */}
+          <div className="flex gap-1">
+            {quickBets.map((qb) => {
+              const capped = Math.min(Math.max(qb.amount, minRaiseTotal), maxRaiseTotal);
+              const isActive = raiseAmount === capped;
+              return (
+                <button
+                  key={qb.label}
+                  className={cn(
+                    'flex-1 text-[9px] py-1 px-1 rounded-full font-bold',
+                    'active:scale-90 transition-all duration-150',
+                  )}
+                  style={{
+                    background: isActive
+                      ? 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))'
+                      : 'linear-gradient(135deg, hsl(160 20% 18%), hsl(160 25% 14%))',
+                    color: isActive ? 'hsl(160 30% 8%)' : 'hsl(0 0% 75%)',
+                    border: isActive ? '1px solid hsl(43 70% 55%)' : '1px solid hsl(160 15% 25%)',
+                    textShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.5)',
+                    boxShadow: isActive ? '0 2px 8px hsl(43 74% 49% / 0.3)' : 'none',
+                  }}
+                  onClick={() => setRaiseAmount(capped)}
+                >
+                  {qb.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Slider + amount display */}
+          <div className="flex items-center gap-2">
+            <Slider
+              value={[raiseAmount]}
+              min={minRaiseTotal}
+              max={maxRaiseTotal}
+              step={bigBlind}
+              onValueChange={([v]) => setRaiseAmount(v)}
+              className="flex-1"
+            />
+            <span className="text-[10px] text-primary w-14 text-right font-bold tabular-nums"
+              style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
             >
-              {qb.label}
-            </button>
-          ))}
-          <Slider
-            value={[raiseAmount]}
-            min={minRaiseTotal}
-            max={maxRaiseTotal}
-            step={bigBlind}
-            onValueChange={([v]) => setRaiseAmount(v)}
-            className="flex-1"
-          />
-          <span className="text-[10px] text-primary w-12 text-right font-bold">
-            {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
-          </span>
+              {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Action buttons — premium gradient buttons */}
+      {/* Action buttons */}
       <div className="flex gap-2 w-full">
         {/* Fold */}
         <button
-          className="flex-1 h-11 rounded-xl font-bold text-sm active:scale-95 transition-all duration-150
-            flex items-center justify-center gap-1"
+          className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150
+            flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
           style={{
             background: 'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             color: 'hsl(0 0% 95%)',
@@ -105,8 +124,8 @@ export function BettingControls({
 
         {/* Check/Call */}
         <button
-          className="flex-1 h-11 rounded-xl font-bold text-sm active:scale-95 transition-all duration-150
-            flex items-center justify-center gap-1"
+          className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150
+            flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
           style={{
             background: canCheck
               ? 'linear-gradient(180deg, hsl(160 45% 30%), hsl(160 50% 22%))'
@@ -136,8 +155,8 @@ export function BettingControls({
         {canRaise && (
           <button
             className={cn(
-              'flex-1 h-11 rounded-xl font-bold text-sm active:scale-95 transition-all duration-150',
-              'flex items-center justify-center gap-1',
+              'flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150',
+              'flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none',
             )}
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
