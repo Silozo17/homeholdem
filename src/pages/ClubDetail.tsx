@@ -37,7 +37,8 @@ import {
   Mail,
   AlertTriangle,
   Settings,
-  Lock
+  Lock,
+  Spade
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
@@ -417,6 +418,23 @@ export default function ClubDetail() {
               </Button>
               <ShareClub clubName={club.name} inviteCode={club.invite_code} />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Action: Poker Tables */}
+        <Card 
+          className="bg-card/50 border-border/50 cursor-pointer hover:bg-card/70 transition-colors active:scale-[0.98]"
+          onClick={() => navigate(`/club/${clubId}/poker`)}
+        >
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Spade className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-sm">Poker Tables</p>
+              <p className="text-xs text-muted-foreground">Create or join a poker table with club members</p>
+            </div>
+            <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180" />
           </CardContent>
         </Card>
 

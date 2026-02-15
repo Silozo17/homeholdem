@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Users, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -37,34 +38,48 @@ interface TableSummary {
   big_blind: number;
   status: string;
   player_count: number;
+  created_by: string;
+  club_id: string | null;
+  invite_code: string | null;
 }
 
 interface OnlinePokerLobbyProps {
   onJoinTable: (tableId: string) => void;
+  clubId?: string;
 }
 
-export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
+export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tables, setTables] = useState<TableSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [joinCodeOpen, setJoinCodeOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>(clubId ? 'club' : 'all');
 
   const [tableName, setTableName] = useState('');
-  const [tableType, setTableType] = useState<'public' | 'friends'>('friends');
+  const [tableType, setTableType] = useState<'public' | 'friends' | 'club'>(clubId ? 'club' : 'friends');
   const [maxSeats, setMaxSeats] = useState(6);
   const [bigBlind, setBigBlind] = useState(100);
   const [maxBuyIn, setMaxBuyIn] = useState(10000);
 
   const fetchTables = useCallback(async () => {
     try {
-      const { data: allTables } = await supabase
+      let query = supabase
         .from('poker_tables')
-        .select('id, name, table_type, max_seats, small_blind, big_blind, status, created_by')
+        .select('id, name, table_type, max_seats, small_blind, big_blind, status, created_by, club_id, invite_code')
         .neq('status', 'closed')
         .order('created_at', { ascending: false })
         .limit(50);
+
+      if (clubId) {
+        query = query.eq('club_id', clubId);
+      }
+
+      const { data: allTables } = await query;
 
       if (!allTables) { setTables([]); return; }
       const tableIds = allTables.map(t => t.id);
@@ -78,7 +93,7 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
 
       setTables(allTables.map(t => ({ ...t, player_count: countMap.get(t.id) || 0 })));
     } catch { /* RLS filter */ } finally { setLoading(false); }
-  }, []);
+  }, [clubId]);
 
   useEffect(() => { fetchTables(); }, [fetchTables]);
 
@@ -87,8 +102,14 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
     setCreating(true);
     try {
       const data = await callEdge('poker-create-table', {
-        name: tableName.trim(), table_type: tableType, max_seats: maxSeats,
-        small_blind: bigBlind / 2, big_blind: bigBlind, min_buy_in: Math.round(maxBuyIn / 10), max_buy_in: maxBuyIn,
+        name: tableName.trim(),
+        table_type: clubId ? 'club' : tableType,
+        max_seats: maxSeats,
+        small_blind: bigBlind / 2,
+        big_blind: bigBlind,
+        min_buy_in: Math.round(maxBuyIn / 10),
+        max_buy_in: maxBuyIn,
+        club_id: clubId || null,
       });
       setCreateOpen(false);
       setTableName('');
@@ -98,7 +119,39 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
     } finally { setCreating(false); }
   };
 
-  // Seat dots
+  const handleJoinByCode = async () => {
+    const code = inviteCode.trim().toUpperCase();
+    if (code.length < 4) { toast({ title: 'Enter a valid invite code', variant: 'destructive' }); return; }
+    setJoiningByCode(true);
+    try {
+      const { data: table } = await supabase
+        .from('poker_tables')
+        .select('id')
+        .eq('invite_code', code)
+        .neq('status', 'closed')
+        .single();
+
+      if (!table) {
+        toast({ title: 'Table not found', description: 'Check the invite code and try again', variant: 'destructive' });
+        return;
+      }
+      setJoinCodeOpen(false);
+      setInviteCode('');
+      onJoinTable(table.id);
+    } catch {
+      toast({ title: 'Table not found', variant: 'destructive' });
+    } finally { setJoiningByCode(false); }
+  };
+
+  const filteredTables = tables.filter(t => {
+    if (clubId) return true; // Club view shows all club tables
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'public') return t.table_type === 'public';
+    if (activeFilter === 'friends') return t.table_type === 'friends';
+    if (activeFilter === 'mine') return t.created_by === user?.id;
+    return true;
+  });
+
   function SeatDots({ filled, total }: { filled: number; total: number }) {
     return (
       <div className="flex gap-1">
@@ -112,11 +165,23 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
     );
   }
 
+  const typeIcon = (type: string) => {
+    if (type === 'public') return <Globe className="h-3 w-3 text-emerald-400" />;
+    if (type === 'club') return <Users className="h-3 w-3 text-blue-400" />;
+    return <Lock className="h-3 w-3 text-amber-400" />;
+  };
+
+  const typeLabel = (type: string) => {
+    if (type === 'public') return 'Public';
+    if (type === 'club') return 'Club';
+    return 'Invite Only';
+  };
+
   return (
     <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/poker')} className="text-foreground/70">
+        <Button variant="ghost" size="icon" onClick={() => navigate(clubId ? `/club/${clubId}` : '/poker')} className="text-foreground/70">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex items-center gap-1">
@@ -129,77 +194,132 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
       <div className="flex-1 px-4 pb-24 space-y-5">
         {/* Hero */}
         <div className="text-center space-y-2 animate-slide-up-fade">
-          <h1 className="text-2xl font-black text-shimmer">Online Tables</h1>
-          <p className="text-sm text-muted-foreground">Play Texas Hold'em with friends — real-time multiplayer</p>
+          <h1 className="text-2xl font-black text-shimmer">
+            {clubId ? 'Club Tables' : 'Online Tables'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {clubId ? 'Play poker with your club members' : "Play Texas Hold'em with friends — real-time multiplayer"}
+          </p>
         </div>
 
-        {/* Create table card */}
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <button className="w-full glass-card rounded-2xl p-5 flex items-center gap-4 text-left group active:scale-[0.98] transition-all animate-slide-up-fade stagger-1 animate-glow-pulse">
-              <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                <Plus className="h-6 w-6 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-foreground">Create Table</p>
-                <p className="text-xs text-muted-foreground">Set up a new game for your friends</p>
-              </div>
-            </button>
-          </DialogTrigger>
-          <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-            <DialogHeader><DialogTitle>Create Table</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-2">
-              <Input placeholder="Table name" value={tableName} onChange={(e) => setTableName(e.target.value)} />
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Type</label>
-                <Select value={tableType} onValueChange={(v) => setTableType(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="friends">Friends (Invite Only)</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Max Seats</span>
-                  <span className="font-bold text-primary">{maxSeats}</span>
+        {/* Action row */}
+        <div className="flex gap-2 animate-slide-up-fade stagger-1">
+          {/* Create table */}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <button className="flex-1 glass-card rounded-2xl p-4 flex items-center gap-3 text-left group active:scale-[0.98] transition-all animate-glow-pulse">
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                  <Plus className="h-5 w-5 text-primary" />
                 </div>
-                <Slider value={[maxSeats]} min={2} max={9} step={1} onValueChange={([v]) => setMaxSeats(v)} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Blinds</span>
-                  <span className="font-bold text-primary">{bigBlind / 2}/{bigBlind}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-foreground text-sm">Create Table</p>
+                  <p className="text-[10px] text-muted-foreground truncate">Set up a new game</p>
                 </div>
-                <Slider value={[bigBlind]} min={20} max={1000} step={20} onValueChange={([v]) => setBigBlind(v)} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Max Buy-in</span>
-                  <span className="font-bold text-primary">{maxBuyIn.toLocaleString()}</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+              <DialogHeader><DialogTitle>Create Table</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <Input placeholder="Table name" value={tableName} onChange={(e) => setTableName(e.target.value)} />
+                {!clubId && (
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Type</label>
+                    <Select value={tableType} onValueChange={(v) => setTableType(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="friends">Friends (Invite Only)</SelectItem>
+                        <SelectItem value="public">Public</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Max Seats</span>
+                    <span className="font-bold text-primary">{maxSeats}</span>
+                  </div>
+                  <Slider value={[maxSeats]} min={2} max={9} step={1} onValueChange={([v]) => setMaxSeats(v)} />
                 </div>
-                <Slider value={[maxBuyIn]} min={1000} max={100000} step={1000} onValueChange={([v]) => setMaxBuyIn(v)} />
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Blinds</span>
+                    <span className="font-bold text-primary">{bigBlind / 2}/{bigBlind}</span>
+                  </div>
+                  <Slider value={[bigBlind]} min={20} max={1000} step={20} onValueChange={([v]) => setBigBlind(v)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Max Buy-in</span>
+                    <span className="font-bold text-primary">{maxBuyIn.toLocaleString()}</span>
+                  </div>
+                  <Slider value={[maxBuyIn]} min={1000} max={100000} step={1000} onValueChange={([v]) => setMaxBuyIn(v)} />
+                </div>
+                <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleCreate} disabled={creating}>
+                  {creating ? 'Creating...' : 'Create & Sit Down'}
+                </Button>
               </div>
-              <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleCreate} disabled={creating}>
-                {creating ? 'Creating...' : 'Create & Sit Down'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+
+          {/* Join by code */}
+          {!clubId && (
+            <Dialog open={joinCodeOpen} onOpenChange={setJoinCodeOpen}>
+              <DialogTrigger asChild>
+                <button className="flex-1 glass-card rounded-2xl p-4 flex items-center gap-3 text-left group active:scale-[0.98] transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-secondary/50 flex items-center justify-center shrink-0">
+                    <Hash className="h-5 w-5 text-foreground/70" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-foreground text-sm">Join by Code</p>
+                    <p className="text-[10px] text-muted-foreground truncate">Enter invite code</p>
+                  </div>
+                </button>
+              </DialogTrigger>
+              <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+                <DialogHeader><DialogTitle>Join Table by Code</DialogTitle></DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <Input
+                    placeholder="Enter 6-character invite code"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    maxLength={6}
+                    className="text-center text-2xl font-mono tracking-[0.3em]"
+                  />
+                  <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleJoinByCode} disabled={joiningByCode || inviteCode.length < 4}>
+                    {joiningByCode ? 'Joining...' : 'Join Table'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        {/* Filter tabs (not for club view) */}
+        {!clubId && (
+          <Tabs value={activeFilter} onValueChange={setActiveFilter} className="animate-slide-up-fade stagger-2">
+            <TabsList className="grid w-full grid-cols-4 h-8">
+              <TabsTrigger value="all" className="text-[10px] py-1">All</TabsTrigger>
+              <TabsTrigger value="public" className="text-[10px] py-1">Public</TabsTrigger>
+              <TabsTrigger value="friends" className="text-[10px] py-1">Friends</TabsTrigger>
+              <TabsTrigger value="mine" className="text-[10px] py-1">My Tables</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Table list */}
         <div className="space-y-3 animate-slide-up-fade stagger-2">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Available Tables</h2>
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {filteredTables.length} {filteredTables.length === 1 ? 'Table' : 'Tables'}
+          </h2>
           {loading ? (
             <div className="text-center py-8 text-muted-foreground animate-pulse">Loading tables...</div>
-          ) : tables.length === 0 ? (
+          ) : filteredTables.length === 0 ? (
             <div className="glass-card rounded-2xl p-8 text-center space-y-4">
               <CardFan />
               <p className="text-muted-foreground text-sm">No tables yet — be the first to deal!</p>
             </div>
           ) : (
-            tables.map(t => (
+            filteredTables.map(t => (
               <button
                 key={t.id}
                 className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group active:scale-[0.98] transition-all hover:shadow-lg"
@@ -207,9 +327,12 @@ export function OnlinePokerLobby({ onJoinTable }: OnlinePokerLobbyProps) {
               >
                 <div className="space-y-1.5">
                   <p className="font-bold text-foreground text-sm">{t.name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t.small_blind}/{t.big_blind} • {t.table_type === 'friends' ? 'Invite Only' : 'Public'}
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {typeIcon(t.table_type)}
+                    <span>{typeLabel(t.table_type)}</span>
+                    <span>•</span>
+                    <span>{t.small_blind}/{t.big_blind}</span>
+                  </div>
                   <SeatDots filled={t.player_count} total={t.max_seats} />
                 </div>
                 <div className="flex flex-col items-end gap-1.5">

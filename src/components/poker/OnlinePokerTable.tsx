@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOnlinePokerTable } from '@/hooks/useOnlinePokerTable';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
@@ -12,11 +13,29 @@ import { TurnTimer } from './TurnTimer';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import leatherBg from '@/assets/leather-bg.jpg';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+async function callEdge(fn: string, body: any) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Edge function error');
+  return data;
+}
 
 interface OnlinePokerTableProps {
   tableId: string;
@@ -48,6 +67,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
+  const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
+  const [closeConfirm, setCloseConfirm] = useState(false);
 
   // Sound triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
@@ -64,6 +85,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
     if (!currentPhase) setPrevPhase(null);
   }, [currentPhase, prevPhase, play]);
+
+  // Listen for kicked broadcast
+  useEffect(() => {
+    if (!tableState || !user) return;
+    // The seat_change broadcast with action=kicked is handled by the hook's refreshState
+    // But we also check if WE were kicked
+    const checkKicked = () => {
+      if (mySeatNumber !== null) return; // still seated
+    };
+    checkKicked();
+  }, [tableState, user, mySeatNumber]);
 
   // Your turn sound
   useEffect(() => {
@@ -89,11 +121,34 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   const { table, seats, current_hand: hand } = tableState;
   const isSeated = mySeatNumber !== null;
+  const isSpectator = !isSeated;
   const isCreator = user?.id === table.created_by;
   const activeSeats = seats.filter(s => s.player_id);
   const canStartHand = (isCreator || isSeated) && !hand && activeSeats.length >= 2;
   const totalPot = hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const mySeat = seats.find(s => s.player_id === user?.id);
+  const canModerate = isCreator && !hand;
+
+  const handleKickPlayer = async (playerId: string) => {
+    try {
+      await callEdge('poker-moderate-table', { table_id: tableId, action: 'kick', target_player_id: playerId });
+      toast({ title: 'Player removed' });
+      setKickTarget(null);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleCloseTable = async () => {
+    try {
+      await callEdge('poker-moderate-table', { table_id: tableId, action: 'close' });
+      toast({ title: 'Table closed' });
+      setCloseConfirm(false);
+      onLeave();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const handleJoinSeat = async (seatNum: number) => {
     const amount = parseInt(buyInAmount) || table.max_buy_in;
@@ -185,6 +240,37 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           >
             {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
           </button>
+          {isSpectator && (
+            <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground font-bold">
+              <Eye className="h-2.5 w-2.5" /> Watching
+            </span>
+          )}
+          {isCreator && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+                  <MoreVertical className="h-3.5 w-3.5 text-foreground/80" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
+                  <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
+                    <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
+                  </DropdownMenuItem>
+                ))}
+                {canModerate && (
+                  <DropdownMenuItem onClick={() => setCloseConfirm(true)} className="text-destructive">
+                    <XCircle className="h-3.5 w-3.5 mr-2" /> Close Table
+                  </DropdownMenuItem>
+                )}
+                {!canModerate && hand && (
+                  <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                    Wait for hand to end
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <div className="flex items-center gap-0.5 text-[10px] text-foreground/50">
             <Users className="h-3 w-3" />
             <span>{activeSeats.length}/{table.max_seats}</span>
@@ -375,22 +461,45 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </button>
           )}
         </div>
-      ) : !isSeated ? (
+      ) : isSpectator ? (
         <div className="px-4 py-3 z-20 safe-area-bottom shrink-0 relative"
           style={{ background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))' }}
         >
-          <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
-            Tap an empty seat to join
-          </p>
-          <div className="flex items-center gap-2 max-w-xs mx-auto">
-            <Input
-              type="number"
-              placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
-              value={buyInAmount}
-              onChange={(e) => setBuyInAmount(e.target.value)}
-              className="text-center text-sm bg-black/30 border-border/30"
-            />
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Eye className="h-4 w-4 text-foreground/40" />
+            <span className="text-xs text-foreground/50 font-bold">Spectating</span>
           </div>
+          {!hand ? (
+            <>
+              <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
+                Tap an empty seat to join
+              </p>
+              <div className="flex items-center gap-2 max-w-xs mx-auto">
+                <Input
+                  type="number"
+                  placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
+                  value={buyInAmount}
+                  onChange={(e) => setBuyInAmount(e.target.value)}
+                  className="text-center text-sm bg-black/30 border-border/30"
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-[10px] text-center text-foreground/30 font-medium">
+              Wait for the current hand to finish before joining
+            </p>
+          )}
+          <button
+            onClick={onLeave}
+            className="flex items-center justify-center gap-1.5 w-full mt-2 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"
+            style={{
+              background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))',
+              color: 'hsl(0 0% 60%)',
+              border: '1px solid hsl(0 0% 20%)',
+            }}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Leave
+          </button>
         </div>
       ) : null}
 
@@ -409,6 +518,42 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </span>
         </div>
       )}
+
+      {/* Kick confirmation dialog */}
+      <AlertDialog open={!!kickTarget} onOpenChange={(open) => !open && setKickTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kick {kickTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove {kickTarget?.name} from the table. They can rejoin later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => kickTarget && handleKickPlayer(kickTarget.id)} className="bg-destructive text-destructive-foreground">
+              Kick Player
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close table confirmation */}
+      <AlertDialog open={closeConfirm} onOpenChange={setCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close Table?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all players and permanently close the table.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseTable} className="bg-destructive text-destructive-foreground">
+              Close Table
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
