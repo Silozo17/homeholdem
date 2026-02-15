@@ -37,19 +37,18 @@ export function PotDisplay({ pot, className }: PotDisplayProps) {
 
   return (
     <div className={cn(
-      'flex items-center gap-2 px-4 py-1.5 rounded-full',
+      'flex items-center gap-1.5 px-3 py-1 rounded-full',
       'bg-background/40 backdrop-blur-sm border border-primary/30',
       isAnimating && 'animate-counter-pulse',
       className,
     )}>
-      {/* Chip stack icon */}
-      <div className="relative w-5 h-5">
-        <div className="absolute bottom-0 left-0 w-5 h-2 rounded-full bg-primary/80 border border-primary" />
-        <div className="absolute bottom-1 left-0 w-5 h-2 rounded-full bg-primary/60 border border-primary/80" />
-        <div className="absolute bottom-2 left-0 w-5 h-2 rounded-full bg-primary/40 border border-primary/60" />
+      <div className="relative w-4 h-4">
+        <div className="absolute bottom-0 left-0 w-4 h-1.5 rounded-full bg-primary/80 border border-primary" />
+        <div className="absolute bottom-1 left-0 w-4 h-1.5 rounded-full bg-primary/60 border border-primary/80" />
+        <div className="absolute bottom-2 left-0 w-4 h-1.5 rounded-full bg-primary/40 border border-primary/60" />
       </div>
       <span className={cn(
-        'font-bold text-sm text-primary',
+        'font-bold text-xs text-primary',
         isAnimating && 'text-primary',
       )}>
         {displayPot.toLocaleString()}

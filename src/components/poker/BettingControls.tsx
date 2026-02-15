@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { QuickBetButtons } from './QuickBetButtons';
 import { cn } from '@/lib/utils';
 
 interface BettingControlsProps {
@@ -28,26 +27,44 @@ export function BettingControls({
   const minRaiseTotal = maxBet + minRaise;
   const maxRaiseTotal = maxBet + playerChips;
   const [raiseAmount, setRaiseAmount] = useState(minRaiseTotal);
+  const [showRaiseSlider, setShowRaiseSlider] = useState(false);
 
   const canRaise = playerChips > amountToCall && minRaiseTotal <= maxRaiseTotal;
 
-  return (
-    <div className="flex flex-col gap-2 w-full animate-fade-in">
-      {/* Quick bet presets */}
-      {canRaise && (
-        <QuickBetButtons
-          pot={pot}
-          minRaise={minRaise}
-          maxBet={maxBet}
-          playerChips={playerChips}
-          onSetAmount={(v) => setRaiseAmount(Math.min(Math.max(v, minRaiseTotal), maxRaiseTotal))}
-        />
-      )}
+  const handleRaiseTap = () => {
+    if (!showRaiseSlider) {
+      setShowRaiseSlider(true);
+      setRaiseAmount(minRaiseTotal);
+    } else {
+      if (raiseAmount >= maxRaiseTotal) {
+        onAction({ type: 'all-in' });
+      } else {
+        onAction({ type: 'raise', amount: raiseAmount });
+      }
+      setShowRaiseSlider(false);
+    }
+  };
 
-      {/* Raise slider */}
-      {canRaise && (
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-muted-foreground w-10 text-right">{minRaiseTotal}</span>
+  const quickBets = [
+    { label: '½', amount: Math.round(pot / 2) },
+    { label: 'Pot', amount: pot },
+    { label: 'All', amount: maxRaiseTotal },
+  ];
+
+  return (
+    <div className="flex flex-col gap-1 w-full animate-fade-in">
+      {/* Raise slider — only visible after tapping Raise */}
+      {showRaiseSlider && canRaise && (
+        <div className="flex items-center gap-1.5 px-1 animate-fade-in">
+          {quickBets.map((qb) => (
+            <button
+              key={qb.label}
+              className="text-[9px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold active:scale-95 transition-transform"
+              onClick={() => setRaiseAmount(Math.min(Math.max(qb.amount, minRaiseTotal), maxRaiseTotal))}
+            >
+              {qb.label}
+            </button>
+          ))}
           <Slider
             value={[raiseAmount]}
             min={minRaiseTotal}
@@ -56,38 +73,39 @@ export function BettingControls({
             onValueChange={([v]) => setRaiseAmount(v)}
             className="flex-1"
           />
-          <span className="text-[10px] text-muted-foreground w-14 text-right font-medium">
+          <span className="text-[10px] text-muted-foreground w-12 text-right font-medium">
             {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
           </span>
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="flex gap-2 w-full">
+      {/* Action buttons — single compact row */}
+      <div className="flex gap-1.5 w-full">
         <Button
-          size="lg"
-          className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold
+          size="sm"
+          className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold h-10
             active:scale-95 transition-transform"
-          onClick={() => onAction({ type: 'fold' })}
+          onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
           Fold
         </Button>
 
         {canCheck ? (
           <Button
-            size="lg"
-            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold
+            size="sm"
+            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold h-10
               active:scale-95 transition-transform"
-            onClick={() => onAction({ type: 'check' })}
+            onClick={() => { onAction({ type: 'check' }); setShowRaiseSlider(false); }}
           >
             Check
           </Button>
         ) : (
           <Button
-            size="lg"
-            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold
+            size="sm"
+            className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold h-10
               active:scale-95 transition-transform"
             onClick={() => {
+              setShowRaiseSlider(false);
               if (amountToCall >= playerChips) {
                 onAction({ type: 'all-in' });
               } else {
@@ -103,24 +121,20 @@ export function BettingControls({
 
         {canRaise && (
           <Button
-            size="lg"
+            size="sm"
             className={cn(
-              'flex-1 font-bold active:scale-95 transition-transform',
-              raiseAmount >= maxRaiseTotal
-                ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+              'flex-1 font-bold h-10 active:scale-95 transition-transform',
+              showRaiseSlider
+                ? (raiseAmount >= maxRaiseTotal
+                    ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground')
                 : 'bg-primary hover:bg-primary/90 text-primary-foreground',
             )}
-            onClick={() => {
-              if (raiseAmount >= maxRaiseTotal) {
-                onAction({ type: 'all-in' });
-              } else {
-                onAction({ type: 'raise', amount: raiseAmount });
-              }
-            }}
+            onClick={handleRaiseTap}
           >
-            {raiseAmount >= maxRaiseTotal
-              ? 'All-in'
-              : `Raise ${raiseAmount.toLocaleString()}`}
+            {showRaiseSlider
+              ? (raiseAmount >= maxRaiseTotal ? 'All-in' : `Raise ${raiseAmount.toLocaleString()}`)
+              : 'Raise'}
           </Button>
         )}
       </div>
