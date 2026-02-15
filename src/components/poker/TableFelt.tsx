@@ -12,15 +12,12 @@ export function TableFelt({ children, className }: TableFeltProps) {
       {/* Dark background fill */}
       <div className="absolute inset-0 bg-background" />
 
-      {/* Oval table shape */}
+      {/* Constrained oval wrapper — forces a wide, flat poker-table ellipse */}
       <div
-        className="absolute pointer-events-none"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] pointer-events-none"
         style={{
-          left: '6%',
-          right: '6%',
-          top: '10%',
-          bottom: '8%',
-          borderRadius: '50%',
+          aspectRatio: '2.2 / 1',
+          maxHeight: '55vh',
         }}
       >
         {/* Wood rail border */}
@@ -56,7 +53,7 @@ export function TableFelt({ children, className }: TableFeltProps) {
         <div
           className="absolute rounded-[50%] overflow-hidden"
           style={{
-            inset: '4%',
+            inset: '6%',
           }}
         >
           {/* Felt texture image */}

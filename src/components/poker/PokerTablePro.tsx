@@ -40,61 +40,61 @@ function useIsLandscape() {
 const SEAT_POSITIONS_PORTRAIT: Record<number, { x: number; y: number }[]> = {
   2: [
     { x: 50, y: 86 },
-    { x: 50, y: 8 },
+    { x: 50, y: 18 },
   ],
   3: [
     { x: 50, y: 86 },
-    { x: 15, y: 30 },
-    { x: 85, y: 30 },
+    { x: 15, y: 40 },
+    { x: 85, y: 40 },
   ],
   4: [
     { x: 50, y: 86 },
-    { x: 85, y: 50 },
-    { x: 50, y: 8 },
-    { x: 15, y: 50 },
+    { x: 88, y: 52 },
+    { x: 50, y: 18 },
+    { x: 12, y: 52 },
   ],
   5: [
     { x: 50, y: 86 },
-    { x: 88, y: 55 },
-    { x: 75, y: 8 },
-    { x: 25, y: 8 },
-    { x: 12, y: 55 },
+    { x: 88, y: 58 },
+    { x: 78, y: 18 },
+    { x: 22, y: 18 },
+    { x: 12, y: 58 },
   ],
   6: [
     { x: 50, y: 86 },
-    { x: 88, y: 60 },
-    { x: 80, y: 8 },
-    { x: 50, y: 3 },
-    { x: 20, y: 8 },
-    { x: 12, y: 60 },
+    { x: 88, y: 62 },
+    { x: 82, y: 18 },
+    { x: 50, y: 14 },
+    { x: 18, y: 18 },
+    { x: 12, y: 62 },
   ],
   7: [
     { x: 50, y: 86 },
     { x: 88, y: 65 },
-    { x: 85, y: 25 },
-    { x: 62, y: 3 },
-    { x: 38, y: 3 },
-    { x: 15, y: 25 },
+    { x: 87, y: 30 },
+    { x: 65, y: 16 },
+    { x: 35, y: 16 },
+    { x: 13, y: 30 },
     { x: 12, y: 65 },
   ],
   8: [
     { x: 50, y: 86 },
     { x: 88, y: 65 },
-    { x: 88, y: 25 },
-    { x: 65, y: 3 },
-    { x: 35, y: 3 },
-    { x: 12, y: 25 },
+    { x: 90, y: 30 },
+    { x: 68, y: 16 },
+    { x: 32, y: 16 },
+    { x: 10, y: 30 },
     { x: 12, y: 65 },
     { x: 75, y: 86 },
   ],
   9: [
     { x: 50, y: 86 },
     { x: 88, y: 70 },
-    { x: 90, y: 35 },
-    { x: 72, y: 3 },
-    { x: 50, y: 0 },
-    { x: 28, y: 3 },
-    { x: 10, y: 35 },
+    { x: 90, y: 38 },
+    { x: 74, y: 16 },
+    { x: 50, y: 12 },
+    { x: 26, y: 16 },
+    { x: 10, y: 38 },
     { x: 12, y: 70 },
     { x: 25, y: 86 },
   ],
@@ -324,17 +324,17 @@ export function PokerTablePro({
       <div className="flex-1 relative z-10">
         <TableFelt className="absolute inset-0">
           {/* Dealer character at top center */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '12%' }}>
+          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '4%' }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
           {/* Pot display */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '38%' }}>
+          <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '40%' }}>
             <PotDisplay pot={state.pot} />
           </div>
 
           {/* Community cards */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex gap-1.5 items-center" style={{ top: '48%' }}>
+          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex gap-1.5 items-center" style={{ top: '50%' }}>
             {state.communityCards.map((card, i) => (
               <CardDisplay
                 key={`${card.suit}-${card.rank}-${i}`}
