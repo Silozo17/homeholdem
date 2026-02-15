@@ -10,6 +10,7 @@ import { Trophy, TrendingUp, TrendingDown, Target, Calendar, Crown, Medal, Dolla
 import { Progress } from '@/components/ui/progress';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { PokerCareerStats } from '@/components/poker/PokerCareerStats';
 
 interface ClubStats {
   clubId: string;
@@ -441,6 +442,9 @@ export default function Stats() {
             )}
           </>
         )}
+
+        {/* Poker Career Stats */}
+        <PokerCareerStats />
       </main>
 
       <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
