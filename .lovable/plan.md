@@ -1,76 +1,105 @@
 
 
-## Fix: Fit-to-Screen Premium Poker Table
+## Premium Poker Game Visual Overhaul
 
-The game currently overflows the viewport because (1) the bottom nav and its 80px padding remain visible during active gameplay, (2) the felt table area takes too much vertical space, and (3) the bot section wraps freely. Looking at the reference screenshots, premium poker games use a single fullscreen view where everything -- opponents, table, cards, controls -- fits within the viewport with zero scrolling.
-
----
-
-### Problems Identified
-
-1. **Bottom nav stays visible** -- `/play-poker` is not in the hidden routes list in `AppLayout.tsx`, so the nav bar and its `pb-20` padding persist during gameplay
-2. **Table area wastes space** -- The felt center uses `flex-1` with `min-h-[180px]` and `p-4`, making it too tall when there are few community cards
-3. **Bot section is unbounded** -- Uses `flex-wrap` that can grow vertically with more bots
-4. **Community card placeholders** -- 5 empty card slots always rendered, taking space even when unnecessary
-5. **Human player section has loose spacing** -- `space-y-2` and `gap-4` add up
+The current game looks basic because it uses plain colored circles, simple CSS gradients, and lacks the visual richness of real poker games. This plan transforms every visual element with AI-generated graphics, rich textures, 3D-style card designs, and polished animations.
 
 ---
 
-### Solution: Single-Screen Layout
+### What Changes
 
-Redesign `PokerTablePro.tsx` to be a true fullscreen, no-scroll poker table:
+**1. AI-Generated Game Assets**
 
-**AppLayout.tsx** -- Add `/play-poker` to the hidden nav routes so bottom nav and padding are removed during active gameplay.
+Create a backend function that uses Lovable AI's image generation (google/gemini-2.5-flash-image) to produce premium game assets, stored in file storage:
 
-**PokerTablePro.tsx** -- Complete layout restructure:
-- Use a CSS grid or constrained flexbox with `h-[100dvh]` and `overflow-hidden` (already has this, but the AppLayout wrapper overrides it)
-- **Header**: Shrink to a minimal 32px bar with hand number and blinds
-- **Bot arc**: Use `overflow-x-auto` with `flex-nowrap` so bots scroll horizontally instead of wrapping vertically. Each bot seat becomes more compact (48px wide)
-- **Felt center**: Remove `min-h-[180px]`, reduce padding to `p-2`, tighten gap. Only show community card placeholders when a hand is active
-- **Human section**: Compact layout -- cards and avatar side-by-side in a single row, chip count inline
-- **Betting controls**: Rendered inside the felt area or overlaid at the bottom, not stacked below it
-- **"Next Hand" button**: Overlaid on the felt center, not below it
+- Poker table felt texture (top-down oval green felt with rail and cup holders)
+- Card back design (premium pattern with gold accents)
+- Chip stack icons for pot display
+- Background texture for the game screen
 
-**BettingControls.tsx** -- Make more compact:
-- Quick bet buttons and action buttons in a single combined row
-- Remove the slider by default (only show when "Raise" is tapped as a second step, or use a more compact inline input)
-- Reduce overall height from ~120px to ~80px
+These get generated once per project and cached in storage so they load instantly during gameplay.
 
-**CardDisplay.tsx** -- Reduce `md` size slightly (from `w-11 h-16` to `w-10 h-14`) to save vertical space in the community card area.
+**2. Redesigned Poker Table (PokerTablePro.tsx)**
 
-**PlayerAvatar.tsx** -- No changes needed, already compact.
+Replace the current plain radial gradient with a layered visual:
+- Full-bleed background with dark leather/wood texture
+- Centered oval table element with an actual felt texture image, raised rail border with 3D shadow
+- Inner betting line (gold dashed ellipse) where community cards sit
+- The pot display centered with a chip stack graphic
+- Subtle vignette overlay on edges for depth
 
-**PotDisplay.tsx** -- Reduce padding (`px-3 py-1` instead of `px-4 py-1.5`).
+**3. Premium Card Design (CardDisplay.tsx)**
+
+Complete card visual overhaul:
+- White cards with rounded corners, subtle inner shadow, and a linen texture gradient
+- Rank and suit rendered larger with proper card layout (top-left corner + center suit)
+- Red suits use a rich crimson, black suits use deep charcoal
+- Card back gets a premium crosshatch/diamond pattern with gold foil border
+- 3D perspective tilt on hover/deal (subtle rotateX + rotateY)
+- Winner cards get a golden glow border with particle sparkle overlay
+- Folded cards: desaturate + scale down + rotate away
+
+**4. Rich Player Avatars (PlayerAvatar.tsx)**
+
+Replace plain colored circles with premium styled avatars:
+- Gradient ring border (gold for active, grey for folded, red pulse for all-in)
+- Inner shadow and 3D raised effect
+- Player name on a dark pill below the avatar
+- Chip count displayed as a styled badge with chip icon
+- Action badges (Fold/Call/Raise/All-in) as floating animated pills with color coding and icons
+- Current player gets an animated spotlight ring (concentric expanding circles)
+
+**5. Immersive Betting Controls (BettingControls.tsx)**
+
+Transform from plain buttons to premium game controls:
+- Fold: Dark red gradient button with a card-toss icon, press animation (cards fly away)
+- Check/Call: Teal gradient with chip icon, press ripple effect
+- Raise: Gold gradient with upward arrow, expandable slider with gold track
+- Quick bet chips: Styled as actual poker chip shapes (using the existing .poker-chip CSS) with denominations
+- Entire control bar has a dark frosted glass background with rounded corners
+
+**6. Enhanced Pot Display (PotDisplay.tsx)**
+
+- Replace the simple chip stack with layered chip graphics (3-4 stacked colored circles with edge highlights)
+- Number counter with a gold glow and shadow
+- Chips animate (scale bounce) when pot increases
+- Show side pots as separate smaller displays
+
+**7. Cinematic Animations (index.css + components)**
+
+New premium animations:
+- Card dealing: Cards slide from a deck position (top-right corner) with rotation, arriving at their position with a satisfying "snap"
+- Community card reveal: Card placed face-down first, then flips with a 3D rotate effect and a brief light flash
+- Bet action: Chip token slides from player toward pot center
+- Win announcement: Gold particle burst radiating from the winning cards, cards lift and glow
+- Phase transition: Subtle pulse wave across the table when flop/turn/river is dealt
+- Turn indicator: Spotlight beam effect on the active player's seat
+
+**8. Game Header Redesign**
+
+- Replace plain text header with a dark glass bar
+- Hand number in a gold badge
+- Blinds displayed as styled chip pairs
+- Back button as a translucent circle with arrow
 
 ---
 
 ### Technical Details
 
+**New files:**
+- `supabase/functions/generate-poker-assets/index.ts` -- backend function using Lovable AI image generation to create table felt, card back, and chip graphics (generated once, cached in storage)
+- `src/components/poker/PokerChip.tsx` -- reusable styled poker chip component (CSS-only, uses the existing .poker-chip class with enhancements)
+- `src/components/poker/TableFelt.tsx` -- the oval table visual with layered textures, rail, and betting line
+- `src/hooks/usePokerAssets.ts` -- hook to load/cache AI-generated game assets from storage
+
 **Files to modify:**
+- `src/components/poker/PokerTablePro.tsx` -- use TableFelt component, restructure layout with premium header, spotlight effects
+- `src/components/poker/CardDisplay.tsx` -- complete visual redesign with proper card layout, 3D effects, premium patterns
+- `src/components/poker/PlayerAvatar.tsx` -- gradient rings, 3D raised effect, spotlight for active player
+- `src/components/poker/BettingControls.tsx` -- gradient buttons with icons, poker chip quick-bets, frosted glass bar
+- `src/components/poker/PotDisplay.tsx` -- chip stack graphic, enhanced counter animation
+- `src/components/poker/DealerButton.tsx` -- premium 3D dealer chip with embossed "D"
+- `src/components/poker/WinnerOverlay.tsx` -- more dramatic with gold particle burst, card fan display
+- `src/index.css` -- new keyframes for spotlight, card snap, chip slide, light flash, wave pulse
 
-1. **`src/components/layout/AppLayout.tsx`**
-   - Add `/play-poker` and `/online-poker` to the routes that hide the bottom nav (or check for a gameplay-active prefix)
-
-2. **`src/components/poker/PokerTablePro.tsx`**
-   - Restructure to a 3-zone vertical layout: top (bots, ~25%), middle (felt with pot + community cards, ~45%), bottom (human cards + controls, ~30%)
-   - Bot section: `flex-nowrap overflow-x-auto` with compact seats
-   - Felt: remove `min-h-[180px]`, use `flex-1` with reduced padding
-   - Remove empty card slot placeholders (only show dealt cards)
-   - Human section: single-row layout with cards, avatar, and chip count side by side
-   - Betting controls inline within the bottom section, not stacked
-
-3. **`src/components/poker/BettingControls.tsx`**
-   - Compact single-row layout: Fold | Check/Call | Raise as a tight button bar
-   - Quick bet presets shown as small chips above the main buttons
-   - Raise slider only appears when "Raise" is tapped (two-step interaction), keeping default view to ~44px height
-
-4. **`src/components/poker/CardDisplay.tsx`**
-   - Reduce `md` size: `w-10 h-14 text-xs`
-
-5. **`src/components/poker/PotDisplay.tsx`**
-   - Tighter padding and smaller text
-
-6. **`src/index.css`**
-   - No new animations needed, just ensuring existing ones work with the tighter layout
-
-### No database or backend changes needed.
+**No database schema changes needed.** One new storage bucket for cached game assets (created via migration).
