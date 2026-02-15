@@ -537,3 +537,71 @@
 }
 
 .animate-card-deal-deck { animation: card-deal-from-deck 0.5s ease-out both; }
+
+/* ===== AAA Premium Poker Animations ===== */
+
+/* Dealer breathing idle */
+@keyframes dealer-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+.dealer-breathe { animation: dealer-breathe 4s ease-in-out infinite; }
+
+/* Hand name reveal at showdown */
+@keyframes hand-name-reveal {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.animate-hand-name-reveal { animation: hand-name-reveal 0.6s ease-out both; }
+
+/* Gold particle float upward */
+@keyframes particle-float {
+  0% { opacity: 0; transform: translateY(0) scale(0); }
+  20% { opacity: 1; transform: translateY(-5px) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.5); }
+}
+.animate-particle-float { animation: particle-float 2s ease-out both; }
+
+/* Chip fly from seat to pot (custom properties --chip-dx, --chip-dy) */
+@keyframes chip-fly-custom {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--chip-dx), var(--chip-dy)) scale(0.7); opacity: 0.6; }
+}
+
+/* Seat dimming for non-active players */
+.seat-dimmed { opacity: 0.45; transition: opacity 0.3s ease-out; }
+.seat-active { opacity: 1; transition: opacity 0.3s ease-out; }
+
+/* Card 3D flip */
+.card-flip-3d {
+  perspective: 600px;
+}
+.card-flip-3d-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease-in-out;
+}
+.card-flip-3d-inner.flipped {
+  transform: rotateY(180deg);
+}
+.card-flip-3d-front,
+.card-flip-3d-back {
+  backface-visibility: hidden;
+  position: absolute;
+  inset: 0;
+}
+.card-flip-3d-back {
+  transform: rotateY(180deg);
+}
+
+/* Pot award animation */
+@keyframes pot-award {
+  0% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+  100% { transform: translate(var(--award-dx), var(--award-dy)) scale(0.6); opacity: 0; }
+}
+
+/* Premium wood rail shimmer */
+@keyframes rail-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}

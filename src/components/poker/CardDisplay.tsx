@@ -1,6 +1,6 @@
 import { Card, RANK_NAMES, SUIT_SYMBOLS } from '@/lib/poker/types';
 import { cn } from '@/lib/utils';
-import cardBack from '@/assets/card-back.png';
+import cardBackPremium from '@/assets/poker/card-back-premium.png';
 
 interface CardDisplayProps {
   card?: Card;
@@ -26,13 +26,13 @@ export function CardDisplay({ card, faceDown = false, size = 'md', className, de
         className={cn(
           sizeClasses[size],
           'rounded-lg overflow-hidden flex items-center justify-center select-none',
-          'shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_1px_rgba(255,215,0,0.3)] animate-card-deal',
+          'shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_1px_rgba(255,215,0,0.3)] animate-card-deal-deck',
           'border border-primary/20',
           className,
         )}
         style={{ animationDelay: `${dealDelay}s` }}
       >
-        <img src={cardBack} alt="" className="w-full h-full object-cover" draggable={false} />
+        <img src={cardBackPremium} alt="" className="w-full h-full object-cover" draggable={false} />
       </div>
     );
   }
@@ -50,7 +50,7 @@ export function CardDisplay({ card, faceDown = false, size = 'md', className, de
       className={cn(
         sizeClasses[size],
         'rounded-lg flex flex-col relative select-none',
-        'shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.8)] animate-card-deal',
+        'shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.8)] animate-card-deal-deck',
         isWinner && 'animate-winner-glow ring-1 ring-primary/60',
         className,
       )}
