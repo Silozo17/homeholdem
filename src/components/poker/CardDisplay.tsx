@@ -11,9 +11,9 @@ interface CardDisplayProps {
 }
 
 const sizeClasses = {
-  sm: 'w-8 h-12 text-xs',
-  md: 'w-11 h-16 text-sm',
-  lg: 'w-14 h-20 text-base',
+  sm: 'w-7 h-10 text-[10px]',
+  md: 'w-10 h-14 text-xs',
+  lg: 'w-12 h-[68px] text-sm',
 };
 
 export function CardDisplay({ card, faceDown = false, size = 'md', className, dealDelay = 0, isWinner }: CardDisplayProps) {

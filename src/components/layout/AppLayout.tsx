@@ -14,6 +14,8 @@ const hiddenNavRoutes = ['/', '/auth'];
 // Routes where nav should always be hidden (active gameplay)
 const gameplayRoutes = ['/event/'];
 const conditionalNavRoutes = ['/game'];
+// Routes where bottom nav is hidden for fullscreen gameplay
+const fullscreenRoutes = ['/play-poker', '/online-poker'];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
@@ -27,7 +29,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isGameTVMode = location.pathname.includes('/game') && 
     new URLSearchParams(location.search).get('tv') === 'true';
 
-  const showBottomNav = shouldShowNav && !isGameTVMode;
+  const isFullscreenGameplay = fullscreenRoutes.some(
+    (route) => location.pathname.startsWith(route)
+  );
+
+  const showBottomNav = shouldShowNav && !isGameTVMode && !isFullscreenGameplay;
 
   // Show mini bar when:
   // 1. There's an active game
