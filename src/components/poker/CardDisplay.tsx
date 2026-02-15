@@ -6,6 +6,8 @@ interface CardDisplayProps {
   faceDown?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  dealDelay?: number;
+  isWinner?: boolean;
 }
 
 const sizeClasses = {
@@ -14,32 +16,49 @@ const sizeClasses = {
   lg: 'w-14 h-20 text-base',
 };
 
-export function CardDisplay({ card, faceDown = false, size = 'md', className }: CardDisplayProps) {
+export function CardDisplay({ card, faceDown = false, size = 'md', className, dealDelay = 0, isWinner }: CardDisplayProps) {
   const isRed = card?.suit === 'hearts' || card?.suit === 'diamonds';
 
   if (faceDown || !card) {
     return (
-      <div className={cn(
-        sizeClasses[size],
-        'rounded-md border border-border bg-primary/20 flex items-center justify-center font-bold select-none',
-        'shadow-md',
-        className,
-      )}>
-        <span className="text-primary opacity-60">♠</span>
+      <div
+        className={cn(
+          sizeClasses[size],
+          'rounded-lg card-back-premium flex items-center justify-center font-bold select-none',
+          'shadow-lg border border-border/40 animate-card-deal',
+          className,
+        )}
+        style={{ animationDelay: `${dealDelay}s` }}
+      >
+        <span className="text-primary/50 text-lg">♠</span>
       </div>
     );
   }
 
   return (
-    <div className={cn(
-      sizeClasses[size],
-      'rounded-md border bg-foreground flex flex-col items-center justify-center font-bold select-none',
-      'shadow-md transition-transform duration-200',
-      isRed ? 'text-destructive' : 'text-background',
-      className,
-    )}>
-      <span className="leading-none">{RANK_NAMES[card.rank]}</span>
-      <span className="leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+    <div
+      className={cn(
+        sizeClasses[size],
+        'rounded-lg card-face-white flex flex-col items-center justify-center font-bold select-none',
+        'shadow-lg border border-border/20 animate-card-deal',
+        isWinner && 'animate-winner-glow',
+        className,
+      )}
+      style={{ animationDelay: `${dealDelay}s` }}
+    >
+      <span className={cn(
+        'leading-none font-extrabold',
+        isRed ? 'text-red-600' : 'text-gray-900',
+      )}>
+        {RANK_NAMES[card.rank]}
+      </span>
+      <span className={cn(
+        'leading-none',
+        isRed ? 'text-red-500' : 'text-gray-800',
+        size === 'lg' && 'text-lg',
+      )}>
+        {SUIT_SYMBOLS[card.suit]}
+      </span>
     </div>
   );
 }

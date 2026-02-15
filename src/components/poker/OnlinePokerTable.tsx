@@ -213,6 +213,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               maxBet={hand?.current_bet ?? 0}
               playerChips={mySeat.stack}
               bigBlind={table.big_blind}
+              pot={hand?.pots?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) ?? 0}
               onAction={(action) => {
                 const actionType = action.type === 'all-in' ? 'all_in' : action.type;
                 sendAction(actionType, action.amount);

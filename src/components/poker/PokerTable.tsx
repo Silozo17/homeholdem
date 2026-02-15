@@ -126,6 +126,7 @@ export function PokerTable({
               maxBet={maxBet}
               playerChips={humanPlayer.chips}
               bigBlind={state.bigBlind}
+              pot={state.pot}
               onAction={onAction}
             />
           )}
