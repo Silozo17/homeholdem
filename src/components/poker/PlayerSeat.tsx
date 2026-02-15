@@ -2,6 +2,7 @@ import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
 import { DealerButton } from './DealerButton';
+import { TurnTimer } from './TurnTimer';
 import { cn } from '@/lib/utils';
 
 interface PlayerSeatProps {
@@ -20,7 +21,7 @@ export function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShow
       'flex flex-col items-center gap-0.5 transition-all duration-300',
       isOut && 'opacity-40',
     )}>
-      {/* Avatar with dealer button */}
+      {/* Avatar with dealer button + turn timer */}
       <div className="relative">
         <PlayerAvatar
           name={player.name}
@@ -32,9 +33,13 @@ export function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShow
         {player.isDealer && (
           <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />
         )}
+        {/* Turn timer ring */}
+        {isCurrentPlayer && !isOut && (
+          <TurnTimer active={true} size={40} strokeWidth={2.5} />
+        )}
       </div>
 
-      {/* Cards — only show when dealt */}
+      {/* Cards */}
       {player.holeCards.length > 0 && (
         <div className="flex gap-0.5 mt-0.5">
           {player.holeCards.map((card, i) => (
