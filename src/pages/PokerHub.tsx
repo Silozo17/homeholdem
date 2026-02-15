@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, Settings2, Users, ArrowLeft } from 'lucide-react';
+import { Zap, Settings2, Users, ArrowLeft, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
@@ -58,6 +58,15 @@ export default function PokerHub() {
             accentClass="bg-emerald-500/15"
             ctaLabel="Find Table"
             onClick={() => navigate('/online-poker')}
+          />
+          <GameModeCard
+            icon={Trophy}
+            title="Tournaments"
+            description="Structured competitions with blind schedules"
+            hint="Multi-table • Payouts"
+            accentClass="bg-purple-500/15"
+            ctaLabel="Browse Tournaments"
+            onClick={() => navigate('/poker-tournament')}
           />
         </div>
       </div>
