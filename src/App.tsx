@@ -24,6 +24,7 @@ import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import PlayPoker from "./pages/PlayPoker";
+import OnlinePoker from "./pages/OnlinePoker";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +63,7 @@ const App = () => (
                   <Route path="/install" element={<Install />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/play-poker" element={<PlayPoker />} />
+                  <Route path="/online-poker" element={<OnlinePoker />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
