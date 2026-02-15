@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Users, Calendar, ArrowRight } from 'lucide-react';
+import { Users, Calendar, ArrowRight, Gamepad2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
@@ -141,6 +141,26 @@ export function QuickCreateDialog({ open, onOpenChange }: QuickCreateDialogProps
                   <div className="text-left">
                     <div className="font-semibold">{t('quick_create.new_event')}</div>
                     <div className="text-xs text-muted-foreground">{t('quick_create.new_event_desc')}</div>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full h-16 justify-between border-border hover:bg-secondary"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate('/online-poker');
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Gamepad2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold">{t('quick_create.play_poker')}</div>
+                    <div className="text-xs text-muted-foreground">{t('quick_create.play_poker_desc')}</div>
                   </div>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />

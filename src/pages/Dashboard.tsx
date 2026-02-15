@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
-import { Plus, Users, Crown } from 'lucide-react';
+import { Plus, Users, Crown, Gamepad2, ArrowRight } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
@@ -266,7 +266,26 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="container px-4 py-6 space-y-6">
-        {/* Welcome Section */}
+        {/* Play Poker Hero Card */}
+        <Card 
+          className="bg-card border-border/50 cursor-pointer hover:border-primary/50 transition-colors overflow-hidden"
+          onClick={() => navigate('/online-poker')}
+        >
+          <CardContent className="flex items-center justify-between p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <Gamepad2 className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg text-gold-gradient">{t('dashboard.play_poker')}</CardTitle>
+                <CardDescription>{t('dashboard.play_poker_desc')}</CardDescription>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0" />
+          </CardContent>
+        </Card>
+
+        {/* Clubs Section */}
         <div className="space-y-1">
           <h2 className="text-2xl font-bold text-gold-gradient">{t('dashboard.your_clubs')}</h2>
           <p className="text-muted-foreground">
