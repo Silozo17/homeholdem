@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
+import { PlayerAvatar } from './PlayerAvatar';
+import { DealerButton } from './DealerButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Play, LogOut, Users, Copy, Check } from 'lucide-react';
@@ -19,18 +21,8 @@ interface OnlinePokerTableProps {
 export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { user } = useAuth();
   const {
-    tableState,
-    myCards,
-    loading,
-    error,
-    mySeatNumber,
-    isMyTurn,
-    amountToCall,
-    canCheck,
-    joinTable,
-    leaveTable,
-    startHand,
-    sendAction,
+    tableState, myCards, loading, error, mySeatNumber, isMyTurn,
+    amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -39,7 +31,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[100dvh] poker-felt-bg">
         <div className="text-muted-foreground animate-pulse">Loading table...</div>
       </div>
     );
@@ -47,7 +39,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   if (error || !tableState) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] poker-felt-bg gap-4">
         <p className="text-destructive">{error || 'Table not found'}</p>
         <Button variant="outline" onClick={onLeave}>Go Back</Button>
       </div>
@@ -69,23 +61,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       return;
     }
     setJoining(true);
-    try {
-      await joinTable(seatNum, amount);
-      toast({ title: 'Seated!' });
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally {
-      setJoining(false);
-    }
+    try { await joinTable(seatNum, amount); toast({ title: 'Seated!' }); }
+    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    finally { setJoining(false); }
   };
 
   const handleLeave = async () => {
-    try {
-      await leaveTable();
-      onLeave();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    }
+    try { await leaveTable(); onLeave(); }
+    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
   };
 
   const copyInviteCode = () => {
@@ -96,19 +79,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  // Build seat layout - all seats around the table
   const allSeats: (OnlineSeatInfo | null)[] = Array.from({ length: table.max_seats }, (_, i) => {
     return seats.find(s => s.seat === i) || null;
   });
 
-  // Split: my seat at bottom, others on top
-  const otherSeats = allSeats.map((seat, i) => ({ seat, index: i }))
-    .filter(({ index }) => index !== mySeatNumber);
+  const otherSeats = allSeats.map((seat, i) => ({ seat, index: i })).filter(({ index }) => index !== mySeatNumber);
 
   return (
-    <div className="flex flex-col h-full min-h-[80vh] relative">
+    <div className="flex flex-col h-[100dvh] relative overflow-hidden poker-felt-bg">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between px-3 py-2 z-10 safe-area-top">
         <Button variant="ghost" size="icon" onClick={isSeated ? handleLeave : onLeave}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -132,8 +112,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       </div>
 
-      {/* Other players - top area */}
-      <div className="flex flex-wrap justify-center gap-1 px-2 py-1">
+      {/* Other players - arc layout */}
+      <div className="flex flex-wrap justify-center gap-1 px-2 pt-1 pb-2 z-10">
         {otherSeats.map(({ seat: seatData, index }) => (
           <OnlineSeatDisplay
             key={index}
@@ -141,37 +121,44 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             seatData={seatData}
             hand={hand}
             isCurrentActor={hand?.current_actor_seat === index}
+            isDealer={hand?.dealer_seat === index}
             onJoin={!isSeated && !seatData?.player_id ? () => handleJoinSeat(index) : undefined}
           />
         ))}
       </div>
 
       {/* Table felt - center */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 mx-4 rounded-2xl bg-secondary/30 border border-border/50 p-4 min-h-[180px]">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2.5 mx-3 rounded-[2rem] border border-border/30 p-4 min-h-[180px] relative"
+        style={{
+          background: 'radial-gradient(ellipse 90% 70% at 50% 50%, hsl(160 50% 20%) 0%, hsl(160 40% 14%) 50%, hsl(160 30% 10%) 100%)',
+          boxShadow: 'inset 0 2px 20px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.4)',
+        }}
+      >
         {totalPot > 0 && <PotDisplay pot={totalPot} />}
 
         {/* Community cards */}
-        <div className="flex gap-1.5 min-h-[64px] items-center">
+        <div className="flex gap-1.5 min-h-[68px] items-center">
           {(hand?.community_cards || []).map((card, i) => (
-            <CardDisplay key={i} card={card} size="md" />
+            <CardDisplay key={i} card={card} size="md" dealDelay={i * 0.12} />
           ))}
           {Array.from({ length: 5 - (hand?.community_cards?.length || 0) }).map((_, i) => (
-            <div key={`empty-${i}`} className="w-11 h-16 rounded-md border border-border/30 bg-secondary/20" />
+            <div key={`empty-${i}`} className="w-11 h-16 rounded-lg border border-border/20 bg-secondary/10" />
           ))}
         </div>
 
-        {/* Phase indicator */}
         {hand && (
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
+          <span className={cn(
+            'text-[10px] text-muted-foreground/70 uppercase tracking-[0.15em] font-medium',
+            (hand.phase === 'flop' || hand.phase === 'turn' || hand.phase === 'river') && 'animate-phase-flash',
+          )}>
             {hand.phase === 'preflop' ? 'Pre-Flop' : hand.phase}
           </span>
         )}
 
-        {/* Start hand / waiting messaging */}
         {!hand && isSeated && (
           <div className="text-center space-y-2">
             {canStartHand ? (
-              <Button onClick={startHand} size="sm" className="gap-2">
+              <Button onClick={startHand} size="sm" className="gap-2 shimmer-btn text-primary-foreground font-bold">
                 <Play className="h-4 w-4" /> Deal Hand
               </Button>
             ) : (
@@ -183,11 +170,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* My seat - bottom */}
       {isSeated && mySeat ? (
-        <div className="px-4 py-3 space-y-3">
+        <div className="px-3 py-2 space-y-2 z-10 safe-area-bottom">
           <div className="flex items-center justify-center gap-4">
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               {myCards && myCards.length > 0 ? (
-                myCards.map((card, i) => <CardDisplay key={i} card={card} size="lg" />)
+                myCards.map((card, i) => <CardDisplay key={i} card={card} size="lg" dealDelay={i * 0.15} />)
               ) : hand ? (
                 <>
                   <CardDisplay faceDown size="lg" />
@@ -196,15 +183,25 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               ) : null}
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold text-primary">You</p>
-              <p className="text-lg font-bold text-foreground">{mySeat.stack.toLocaleString()}</p>
+              <div className="flex items-center gap-1.5 justify-center">
+                <PlayerAvatar
+                  name="You"
+                  index={0}
+                  status={mySeat.status === 'folded' ? 'folded' : 'active'}
+                  isCurrentPlayer={isMyTurn}
+                  size="sm"
+                />
+                {hand?.dealer_seat === mySeatNumber && <DealerButton />}
+              </div>
+              <p className="text-lg font-bold text-foreground mt-0.5">{mySeat.stack.toLocaleString()}</p>
               {mySeat.last_action && (
-                <p className="text-xs text-muted-foreground">{mySeat.last_action}</p>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-secondary/50 text-muted-foreground">
+                  {mySeat.last_action}
+                </span>
               )}
             </div>
           </div>
 
-          {/* Betting controls */}
           {isMyTurn && (
             <BettingControls
               canCheck={canCheck}
@@ -222,8 +219,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           )}
         </div>
       ) : !isSeated ? (
-        /* Join controls */
-        <div className="px-4 py-4 space-y-3 border-t border-border">
+        <div className="px-4 py-4 space-y-3 border-t border-border/30 safe-area-bottom">
           <p className="text-sm text-center text-muted-foreground">Tap an empty seat to join</p>
           <div className="flex items-center gap-2 max-w-xs mx-auto">
             <Input
@@ -237,9 +233,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       ) : null}
 
-      {/* Leave button */}
       {isSeated && !hand && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 safe-area-bottom">
           <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLeave}>
             <LogOut className="h-4 w-4" /> Leave Table
           </Button>
@@ -249,18 +244,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   );
 }
 
-// Individual seat display component
 function OnlineSeatDisplay({
-  seatNumber,
-  seatData,
-  hand,
-  isCurrentActor,
-  onJoin,
+  seatNumber, seatData, hand, isCurrentActor, isDealer, onJoin,
 }: {
   seatNumber: number;
   seatData: OnlineSeatInfo | null;
   hand: any;
   isCurrentActor: boolean;
+  isDealer?: boolean;
   onJoin?: () => void;
 }) {
   const isEmpty = !seatData?.player_id;
@@ -273,52 +264,50 @@ function OnlineSeatDisplay({
         onClick={onJoin}
         disabled={!onJoin}
         className={cn(
-          'flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[72px] min-h-[80px] transition-all',
-          'border border-dashed border-border/40',
-          onJoin ? 'hover:bg-secondary/30 hover:border-primary/40 cursor-pointer' : 'opacity-30',
+          'flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[64px] min-h-[76px] transition-all',
+          'border border-dashed border-border/30',
+          onJoin ? 'hover:bg-secondary/30 hover:border-primary/40 cursor-pointer animate-pulse-border' : 'opacity-30',
         )}
       >
         <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center text-xs text-muted-foreground">
           {seatNumber + 1}
         </div>
-        {onJoin && <span className="text-[10px] text-muted-foreground">Sit</span>}
+        {onJoin && <span className="text-[10px] text-primary font-medium">Sit</span>}
       </button>
     );
   }
 
   return (
     <div className={cn(
-      'flex flex-col items-center gap-1 p-2 rounded-lg min-w-[72px] transition-all',
-      isCurrentActor && !isFolded && 'ring-2 ring-primary bg-primary/10',
+      'flex flex-col items-center gap-0.5 p-2 rounded-lg min-w-[64px] transition-all',
       isFolded && 'opacity-40',
-      isAllIn && 'ring-2 ring-destructive',
     )}>
-      {/* Cards face-down indicator */}
+      <div className="relative">
+        <PlayerAvatar
+          name={seatData.display_name}
+          index={seatNumber}
+          status={isFolded ? 'folded' : isAllIn ? 'all-in' : 'active'}
+          isCurrentPlayer={isCurrentActor && !isFolded}
+        />
+        {isDealer && <DealerButton className="absolute -top-1 -right-1" />}
+      </div>
+
+      {/* Cards */}
       <div className="flex gap-0.5">
         {hand && seatData?.has_cards && !isFolded ? (
           <>
-            <CardDisplay faceDown size="sm" />
-            <CardDisplay faceDown size="sm" />
+            <CardDisplay faceDown size="sm" dealDelay={0} />
+            <CardDisplay faceDown size="sm" dealDelay={0.1} />
           </>
-        ) : (
-          <div className="h-12 w-8" />
-        )}
+        ) : <div className="h-10 w-8" />}
       </div>
 
-      {/* Name & stack */}
-      <div className="text-center">
-        <p className="text-xs font-semibold truncate max-w-[72px] text-foreground">
-          {seatData.display_name}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {seatData.stack.toLocaleString()}
-        </p>
-      </div>
+      <p className="text-[10px] font-semibold text-foreground/80 truncate max-w-[64px]">{seatData.display_name}</p>
+      <p className="text-[10px] text-muted-foreground">{seatData.stack.toLocaleString()}</p>
 
-      {/* Last action */}
       {seatData.last_action && (
         <span className={cn(
-          'text-[10px] px-1.5 py-0.5 rounded-full',
+          'text-[9px] px-1.5 py-0.5 rounded-full font-medium animate-fade-in',
           seatData.last_action.startsWith('Fold') ? 'bg-muted text-muted-foreground' :
           seatData.last_action.includes('Raise') || seatData.last_action.includes('All')
             ? 'bg-destructive/20 text-destructive'

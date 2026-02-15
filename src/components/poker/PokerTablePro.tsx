@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { GameState } from '@/lib/poker/types';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -23,19 +23,23 @@ interface PokerTableProProps {
 }
 
 export function PokerTablePro({
-  state,
-  isHumanTurn,
-  amountToCall,
-  canCheck,
-  maxBet,
-  onAction,
-  onNextHand,
-  onQuit,
+  state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
 }: PokerTableProProps) {
   const humanPlayer = state.players.find(p => p.id === 'human');
   const isShowdown = state.phase === 'hand_complete' || state.phase === 'showdown';
   const isGameOver = state.phase === 'game_over';
   const bots = state.players.filter(p => p.isBot);
+  const [showAllinFlash, setShowAllinFlash] = useState(false);
+
+  // All-in flash effect
+  useEffect(() => {
+    const anyAllIn = state.players.some(p => p.lastAction?.startsWith('All-in'));
+    if (anyAllIn) {
+      setShowAllinFlash(true);
+      const t = setTimeout(() => setShowAllinFlash(false), 600);
+      return () => clearTimeout(t);
+    }
+  }, [state.players.map(p => p.lastAction).join(',')]);
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
@@ -59,6 +63,11 @@ export function PokerTablePro({
 
   return (
     <div className="flex flex-col h-[100dvh] relative overflow-hidden poker-felt-bg">
+      {/* All-in flash */}
+      {showAllinFlash && (
+        <div className="absolute inset-0 z-20 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash" />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 z-10 safe-area-top">
         <Button variant="ghost" size="icon" onClick={onQuit} className="text-foreground/70 hover:text-foreground">
@@ -73,7 +82,10 @@ export function PokerTablePro({
       {/* Bot players - arc layout */}
       <div className="flex flex-wrap justify-center gap-1 px-2 pt-1 pb-2 z-10">
         {bots.map((bot) => (
-          <div key={bot.id} className="flex flex-col items-center gap-0.5 min-w-[64px]">
+          <div key={bot.id} className={cn(
+            'flex flex-col items-center gap-0.5 min-w-[64px]',
+            bot.status === 'folded' && 'opacity-40',
+          )}>
             <div className="relative">
               <PlayerAvatar
                 name={bot.name}
@@ -93,6 +105,7 @@ export function PokerTablePro({
                     faceDown={!isShowdown || (bot.status !== 'active' && bot.status !== 'all-in')}
                     size="sm"
                     dealDelay={i * 0.1}
+                    className={bot.status === 'folded' ? 'animate-fold-away' : ''}
                   />
                 ))
               ) : <div className="h-10" />}
@@ -123,7 +136,6 @@ export function PokerTablePro({
           boxShadow: 'inset 0 2px 20px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.4)',
         }}
       >
-        {/* Pot */}
         <PotDisplay pot={state.pot} />
 
         {/* Community cards */}
@@ -154,11 +166,11 @@ export function PokerTablePro({
       {/* Human player - bottom */}
       {humanPlayer && (
         <div className="px-3 py-2 space-y-2 z-10 safe-area-bottom">
-          {/* Human cards and info */}
           <div className="flex items-center justify-center gap-4">
             <div className="flex gap-1.5">
               {humanPlayer.holeCards.map((card, i) => (
-                <CardDisplay key={i} card={card} size="lg" dealDelay={i * 0.15} />
+                <CardDisplay key={i} card={card} size="lg" dealDelay={i * 0.15}
+                  className={humanPlayer.status === 'folded' ? 'animate-fold-away' : ''} />
               ))}
               {humanPlayer.holeCards.length === 0 && (
                 <>
@@ -179,7 +191,12 @@ export function PokerTablePro({
                 {humanPlayer.isDealer && <DealerButton />}
               </div>
               <p className="text-lg font-bold text-foreground mt-0.5">{humanPlayer.chips.toLocaleString()}</p>
-              {humanPlayer.lastAction && (
+              {isHumanTurn && humanPlayer.status === 'active' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-bold animate-turn-pulse inline-block">
+                  YOUR TURN
+                </span>
+              )}
+              {humanPlayer.lastAction && !isHumanTurn && (
                 <span className={cn(
                   'text-xs px-2 py-0.5 rounded-full font-medium',
                   humanPlayer.lastAction.includes('!') ? 'bg-primary/20 text-primary' : 'bg-secondary/50 text-muted-foreground',
@@ -190,7 +207,6 @@ export function PokerTablePro({
             </div>
           </div>
 
-          {/* Betting controls */}
           {isHumanTurn && humanPlayer.status === 'active' && (
             <BettingControls
               canCheck={canCheck}
@@ -204,7 +220,6 @@ export function PokerTablePro({
             />
           )}
 
-          {/* Next hand button */}
           {state.phase === 'hand_complete' && (
             <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={onNextHand}>
               Next Hand →

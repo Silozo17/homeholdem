@@ -1,11 +1,13 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Home, Calendar, Plus, Trophy, User, Crown } from 'lucide-react';
+import { Home, Calendar, Plus, Trophy, User, Crown, Gamepad2, BookOpen, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { useSubscription } from '@/hooks/useSubscription';
+
+const POKER_ROUTES = ['/poker', '/play-poker', '/online-poker'];
 
 export function BottomNav() {
   const { t } = useTranslation();
@@ -15,20 +17,37 @@ export function BottomNav() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { isActive: hasActiveSubscription } = useSubscription();
 
-  const navItems = [
+  const isPokerMode = POKER_ROUTES.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
+
+  const defaultNav = [
     { icon: Home, label: t('nav.home'), path: '/dashboard' },
     { icon: Calendar, label: t('nav.events'), path: '/events' },
-    { icon: Plus, label: t('nav.create'), path: null }, // Opens modal
+    { icon: Plus, label: t('nav.create'), path: null },
     { icon: Trophy, label: t('nav.stats'), path: '/stats' },
     { icon: User, label: t('nav.profile'), path: '/profile' },
   ];
 
+  const pokerNav = [
+    { icon: Home, label: 'Home', path: '/dashboard' },
+    { icon: Gamepad2, label: 'Games', path: '/poker' },
+    { icon: Zap, label: 'Quick', path: null }, // Quick play
+    { icon: Trophy, label: 'Stats', path: '/stats' },
+    { icon: BookOpen, label: 'Rules', path: '/rules' },
+  ];
+
+  const navItems = isPokerMode ? pokerNav : defaultNav;
+
   const handleNavClick = (path: string | null) => {
     if (path === null) {
-      if (hasActiveSubscription) {
-        setCreateDialogOpen(true);
+      if (isPokerMode) {
+        // Quick play - navigate to play-poker with defaults
+        navigate('/play-poker');
       } else {
-        setPaywallOpen(true);
+        if (hasActiveSubscription) {
+          setCreateDialogOpen(true);
+        } else {
+          setPaywallOpen(true);
+        }
       }
     } else {
       navigate(path);
@@ -47,7 +66,7 @@ export function BottomNav() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
-            const isCreateButton = item.path === null;
+            const isCenterButton = item.path === null;
 
             return (
               <button
@@ -55,28 +74,18 @@ export function BottomNav() {
                 onClick={() => handleNavClick(item.path)}
                 className={cn(
                   'flex flex-col items-center justify-center flex-1 h-full transition-colors',
-                  isCreateButton
+                  isCenterButton
                     ? 'text-primary'
                     : active
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {isCreateButton ? (
+                {isCenterButton ? (
                   <div className="relative -mt-6">
-                    {/* Poker chip design */}
                     <div className="relative w-14 h-14">
-                      {/* Outer ring with notches */}
-                      <svg 
-                        viewBox="0 0 56 56" 
-                        className="absolute inset-0 w-full h-full"
-                      >
-                        {/* Background circle */}
-                        <circle 
-                          cx="28" cy="28" r="26" 
-                          className="fill-primary"
-                        />
-                        {/* Notches around the edge */}
+                      <svg viewBox="0 0 56 56" className="absolute inset-0 w-full h-full">
+                        <circle cx="28" cy="28" r="26" className="fill-primary" />
                         {Array.from({ length: 12 }).map((_, i) => {
                           const angle = (i * 30) * (Math.PI / 180);
                           const x1 = 28 + 26 * Math.cos(angle);
@@ -84,50 +93,29 @@ export function BottomNav() {
                           const x2 = 28 + 21 * Math.cos(angle);
                           const y2 = 28 + 21 * Math.sin(angle);
                           return (
-                            <line
-                              key={i}
-                              x1={x1}
-                              y1={y1}
-                              x2={x2}
-                              y2={y2}
-                              stroke="hsl(var(--background))"
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                            />
+                            <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+                              stroke="hsl(var(--background))" strokeWidth="3" strokeLinecap="round" />
                           );
                         })}
-                        {/* Inner ring */}
-                        <circle 
-                          cx="28" cy="28" r="18" 
-                          fill="none"
-                          className="stroke-background"
-                          strokeWidth="2"
-                        />
-                        {/* Center circle */}
-                        <circle 
-                          cx="28" cy="28" r="15" 
-                          className="fill-background"
-                        />
+                        <circle cx="28" cy="28" r="18" fill="none" className="stroke-background" strokeWidth="2" />
+                        <circle cx="28" cy="28" r="15" className="fill-background" />
                       </svg>
-                      {/* Icon in center - Plus for subscribed, Crown for non-subscribed */}
                       <div className="absolute inset-0 flex items-center justify-center">
-                        {hasActiveSubscription ? (
+                        {isPokerMode ? (
+                          <Zap className="h-6 w-6 text-primary" strokeWidth={2.5} />
+                        ) : hasActiveSubscription ? (
                           <Plus className="h-6 w-6 text-primary" strokeWidth={3} />
                         ) : (
                           <Crown className="h-5 w-5 text-primary" strokeWidth={2.5} />
                         )}
                       </div>
                     </div>
-                    {/* Glow effect */}
                     <div className="absolute inset-0 w-14 h-14 rounded-full bg-primary/20 blur-md -z-10" />
                   </div>
                 ) : (
                   <>
                     <Icon className={cn('h-5 w-5', active && 'glow-gold')} />
-                    <span className={cn(
-                      'text-xs mt-1 font-medium',
-                      active && 'text-gold-gradient'
-                    )}>
+                    <span className={cn('text-xs mt-1 font-medium', active && 'text-gold-gradient')}>
                       {item.label}
                     </span>
                   </>
@@ -138,15 +126,8 @@ export function BottomNav() {
         </div>
       </nav>
 
-      <QuickCreateDialog 
-        open={createDialogOpen} 
-        onOpenChange={setCreateDialogOpen} 
-      />
-
-      <PaywallDrawer 
-        open={paywallOpen} 
-        onOpenChange={setPaywallOpen} 
-      />
+      <QuickCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
     </>
   );
 }

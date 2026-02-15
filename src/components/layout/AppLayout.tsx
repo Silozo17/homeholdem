@@ -11,7 +11,8 @@ interface AppLayoutProps {
 
 // Routes where bottom nav should be hidden
 const hiddenNavRoutes = ['/', '/auth'];
-// Routes where nav is conditionally hidden (e.g., TV display mode)
+// Routes where nav should always be hidden (active gameplay)
+const gameplayRoutes = ['/event/'];
 const conditionalNavRoutes = ['/game'];
 
 export function AppLayout({ children }: AppLayoutProps) {
