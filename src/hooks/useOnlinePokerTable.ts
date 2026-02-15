@@ -189,9 +189,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   }, [tableId, refreshState]);
 
   const leaveTable = useCallback(async () => {
+    // Don't call if we're not actually seated
+    if (mySeatNumber === null) return;
     await callEdge('poker-leave-table', { table_id: tableId });
     await refreshState();
-  }, [tableId, refreshState]);
+  }, [tableId, refreshState, mySeatNumber]);
 
   const startHand = useCallback(async () => {
     const data = await callEdge('poker-start-hand', { table_id: tableId });

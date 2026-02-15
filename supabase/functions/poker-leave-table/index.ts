@@ -58,9 +58,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (!seat) {
+      // Idempotent: if not seated, just return success
       return new Response(
-        JSON.stringify({ error: "Not seated at this table" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ message: "Not seated", stack: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
