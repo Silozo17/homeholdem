@@ -1,105 +1,147 @@
 
 
-## Premium Poker Game Visual Overhaul
+## Complete Poker Table Redesign: Players Around the Table
 
-The current game looks basic because it uses plain colored circles, simple CSS gradients, and lacks the visual richness of real poker games. This plan transforms every visual element with AI-generated graphics, rich textures, 3D-style card designs, and polished animations.
+The current layout puts all bot players in a horizontal strip above the table -- this is fundamentally wrong. Every premium poker game seats players around the perimeter of an oval table. This plan rebuilds the entire table component from scratch with proper seating, removes the "Next Hand" modal, fixes "Check" behavior, and auto-advances between hands.
 
 ---
 
-### What Changes
+### Core Problems to Fix
 
-**1. AI-Generated Game Assets**
+1. **Players are NOT seated around the table** -- bots are in a row at the top, not positioned around the felt
+2. **"Next Hand" modal blocks gameplay** -- real poker auto-deals the next hand after a brief showdown pause
+3. **No dealer avatar** -- reference games show a dealer character at the top of the table
+4. **Card dealing animation not visible** -- cards appear instantly rather than animating from a deck
+5. **WinnerOverlay is a fullscreen modal** -- should be an inline banner/toast on the felt, not blocking the view
 
-Create a backend function that uses Lovable AI's image generation (google/gemini-2.5-flash-image) to produce premium game assets, stored in file storage:
+---
 
-- Poker table felt texture (top-down oval green felt with rail and cup holders)
-- Card back design (premium pattern with gold accents)
-- Chip stack icons for pot display
-- Background texture for the game screen
+### 1. Arc/Perimeter Seat Layout (PokerTablePro.tsx -- full rewrite)
 
-These get generated once per project and cached in storage so they load instantly during gameplay.
+Replace the "bots at top, table in middle, human at bottom" layout with a single fullscreen view where:
 
-**2. Redesigned Poker Table (PokerTablePro.tsx)**
+- The entire screen IS the table (leather background + felt oval centered)
+- Player seats are positioned around the oval table using absolute positioning with percentage-based coordinates
+- For mobile portrait (our main case), seat positions for up to 8 bots + 1 human:
+  - Human player: bottom center (50%, 88%)
+  - Seats arranged clockwise from bottom-left around the top to bottom-right
+  - Each seat shows: avatar, name, chip count, action badge, and face-down cards beside them
+- Community cards and pot display in the center of the table
+- Betting controls overlay at the very bottom of the screen
 
-Replace the current plain radial gradient with a layered visual:
-- Full-bleed background with dark leather/wood texture
-- Centered oval table element with an actual felt texture image, raised rail border with 3D shadow
-- Inner betting line (gold dashed ellipse) where community cards sit
-- The pot display centered with a chip stack graphic
-- Subtle vignette overlay on edges for depth
+Seat position map (percentage-based for responsive scaling):
 
-**3. Premium Card Design (CardDisplay.tsx)**
+```text
+              [Dealer Girl]
+         S4 ---- S3 ---- S2
+        /                    \
+      S5                      S1
+        \                    /
+         S6 ---- S7 ---- S8
+              [HUMAN]
+```
 
-Complete card visual overhaul:
-- White cards with rounded corners, subtle inner shadow, and a linen texture gradient
-- Rank and suit rendered larger with proper card layout (top-left corner + center suit)
-- Red suits use a rich crimson, black suits use deep charcoal
-- Card back gets a premium crosshatch/diamond pattern with gold foil border
-- 3D perspective tilt on hover/deal (subtle rotateX + rotateY)
-- Winner cards get a golden glow border with particle sparkle overlay
-- Folded cards: desaturate + scale down + rotate away
+Each seat is a self-contained component showing avatar + cards + info stacked vertically.
 
-**4. Rich Player Avatars (PlayerAvatar.tsx)**
+### 2. Dealer Avatar
 
-Replace plain colored circles with premium styled avatars:
-- Gradient ring border (gold for active, grey for folded, red pulse for all-in)
-- Inner shadow and 3D raised effect
-- Player name on a dark pill below the avatar
-- Chip count displayed as a styled badge with chip icon
-- Action badges (Fold/Call/Raise/All-in) as floating animated pills with color coding and icons
-- Current player gets an animated spotlight ring (concentric expanding circles)
+Add a decorative dealer character at the top-center of the table:
+- A styled "Dealer" indicator with a casino-themed icon (using CSS, no AI generation needed)
+- Gold-bordered circular frame with a diamond/spade pattern
+- Shows "DEALER" text below
+- The dealer button (D chip) still rotates to the player who is dealing
 
-**5. Immersive Betting Controls (BettingControls.tsx)**
+### 3. Player Seat Component (new: PlayerSeat.tsx)
 
-Transform from plain buttons to premium game controls:
-- Fold: Dark red gradient button with a card-toss icon, press animation (cards fly away)
-- Check/Call: Teal gradient with chip icon, press ripple effect
-- Raise: Gold gradient with upward arrow, expandable slider with gold track
-- Quick bet chips: Styled as actual poker chip shapes (using the existing .poker-chip CSS) with denominations
-- Entire control bar has a dark frosted glass background with rounded corners
+A new compact component for each seat around the table:
+- Avatar circle (reuse PlayerAvatar with current-turn ring animation)
+- Two mini face-down cards shown beside/below the avatar
+- Name label (truncated to ~8 chars)
+- Chip count in gold text
+- Action badge (Fold/Call/Raise/Check/All-in) as a floating pill
+- Bet amount shown between the seat and the center pot (as a small chip + number)
+- Folded state: entire seat goes semi-transparent, cards slide away
+- Current turn: golden ring pulse around avatar
 
-**6. Enhanced Pot Display (PotDisplay.tsx)**
+### 4. Remove "Next Hand" Modal -- Auto-Advance
 
-- Replace the simple chip stack with layered chip graphics (3-4 stacked colored circles with edge highlights)
-- Number counter with a gold glow and shadow
-- Chips animate (scale bounce) when pot increases
-- Show side pots as separate smaller displays
+This is the biggest game flow fix:
 
-**7. Cinematic Animations (index.css + components)**
+**usePokerGame.ts changes:**
+- When `hand_complete` phase is reached, show the winner banner for 2.5 seconds
+- Then automatically dispatch `NEXT_HAND` (no user interaction needed)
+- The WinnerOverlay becomes a brief inline announcement on the felt (not a modal)
+- Only show a full modal on `game_over` (when someone is eliminated from the tournament)
 
-New premium animations:
-- Card dealing: Cards slide from a deck position (top-right corner) with rotation, arriving at their position with a satisfying "snap"
-- Community card reveal: Card placed face-down first, then flips with a 3D rotate effect and a brief light flash
-- Bet action: Chip token slides from player toward pot center
-- Win announcement: Gold particle burst radiating from the winning cards, cards lift and glow
-- Phase transition: Subtle pulse wave across the table when flop/turn/river is dealt
-- Turn indicator: Spotlight beam effect on the active player's seat
+**WinnerOverlay.tsx changes:**
+- Convert from a fullscreen modal to a compact banner overlaid on the center of the felt
+- Shows winner name + hand name + chip animation for ~2.5 seconds
+- Auto-dismisses (no "Next Hand" button)
+- Game over screen remains as a full overlay with stats
 
-**8. Game Header Redesign**
+### 5. Fix Check Action
 
-- Replace plain text header with a dark glass bar
-- Hand number in a gold badge
-- Blinds displayed as styled chip pairs
-- Back button as a translucent circle with arrow
+The check logic in `BettingControls.tsx` already dispatches `{ type: 'check' }` and the reducer handles it correctly (line 199-200 of usePokerGame.ts). The `canCheck` prop is computed correctly (line 525: `amountToCall === 0`).
+
+The issue is likely in the betting round completion logic. When a player checks, the round should continue to the next player. The round ends when all active players have acted and all bets are equal. Need to verify the `lastRaiserIndex` logic handles the case where everyone checks (no raiser).
+
+**Fix in usePokerGame.ts:**
+- When `lastRaiserIndex` is `null` and a check happens, set a `roundStartIndex` to track when we've gone full circle
+- The current logic `nextIdx === lastRaiserIndex` fails when `lastRaiserIndex` is `null` (nobody raised)
+- Add: if `lastRaiserIndex === null` and we've gone around to the first player who acted this round, advance phase
+
+### 6. Enhanced Card Dealing Animation
+
+Cards should visually animate from a "deck" position to their destination:
+- Add a CSS `@keyframes card-deal-from-deck` that starts cards at the top-center of the table (where the dealer is), scaled down and rotated, then translates them to their final position
+- Each card gets a staggered `animation-delay` (0.1s apart)
+- Community cards animate from the deck position to the center with a flip effect
+
+### 7. Bet Amount Indicators
+
+When a player bets, show their bet amount as a small chip + number positioned between their seat and the pot center. This is standard in all poker games shown in the reference screenshots.
 
 ---
 
 ### Technical Details
 
 **New files:**
-- `supabase/functions/generate-poker-assets/index.ts` -- backend function using Lovable AI image generation to create table felt, card back, and chip graphics (generated once, cached in storage)
-- `src/components/poker/PokerChip.tsx` -- reusable styled poker chip component (CSS-only, uses the existing .poker-chip class with enhancements)
-- `src/components/poker/TableFelt.tsx` -- the oval table visual with layered textures, rail, and betting line
-- `src/hooks/usePokerAssets.ts` -- hook to load/cache AI-generated game assets from storage
+- `src/components/poker/PlayerSeat.tsx` -- self-contained seat component with avatar, cards, name, chips, action badge, and bet indicator
 
 **Files to modify:**
-- `src/components/poker/PokerTablePro.tsx` -- use TableFelt component, restructure layout with premium header, spotlight effects
-- `src/components/poker/CardDisplay.tsx` -- complete visual redesign with proper card layout, 3D effects, premium patterns
-- `src/components/poker/PlayerAvatar.tsx` -- gradient rings, 3D raised effect, spotlight for active player
-- `src/components/poker/BettingControls.tsx` -- gradient buttons with icons, poker chip quick-bets, frosted glass bar
-- `src/components/poker/PotDisplay.tsx` -- chip stack graphic, enhanced counter animation
-- `src/components/poker/DealerButton.tsx` -- premium 3D dealer chip with embossed "D"
-- `src/components/poker/WinnerOverlay.tsx` -- more dramatic with gold particle burst, card fan display
-- `src/index.css` -- new keyframes for spotlight, card snap, chip slide, light flash, wave pulse
 
-**No database schema changes needed.** One new storage bucket for cached game assets (created via migration).
+1. **`src/components/poker/PokerTablePro.tsx`** -- Complete rewrite:
+   - Remove horizontal bot strip layout
+   - Implement absolute-positioned seats around the table
+   - Define seat coordinate arrays for different player counts (2-9 players)
+   - TableFelt becomes the full background with seats overlaid
+   - Community cards and pot centered
+   - Betting controls fixed at bottom
+   - Add dealer avatar at top center
+   - Remove "Next Hand" button from the felt
+
+2. **`src/hooks/usePokerGame.ts`** -- Game flow fixes:
+   - Add auto-advance timer: after `hand_complete`, wait 2.5s then dispatch `NEXT_HAND`
+   - Fix check round-completion bug: track `roundStartIndex` when no raise has occurred, advance phase when we complete the circle
+   - Add a `showdownDelay` state or use effect timing to control the brief winner display
+
+3. **`src/components/poker/WinnerOverlay.tsx`** -- Convert to inline banner:
+   - Remove fullscreen modal backdrop
+   - Make it a positioned overlay on the felt center (not blocking interaction)
+   - Show winner name + hand + chips for 2.5s then fade out
+   - Keep fullscreen modal ONLY for game_over state
+
+4. **`src/components/poker/PlayerAvatar.tsx`** -- Minor tweaks:
+   - Ensure the turn-pulse ring works correctly at smaller sizes
+   - Add "all-in" red glow variant
+
+5. **`src/components/poker/BettingControls.tsx`** -- No logic changes needed (check already works), but verify the button correctly shows "Check" when `canCheck` is true
+
+6. **`src/index.css`** -- Add new keyframes:
+   - `card-deal-from-deck`: translate from top-center + scale(0.5) + rotate to final position
+   - Refine existing animations for the new layout
+
+7. **`src/components/poker/TableFelt.tsx`** -- Make it fill the entire screen area (remove margins), serve as the absolute positioning container for all seats
+
+**No database or backend changes needed.**
+
