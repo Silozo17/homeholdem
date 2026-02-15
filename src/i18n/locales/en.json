@@ -112,6 +112,7 @@
     "please_enter_code": "Please enter the verification code"
   },
   "dashboard": {
+    "welcome": "Welcome",
     "your_clubs": "Your Clubs",
     "manage_clubs": "Manage your poker clubs",
     "create_club": "Create Club",
@@ -123,7 +124,10 @@
     "already_member": "You're already a member of this club",
     "welcome_to": "Welcome to",
     "upcoming_event": "Upcoming Event",
-    "next_game": "Next Game"
+    "next_game": "Next Game",
+    "play_poker": "Play Poker",
+    "play_poker_desc": "Jump into a multiplayer game",
+    "play_poker_cta": "Find a Table"
   },
   "club": {
     "create": "Create Club",
@@ -933,6 +937,8 @@
     "new_club_desc": "Start a new poker group",
     "new_event": "New Event", 
     "new_event_desc": "Schedule a poker night",
+    "play_poker": "Play Poker",
+    "play_poker_desc": "Join or create a table",
     "select_club": "Select a club first"
   },
   "leaderboard": {
