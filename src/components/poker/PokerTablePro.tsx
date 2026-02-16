@@ -7,11 +7,10 @@ import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
 import { WinnerOverlay } from './WinnerOverlay';
 import { TableFelt } from './TableFelt';
-import { TableStage } from './TableStage';
 import { DealerCharacter } from './DealerCharacter';
-import { TurnTimer } from './TurnTimer';
-import { getSeatPositions } from '@/lib/poker/ui/seatLayout';
-import { usePokerSounds, PokerSoundEvent } from '@/hooks/usePokerSounds';
+import { DebugOverlay } from './DebugOverlay';
+import { getSeatPositions, getDefaultEllipse } from '@/lib/poker/ui/seatLayout';
+import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
@@ -44,22 +43,7 @@ function useIsLandscape() {
   return isLandscape;
 }
 
-/*
- * Z-index layering model:
- *  0  - leather bg + dark overlay
- *  1  - TableFelt (rail, felt, vignette, betting line)
- *  5  - Pot display
- *  5  - Community cards
- *  5  - Phase indicator
- *  10 - Dealer character
- *  15 - Player seats
- *  20 - Hand name reveal / particles
- *  25 - All-in flash
- *  30 - Winner overlay
- *  40 - Header bar
- *  50 - Action bar (betting controls)
- *  50 - YOUR TURN badge
- */
+const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
 export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
@@ -69,6 +53,7 @@ export function PokerTablePro({
   const isGameOver = state.phase === 'game_over';
   const [showAllinFlash, setShowAllinFlash] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
+  const isLandscape = useIsLandscape();
 
   const [prevPhase, setPrevPhase] = useState(state.phase);
   const [prevHandNumber, setPrevHandNumber] = useState(state.handNumber);
@@ -127,7 +112,8 @@ export function PokerTablePro({
     onAction(action);
   }, [onAction, play]);
 
-  const isLandscape = useIsLandscape();
+  // Ellipse-anchored seat positions
+  const ellipse = getDefaultEllipse(isLandscape);
   const positions = getSeatPositions(state.players.length, isLandscape);
   const currentPlayerIdx = state.currentPlayerIndex;
 
@@ -151,20 +137,51 @@ export function PokerTablePro({
     duration: Date.now() - state.startTime,
   }), [state.handsPlayed, state.handsWon, state.bestHandName, state.biggestPot, state.startTime]);
 
+  const showActions = isHumanTurn && humanPlayer && humanPlayer.status === 'active';
+
   return (
-    <TableStage>
-      {/* Leather background */}
-      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} style={{ zIndex: Z.BG }} />
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" style={{ zIndex: Z.BG }} />
+    <div
+      className="fixed inset-0 overflow-hidden"
+      style={{
+        display: 'grid',
+        gridTemplateRows: showActions
+          ? '40px 52px 1fr auto'
+          : '40px 52px 1fr',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
+      }}
+    >
+      {/* ====== BG LAYERS (behind everything) ====== */}
+      <img
+        src={leatherBg}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        draggable={false}
+        style={{ zIndex: Z.BG }}
+      />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: Z.BG,
+          background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.25), rgba(0,0,0,0.75))',
+        }}
+      />
 
       {/* All-in flash */}
       {showAllinFlash && (
-        <div className="absolute inset-0 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash pointer-events-none" style={{ zIndex: Z.ALLIN_FLASH }} />
+        <div
+          className="absolute inset-0 pointer-events-none allin-flash"
+          style={{
+            zIndex: Z.ALLIN_FLASH,
+            background: 'radial-gradient(ellipse at 50% 50%, hsl(43 74% 49% / 0.15), transparent 60%)',
+          }}
+        />
       )}
 
-      {/* Header */}
+      {/* ====== ROW 1: HEADER BAR ====== */}
       <div
-        className="flex items-center justify-between px-3 h-9 shrink-0 relative"
+        className="relative flex items-center justify-between px-3"
         style={{
           zIndex: Z.HEADER,
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.5), hsl(0 0% 0% / 0.3))',
@@ -194,21 +211,51 @@ export function PokerTablePro({
         </button>
       </div>
 
-      {/* Main table area — fills remaining space */}
-      <div className="flex-1 relative" style={{ zIndex: Z.TABLE }}>
-        <TableFelt className="absolute inset-0">
-          {/* Dealer above the table, top-center */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: isLandscape ? '22%' : '24%', zIndex: Z.DEALER, position: 'absolute' }}
-          >
-            <DealerCharacter expression={dealerExpression} />
-          </div>
+      {/* ====== ROW 2: DEALER HUD ====== */}
+      <div
+        className="relative flex items-center justify-center"
+        style={{
+          zIndex: Z.DEALER,
+          transform: 'translateY(6px)', // slight overlap onto table rail
+        }}
+      >
+        <DealerCharacter expression={dealerExpression} />
+      </div>
 
-          {/* Pot */}
+      {/* ====== ROW 3: TABLE SCENE ====== */}
+      <div
+        className="relative flex items-center justify-center overflow-visible"
+        style={{ zIndex: Z.TABLE, padding: isLandscape ? '4px 12px 0' : '0 8px' }}
+      >
+        {/* Table wrapper — all table-relative elements positioned inside this */}
+        <div
+          className="relative overflow-visible"
+          style={{
+            aspectRatio: '16 / 9',
+            height: isLandscape ? 'min(72vh, 520px)' : 'min(62vh, 460px)',
+            width: 'auto',
+            maxWidth: isLandscape ? 'min(92vw, 1000px)' : 'min(98vw, 650px)',
+          }}
+        >
+          {/* Table image (visual only) */}
+          <TableFelt />
+
+          {/* Subtle spotlight on felt */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse 50% 40% at 50% 48%, hsl(43 74% 49% / 0.04) 0%, transparent 60%)',
+              zIndex: Z.TRIM_GLOW,
+            }}
+          />
+
+          {/* Debug overlay */}
+          {isDebug && <DebugOverlay ellipse={ellipse} seatPositions={positions} />}
+
+          {/* Pot display */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: isLandscape ? '36%' : '38%', zIndex: Z.CARDS }}
+            style={{ top: '32%', zIndex: Z.CARDS }}
           >
             <PotDisplay pot={state.pot} />
           </div>
@@ -216,7 +263,7 @@ export function PokerTablePro({
           {/* Community cards */}
           <div
             className="absolute left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
-            style={{ top: isLandscape ? '46%' : '48%', zIndex: Z.CARDS }}
+            style={{ top: '45%', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => (
               <CardDisplay
@@ -236,9 +283,9 @@ export function PokerTablePro({
 
           {/* Hand name at showdown */}
           {showHandName && (
-            <div className="absolute left-1/2 top-1/2 animate-hand-name-reveal pointer-events-none" style={{ transform: 'translate(-50%, -50%)', zIndex: Z.EFFECTS }}>
+            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: '58%', zIndex: Z.EFFECTS }}>
               <span
-                className="text-xl font-black uppercase tracking-wider"
+                className="text-xl font-black uppercase tracking-wider animate-hand-name-reveal"
                 style={{
                   fontFamily: 'Georgia, serif',
                   background: 'linear-gradient(135deg, hsl(43 74% 60%), hsl(43 90% 75%), hsl(43 74% 50%))',
@@ -252,6 +299,16 @@ export function PokerTablePro({
               </span>
             </div>
           )}
+
+          {/* Phase indicator */}
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '60%', zIndex: Z.CARDS }}>
+            <span className={cn(
+              'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
+              (state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') && 'animate-phase-flash',
+            )} style={{ textShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
+              {state.phase === 'preflop' ? 'Pre-Flop' : state.phase === 'hand_complete' ? 'Showdown' : state.phase}
+            </span>
+          </div>
 
           {/* Showdown particles */}
           {state.phase === 'hand_complete' && !isGameOver && (
@@ -272,17 +329,7 @@ export function PokerTablePro({
             </div>
           )}
 
-          {/* Phase indicator */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '57%' : '58%', zIndex: Z.CARDS }}>
-            <span className={cn(
-              'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
-              (state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') && 'animate-phase-flash',
-            )} style={{ textShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
-              {state.phase === 'preflop' ? 'Pre-Flop' : state.phase === 'hand_complete' ? 'Showdown' : state.phase}
-            </span>
-          </div>
-
-          {/* Player seats */}
+          {/* ====== SEATS (positioned on ellipse rail) ====== */}
           {state.players.map((player, i) => {
             const pos = positions[i];
             if (!pos) return null;
@@ -295,7 +342,7 @@ export function PokerTablePro({
                 key={player.id}
                 className={cn(
                   'absolute transition-opacity duration-300',
-                  !isShowdown && !isActive && state.phase !== 'dealing' && state.phase !== 'idle' ? 'seat-dimmed' : 'seat-active',
+                  !isShowdown && !isActive && state.phase !== 'dealing' && state.phase !== 'idle' ? 'opacity-60' : 'opacity-100',
                 )}
                 style={{
                   left: `${pos.xPct}%`,
@@ -314,35 +361,12 @@ export function PokerTablePro({
               </div>
             );
           })}
-        </TableFelt>
+        </div>
       </div>
 
-      {/* Action bar — always at bottom, above everything */}
-      {isHumanTurn && humanPlayer && humanPlayer.status === 'active' && (
-        <div
-          className="px-3 pb-2 pt-1 shrink-0 relative"
-          style={{
-            zIndex: Z.ACTIONS,
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
-            background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))',
-          }}
-        >
-          <BettingControls
-            canCheck={canCheck}
-            amountToCall={amountToCall}
-            minRaise={state.minRaise}
-            maxBet={maxBet}
-            playerChips={humanPlayer.chips}
-            bigBlind={state.bigBlind}
-            pot={state.pot}
-            onAction={handleAction}
-          />
-        </div>
-      )}
-
-      {/* YOUR TURN badge */}
-      {isHumanTurn && humanPlayer && humanPlayer.status === 'active' && (
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)', zIndex: Z.ACTIONS }}>
+      {/* YOUR TURN badge (floats above action bar) */}
+      {showActions && (
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 82px)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{
               background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
@@ -356,13 +380,36 @@ export function PokerTablePro({
         </div>
       )}
 
-      {/* Winner overlay */}
+      {/* ====== ROW 4: ACTION BAR (conditionally rendered) ====== */}
+      {showActions && (
+        <div
+          className="relative px-3 pt-1"
+          style={{
+            zIndex: Z.ACTIONS,
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)',
+            background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))',
+          }}
+        >
+          <BettingControls
+            canCheck={canCheck}
+            amountToCall={amountToCall}
+            minRaise={state.minRaise}
+            maxBet={maxBet}
+            playerChips={humanPlayer!.chips}
+            bigBlind={state.bigBlind}
+            pot={state.pot}
+            onAction={handleAction}
+          />
+        </div>
+      )}
+
+      {/* ====== OVERLAYS ====== */}
       {state.phase === 'hand_complete' && !isGameOver && winners.length > 0 && (
         <WinnerOverlay winners={winners} isGameOver={false} onNextHand={onNextHand} onQuit={onQuit} />
       )}
       {isGameOver && winners.length > 0 && (
         <WinnerOverlay winners={winners} isGameOver={true} stats={gameStats} onNextHand={onNextHand} onQuit={onQuit} />
       )}
-    </TableStage>
+    </div>
   );
 }
