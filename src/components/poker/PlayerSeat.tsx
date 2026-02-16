@@ -12,9 +12,10 @@ interface PlayerSeatProps {
   showCards: boolean;
   isHuman: boolean;
   isShowdown: boolean;
+  seatDealOrder?: number; // 0-based order for dealing animation stagger
 }
 
-export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShowdown }: PlayerSeatProps) {
+export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShowdown, seatDealOrder = 0 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
 
   return (
@@ -43,16 +44,20 @@ export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, sh
       {/* Cards */}
       {player.holeCards.length > 0 && (
         <div className="flex gap-0.5 mt-0.5">
-          {player.holeCards.map((card, i) => (
-            <CardDisplay
-              key={i}
-              card={showCards ? card : undefined}
-              faceDown={!showCards}
-              size="sm"
-              dealDelay={i * 0.1}
-              className={isOut ? 'animate-fold-away' : ''}
-            />
-          ))}
+          {player.holeCards.map((card, i) => {
+            // Stagger: first card to each player in seat order, then second card
+            const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
+            return (
+              <CardDisplay
+                key={i}
+                card={showCards ? card : undefined}
+                faceDown={!showCards}
+                size="sm"
+                dealDelay={dealDelay}
+                className={isOut ? 'animate-fold-away' : ''}
+              />
+            );
+          })}
         </div>
       )}
 

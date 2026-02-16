@@ -241,15 +241,20 @@ export function PokerTablePro({
             className="absolute left-1/2 -translate-x-1/2 flex gap-1 items-center"
             style={{ top: '44%', zIndex: Z.CARDS }}
           >
-            {state.communityCards.map((card, i) => (
-              <CardDisplay
-                key={`${card.suit}-${card.rank}-${i}`}
-                card={card}
-                size="md"
-                dealDelay={i * 0.12}
-                isWinner={false}
-              />
-            ))}
+            {state.communityCards.map((card, i) => {
+              // Flop cards (0-2) stagger quickly, turn (3) and river (4) appear solo
+              const isFlop = i < 3;
+              const dealDelay = isFlop ? i * 0.18 : 0.1;
+              return (
+                <CardDisplay
+                  key={`${card.suit}-${card.rank}-${i}`}
+                  card={card}
+                  size="md"
+                  dealDelay={dealDelay}
+                  isWinner={false}
+                />
+              );
+            })}
             {state.communityCards.length === 0 && (
               <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                 Waiting for cards...
@@ -313,6 +318,16 @@ export function PokerTablePro({
             const showCards = isHuman || (isShowdown && (player.status === 'active' || player.status === 'all-in'));
             const isActive = currentPlayerIdx === i && !isShowdown;
 
+            // Calculate dealing order: clockwise from dealer
+            const activePlayers = state.players.filter(p => p.status !== 'eliminated');
+            const dealerIdx = state.dealerIndex;
+            const activeIndices = state.players.map((p, idx) => p.status !== 'eliminated' ? idx : -1).filter(idx => idx !== -1);
+            const dealerPosInActive = activeIndices.indexOf(dealerIdx);
+            const myPosInActive = activeIndices.indexOf(i);
+            const seatDealOrder = myPosInActive >= 0 && dealerPosInActive >= 0
+              ? (myPosInActive - dealerPosInActive - 1 + activeIndices.length) % activeIndices.length
+              : i;
+
             return (
               <div
                 key={player.id}
@@ -333,6 +348,7 @@ export function PokerTablePro({
                   showCards={showCards}
                   isHuman={isHuman}
                   isShowdown={isShowdown}
+                  seatDealOrder={seatDealOrder}
                 />
               </div>
             );
