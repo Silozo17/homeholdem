@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { GameState } from '@/lib/poker/types';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { PlayerSeat } from './PlayerSeat';
 import { CardDisplay } from './CardDisplay';
@@ -49,6 +51,7 @@ const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.loca
 export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
 }: PokerTableProProps) {
+  const { user } = useAuth();
   const humanPlayer = state.players.find(p => p.id === 'human');
   const isShowdown = state.phase === 'hand_complete' || state.phase === 'showdown';
   const isGameOver = state.phase === 'game_over';
@@ -56,6 +59,14 @@ export function PokerTablePro({
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const isLandscape = useIsLandscape();
+  const [humanAvatarUrl, setHumanAvatarUrl] = useState<string | null>(null);
+
+  // Fetch human player's profile avatar
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+      .then(({ data }) => { if (data?.avatar_url) setHumanAvatarUrl(data.avatar_url); });
+  }, [user?.id]);
 
   const [prevPhase, setPrevPhase] = useState(state.phase);
   const [prevHandNumber, setPrevHandNumber] = useState(state.handNumber);
@@ -347,6 +358,8 @@ export function PokerTablePro({
                   showCards={showCards}
                   isHuman={isHuman}
                   isShowdown={isShowdown}
+                  tableHalf={pos.yPct < 55 ? 'top' : 'bottom'}
+                  avatarUrl={isHuman ? humanAvatarUrl : undefined}
                   seatDealOrder={seatDealOrder}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
                 />
