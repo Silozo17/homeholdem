@@ -67,6 +67,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const channelRef = useRef<any>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoStartAttemptedRef = useRef(false);
 
   const userId = user?.id;
 
@@ -155,7 +156,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Clear showdown timer if one exists
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
 
-        // After 5s pause, clear hand so Deal button reappears
+        // After 5s pause, clear hand and auto-start next
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
             if (!prev) return prev;
@@ -164,6 +165,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setMyCards(null);
           setRevealedCards([]);
           showdownTimerRef.current = null;
+          // Auto-deal next hand (server rejects duplicates)
+          autoStartAttemptedRef.current = false;
         }, 5000);
       })
       .subscribe();
@@ -207,6 +210,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       if (timeoutTimerRef.current) clearTimeout(timeoutTimerRef.current);
     };
   }, [hand?.action_deadline, isMyTurn, userId, mySeatNumber]);
+
 
   // Actions
   const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
@@ -266,6 +270,27 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       hand_id: hand.hand_id,
     });
   }, [tableId, hand]);
+
+  // Auto-deal: when 2+ seated players and no active hand, start automatically
+  const seatedCount = tableState?.seats.filter(s => s.player_id && s.status !== 'eliminated').length ?? 0;
+  const hasActiveHand = !!tableState?.current_hand;
+
+  useEffect(() => {
+    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttemptedRef.current && mySeatNumber !== null) {
+      autoStartAttemptedRef.current = true;
+      const timer = setTimeout(() => {
+        startHand().catch(() => {});
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [seatedCount, hasActiveHand, mySeatNumber, startHand]);
+
+  // Reset auto-start flag when a new hand begins
+  useEffect(() => {
+    if (hasActiveHand) {
+      autoStartAttemptedRef.current = true;
+    }
+  }, [hasActiveHand]);
 
   return {
     tableState,
