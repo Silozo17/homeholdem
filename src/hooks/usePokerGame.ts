@@ -432,22 +432,8 @@ function advancePhase(state: GameState): GameState {
       return state;
   }
 
-  // Check if only 1 or 0 players can still act
-  const actionable = getActionablePlayers(players);
-  if (actionable.length <= 1) {
-    // Skip to showdown if no more betting possible
-    if (nextPhase as string !== 'showdown') {
-      // Deal remaining community cards
-      while (communityCards.length < 5) {
-        const [card, rem] = deal(deck, 1);
-        communityCards = [...communityCards, ...card];
-        deck = rem;
-      }
-      return { ...state, phase: 'showdown', players, deck, communityCards };
-    }
-  }
-
-  // First to act postflop: first active after dealer
+  // Always advance phase-by-phase (even during all-in runouts)
+  // The useEffect auto-advance handles moving through phases with dramatic pauses
   const firstToAct = nextActivePlayerIndex(players, state.dealerIndex);
 
   return {
@@ -481,19 +467,19 @@ export function usePokerGame() {
       botTimeoutRef.current = null;
     }
 
-    // Auto-deal on 'dealing' phase — slight pause for card shuffle feel
+    // Auto-deal on 'dealing' phase — pause for card shuffle feel
     if (state.phase === 'dealing') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'DEAL_HAND' });
-      }, 800);
+      }, 1800);
       return;
     }
 
-    // Auto-showdown — pause for drama
+    // Auto-showdown — dramatic pause
     if (state.phase === 'showdown') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'SHOWDOWN' });
-      }, 1500);
+      }, 2500);
       return;
     }
 
@@ -501,11 +487,24 @@ export function usePokerGame() {
     if (state.phase === 'hand_complete') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'NEXT_HAND' });
-      }, 3000);
+      }, 4500);
       return;
     }
 
-    // Bot's turn
+    // All-in runout: auto-advance through phases when no one can act
+    if (
+      (state.phase === 'preflop' || state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') &&
+      getActionablePlayers(state.players).length <= 1
+    ) {
+      // No one can bet — dramatic pause then advance to next phase
+      const delay = state.phase === 'flop' ? 2200 : 1800;
+      botTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'ADVANCE_PHASE' });
+      }, delay);
+      return;
+    }
+
+    // Bot's turn — realistic thinking delay
     if (
       (state.phase === 'preflop' || state.phase === 'flop' ||
        state.phase === 'turn' || state.phase === 'river') &&
@@ -525,9 +524,9 @@ export function usePokerGame() {
           state.bigBlind,
         );
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, 1000 + Math.random() * 800); // 1.0-1.8s delay for more realistic pacing
+      }, 1500 + Math.random() * 1500); // 1.5-3.0s delay for realistic pacing
     }
-  }, [state.phase, state.currentPlayerIndex, state.handNumber]);
+  }, [state.phase, state.currentPlayerIndex, state.handNumber, state.players.map(p => p.status).join()]);
 
   const startGame = useCallback((settings: LobbySettings) => {
     dispatch({ type: 'START_GAME', settings });
