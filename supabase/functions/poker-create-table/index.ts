@@ -58,6 +58,7 @@ Deno.serve(async (req) => {
       min_buy_in = 1000,
       max_buy_in = 10000,
       club_id = null,
+      blind_timer_minutes = 0,
     } = body;
 
     if (!name || name.trim().length === 0) {
@@ -105,6 +106,7 @@ Deno.serve(async (req) => {
         max_buy_in,
         club_id: table_type === "club" ? club_id : null,
         invite_code,
+        blind_timer_minutes: [0, 5, 10, 15, 30].includes(blind_timer_minutes) ? blind_timer_minutes : 0,
       })
       .select()
       .single();

@@ -16,6 +16,7 @@ export interface OnlineTableInfo {
   invite_code: string | null;
   club_id: string | null;
   created_by: string;
+  blind_timer_minutes: number;
 }
 
 export interface OnlineSeatInfo {
