@@ -96,6 +96,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevHandIdRef = useRef<string | null>(null);
   const chatIdCounter = useRef(0);
+  const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [handHasEverStarted, setHandHasEverStarted] = useState(false);
 
   const userId = user?.id;
@@ -396,14 +397,21 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   useEffect(() => {
     if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
-      setAutoStartAttempted(true);
+      if (autoStartTimerRef.current) return;
       const jitter = Math.random() * 1000;
-      const timer = setTimeout(() => {
+      autoStartTimerRef.current = setTimeout(() => {
+        autoStartTimerRef.current = null;
+        setAutoStartAttempted(true);
         startHand().catch(() => {
           setAutoStartAttempted(false);
         });
       }, 2000 + jitter);
-      return () => clearTimeout(timer);
+      return () => {
+        if (autoStartTimerRef.current) {
+          clearTimeout(autoStartTimerRef.current);
+          autoStartTimerRef.current = null;
+        }
+      };
     }
   }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
 
