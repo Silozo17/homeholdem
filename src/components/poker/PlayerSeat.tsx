@@ -61,7 +61,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
   // Human player cards (fanned behind avatar)
   const humanCards = isHuman && player.holeCards.length > 0 ? (
-   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
+   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 4px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
         return (
