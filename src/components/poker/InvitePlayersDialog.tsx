@@ -91,7 +91,7 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm z-[70] [&~*]:z-[70]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
