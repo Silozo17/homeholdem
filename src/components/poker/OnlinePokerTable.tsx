@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
 import { WinnerOverlay } from './WinnerOverlay';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,8 @@ import { SeatAnchor } from './SeatAnchor';
 import { DealerCharacter } from './DealerCharacter';
 import { TableFelt } from './TableFelt';
 import { ConnectionOverlay } from './ConnectionOverlay';
+import { ChipAnimation } from './ChipAnimation';
+import { QuickChat } from './QuickChat';
 import { getSeatPositions, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { Z } from './z';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
@@ -120,7 +122,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
-    actionPending, lastActions, handWinners,
+    actionPending, lastActions, handWinners, chatBubbles, sendChat,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -134,6 +136,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [isDisconnected, setIsDisconnected] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
+  const [dealing, setDealing] = useState(false);
+  const prevHandIdRef = useRef<string | null>(null);
+  const chipAnimIdRef = useRef(0);
   const isLandscape = useIsLandscape();
   useLockLandscape();
 
@@ -188,6 +195,52 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       setIsDisconnected(false);
     }
   }, [error, tableState]);
+
+  // Game over detection: human stack hits 0
+  useEffect(() => {
+    if (!tableState || !user) return;
+    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+    if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
+      setGameOver(true);
+    }
+  }, [tableState, user, handWinners]);
+
+  // Deal animation on new hand
+  useEffect(() => {
+    const currentHandId = tableState?.current_hand?.hand_id ?? null;
+    if (currentHandId && currentHandId !== prevHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
+      setDealing(true);
+      const timer = setTimeout(() => setDealing(false), 2000);
+      prevHandIdRef.current = currentHandId;
+      return () => clearTimeout(timer);
+    }
+    if (!currentHandId) prevHandIdRef.current = null;
+  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
+
+  // Chip animation: pot flies to winner
+  useEffect(() => {
+    if (handWinners.length === 0 || !tableState) return;
+    const winner = handWinners[0];
+    const heroSeatNum = mySeatNumber ?? 0;
+    const maxSeatsCount = tableState.table.max_seats;
+    const isLand = window.innerWidth > window.innerHeight;
+    const positionsArr = getSeatPositions(maxSeatsCount, isLand);
+    // Find winner's screen position
+    const winnerSeat = tableState.seats.find(s => s.player_id === winner.player_id);
+    if (!winnerSeat) return;
+    const screenIdx = ((winnerSeat.seat - heroSeatNum) + maxSeatsCount) % maxSeatsCount;
+    const winnerPos = positionsArr[screenIdx];
+    if (!winnerPos) return;
+    // Spawn 4 chip animations from pot (50, 20) to winner seat
+    const newChips = Array.from({ length: 4 }, (_, i) => ({
+      id: chipAnimIdRef.current++,
+      toX: winnerPos.xPct,
+      toY: winnerPos.yPct,
+    }));
+    setChipAnimations(newChips);
+    const timer = setTimeout(() => setChipAnimations([]), 800);
+    return () => clearTimeout(timer);
+  }, [handWinners, tableState, mySeatNumber]);
 
   const handleReconnect = useCallback(() => { window.location.reload(); }, []);
 
@@ -369,6 +422,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
             </button>
           )}
+          <QuickChat onSend={sendChat} />
           <button onClick={() => setInviteOpen(true)}
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
           >
@@ -505,7 +559,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           )}
 
           {/* Winner banner during showdown pause */}
-          {handWinners.length > 0 && (
+          {handWinners.length > 0 && !gameOver && (
             <WinnerOverlay
               winners={handWinners.map(w => ({
                 name: w.player_id === user?.id ? 'You' : w.display_name,
@@ -517,6 +571,117 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               onQuit={() => {}}
             />
           )}
+
+          {/* Game Over overlay */}
+          {gameOver && (
+            <WinnerOverlay
+              winners={handWinners.map(w => ({
+                name: w.player_id === user?.id ? 'You' : w.display_name,
+                hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] },
+                chips: w.amount,
+              }))}
+              isGameOver={true}
+              onNextHand={() => {}}
+              onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
+            />
+          )}
+
+          {/* Confetti when human wins */}
+          {handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id) && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
+              {Array.from({ length: 24 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute animate-confetti-drift"
+                  style={{
+                    left: `${10 + Math.random() * 80}%`,
+                    top: `${10 + Math.random() * 30}%`,
+                    width: `${6 + Math.random() * 6}px`,
+                    height: `${6 + Math.random() * 6}px`,
+                    background: ['hsl(43 74% 49%)', 'hsl(0 70% 50%)', 'hsl(210 80% 55%)', 'hsl(142 70% 45%)', 'hsl(280 60% 55%)'][i % 5],
+                    borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                    animationDelay: `${i * 0.08}s`,
+                    animationDuration: `${1.5 + Math.random()}s`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Chip animations: pot flies to winner */}
+          {chipAnimations.map(chip => (
+            <ChipAnimation
+              key={chip.id}
+              fromX={50}
+              fromY={20}
+              toX={chip.toX}
+              toY={chip.toY}
+              duration={600}
+            />
+          ))}
+
+          {/* Deal animation: cards fly from dealer to seats */}
+          {dealing && (() => {
+            const activeSeatCount = activeSeats.length;
+            const posArr = positions;
+            return rotatedSeats.map((seatData, screenPos) => {
+              if (!seatData?.player_id) return null;
+              const pos = posArr[screenPos];
+              if (!pos) return null;
+              return [0, 1].map(cardIdx => {
+                const delay = (cardIdx * activeSeatCount + screenPos) * 0.18;
+                return (
+                  <div
+                    key={`deal-${screenPos}-${cardIdx}`}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: '50%',
+                      top: '2%',
+                      zIndex: Z.EFFECTS,
+                      animation: `deal-card-fly 0.4s ease-out ${delay}s both`,
+                      ['--deal-dx' as any]: `${pos.xPct - 50}vw`,
+                      ['--deal-dy' as any]: `${pos.yPct - 2}vh`,
+                    }}
+                  >
+                    <div className="w-6 h-9 rounded card-back-premium border border-white/10" />
+                  </div>
+                );
+              });
+            });
+          })()}
+
+          {/* Chat bubbles near player seats */}
+          {chatBubbles.map(bubble => {
+            const seatInfo = tableState.seats.find(s => s.player_id === bubble.player_id);
+            if (!seatInfo) return null;
+            const heroSeatNum = mySeatNumber ?? 0;
+            const screenIdx = ((seatInfo.seat - heroSeatNum) + maxSeats) % maxSeats;
+            const pos = positions[screenIdx];
+            if (!pos) return null;
+            return (
+              <div
+                key={bubble.id}
+                className="absolute animate-float-up pointer-events-none"
+                style={{
+                  left: `${pos.xPct}%`,
+                  top: `${pos.yPct - 12}%`,
+                  transform: 'translateX(-50%)',
+                  zIndex: Z.EFFECTS + 5,
+                }}
+              >
+                <span className="text-sm px-2 py-1 rounded-lg font-bold"
+                  style={{
+                    background: 'hsl(0 0% 0% / 0.7)',
+                    color: 'hsl(45 30% 95%)',
+                    border: '1px solid hsl(43 74% 49% / 0.3)',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {bubble.text}
+                </span>
+              </div>
+            );
+          })}
           {/* ====== SEATS — using SeatAnchor + PlayerSeat, same as PokerTablePro ====== */}
           {rotatedSeats.map((seatData, screenPos) => {
             const actualSeatNumber = (heroSeat + screenPos) % maxSeats;

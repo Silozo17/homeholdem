@@ -61,7 +61,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
   // Human player cards (fanned behind avatar)
   const humanCards = isHuman && player.holeCards.length > 0 ? (
-   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 7px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
+   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 9px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
         return (
@@ -150,13 +150,15 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Action badge (floating near nameplate) */}
 
-      {/* Action badge (floating near nameplate) */}
+      {/* Action badge (floating near nameplate) — hero gets it to the right */}
       {player.lastAction && (
         <span className={cn(
           'absolute text-[8px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in leading-tight whitespace-nowrap',
-          compact ? '-bottom-4' : '-bottom-5',
+          isHuman
+            ? 'left-full ml-1 top-1/2 -translate-y-1/2'
+            : compact ? '-bottom-4' : '-bottom-5',
           player.lastAction.startsWith('Fold') && 'bg-destructive/20 text-destructive border border-destructive/30',
-          (player.lastAction.startsWith('Raise') || player.lastAction.startsWith('All-in')) && 'bg-destructive/30 text-destructive border border-destructive/30',
+          (player.lastAction.startsWith('Raise') || player.lastAction.startsWith('All-in') || player.lastAction.startsWith('All')) && 'bg-destructive/30 text-destructive border border-destructive/30',
           (player.lastAction.startsWith('Call') || player.lastAction.startsWith('Check')) && 'bg-secondary/80 text-secondary-foreground',
           player.lastAction.includes('!') && 'bg-primary/30 text-primary animate-winner-glow border border-primary/30',
         )} style={{

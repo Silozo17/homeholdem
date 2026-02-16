@@ -14,7 +14,7 @@ interface TurnTimerProps {
 }
 
 export function TurnTimer({
-  duration = 30,
+  duration = 15,
   size = 36,
   strokeWidth = 2.5,
   onTimeout,

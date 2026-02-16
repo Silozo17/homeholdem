@@ -514,7 +514,7 @@ async function processAction(
     nextActorSeat = nextActiveSeat(seatStates, hand.dealer_seat, table.max_seats, ["folded", "all-in", "sitting_out", "disconnected"]);
   }
 
-  const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 30_000).toISOString() : null;
+  const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 15_000).toISOString() : null;
 
   // 9. Commit state
   const seatUpdates = seatStates.map(s => ({
