@@ -201,7 +201,9 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           </div>
         </div>
       </header>
-      <div className="h-14 safe-area-top shrink-0" />
+      <div className="shrink-0 safe-area-top">
+        <div className="h-14" />
+      </div>
 
       <div className="flex-1 px-4 pt-4 space-y-5">
         {/* Hero */}
