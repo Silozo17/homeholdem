@@ -200,14 +200,24 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       })
       .on('broadcast', { event: 'seat_change' }, ({ payload }) => {
         if (payload?.action === 'table_closed') {
-          // Table was auto-closed, navigate away
           setTableState(null);
           return;
         }
-        if (payload?.remaining_players === 1 && payload?.action === 'leave') {
-          // Only one player left — notify them
-          setTableState(prev => prev ? { ...prev } : prev);
+        if (payload?.action === 'leave' && payload?.seat != null) {
+          // Immediately remove the departed player from local state
+          setTableState(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              seats: prev.seats.map(s =>
+                s.seat === payload.seat
+                  ? { ...s, player_id: null, display_name: '', avatar_url: null, stack: 0, status: 'empty', has_cards: false, current_bet: 0, last_action: null }
+                  : s
+              ),
+            };
+          });
         }
+        // Still refresh for full consistency
         refreshState();
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
