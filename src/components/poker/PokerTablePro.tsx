@@ -213,7 +213,7 @@ export function PokerTablePro({
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
       {/* Portrait block overlay */}
-      {!isLandscape && (
+      {!isLandscape && !isGameOver && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary animate-pulse">
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
