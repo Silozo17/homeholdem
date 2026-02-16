@@ -1,96 +1,74 @@
 
-# Fix Online Poker: Frozen Screen, Wake Lock, Notifications, and Table Visibility
 
-## Issue 1: 3-Dots Menu Freezes Screen
+# Fix: Rotate Online Poker Seats to Hero Perspective
 
-**Root cause:** Same z-index bug as the invite dialog. The `DropdownMenuContent` in `dropdown-menu.tsx` renders via a Radix portal at `z-50`. The poker table container is `z-[60]`. When the dropdown opens, its invisible overlay captures all clicks at `z-50` (behind the table), while the actual menu content is also hidden behind the table. The user sees nothing but can no longer click anything because the overlay is intercepting events.
+## Problem
 
-**Fix:** In `OnlinePokerTable.tsx`, pass `className="z-[70]"` to the `DropdownMenuContent` component so both the menu and its portal render above the `z-[60]` table.
+The online poker table renders all players at screen positions matching their raw seat number (0-8). Your seat is hidden from the loop and shown at the bottom, but everyone else stays at their absolute positions. This means:
 
-**File:** `src/components/poker/OnlinePokerTable.tsx` (line 277)
+- If you sit in seat 3, other players appear at positions 0, 1, 2, 4, 5... on screen
+- The visual gap where seat 3 was is just skipped
+- Other players do NOT rotate around you -- they see the same layout you do
 
----
+The correct behavior: each player should always see themselves at position 0 (bottom center), with other players arranged clockwise in their correct relative order.
 
-## Issue 2: Screen Sleeps During Game
+## Solution
 
-**Root cause:** The `useWakeLock` hook exists and is used in `TVDisplay.tsx`, but neither `OnlinePokerTable` nor `PokerTablePro` call it. There is no wake lock active during online multiplayer games or single-player poker.
+Rotate the seat-to-position mapping so that the hero's seat index always maps to position 0 (bottom center). All other seats shift by the same offset, preserving clockwise order.
 
-**Fix:** Import and activate `useWakeLock` in both `OnlinePokerTable.tsx` and `PokerTablePro.tsx`. Request the wake lock on mount, release on unmount.
+### File: `src/components/poker/OnlinePokerTable.tsx`
 
-**Files:** `src/components/poker/OnlinePokerTable.tsx`, `src/components/poker/PokerTablePro.tsx`
+Replace the current direct mapping:
 
----
-
-## Issue 3: Invited Users Don't Get Notifications
-
-**Root cause:** The `notifyPokerInvite` function sends correctly, but the edge function (`send-push-notification`) filters users by `notification_type = 'rsvp_updates'`, checking for a column `push_rsvp_updates` in `user_preferences`. If the invited user:
-- Has no row in `push_subscriptions` (never granted push permission), OR
-- Has no row in `user_preferences` but the preference filter logic has a subtle issue
-
-The edge function logs show it booted but logged zero actual sends -- meaning either no subscriptions were found for the target user, or the preference filter excluded them.
-
-The deeper issue: the notification type `'rsvp_updates'` is semantically wrong for poker invites. It should be a distinct type, but since we can't add a new column easily, the more practical fix is to either:
-1. Send poker invites without a `notificationType` filter (so all users with subscriptions get them), or
-2. Add a proper notification type
-
-The simplest fix: Remove the `notificationType` from `notifyPokerInvite` so it bypasses preference filtering. Poker invites are direct, personal invitations and should always be delivered.
-
-**File:** `src/lib/push-notifications.ts` (the `notifyPokerInvite` function)
-
----
-
-## Issue 4: Other Users Can't See Created Tables
-
-**Root cause:** The RLS policy is actually correct now -- it includes friends visibility via shared clubs. The real issue is that the lobby doesn't auto-refresh. When you create a table, the other user's lobby is stale. They need to manually pull to refresh.
-
-**Fix:** Add a Supabase Realtime subscription to the `poker_tables` table in the lobby component, so when a new table is created (INSERT) or status changes, the lobby auto-refreshes.
-
-**File:** `src/components/poker/OnlinePokerLobby.tsx`
-
----
-
-## Summary of Changes
-
-| File | Change |
-|------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Add `className="z-[70]"` to DropdownMenuContent; import and activate `useWakeLock` |
-| `src/components/poker/PokerTablePro.tsx` | Import and activate `useWakeLock` |
-| `src/lib/push-notifications.ts` | Remove `notificationType` from `notifyPokerInvite` so invites bypass preference filtering |
-| `src/components/poker/OnlinePokerLobby.tsx` | Add realtime subscription to `poker_tables` for auto-refresh when tables are created/updated |
-
-## Technical Details
-
-### Wake Lock Integration
 ```typescript
-// In OnlinePokerTable.tsx and PokerTablePro.tsx
-import { useWakeLock } from '@/hooks/useWakeLock';
-
-// Inside the component:
-const { requestWakeLock, releaseWakeLock } = useWakeLock();
-useEffect(() => {
-  requestWakeLock();
-  return () => { releaseWakeLock(); };
-}, []);
+// CURRENT (broken): raw seat index = screen position
+const allSeats = Array.from({ length: table.max_seats }, (_, i) => 
+  seats.find(s => s.seat === i) || null
+);
+// Then: allSeats[seatIndex] -> positions[seatIndex]
 ```
 
-### Realtime Lobby Refresh
+With a rotated mapping:
+
 ```typescript
-// In OnlinePokerLobby.tsx useEffect
-useEffect(() => {
-  const channel = supabase
-    .channel('poker-tables-lobby')
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'poker_tables',
-    }, () => { fetchTables(); })
-    .subscribe();
-  return () => { supabase.removeChannel(channel); };
-}, [fetchTables]);
+// NEW: rotate so hero's seat maps to position 0 (bottom center)
+const maxSeats = table.max_seats;
+const heroSeat = mySeatNumber ?? 0;
+
+// Build array of seats rotated so hero is at index 0
+const rotatedSeats: (OnlineSeatInfo | null)[] = Array.from(
+  { length: maxSeats },
+  (_, i) => {
+    const actualSeat = (heroSeat + i) % maxSeats;
+    return seats.find(s => s.seat === actualSeat) || null;
+  }
+);
 ```
 
-### Database Change
-Enable realtime for `poker_tables`:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.poker_tables;
-```
+Then in the rendering loop, use `rotatedSeats` instead of `allSeats`. The `seatIndex` now becomes the screen position index (0 = bottom center = hero), and each element contains the actual seat data for the player who should appear at that position.
+
+The key changes in the rendering loop:
+- Use `rotatedSeats` instead of `allSeats`
+- For `isCurrentActor` and `isDealer`, compare using the original seat number from `seatData.seat` (not the rotated index)
+- For `handleJoinSeat`, pass the actual seat number `(heroSeat + seatIndex) % maxSeats` instead of the rotated index
+- When spectating (not seated), skip rotation (heroSeat defaults to 0, so no change)
+
+### Summary of changes
+
+| Location | Change |
+|----------|--------|
+| Lines 213-215 | Replace `allSeats` with `rotatedSeats` that offsets by `mySeatNumber` |
+| Lines 372-412 | Update seat rendering loop to use `rotatedSeats`, derive actual seat number for game logic comparisons |
+
+### How it works after the fix
+
+Example: 6-seat table. You are in seat 3, Kris in seat 4, Pete in seat 2.
+
+**Your view:** You at position 0 (bottom), Kris at position 1 (your left), Pete at position 5 (your right) -- correct clockwise order.
+
+**Kris's view:** Kris at position 0 (bottom), seat 5 at position 1 (Kris's left), you at position 5 (Kris's right) -- correct clockwise order.
+
+**Pete's view:** Pete at position 0 (bottom), you at position 1 (Pete's left) -- correct clockwise order.
+
+Each player always sees themselves centered at the bottom with others arranged in proper relative order.
+
