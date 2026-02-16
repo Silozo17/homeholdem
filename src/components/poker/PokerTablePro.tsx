@@ -17,6 +17,7 @@ import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import leatherBg from '@/assets/leather-bg.jpg';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -120,6 +121,13 @@ export function PokerTablePro({
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const isLandscape = useIsLandscape();
   useLockLandscape();
+
+  // Keep screen awake during game
+  const { requestWakeLock, releaseWakeLock } = useWakeLock();
+  useEffect(() => {
+    requestWakeLock();
+    return () => { releaseWakeLock(); };
+  }, [requestWakeLock, releaseWakeLock]);
   const [humanAvatarUrl, setHumanAvatarUrl] = useState<string | null>(null);
 
   // Fetch human player's profile avatar
