@@ -1,142 +1,73 @@
 
+# Poker Table Visual & Gameplay Fixes
 
-# Poker Table Visual Overhaul: Reference-Inspired Redesign
+## 1. Game Over Screen for Bot Game (Human Loses)
 
-## Overview
+**Problem**: When the human player runs out of chips, the game transitions to `game_over` phase, but `PlayPoker.tsx` (line 18) immediately returns to the lobby (`PlayPokerLobby`) when phase is `game_over`. The `WinnerOverlay` game-over screen never gets a chance to display.
 
-Redesign the poker table experience to match the reference image's aesthetic: larger table, avatar-centric player design with cards hidden until showdown, and upgraded sound and animation systems.
+**Fix**:
+- **`src/pages/PlayPoker.tsx`**: Remove `game_over` from the lobby condition. Keep the table rendered during `game_over` so the `WinnerOverlay` full-screen overlay displays with stats.
+- **`src/components/poker/WinnerOverlay.tsx`**: The "Play Again" button currently calls `onQuit` (line 223) -- this is a bug. Change it to call `onNextHand` (which resets the game). Also rename it properly. Ensure the game-over overlay shows whether the human won or lost, with appropriate messaging ("You Won!" vs "Game Over -- You Busted").
 
----
+## 2. Back Button Exit Warning
 
-## 1. Hide Opponent Cards Until Showdown
+**Problem**: The back button (line 231 in PokerTablePro) calls `setShowQuitConfirm(true)` which should open the AlertDialog. The dialog exists at the bottom of the file (line 480). This should work -- but let me verify the dialog implementation is correct. The issue may be that the `AlertDialogContent` needs to render inside the `fixed inset-0 z-[60]` container to appear above it. Currently the AlertDialog uses a portal which should work, but the z-index may conflict.
 
-**Current behavior**: Bot cards show face-down card backs during play.
-**New behavior**: Opponents show NO cards at all during play. Only the human player sees their own hole cards. At showdown, opponent cards appear with a 3D flip reveal animation replacing/overlapping the avatar.
+**Fix**:
+- Ensure the `AlertDialog` in `PokerTablePro.tsx` renders properly by verifying z-index. The dialog portal defaults to z-50 but our game is z-[60]. Add a className to `AlertDialogContent` with `z-[70]` to ensure it appears above the game.
+- Also intercept the browser back button / hardware back button using `popstate` event to show the confirmation dialog instead of navigating away.
 
-### Changes
-- **`src/components/poker/PlayerSeat.tsx`**: When `showCards` is false AND player is not human, hide the cards element entirely (no face-down cards). Only render cards when `showCards` is true (showdown) or player is human.
-- At showdown, cards animate in with a 3D flip effect overlaying the avatar circle area.
+## 3. Double the Profile Pic Sizes
 
----
+**Current sizes**: `lg` = `w-14 h-14`, `sm` = `w-9 h-9`
 
-## 2. Redesigned Player Seat (Avatar-Centric Like Reference)
+**New sizes** (doubled):
+- **`src/components/poker/PlayerAvatar.tsx`**: Add `xl` size: `w-20 h-20 text-lg` and `2xl` size: `w-24 h-24 text-xl`. Update `lg` to `w-20 h-20` (was w-14). This effectively doubles the avatar.
+- **`src/components/poker/PlayerSeat.tsx`**: Use `xl` instead of `lg` for non-compact mode.
+- **Online poker `OnlineSeatDisplay`**: Increase from `sm` to `lg` size.
 
-Inspired by the reference: circular avatar cropped at bottom by a dark info bar showing name + chip count.
+## 4. Human Player Cards Below Profile Pic
 
-### New PlayerSeat Layout
-```text
-  ┌──────────────┐
-  │   (avatar     │  <-- Circular avatar, larger (w-14 h-14)
-  │    circle)    │
-  ├──────────────┤
-  │ Name         │  <-- Dark semi-transparent bar
-  │ $10,000      │  <-- Gold chip count
-  └──────────────┘
-```
+**Current**: Cards overlay the avatar area at `-bottom-1` for human.
+**New**: For human player, cards render BELOW the nameplate bar, not overlaying the avatar.
 
-- Avatar is a full circle with a thick ring for active player (gold animated) or all-in (red pulse).
-- Below avatar: a compact dark "nameplate" bar with name + chips, styled with rounded-bottom corners and semi-transparent dark background.
-- At showdown: the two hole cards appear overlapping the top of the avatar (like the reference image shows cards fanning above/beside the avatar).
-- Action badges (Fold, Raise, Check) appear as small floating tags near the nameplate.
-- The turn timer ring wraps the avatar circle.
+**Changes**:
+- **`src/components/poker/PlayerSeat.tsx`**: Move the human player's cards rendering from inside the avatar container to below the nameplate bar. Cards display as a small fan beneath the name/chips info.
+- **Online poker `OnlinePokerTable.tsx`**: The "My seat at bottom" section already shows cards beside the avatar. Keep this layout but ensure it matches the new design (cards below avatar instead of beside it).
 
-### Files
-- **`src/components/poker/PlayerSeat.tsx`**: Complete redesign to avatar-centric layout with nameplate bar. Remove the current vertical/horizontal stack system. All seats use the same layout (avatar + nameplate below), with cards appearing above/overlapping at showdown.
-- **`src/components/poker/PlayerAvatar.tsx`**: Increase default sizes, add thicker active ring, improve gradient quality.
+## 5. Dealer Top-Centered
 
----
+**Current**: Dealer character sits in the header bar alongside hand number and blinds info.
+**New**: Move dealer to an absolute position at top-center of the table area.
 
-## 3. Larger Table (85% Screen Coverage)
+**Changes**:
+- **`src/components/poker/PokerTablePro.tsx`**: Remove `DealerCharacter` from the header bar. Add it as an absolutely positioned element inside the table wrapper at `top: 2%, left: 50%` (top center, above the table rail).
+- **Online poker**: Dealer is already at `top: 12%` center. Adjust to `top: 2%` to match.
 
-### Changes
-- **`src/components/poker/PokerTablePro.tsx`**: Change table wrapper width from `min(78vw, 900px)` to `min(88vw, 1100px)` and max-height from `70vh` to `82vh`. This makes the table dominate the screen.
-- Community cards stay centered within the table at `top: 44%` (adjust if needed to `top: 48%` for visual center).
-- Pot display moves up slightly to `top: 32%`.
+## 6. Seat Arrangement on Table Edge
 
----
+Adjust seat coordinates so all player avatars sit precisely on the table's brown rail edge. With larger avatars, positions need slight adjustments.
 
-## 4. Community Cards Centered on Table
+**Changes**:
+- **`src/lib/poker/ui/seatLayout.ts`**: Fine-tune landscape positions. The hero (Y) moves to `yPct: 92` (was 94). Top seats (D, H) move to `yPct: 8` (was 6). Left/right sides adjust inward slightly to account for larger avatars.
+- **Online poker `SEAT_POSITIONS`**: Adjust coordinates to match the same rail-edge alignment.
 
-Currently cards are at `top: 44%` which is correct. Ensure they remain horizontally and vertically centered within the felt area. Increase card size from `lg` to a new `xl` size for community cards to match the reference's prominent card display.
+## 7. Use Uploaded Table Image for All Games
 
-### Changes
-- **`src/components/poker/CardDisplay.tsx`**: Add `xl` size variant (`w-14 h-[80px]`) for community cards.
-- **`src/components/poker/PokerTablePro.tsx`**: Use `xl` size for community cards.
+Replace the current `table_premium.png` with the user-uploaded table image. This will automatically apply to all game modes since `TableFelt.tsx` imports from `src/assets/poker/table/table_premium.png`.
 
----
+**Changes**:
+- Copy `user-uploads://poker_table.png` to `src/assets/poker/table/table_premium.png` (overwrite). Since `TableFelt.tsx` already imports this path, all game modes (bot, online, tournament) will use the new image automatically.
 
-## 5. Seat Position Adjustments
-
-With the larger table, seat positions need slight adjustments to stay on the rail edge.
-
-### Changes
-- **`src/lib/poker/ui/seatLayout.ts`**: Adjust landscape seat coordinates slightly outward to account for the bigger table wrapper. Fine-tune Y seat (hero) to `yPct: 94` and top seats to `yPct: 6` for more spread.
-
----
-
-## 6. Enhanced Sound Effects
-
-Replace basic oscillator beeps with richer, multi-layered synthesized sounds.
-
-### Changes to `src/hooks/usePokerSounds.ts`
-
-| Sound | Current | Improved |
-|-------|---------|----------|
-| `shuffle` | Single bandpass noise | Layered noise bursts (3 rapid bursts) simulating card riffle |
-| `deal` | Single 1200Hz tone | Quick "snap" - noise burst + high click |
-| `flip` | Single noise burst | 3D pan sweep + whoosh noise for card reveal |
-| `chipClink` | 2 sine tones | 3-4 metallic harmonics with slight randomization |
-| `chipStack` | 3 sequential tones | Cascading ceramic clicks with reverb tail |
-| `check` | Low 200Hz tone | Double-tap "knock" sound (two short filtered noise bursts) |
-| `raise` | Ascending 3-note | Confident ascending chord + subtle chip slide |
-| `allIn` | Low rumble | Dramatic sub-bass drop + rising tension sweep + impact |
-| `win` | C-E-G chord | Full victory fanfare: arpeggio + shimmer sweep + sustained chord |
-| `yourTurn` | Single 880Hz | Gentle 2-note "ding-dong" notification |
-| `fold` | (new) | Soft "swoosh" - filtered descending noise |
-
----
-
-## 7. Enhanced Visual Animations
-
-### New/Upgraded Animations in `src/index.css`
-
-1. **Card Reveal at Showdown**: New `card-showdown-reveal` - 3D flip from card back to face with a gold flash on completion.
-
-2. **Winning Hand Highlight**: New `winning-cards-glow` - Cards pulse with a gold halo and slight float upward.
-
-3. **Chip Scatter on Win**: New `chips-scatter` - Multiple small chip sprites fly from pot toward the winner's seat position.
-
-4. **Player Elimination**: Improved `fold-away` - Avatar grayscales and shrinks with a subtle smoke/fade particle effect.
-
-5. **Active Player Spotlight**: New `spotlight-pulse` - Subtle radial light behind the active player's seat.
-
-6. **All-In Shockwave**: Improved flash - Expanding ring wave from the player who went all-in.
-
-7. **Card Deal Arc**: Improved `card-deal-from-deck` - Cards fly in an arc from the dealer position rather than straight down.
-
-8. **Pot Growth Animation**: Enhanced `counter-pulse` - Numbers scale up with a gold flash on each pot increase.
-
----
-
-## 8. Winner Overlay Enhancement
-
-### Changes to `src/components/poker/WinnerOverlay.tsx`
-- The inline hand-complete banner gets gold confetti particles that drift down.
-- Winning player's cards appear prominently in the banner alongside the hand name.
-- Chip count animation is accompanied by a "cha-ching" sound.
-
----
-
-## Summary of Files to Modify
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/poker/PlayerSeat.tsx` | Complete redesign: avatar-centric with nameplate, hide opponent cards until showdown, showdown card reveal overlay |
-| `src/components/poker/PlayerAvatar.tsx` | Larger sizes, thicker rings, improved styling |
-| `src/components/poker/CardDisplay.tsx` | Add `xl` size for community cards |
-| `src/components/poker/PokerTablePro.tsx` | Bigger table (88vw), adjusted card/pot positioning, use `xl` community cards, pass showdown context |
-| `src/lib/poker/ui/seatLayout.ts` | Adjusted seat coordinates for larger table |
-| `src/hooks/usePokerSounds.ts` | Richer multi-layered synthesized sounds for all events, add 'fold' sound |
-| `src/index.css` | New animations: showdown card reveal, winning glow, chip scatter, spotlight, shockwave, improved existing animations |
-| `src/components/poker/WinnerOverlay.tsx` | Enhanced confetti, winning cards display in banner |
-
+| `src/pages/PlayPoker.tsx` | Keep table rendered during `game_over` phase |
+| `src/components/poker/WinnerOverlay.tsx` | Fix "Play Again" button action, add win/lose messaging |
+| `src/components/poker/PokerTablePro.tsx` | Move dealer to top-center of table, fix AlertDialog z-index, add browser back button interception |
+| `src/components/poker/PlayerAvatar.tsx` | Add `xl`/`2xl` sizes, increase `lg` to w-20 |
+| `src/components/poker/PlayerSeat.tsx` | Use larger avatar sizes, move human cards below nameplate |
+| `src/components/poker/OnlinePokerTable.tsx` | Increase seat avatar sizes, move dealer position, adjust seat coordinates, update card layout |
+| `src/lib/poker/ui/seatLayout.ts` | Adjust seat coordinates for larger avatars |
+| `src/assets/poker/table/table_premium.png` | Replace with uploaded table image |
