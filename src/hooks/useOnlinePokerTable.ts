@@ -73,6 +73,7 @@ interface UseOnlinePokerTableReturn {
   pingTimeout: () => Promise<void>;
   refreshState: () => Promise<void>;
   sendChat: (text: string) => void;
+  autoStartAttempted: boolean;
 }
 
 export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn {
@@ -437,5 +438,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     pingTimeout,
     refreshState,
     sendChat,
+    autoStartAttempted,
   };
 }
