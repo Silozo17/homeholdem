@@ -11,6 +11,7 @@ export function useWakeLock() {
     isActive: false,
   });
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const shouldBeActive = useRef(false);
 
   useEffect(() => {
     setState(prev => ({
@@ -21,6 +22,7 @@ export function useWakeLock() {
 
   const requestWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return false;
+    shouldBeActive.current = true;
 
     try {
       const lock = await navigator.wakeLock.request('screen');
@@ -28,6 +30,7 @@ export function useWakeLock() {
       setState(prev => ({ ...prev, isActive: true }));
 
       lock.addEventListener('release', () => {
+        wakeLockRef.current = null;
         setState(prev => ({ ...prev, isActive: false }));
       });
 
@@ -39,6 +42,7 @@ export function useWakeLock() {
   }, []);
 
   const releaseWakeLock = useCallback(async () => {
+    shouldBeActive.current = false;
     if (wakeLockRef.current) {
       try {
         await wakeLockRef.current.release();
@@ -53,7 +57,7 @@ export function useWakeLock() {
   // Re-acquire wake lock when page becomes visible again
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && shouldBeActive.current) {
         await requestWakeLock();
       }
     };
@@ -62,6 +66,18 @@ export function useWakeLock() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+  }, [requestWakeLock]);
+
+  // Periodic re-acquire safety net (every 30s)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (shouldBeActive.current && !wakeLockRef.current) {
+        try {
+          await requestWakeLock();
+        } catch {}
+      }
+    }, 30000);
+    return () => clearInterval(interval);
   }, [requestWakeLock]);
 
   return {

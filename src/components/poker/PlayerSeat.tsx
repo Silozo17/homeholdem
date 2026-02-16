@@ -20,6 +20,7 @@ interface PlayerSeatProps {
   totalActivePlayers?: number;
   compact?: boolean;
   onTimeout?: () => void;
+  onLowTime?: () => void;
 }
 
 /**
@@ -29,7 +30,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, onTimeout,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, onTimeout, onLowTime,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -137,7 +138,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
         {/* Turn timer wraps the avatar */}
         {isCurrentPlayer && !isOut && (
-          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={4} onTimeout={onTimeout} />
+          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={4} onTimeout={onTimeout} onLowTime={onLowTime} />
         )}
 
         {/* Opponent showdown cards overlaying avatar */}

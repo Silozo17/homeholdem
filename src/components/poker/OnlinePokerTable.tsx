@@ -138,7 +138,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [gameOver, setGameOver] = useState(false);
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
+  const [lowTimeWarning, setLowTimeWarning] = useState(false);
   const prevHandIdRef = useRef<string | null>(null);
+  const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
   const isLandscape = useIsLandscape();
   useLockLandscape();
@@ -185,7 +187,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     checkKicked();
   }, [tableState, user, mySeatNumber]);
 
-  useEffect(() => { if (isMyTurn) play('yourTurn'); }, [isMyTurn, play]);
+  // Your turn: sound + haptic
+  useEffect(() => {
+    if (isMyTurn && !prevIsMyTurnRef.current) {
+      play('yourTurn');
+      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+    }
+    prevIsMyTurnRef.current = isMyTurn;
+    if (!isMyTurn) setLowTimeWarning(false);
+  }, [isMyTurn, play]);
 
   useEffect(() => {
     if (error && (error.includes('fetch') || error.includes('network') || error.includes('Failed'))) {
@@ -245,6 +255,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const timer = setTimeout(() => setChipAnimations([]), 1200);
     return () => clearTimeout(timer);
   }, [handWinners, tableState, mySeatNumber]);
+
+  // Low time callback for hero
+  const handleLowTime = useCallback(() => {
+    if (isMyTurn) {
+      setLowTimeWarning(true);
+      play('timerWarning');
+      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+      setTimeout(() => setLowTimeWarning(false), 2500);
+    }
+  }, [isMyTurn, play]);
 
   const handleReconnect = useCallback(() => { window.location.reload(); }, []);
 
@@ -322,10 +342,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleAction = async (action: any) => {
+    // Haptic tap on every action
+    if ('vibrate' in navigator) navigator.vibrate(50);
     if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
     else if (action.type === 'raise') play('chipStack');
     else if (action.type === 'all-in') play('allIn');
+    else if (action.type === 'fold') play('fold');
     const actionType = action.type === 'all-in' ? 'all_in' : action.type;
     try {
       await sendAction(actionType, action.amount);
@@ -333,6 +356,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     }
   };
+
 
   // ── Rotated seats: hero always at screen position 0 ──
   const maxSeats = table.max_seats;
@@ -763,6 +787,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   compact={isMobileLandscape}
                   avatarUrl={seatData!.avatar_url}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
+                  onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                 />
               </SeatAnchor>
             );
@@ -787,6 +812,28 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             }}
           >
             YOUR TURN
+          </span>
+        </div>
+      )}
+
+      {/* 5 SEC LEFT warning pill */}
+      {lowTimeWarning && (
+        <div className="absolute pointer-events-none animate-low-time-pill" style={{
+          bottom: isLandscape ? 'calc(50% + 90px)' : 'calc(50% + 110px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: Z.ACTIONS + 1,
+        }}>
+          <span className="text-[11px] px-4 py-1.5 rounded-full font-black"
+            style={{
+              background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.8), hsl(0 70% 40% / 0.6))',
+              color: 'hsl(0 0% 100%)',
+              border: '1px solid hsl(0 70% 50% / 0.6)',
+              textShadow: '0 0 8px hsl(0 70% 50% / 0.8)',
+              animation: 'low-time-pulse 0.5s ease-in-out infinite',
+            }}
+          >
+            5 SEC LEFT!
           </span>
         </div>
       )}

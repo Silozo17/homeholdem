@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface TurnTimerProps {
   /** Duration in seconds */
@@ -9,6 +9,8 @@ interface TurnTimerProps {
   strokeWidth?: number;
   /** Called when timer reaches zero */
   onTimeout?: () => void;
+  /** Called when remaining time hits threshold (default 5s) */
+  onLowTime?: () => void;
   /** Whether to animate */
   active: boolean;
 }
@@ -18,17 +20,21 @@ export function TurnTimer({
   size = 36,
   strokeWidth = 4,
   onTimeout,
+  onLowTime,
   active,
 }: TurnTimerProps) {
   const [elapsed, setElapsed] = useState(0);
+  const lowTimeFired = useRef(false);
 
   useEffect(() => {
     if (!active) {
       setElapsed(0);
+      lowTimeFired.current = false;
       return;
     }
 
     setElapsed(0);
+    lowTimeFired.current = false;
     const start = Date.now();
     const interval = setInterval(() => {
       const now = Date.now();
@@ -39,11 +45,16 @@ export function TurnTimer({
         onTimeout?.();
       } else {
         setElapsed(secs);
+        // Fire low time callback at 5 seconds remaining
+        if (!lowTimeFired.current && (duration - secs) <= 5) {
+          lowTimeFired.current = true;
+          onLowTime?.();
+        }
       }
     }, 50);
 
     return () => clearInterval(interval);
-  }, [active, duration, onTimeout]);
+  }, [active, duration, onTimeout, onLowTime]);
 
   if (!active) return null;
 

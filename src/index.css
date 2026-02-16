@@ -681,3 +681,18 @@
   40% { opacity: 1; }
   100% { transform: translate(var(--deal-dx), var(--deal-dy)) scale(1); opacity: 0.9; }
 }
+
+/* Low time warning pill fade-in/out */
+@keyframes low-time-pill-anim {
+  0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+}
+.animate-low-time-pill { animation: low-time-pill-anim 2.5s ease-out both; }
+
+/* Low time red pulse */
+@keyframes low-time-pulse {
+  0%, 100% { box-shadow: 0 0 8px hsl(0 70% 50% / 0.4); }
+  50% { box-shadow: 0 0 20px hsl(0 70% 50% / 0.8); }
+}
