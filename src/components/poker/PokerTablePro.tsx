@@ -302,8 +302,8 @@ export function PokerTablePro({
 
           {/* Community cards */}
           <div
-            className="absolute left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
-            style={{ top: '46%', zIndex: Z.CARDS }}
+            className="absolute left-1/2 flex gap-1.5 items-center"
+            style={{ top: '44%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => {
               const isFlop = i < 3;
