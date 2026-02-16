@@ -1,95 +1,97 @@
 
-# Multiplayer Poker: 7 Fixes
 
-## 1. Allow mid-game joining
+# Fix Multiplayer Poker: Deal Button, Auto-Buy-In, Seat UX
 
-**Current**: `canJoin={!isSeated && !hand}` (line 717) blocks joining when a hand is in progress.
-**Fix**: Change to `canJoin={!isSeated}`. The server already allows it (no hand-active check in `poker-join-table`). New players simply sit out until the next hand. The `poker-start-hand` edge function only deals to players who were seated before the hand began, so this is safe.
+## Problem Analysis
 
-**File**: `src/components/poker/OnlinePokerTable.tsx` (line 717)
+### 1. Deal Button Never Visible (Root Cause Found)
+The auto-deal `useEffect` in `useOnlinePokerTable.ts` fires as soon as 2 players are seated, immediately setting `autoStartAttempted = true`. The Deal button requires `!autoStartAttempted`, so it disappears before the user can ever see it.
 
----
+**The fix**: The auto-deal should only kick in after the first hand has been played (`handHasEverStarted === true`). The first hand is always started manually via the Deal button.
 
-## 2. Longer winner banner display
+### 2. Remove Buy-In Selection
+Players should not choose their buy-in amount. The table's `max_buy_in` is used automatically for all players. The buy-in input and spectator overlay will be simplified.
 
-**Current**: The showdown timer clears winners after 5 seconds (line 243 in `useOnlinePokerTable.ts`).
-**Fix**: Increase from `5000` to `7000` ms so the winner overlay displays for 7 seconds.
-
-**File**: `src/hooks/useOnlinePokerTable.ts` (line 253 timeout)
+### 3. Empty Seats Need Pulse Glow + Helper Text
+Empty seats should have a pulsing gold glow animation and a "Choose your seat to begin" message when the player is not yet seated.
 
 ---
 
-## 3. Emoji display duration to 6 seconds
+## Technical Changes
 
-**Current**: Chat bubbles disappear after 5 seconds (lines 262 and 416).
-**Fix**: Change both timeouts from `5000` to `6000`.
+### File: `src/hooks/useOnlinePokerTable.ts`
 
-**File**: `src/hooks/useOnlinePokerTable.ts` (lines 262, 416)
+**Auto-deal useEffect** (line 387-398): Add `handHasEverStarted` to the condition so auto-deal only fires for subsequent hands, not the first one.
 
----
+```typescript
+// BEFORE (broken):
+if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null) {
 
-## 4. Deal button only at the very beginning
+// AFTER (fixed):
+if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
+```
 
-**Current**: The Deal button shows whenever `!hand && !autoStartAttempted` which includes between hands.
-**Fix**: Add a `handHasEverStarted` ref that is set to `true` once the first hand begins and never resets. The Deal button condition becomes: `isCreator && !hand && !autoStartAttempted && !handHasEverStarted && activeSeats.length >= 2`.
+This single change ensures:
+- First hand: only the manual Deal button can start it
+- All subsequent hands: auto-deal works as before (after showdown clears `autoStartAttempted`)
 
-**Files**: `src/hooks/useOnlinePokerTable.ts` (add `handHasEverStarted` state, set true when first hand starts, export it), `src/components/poker/OnlinePokerTable.tsx` (add to condition)
+### File: `src/components/poker/OnlinePokerTable.tsx`
 
----
+**Deal button condition** (line 546): Simplify to remove `!autoStartAttempted` since auto-deal won't fire before first hand anyway:
+```typescript
+// Show Deal button when: creator, no hand active, first hand never started, 2+ players
+{isCreator && !hand && !handHasEverStarted && activeSeats.length >= 2 && (
+  <button ...>Deal Hand</button>
+)}
+```
 
-## 5. Fix deal card animation order and speed
+**Remove buy-in input** (lines 839-876): Replace the spectator overlay. Remove the `<Input>` for buy-in amount. Instead show only "Choose your seat to begin" with no number input.
 
-**Current issues**:
-- Animation uses `(cardIdx * activeSeatCount + screenPos) * 0.243` which doesn't produce a realistic round-robin deal (should deal one card to each player in order, then second card to each).
-- The card opacity ends at 0 in the keyframe (`opacity: 0` at 100%), making the flying card invisible on arrival.
-- Animation is too fast (0.54s flight, 0.243s gap).
+**handleJoinSeat** (line 300-309): Always use `table.max_buy_in` instead of parsing user input:
+```typescript
+const handleJoinSeat = async (seatNum: number) => {
+  setJoining(true);
+  try {
+    await joinTable(seatNum, table.max_buy_in);
+    toast({ title: 'Seated!' });
+  } catch (err: any) {
+    toast({ title: 'Error', description: err.message, variant: 'destructive' });
+  } finally {
+    setJoining(false);
+  }
+};
+```
 
-**Fix**:
-- Change delay formula to real round-robin: `const seatOrder = activeScreenPositions.indexOf(screenPos); const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;` -- only count active seats in order.
-- Slow flight duration from `0.54s` to `0.7s`.
-- Increase the dealing state duration from `3000` to `4500` ms to accommodate slower animation.
-- Fix the CSS keyframe in `src/index.css` so the card doesn't vanish: change final opacity from `0` to `1` (or `0.9`), and keep scale at 1.
+**Empty seat pulse glow** (EmptySeatDisplay, lines 950-979): Add a pulsing gold ring animation to joinable seats:
+- The dashed border becomes a glowing animated border
+- Add CSS class `animate-pulse` with a gold box-shadow
+- Change label from "Sit" to show seat number only, with the glow doing the inviting
 
-**Files**: `src/components/poker/OnlinePokerTable.tsx` (lines 639-666, line 218), `src/index.css` (deal-card-fly keyframe)
+**Spectator overlay** (lines 839-876): Replace with a simple banner:
+```text
+"Tap a glowing seat to join"
+[Leave button]
+```
+No buy-in input field.
 
----
+### File: `src/index.css`
 
-## 6. Make chip-to-winner animation visible
-
-**Current issues**:
-- ChipAnimation ends at `opacity: 0.6` and `scale(0.7)` -- chips shrink and fade as they travel, becoming nearly invisible.
-- Only 4 chips spawn and they last 600ms with the cleanup timer at 800ms.
-- The chip itself is only `w-3 h-3` (12px).
-
-**Fix**:
-- Update `chip-fly-custom` keyframe in `src/index.css`: change end state to `opacity: 1` and `scale(1.2)` so chips grow and stay visible.
-- Increase chip count from 4 to 6.
-- Increase chip size in `ChipAnimation.tsx` from `w-3 h-3` to `w-4 h-4`.
-- Increase animation duration from 600ms to 900ms and cleanup from 800ms to 1200ms.
-- Add a gold glow/shadow to make chips pop against the green felt.
-
-**Files**: `src/index.css`, `src/components/poker/ChipAnimation.tsx`, `src/components/poker/OnlinePokerTable.tsx` (chip animation spawn, lines 240-247)
-
----
-
-## 7. All-in auto-deal to the end
-
-**Current**: The server already handles this correctly (lines 422-429 in `poker-action/index.ts`): when all active players are all-in, it runs out all community cards at once and goes to showdown. This is working server-side.
-
-**Verify client-side**: The client receives the `game_state` broadcast with all 5 community cards and phase `showdown`, then the `hand_result` broadcast. No client changes needed -- this already works. However, if there's a visual issue where the community cards appear all at once without drama, we can add a staggered reveal animation.
-
-**Fix (optional polish)**: No code changes needed for correctness. The server already auto-deals when everyone is all-in. If the user reports it's not working, it may be a separate issue with the action flow.
+Add a `seat-pulse` keyframe for the empty seat glow:
+```css
+@keyframes seat-pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px hsl(43 74% 49% / 0.3); }
+  50% { box-shadow: 0 0 12px hsl(43 74% 49% / 0.7), 0 0 20px hsl(43 74% 49% / 0.3); }
+}
+```
 
 ---
 
 ## Summary
 
-| # | Fix | Files |
-|---|-----|-------|
-| 1 | Mid-game joining | `OnlinePokerTable.tsx` |
-| 2 | Winner banner 5s to 7s | `useOnlinePokerTable.ts` |
-| 3 | Emoji 5s to 6s | `useOnlinePokerTable.ts` |
-| 4 | Deal button first hand only | `useOnlinePokerTable.ts`, `OnlinePokerTable.tsx` |
-| 5 | Deal animation order + speed | `OnlinePokerTable.tsx`, `index.css` |
-| 6 | Visible chip animations | `index.css`, `ChipAnimation.tsx`, `OnlinePokerTable.tsx` |
-| 7 | All-in auto-deal | Already working server-side, no changes needed |
+| # | Fix | File |
+|---|-----|------|
+| 1 | Auto-deal only after first hand (add `handHasEverStarted` guard) | `useOnlinePokerTable.ts` |
+| 2 | Simplify Deal button condition | `OnlinePokerTable.tsx` |
+| 3 | Remove buy-in input, auto-use `table.max_buy_in` | `OnlinePokerTable.tsx` |
+| 4 | Add pulse glow to empty seats + helper text | `OnlinePokerTable.tsx`, `index.css` |
+
