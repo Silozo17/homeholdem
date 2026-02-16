@@ -8,12 +8,11 @@ interface SeatAnchorProps {
 }
 
 /**
- * Positions its children so that the CENTRE of the first child (the avatar circle)
+ * Positions its children so that the CENTRE of the child
  * sits exactly at (xPct%, yPct%) within the table wrapper.
  *
- * The trick: we position this div at (xPct, yPct) with translate(-50%, -50%)
- * so its own centre is on the point. Then PlayerSeat uses a relative layout
- * where the avatar row is the "origin" and info stacks extend outward.
+ * translate(-50%, -50%) ensures the midpoint of the child element
+ * (which should be the avatar circle) lands on the rail coordinate.
  */
 export function SeatAnchor({ xPct, yPct, zIndex, children }: SeatAnchorProps) {
   return (
@@ -22,9 +21,8 @@ export function SeatAnchor({ xPct, yPct, zIndex, children }: SeatAnchorProps) {
         position: 'absolute',
         left: `${xPct}%`,
         top: `${yPct}%`,
+        transform: 'translate(-50%, -50%)',
         zIndex,
-        // We do NOT translate -50%/-50% on this wrapper.
-        // Instead, PlayerSeat handles centering the avatar at (0,0).
         pointerEvents: 'auto',
       }}
     >
