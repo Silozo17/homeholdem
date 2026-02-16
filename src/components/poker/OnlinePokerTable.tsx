@@ -518,7 +518,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           <TableFelt />
 
           {/* Dealer character — top center */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 'calc(-4% - 62px)', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
