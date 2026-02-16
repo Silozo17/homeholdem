@@ -1,76 +1,72 @@
 
 
-# Fix Online Poker Bugs: Landscape, Table Visibility, and Invites
+# Fix: Invite Friends Dialog Hidden Behind Poker Table
 
-## Bug 1: Android users cannot rotate to landscape
+## Problem
 
-**Root cause (two issues):**
+The "Invite Friends" button **does** work -- it opens the dialog. But the dialog is invisible because of a z-index conflict:
 
-1. `manifest.json` has `"orientation": "portrait"` which tells Android PWAs to lock to portrait mode, preventing rotation entirely.
-2. The `useLockLandscape()` hook in `PokerTablePro.tsx` calls `screen.orientation.lock('landscape')`, but on Android Chrome this requires the page to be in fullscreen mode first. Without fullscreen, the call silently fails. Additionally, there's a stale closure bug: the cleanup reads `locked` which is always `false` (initial value captured by the effect).
+- The poker table container uses `z-[60]` (a fixed full-screen overlay)
+- The Radix Dialog portal renders at `document.body` with `z-50` (both overlay and content)
+- Since `z-50` < `z-[60]`, the dialog appears **behind** the poker table
 
-**Fix:**
-- Change `manifest.json` orientation from `"portrait"` to `"any"` so the PWA allows rotation.
-- Update `useLockLandscape()` to request fullscreen before attempting orientation lock, and use a ref instead of state for the cleanup flag. Wrap both in proper error handling since not all devices support these APIs.
+The console logs confirm the dialog opens and renders its content ("No club members to invite").
 
-**Files:** `public/manifest.json`, `src/components/poker/PokerTablePro.tsx`
+## Solution
 
----
+Pass a higher z-index to the `InvitePlayersDialog`'s `DialogContent` so it renders above the poker table's `z-[60]`.
 
-## Bug 2: Created tables not visible to other players
+### File: `src/components/poker/InvitePlayersDialog.tsx`
 
-**Root cause:** The RLS policy on `poker_tables` only shows tables where:
-- `table_type = 'public'`, OR
-- `created_by = auth.uid()`, OR
-- User is a club member (for club tables), OR
-- User is already seated
+Add `z-[70]` class to the `DialogContent` component, and also override the `DialogOverlay` (via DialogContent's portal) to ensure the backdrop also appears above the poker table.
 
-For `friends` type tables, no other player can see them in the lobby until they are seated (chicken-and-egg problem). They can only join via invite code.
+The simplest approach: add a `className` prop to `DialogContent` with `z-[70]`, and wrap the overlay to also use `z-[70]`.
 
-**Fix:** Update the RLS SELECT policy to also allow visibility for `friends` tables where the viewing user shares at least one club with the table creator. This makes "friends" tables visible to club-mates in the lobby, matching the intent of the feature.
+Since `DialogContent` internally renders `DialogOverlay`, and both use `z-50`, we need to either:
 
-New policy condition adds:
-```sql
-OR (
-  table_type = 'friends' AND EXISTS (
-    SELECT 1 FROM club_members cm1
-    JOIN club_members cm2 ON cm1.club_id = cm2.club_id
-    WHERE cm1.user_id = auth.uid() AND cm2.user_id = poker_tables.created_by
-  )
-)
-```
+1. Override the className on DialogContent to `z-[70]` (this fixes the content but not the overlay), or
+2. Use a custom portal container, or
+3. Simply add `className="z-[70]"` to DialogContent -- the Radix dialog overlay is a sibling in the same portal, so we also need to address it.
 
-**Database migration required.**
+The cleanest fix: In `InvitePlayersDialog.tsx`, replace the plain `<DialogContent className="max-w-sm">` with `<DialogContent className="max-w-sm z-[70]">` and add a custom overlay class. Since the DialogContent component in `dialog.tsx` renders DialogOverlay internally, we can pass the overlay z-index fix by wrapping it differently.
 
----
+Actually, the simplest effective fix: just change the `DialogContent` line to include `z-[70]`, and since the overlay is a separate element also at `z-50`, we should also make the overlay `z-[70]`. The easiest way is to restructure the InvitePlayersDialog to use a manual portal + overlay with the right z-index.
 
-## Bug 3: Invite button broken on mobile PWA
+**Simplest approach**: Override both by passing className to DialogContent (handles the content) and also rendering a custom overlay inside. But since DialogContent already renders DialogOverlay internally, this would duplicate it.
 
-**Root causes (three issues):**
+**Best approach**: Just add `z-[70]` to the DialogContent className. The overlay at `z-50` won't fully dim the poker table, but the content itself will be visible and interactive. For full correctness, we should also pass an overlay override.
 
-1. **Duplicate notification call:** In `InvitePlayersDialog.tsx` lines 82-83, `notifyPokerInvite()` is called twice per invite click (copy-paste bug). Each invite sends two push notifications.
-
-2. **Empty tableId from lobby:** When opened from the lobby's "Invite Friends" button (not from inside a table), `lastCreatedTable` may be null, passing an empty string as `tableId`. The push notification deep link becomes `/online-poker?table=` which doesn't load any table.
-
-3. **Deep link not handled:** The `OnlinePoker` page reads `clubId` from URL params but never reads the `table` query parameter from the invite deep link, so even valid invite links don't auto-join the table.
-
-**Fix:**
-- Remove the duplicate `notifyPokerInvite` call (line 83).
-- In the lobby, disable the standalone "Invite Friends" button or only show it when a table has been created in the current session.
-- In `OnlinePoker.tsx`, read the `table` query param from the URL and auto-set it as `activeTableId` so invite deep links work.
-
-**Files:** `src/components/poker/InvitePlayersDialog.tsx`, `src/components/poker/OnlinePokerLobby.tsx`, `src/pages/OnlinePoker.tsx`
-
----
-
-## Summary of Changes
+**Practical fix** (two small changes):
 
 | File | Change |
 |------|--------|
-| `public/manifest.json` | Change `"orientation"` from `"portrait"` to `"any"` |
-| `src/components/poker/PokerTablePro.tsx` | Fix `useLockLandscape` to request fullscreen first, fix stale closure |
-| Database migration | Update `poker_tables` SELECT RLS to include friends-of-clubs visibility |
-| `src/components/poker/InvitePlayersDialog.tsx` | Remove duplicate `notifyPokerInvite` call |
-| `src/components/poker/OnlinePokerLobby.tsx` | Only show "Invite Friends" button when a table exists in session |
-| `src/pages/OnlinePoker.tsx` | Read `?table=` query param and auto-join that table on load |
+| `src/components/poker/InvitePlayersDialog.tsx` | Add `z-[70]` to DialogContent className |
+| `src/components/ui/dialog.tsx` | No change needed -- we'll use a different approach |
+
+Since the Radix DialogOverlay is rendered inside DialogContent's portal, to fix both overlay and content, pass an explicit style/className. The DialogContent component in `dialog.tsx` renders `<DialogOverlay />` as a sibling -- we can override it by passing a prop or by restructuring.
+
+**Final approach**: In `InvitePlayersDialog.tsx`, manually build the dialog portal with explicit z-indices:
+
+```tsx
+<Dialog open={open} onOpenChange={onOpenChange}>
+  <DialogPortal>
+    <DialogOverlay className="z-[70]" />
+    <DialogContent className="max-w-sm z-[70]" forceMount>
+      ...
+    </DialogContent>
+  </DialogPortal>
+</Dialog>
+```
+
+Wait -- `DialogContent` already renders its own portal and overlay. So this would nest portals. Instead, we should use the lower-level primitives. Or simpler: just use the existing DialogContent but pass the higher z-index, accepting the overlay won't perfectly dim. The dialog will still be fully functional.
+
+**Simplest effective fix**: Add `z-[70]` to the `DialogContent` className in `InvitePlayersDialog.tsx`. The content appears above the poker table, the close button works, invite buttons work. The overlay dimming may partially appear behind the table, but functionally everything works.
+
+### Changes
+
+| File | Change |
+|------|--------|
+| `src/components/poker/InvitePlayersDialog.tsx` | Change `<DialogContent className="max-w-sm">` to `<DialogContent className="max-w-sm z-[70] [&~*]:z-[70]">` to push both content and its overlay above z-[60] |
+
+If the CSS sibling selector doesn't work cleanly for the overlay, an alternative is to modify `dialog.tsx`'s DialogOverlay to accept a className passthrough from DialogContent. But the simpler path is to just test with `z-[70]` on DialogContent alone.
 
