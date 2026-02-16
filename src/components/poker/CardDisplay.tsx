@@ -57,7 +57,7 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
       className={cn(
         sizeClasses[size],
         'rounded-lg flex flex-col relative select-none',
-        'shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.8)] animate-fade-in',
+        'shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.8)]',
         isWinner && 'animate-winner-glow ring-1 ring-primary/60',
         className,
       )}

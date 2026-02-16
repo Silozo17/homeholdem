@@ -420,14 +420,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
-        <button onClick={() => setShowQuitConfirm(true)}
-          className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-        >
-          <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
-        </button>
-
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowQuitConfirm(true)}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
+          </button>
           <span className="text-[10px] font-bold text-foreground/80 truncate max-w-[120px]">{table.name}</span>
+          <span className="text-[10px] text-foreground/60 font-medium">{table.small_blind}/{table.big_blind}</span>
           {hand && (
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
               style={{
@@ -439,7 +439,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               #{hand.hand_number}
             </span>
           )}
-          <span className="text-[10px] text-foreground/60 font-medium">{table.small_blind}/{table.big_blind}</span>
         </div>
 
         <div className="flex items-center gap-1">
@@ -786,6 +785,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape}
                   avatarUrl={seatData!.avatar_url}
+                  seatDealOrder={(() => {
+                    const activeScreenPositions: number[] = [];
+                    rotatedSeats.forEach((sd, sp) => { if (sd?.player_id) activeScreenPositions.push(sp); });
+                    return activeScreenPositions.indexOf(screenPos);
+                  })()}
+                  totalActivePlayers={activeSeats.length}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                 />
@@ -798,7 +803,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* YOUR TURN badge — positioned above hero cards */}
       {showActions && (
         <div className="absolute pointer-events-none" style={{
-          bottom: isLandscape ? 'calc(50% + 60px)' : 'calc(50% + 80px)',
+          bottom: isLandscape ? '18%' : '22%',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS,
@@ -819,7 +824,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* 5 SEC LEFT warning pill */}
       {lowTimeWarning && (
         <div className="absolute pointer-events-none animate-low-time-pill" style={{
-          bottom: isLandscape ? 'calc(50% + 90px)' : 'calc(50% + 110px)',
+          bottom: isLandscape ? '22%' : '26%',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS + 1,

@@ -403,6 +403,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         autoStartTimerRef.current = null;
         setAutoStartAttempted(true);
         startHand().catch(() => {
+          autoStartTimerRef.current = null;
           setAutoStartAttempted(false);
         });
       }, 2000 + jitter);
@@ -425,13 +426,27 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   // Fix #6: Reset autoStartAttempted when hand clears (prevents freeze)
   useEffect(() => {
     if (!hasActiveHand && autoStartAttempted && handHasEverStarted) {
-      // If hand is gone but autoStart is stuck, reset after a short delay
+      // Wait longer than showdown timer (3.5s) + buffer to avoid conflicts
       const fallback = setTimeout(() => {
         setAutoStartAttempted(false);
-      }, 1500);
+      }, 4500);
       return () => clearTimeout(fallback);
     }
   }, [hasActiveHand, autoStartAttempted, handHasEverStarted]);
+
+  // Safety net: force reset if stuck for more than 6 seconds
+  useEffect(() => {
+    if (seatedCount >= 2 && !hasActiveHand && autoStartAttempted && handHasEverStarted) {
+      const safetyNet = setTimeout(() => {
+        setAutoStartAttempted(false);
+        if (autoStartTimerRef.current) {
+          clearTimeout(autoStartTimerRef.current);
+          autoStartTimerRef.current = null;
+        }
+      }, 6000);
+      return () => clearTimeout(safetyNet);
+    }
+  }, [seatedCount, hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;
