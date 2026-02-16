@@ -395,8 +395,8 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         <div className="flex gap-2 animate-slide-up-fade stagger-1">
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <button className="flex-1 glass-card rounded-2xl p-4 flex items-center gap-3 text-left group active:scale-[0.98] transition-all animate-glow-pulse">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <button className="flex-1 glass-card rounded-2xl p-3 flex items-center gap-2 text-left group active:scale-[0.98] transition-all animate-glow-pulse min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -432,9 +432,9 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
           <Dialog open={joinCodeOpen} onOpenChange={setJoinCodeOpen}>
             <DialogTrigger asChild>
-              <button className="flex-1 glass-card rounded-2xl p-4 flex items-center gap-3 text-left group active:scale-[0.98] transition-all">
-                <div className="w-10 h-10 rounded-xl bg-secondary/50 flex items-center justify-center shrink-0">
-                  <Hash className="h-5 w-5 text-foreground/70" />
+              <button className="flex-1 glass-card rounded-2xl p-3 flex items-center gap-2 text-left group active:scale-[0.98] transition-all min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-secondary/50 flex items-center justify-center shrink-0">
+                  <Hash className="h-4 w-4 text-foreground/70" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-foreground text-sm">Join by Code</p>
