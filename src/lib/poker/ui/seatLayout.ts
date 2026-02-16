@@ -30,28 +30,28 @@ export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 // ── 9 fixed seat positions (landscape) ──────────────────────────────
 // Mapped from the reference screenshot yellow markers
 const SEATS_LANDSCAPE = {
-  Y: { xPct: 50, yPct: 98 },    // bottom center (You)
-  A: { xPct: 20, yPct: 82 },    // bottom-left
-  B: { xPct: 4,  yPct: 48 },    // left middle
-  C: { xPct: 12, yPct: 16 },    // upper-left
-  D: { xPct: 32, yPct: 0 },     // top-left
-  E: { xPct: 80, yPct: 82 },    // bottom-right  (mirror of A)
-  F: { xPct: 96, yPct: 48 },    // right middle   (mirror of B)
-  G: { xPct: 88, yPct: 16 },    // upper-right    (mirror of C)
-  H: { xPct: 68, yPct: 0 },     // top-right      (mirror of D)
+  Y: { xPct: 50, yPct: 88 },    // bottom center (You)
+  A: { xPct: 24, yPct: 76 },    // bottom-left
+  B: { xPct: 10, yPct: 44 },    // left middle
+  C: { xPct: 18, yPct: 18 },    // upper-left
+  D: { xPct: 35, yPct: 5 },     // top-left
+  E: { xPct: 76, yPct: 76 },    // bottom-right  (mirror of A)
+  F: { xPct: 90, yPct: 44 },    // right middle   (mirror of B)
+  G: { xPct: 82, yPct: 18 },    // upper-right    (mirror of C)
+  H: { xPct: 65, yPct: 5 },     // top-right      (mirror of D)
 };
 
 // Portrait uses tighter positions
 const SEATS_PORTRAIT = {
-  Y: { xPct: 50, yPct: 98 },
-  A: { xPct: 14, yPct: 80 },
-  B: { xPct: 3,  yPct: 50 },
-  C: { xPct: 10, yPct: 22 },
-  D: { xPct: 30, yPct: 3 },
-  E: { xPct: 86, yPct: 80 },
-  F: { xPct: 97, yPct: 50 },
-  G: { xPct: 90, yPct: 22 },
-  H: { xPct: 70, yPct: 3 },
+  Y: { xPct: 50, yPct: 88 },
+  A: { xPct: 20, yPct: 76 },
+  B: { xPct: 8,  yPct: 44 },
+  C: { xPct: 14, yPct: 18 },
+  D: { xPct: 32, yPct: 5 },
+  E: { xPct: 80, yPct: 76 },
+  F: { xPct: 92, yPct: 44 },
+  G: { xPct: 86, yPct: 18 },
+  H: { xPct: 68, yPct: 5 },
 };
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)
