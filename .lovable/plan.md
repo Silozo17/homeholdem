@@ -1,20 +1,45 @@
 
 
-# Fix: Emoji Display Duration & Self-Visibility
+# Fix: Game Not Starting with 3 Players + Emoji Duration to 5s
 
-## Problem
-1. Users may see duplicate bubbles (once from local add, once from broadcast echo) or none at all depending on channel config.
-2. Bubbles disappear after 3 seconds -- too fast.
+## Issue 1: Game stuck on "Starting soon..."
 
-## Changes
+**Root cause**: When multiple players join, each client's auto-deal `useEffect` fires and sets `autoStartAttempted = true`. The `startHand()` call uses `.catch(() => {})` which silently swallows errors. If the call fails (race condition, server rejects duplicate starts), the flag stays `true` and no client ever retries.
 
-### File: `src/hooks/useOnlinePokerTable.ts`
+**Fix in `src/hooks/useOnlinePokerTable.ts`**:
+- In the auto-deal `useEffect` (line 384-391), if `startHand()` fails, reset `autoStartAttempted` back to `false` so the effect retries after a brief delay.
+- Add a small random jitter (0-1s) to the 2-second delay to reduce the chance of multiple clients racing simultaneously.
 
-**Prevent duplicate bubbles from broadcast listener (line 254-261):**
-- In the `chat_emoji` broadcast handler, skip adding the bubble if `payload.player_id === userId` (since `sendChat` already adds it locally).
+```typescript
+// Current (broken):
+startHand().catch(() => {});
 
-**Increase all bubble durations from 3000ms to 4000ms:**
-- Line 259: Change `3000` to `4000` (broadcast listener timeout).
-- Line 410: Change `3000` to `4000` (local sender timeout).
+// Fixed:
+startHand().catch(() => {
+  setAutoStartAttempted(false); // allow retry
+});
+```
 
-That's it -- two small edits in one file.
+And add jitter to reduce collisions:
+```typescript
+const jitter = Math.random() * 1000;
+const timer = setTimeout(() => {
+  startHand().catch(() => {
+    setAutoStartAttempted(false);
+  });
+}, 2000 + jitter);
+```
+
+## Issue 2: Emoji/message duration to 5 seconds
+
+**Fix in `src/hooks/useOnlinePokerTable.ts`**:
+- Line 259: Change `4000` to `5000` (broadcast listener timeout)
+- Line 413: Change `4000` to `5000` (local sender timeout)
+
+## Summary
+
+| Change | Location |
+|--------|----------|
+| Retry auto-deal on failure + add jitter | `useOnlinePokerTable.ts` lines 384-391 |
+| Emoji duration 4s to 5s | `useOnlinePokerTable.ts` lines 259, 413 |
+
