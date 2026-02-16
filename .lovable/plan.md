@@ -1,72 +1,96 @@
 
+# Fix Online Poker: Frozen Screen, Wake Lock, Notifications, and Table Visibility
 
-# Fix: Invite Friends Dialog Hidden Behind Poker Table
+## Issue 1: 3-Dots Menu Freezes Screen
 
-## Problem
+**Root cause:** Same z-index bug as the invite dialog. The `DropdownMenuContent` in `dropdown-menu.tsx` renders via a Radix portal at `z-50`. The poker table container is `z-[60]`. When the dropdown opens, its invisible overlay captures all clicks at `z-50` (behind the table), while the actual menu content is also hidden behind the table. The user sees nothing but can no longer click anything because the overlay is intercepting events.
 
-The "Invite Friends" button **does** work -- it opens the dialog. But the dialog is invisible because of a z-index conflict:
+**Fix:** In `OnlinePokerTable.tsx`, pass `className="z-[70]"` to the `DropdownMenuContent` component so both the menu and its portal render above the `z-[60]` table.
 
-- The poker table container uses `z-[60]` (a fixed full-screen overlay)
-- The Radix Dialog portal renders at `document.body` with `z-50` (both overlay and content)
-- Since `z-50` < `z-[60]`, the dialog appears **behind** the poker table
+**File:** `src/components/poker/OnlinePokerTable.tsx` (line 277)
 
-The console logs confirm the dialog opens and renders its content ("No club members to invite").
+---
 
-## Solution
+## Issue 2: Screen Sleeps During Game
 
-Pass a higher z-index to the `InvitePlayersDialog`'s `DialogContent` so it renders above the poker table's `z-[60]`.
+**Root cause:** The `useWakeLock` hook exists and is used in `TVDisplay.tsx`, but neither `OnlinePokerTable` nor `PokerTablePro` call it. There is no wake lock active during online multiplayer games or single-player poker.
 
-### File: `src/components/poker/InvitePlayersDialog.tsx`
+**Fix:** Import and activate `useWakeLock` in both `OnlinePokerTable.tsx` and `PokerTablePro.tsx`. Request the wake lock on mount, release on unmount.
 
-Add `z-[70]` class to the `DialogContent` component, and also override the `DialogOverlay` (via DialogContent's portal) to ensure the backdrop also appears above the poker table.
+**Files:** `src/components/poker/OnlinePokerTable.tsx`, `src/components/poker/PokerTablePro.tsx`
 
-The simplest approach: add a `className` prop to `DialogContent` with `z-[70]`, and wrap the overlay to also use `z-[70]`.
+---
 
-Since `DialogContent` internally renders `DialogOverlay`, and both use `z-50`, we need to either:
+## Issue 3: Invited Users Don't Get Notifications
 
-1. Override the className on DialogContent to `z-[70]` (this fixes the content but not the overlay), or
-2. Use a custom portal container, or
-3. Simply add `className="z-[70]"` to DialogContent -- the Radix dialog overlay is a sibling in the same portal, so we also need to address it.
+**Root cause:** The `notifyPokerInvite` function sends correctly, but the edge function (`send-push-notification`) filters users by `notification_type = 'rsvp_updates'`, checking for a column `push_rsvp_updates` in `user_preferences`. If the invited user:
+- Has no row in `push_subscriptions` (never granted push permission), OR
+- Has no row in `user_preferences` but the preference filter logic has a subtle issue
 
-The cleanest fix: In `InvitePlayersDialog.tsx`, replace the plain `<DialogContent className="max-w-sm">` with `<DialogContent className="max-w-sm z-[70]">` and add a custom overlay class. Since the DialogContent component in `dialog.tsx` renders DialogOverlay internally, we can pass the overlay z-index fix by wrapping it differently.
+The edge function logs show it booted but logged zero actual sends -- meaning either no subscriptions were found for the target user, or the preference filter excluded them.
 
-Actually, the simplest effective fix: just change the `DialogContent` line to include `z-[70]`, and since the overlay is a separate element also at `z-50`, we should also make the overlay `z-[70]`. The easiest way is to restructure the InvitePlayersDialog to use a manual portal + overlay with the right z-index.
+The deeper issue: the notification type `'rsvp_updates'` is semantically wrong for poker invites. It should be a distinct type, but since we can't add a new column easily, the more practical fix is to either:
+1. Send poker invites without a `notificationType` filter (so all users with subscriptions get them), or
+2. Add a proper notification type
 
-**Simplest approach**: Override both by passing className to DialogContent (handles the content) and also rendering a custom overlay inside. But since DialogContent already renders DialogOverlay internally, this would duplicate it.
+The simplest fix: Remove the `notificationType` from `notifyPokerInvite` so it bypasses preference filtering. Poker invites are direct, personal invitations and should always be delivered.
 
-**Best approach**: Just add `z-[70]` to the DialogContent className. The overlay at `z-50` won't fully dim the poker table, but the content itself will be visible and interactive. For full correctness, we should also pass an overlay override.
+**File:** `src/lib/push-notifications.ts` (the `notifyPokerInvite` function)
 
-**Practical fix** (two small changes):
+---
+
+## Issue 4: Other Users Can't See Created Tables
+
+**Root cause:** The RLS policy is actually correct now -- it includes friends visibility via shared clubs. The real issue is that the lobby doesn't auto-refresh. When you create a table, the other user's lobby is stale. They need to manually pull to refresh.
+
+**Fix:** Add a Supabase Realtime subscription to the `poker_tables` table in the lobby component, so when a new table is created (INSERT) or status changes, the lobby auto-refreshes.
+
+**File:** `src/components/poker/OnlinePokerLobby.tsx`
+
+---
+
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/components/poker/InvitePlayersDialog.tsx` | Add `z-[70]` to DialogContent className |
-| `src/components/ui/dialog.tsx` | No change needed -- we'll use a different approach |
+| `src/components/poker/OnlinePokerTable.tsx` | Add `className="z-[70]"` to DropdownMenuContent; import and activate `useWakeLock` |
+| `src/components/poker/PokerTablePro.tsx` | Import and activate `useWakeLock` |
+| `src/lib/push-notifications.ts` | Remove `notificationType` from `notifyPokerInvite` so invites bypass preference filtering |
+| `src/components/poker/OnlinePokerLobby.tsx` | Add realtime subscription to `poker_tables` for auto-refresh when tables are created/updated |
 
-Since the Radix DialogOverlay is rendered inside DialogContent's portal, to fix both overlay and content, pass an explicit style/className. The DialogContent component in `dialog.tsx` renders `<DialogOverlay />` as a sibling -- we can override it by passing a prop or by restructuring.
+## Technical Details
 
-**Final approach**: In `InvitePlayersDialog.tsx`, manually build the dialog portal with explicit z-indices:
+### Wake Lock Integration
+```typescript
+// In OnlinePokerTable.tsx and PokerTablePro.tsx
+import { useWakeLock } from '@/hooks/useWakeLock';
 
-```tsx
-<Dialog open={open} onOpenChange={onOpenChange}>
-  <DialogPortal>
-    <DialogOverlay className="z-[70]" />
-    <DialogContent className="max-w-sm z-[70]" forceMount>
-      ...
-    </DialogContent>
-  </DialogPortal>
-</Dialog>
+// Inside the component:
+const { requestWakeLock, releaseWakeLock } = useWakeLock();
+useEffect(() => {
+  requestWakeLock();
+  return () => { releaseWakeLock(); };
+}, []);
 ```
 
-Wait -- `DialogContent` already renders its own portal and overlay. So this would nest portals. Instead, we should use the lower-level primitives. Or simpler: just use the existing DialogContent but pass the higher z-index, accepting the overlay won't perfectly dim. The dialog will still be fully functional.
+### Realtime Lobby Refresh
+```typescript
+// In OnlinePokerLobby.tsx useEffect
+useEffect(() => {
+  const channel = supabase
+    .channel('poker-tables-lobby')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'poker_tables',
+    }, () => { fetchTables(); })
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}, [fetchTables]);
+```
 
-**Simplest effective fix**: Add `z-[70]` to the `DialogContent` className in `InvitePlayersDialog.tsx`. The content appears above the poker table, the close button works, invite buttons work. The overlay dimming may partially appear behind the table, but functionally everything works.
-
-### Changes
-
-| File | Change |
-|------|--------|
-| `src/components/poker/InvitePlayersDialog.tsx` | Change `<DialogContent className="max-w-sm">` to `<DialogContent className="max-w-sm z-[70] [&~*]:z-[70]">` to push both content and its overlay above z-[60] |
-
-If the CSS sibling selector doesn't work cleanly for the overlay, an alternative is to modify `dialog.tsx`'s DialogOverlay to accept a className passthrough from DialogContent. But the simpler path is to just test with `z-[70]` on DialogContent alone.
-
+### Database Change
+Enable realtime for `poker_tables`:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.poker_tables;
+```
