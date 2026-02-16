@@ -97,10 +97,20 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    // Get actions for the current hand to derive folded/all-in status
+    let handActions: any[] = [];
+    if (currentHand) {
+      const { data: actions } = await admin
+        .from("poker_actions")
+        .select("*")
+        .eq("hand_id", currentHand.id)
+        .order("sequence", { ascending: true });
+      handActions = actions || [];
+    }
+
     // Get player's own hole cards if there's an active hand
     let myCards = null;
     if (currentHand) {
-      // Use user's supabase client (RLS enforced)
       const { data: holeCards } = await supabase
         .from("poker_hole_cards")
         .select("cards")
@@ -110,18 +120,51 @@ Deno.serve(async (req) => {
       myCards = holeCards?.cards || null;
     }
 
-    // Build seat info with profiles
+    // Build seat info with profiles, deriving status from actions log
     const seatInfo = (seats || []).map((s: any) => {
       const profile = profileMap.get(s.player_id);
+
+      let derivedStatus = s.status;
+      let currentBet = 0;
+      let lastAction: string | null = null;
+
+      if (currentHand && s.player_id) {
+        // Derive status from actions log
+        const playerActions = handActions.filter((a: any) => a.player_id === s.player_id);
+        const hasFolded = playerActions.some((a: any) => a.action_type === "fold");
+
+        if (hasFolded) {
+          derivedStatus = "folded";
+        } else if (s.stack <= 0 && playerActions.length > 0) {
+          derivedStatus = "all-in";
+        } else if (s.status === "active" || s.status === "sitting_out" || s.status === "disconnected") {
+          derivedStatus = s.status;
+        }
+
+        // Calculate current round bet
+        for (const a of playerActions) {
+          if (a.phase === currentHand.phase) {
+            currentBet += a.amount || 0;
+          }
+        }
+
+        // Get last action
+        if (playerActions.length > 0) {
+          lastAction = playerActions[playerActions.length - 1].action_type;
+        }
+      }
+
       return {
         seat: s.seat_number,
         player_id: s.player_id,
         display_name: profile?.display_name || "Player",
         avatar_url: profile?.avatar_url || null,
         stack: s.stack,
-        status: s.status,
+        status: derivedStatus,
+        current_bet: currentBet,
+        last_action: lastAction,
         has_cards:
-          currentHand && s.status === "active" && s.player_id ? true : false,
+          currentHand && derivedStatus !== "folded" && s.player_id ? true : false,
       };
     });
 

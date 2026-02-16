@@ -583,6 +583,7 @@ async function processAction(
     phase: newPhase,
     community_cards: communityCards,
     pots: finalPots,
+    current_actor_seat: nextActorSeat,
     current_actor_id: nextActorSeat !== null ? seatStates.find(s => s.seat_number === nextActorSeat)?.player_id : null,
     dealer_seat: hand.dealer_seat,
     sb_seat: hand.sb_seat,
