@@ -78,6 +78,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [lastActions, setLastActions] = useState<Record<string, string>>({});
   const [handWinners, setHandWinners] = useState<HandWinner[]>([]);
   const channelRef = useRef<any>(null);
+  const tableStateRef = useRef<OnlineTableState | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartAttemptedRef = useRef(false);
@@ -85,6 +86,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const prevHandIdRef = useRef<string | null>(null);
 
   const userId = user?.id;
+
+  // Keep ref in sync for use inside broadcast callbacks
+  useEffect(() => { tableStateRef.current = tableState; }, [tableState]);
 
   // Derive computed state
   const mySeatNumber = tableState?.seats.find(s => s.player_id === userId)?.seat ?? null;
@@ -188,8 +192,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         setRevealedCards(revealed);
 
         // Store winners
+        const currentSeats = tableStateRef.current?.seats || [];
         const winners: HandWinner[] = (payload.winners || []).map((w: any) => {
-          const seatData = (payload.seats || []).find((s: any) => s.player_id === w.player_id);
+          const seatData = currentSeats.find((s) => s.player_id === w.player_id);
           return {
             player_id: w.player_id,
             display_name: seatData?.display_name || 'Unknown',
