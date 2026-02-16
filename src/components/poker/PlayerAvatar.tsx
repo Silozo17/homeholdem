@@ -6,7 +6,7 @@ interface PlayerAvatarProps {
   status: 'active' | 'folded' | 'all-in' | 'eliminated';
   isCurrentPlayer: boolean;
   avatarUrl?: string | null;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
 }
 
 const AVATAR_COLORS = [
@@ -29,7 +29,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
   return (
     <div className={cn(
       'relative rounded-full flex items-center justify-center font-bold select-none',
-      size === 'md' ? 'w-11 h-11 text-sm' : 'w-8 h-8 text-xs',
+      size === 'md' ? 'w-11 h-11 text-sm' : size === 'sm' ? 'w-8 h-8 text-xs' : 'w-7 h-7 text-[10px]',
       isOut && 'opacity-70',
     )}>
       {/* Animated ring for current player */}

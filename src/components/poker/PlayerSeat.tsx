@@ -20,6 +20,7 @@ interface PlayerSeatProps {
   sidePosition?: SidePosition;
   avatarUrl?: string | null;
   seatDealOrder?: number;
+  compact?: boolean;
   onTimeout?: () => void;
 }
 
@@ -33,11 +34,13 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  tableHalf, sidePosition = 'center', avatarUrl, seatDealOrder = 0, onTimeout,
+  tableHalf, sidePosition = 'center', avatarUrl, seatDealOrder = 0, compact = false, onTimeout,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
   const isTop = tableHalf === 'top';
+  const avatarSize = compact ? 'xs' : 'md';
+  const cardSize = compact ? 'xs' : 'md';
 
   // ── Info stack (cards, name, chips, badges) ──
   const infoStack = (
@@ -52,7 +55,7 @@ export const PlayerSeat = memo(function PlayerSeat({
                 key={i}
                 card={showCards ? card : undefined}
                 faceDown={!showCards}
-                size="md"
+                size={cardSize}
                 dealDelay={dealDelay}
                 className={isOut ? 'animate-fold-away' : ''}
               />
@@ -70,14 +73,15 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Name */}
       <p className={cn(
-        'text-[11px] font-bold truncate max-w-[72px] leading-tight',
+        compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[72px]',
+        'font-bold truncate leading-tight',
         isHuman ? 'text-primary' : 'text-foreground/90',
       )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
         {player.name}
       </p>
 
       {/* Chips */}
-      <p className="text-[10px] text-primary/80 font-semibold leading-none"
+      <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-primary/80 font-semibold leading-none')}
         style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
       >
         {player.chips.toLocaleString()}
@@ -123,7 +127,7 @@ export const PlayerSeat = memo(function PlayerSeat({
           status={player.status}
           isCurrentPlayer={isCurrentPlayer && !isOut}
           avatarUrl={avatarUrl}
-          size="md"
+          size={avatarSize}
         />
         {player.isDealer && (
           <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />

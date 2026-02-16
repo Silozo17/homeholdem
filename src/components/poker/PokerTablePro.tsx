@@ -148,6 +148,7 @@ export function PokerTablePro({
   const ellipse = getDefaultEllipse(isLandscape);
   const positions = getSeatPositions(state.players.length, isLandscape);
   const currentPlayerIdx = state.currentPlayerIndex;
+  const isMobileLandscape = isLandscape && typeof window !== 'undefined' && window.innerWidth < 900;
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
@@ -388,6 +389,7 @@ export function PokerTablePro({
                   isShowdown={isShowdown}
                   tableHalf={pos.yPct < 55 ? 'top' : 'bottom'}
                   sidePosition={pos.xPct < 25 ? 'left' : pos.xPct > 75 ? 'right' : 'center'}
+                  compact={isMobileLandscape}
                   avatarUrl={isHuman ? humanAvatarUrl : undefined}
                   seatDealOrder={seatDealOrder}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
