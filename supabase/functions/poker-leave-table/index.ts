@@ -58,14 +58,13 @@ Deno.serve(async (req) => {
       .single();
 
     if (!seat) {
-      // Idempotent: if not seated, just return success
       return new Response(
         JSON.stringify({ message: "Not seated", stack: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check if mid-hand — if so, mark as folded for current hand
+    // Check if mid-hand
     const { data: activeHand } = await admin
       .from("poker_hands")
       .select("id")
@@ -73,33 +72,39 @@ Deno.serve(async (req) => {
       .is("completed_at", null)
       .single();
 
-    if (activeHand) {
-      // Player leaving mid-hand — they'll be auto-folded by the game engine
-      // For now, just mark seat as sitting_out
-      await admin
-        .from("poker_seats")
-        .update({ status: "sitting_out" })
-        .eq("id", seat.id);
+    // Count other seated players (excluding the leaving player)
+    const { data: allSeats } = await admin
+      .from("poker_seats")
+      .select("id, player_id")
+      .eq("table_id", table_id)
+      .not("player_id", "is", null);
 
-      return new Response(
-        JSON.stringify({
-          message: "Marked as sitting out. Will be removed after hand completes.",
-          stack: seat.stack,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const otherSeats = (allSeats || []).filter(s => s.player_id !== user.id);
+    const remainingAfterLeave = otherSeats.length;
+
+    if (activeHand) {
+      // If only 1 opponent remains, auto-complete the hand so the table isn't stuck
+      if (remainingAfterLeave <= 1) {
+        await admin
+          .from("poker_hands")
+          .update({ completed_at: new Date().toISOString(), phase: "complete" })
+          .eq("id", activeHand.id);
+      }
+
+      // Delete seat immediately (don't just mark sitting_out — player is leaving)
+      await admin.from("poker_seats").delete().eq("id", seat.id);
+    } else {
+      // No active hand — remove seat immediately
+      const { error: deleteErr } = await admin
+        .from("poker_seats")
+        .delete()
+        .eq("id", seat.id);
+      if (deleteErr) throw deleteErr;
     }
 
-    // No active hand — remove seat immediately
-    const { error: deleteErr } = await admin
-      .from("poker_seats")
-      .delete()
-      .eq("id", seat.id);
-
-    if (deleteErr) throw deleteErr;
-
-    // Broadcast seat change
     const channel = admin.channel(`poker:table:${table_id}`);
+
+    // Broadcast seat leave
     await channel.send({
       type: "broadcast",
       event: "seat_change",
@@ -108,11 +113,26 @@ Deno.serve(async (req) => {
         player_id: null,
         display_name: null,
         action: "leave",
+        remaining_players: remainingAfterLeave,
       },
     });
 
+    // If no players remain, auto-close the table
+    if (remainingAfterLeave === 0) {
+      await admin
+        .from("poker_tables")
+        .update({ status: "closed" })
+        .eq("id", table_id);
+
+      await channel.send({
+        type: "broadcast",
+        event: "seat_change",
+        payload: { action: "table_closed" },
+      });
+    }
+
     return new Response(
-      JSON.stringify({ message: "Left table", stack: seat.stack }),
+      JSON.stringify({ message: "Left table", stack: seat.stack, remaining_players: remainingAfterLeave }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

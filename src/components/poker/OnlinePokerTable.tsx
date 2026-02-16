@@ -194,7 +194,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     } else if (tableState) {
       setIsDisconnected(false);
     }
-  }, [error, tableState]);
+    // Handle table_closed: tableState set to null by hook
+    if (!tableState && !loading && !error) {
+      toast({ title: 'Table closed', description: 'This table has been closed.' });
+      onLeave();
+    }
+  }, [error, tableState, loading, onLeave]);
 
   // Game over detection: human stack hits 0
   useEffect(() => {

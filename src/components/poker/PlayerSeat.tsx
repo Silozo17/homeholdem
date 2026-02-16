@@ -112,7 +112,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
         {/* Turn timer wraps the avatar */}
         {isCurrentPlayer && !isOut && (
-          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={2.5} onTimeout={onTimeout} />
+          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={4} onTimeout={onTimeout} />
         )}
 
         {/* Opponent showdown cards overlaying avatar */}
