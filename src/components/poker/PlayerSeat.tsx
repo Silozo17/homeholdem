@@ -22,11 +22,12 @@ interface PlayerSeatProps {
 }
 
 /**
- * PlayerSeat uses a "anchor-centered" layout:
- * - The avatar circle is always the anchor point (centered at 0,0 of parent).
- * - Info (cards, name, chips, badges) renders ABOVE for top-half seats
- *   and BELOW for bottom-half seats.
- * - The whole component is positioned so the avatar center = the rail point.
+ * PlayerSeat — anchor-centered layout.
+ *
+ * The avatar circle is the ONLY flow element and is centered by SeatAnchor.
+ * The info stack (cards, name, chips, badges) is absolutely positioned
+ * so it extends ABOVE for top-half seats or BELOW for bottom-half seats
+ * WITHOUT moving the avatar off the rail.
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
@@ -36,29 +37,9 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isFolded = player.status === 'folded';
   const isTop = tableHalf === 'top';
 
-  // ── Avatar circle (the anchor) ──
-  const avatarCircle = (
-    <div className="relative flex items-center justify-center">
-      <PlayerAvatar
-        name={player.name}
-        index={player.seatIndex}
-        status={player.status}
-        isCurrentPlayer={isCurrentPlayer && !isOut}
-        avatarUrl={avatarUrl}
-        size="md"
-      />
-      {player.isDealer && (
-        <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />
-      )}
-      {isCurrentPlayer && !isOut && (
-        <TurnTimer active={true} size={48} strokeWidth={2.5} onTimeout={onTimeout} />
-      )}
-    </div>
-  );
-
   // ── Info stack (cards, name, chips, badges) ──
   const infoStack = (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5" style={{ whiteSpace: 'nowrap' }}>
       {/* Cards */}
       {player.holeCards.length > 0 && (
         <div className="relative flex gap-0.5">
@@ -125,41 +106,45 @@ export const PlayerSeat = memo(function PlayerSeat({
     </div>
   );
 
-  /*
-   * Layout: The avatar is always the center anchor.
-   * We use negative margin / absolute offset to keep the avatar at (0,0)
-   * while the info stack extends outward.
-   *
-   * Structure:
-   *   <wrapper centered at parent (0,0)>
-   *     {top ? infoStack : null}
-   *     avatarCircle  ← this is at the anchor point
-   *     {bottom ? infoStack : null}
-   *   </wrapper>
-   *
-   * The wrapper uses transform to center the AVATAR (not the whole block).
-   * For top-half: translate(-50%, -100% + half-avatar-height)
-   *   → avatar center sits at the anchor, info extends upward
-   * For bottom-half: translate(-50%, -half-avatar-height)
-   *   → avatar center sits at the anchor, info extends downward
-   *
-   * Avatar height = 44px (w-11 h-11), so half = 22px.
-   */
   return (
     <div
       className={cn(
-        'flex flex-col items-center gap-1 transition-all duration-300',
+        'relative transition-all duration-300',
         isOut && 'opacity-60',
       )}
-      style={{
-        transform: isTop
-          ? 'translate(-50%, calc(-100% + 22px))'  // anchor at avatar center (bottom of block)
-          : 'translate(-50%, -22px)',                // anchor at avatar center (top of block)
-      }}
     >
-      {isTop && infoStack}
-      {avatarCircle}
-      {!isTop && infoStack}
+      {/* Avatar circle — this IS the centered anchor element */}
+      <div className="relative flex items-center justify-center">
+        <PlayerAvatar
+          name={player.name}
+          index={player.seatIndex}
+          status={player.status}
+          isCurrentPlayer={isCurrentPlayer && !isOut}
+          avatarUrl={avatarUrl}
+          size="md"
+        />
+        {player.isDealer && (
+          <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />
+        )}
+        {isCurrentPlayer && !isOut && (
+          <TurnTimer active={true} size={48} strokeWidth={2.5} onTimeout={onTimeout} />
+        )}
+      </div>
+
+      {/* Info stack — absolutely positioned above or below the avatar */}
+      <div
+        className="flex flex-col items-center"
+        style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          ...(isTop
+            ? { bottom: '100%', marginBottom: '4px' }
+            : { top: '100%', marginTop: '4px' }),
+        }}
+      >
+        {infoStack}
+      </div>
     </div>
   );
 });

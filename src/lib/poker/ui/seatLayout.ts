@@ -41,17 +41,17 @@ const SEATS_LANDSCAPE = {
   H: { xPct: 67, yPct: 8 },     // top-right      (mirror of D)
 };
 
-// Portrait uses tighter positions
+// Portrait uses tighter positions — sides pulled inward to avoid clipping
 const SEATS_PORTRAIT = {
-  Y: { xPct: 50, yPct: 86 },
-  A: { xPct: 22, yPct: 70 },
-  B: { xPct: 12, yPct: 50 },
-  C: { xPct: 17, yPct: 22 },
-  D: { xPct: 30, yPct: 8 },
-  E: { xPct: 78, yPct: 70 },
-  F: { xPct: 88, yPct: 50 },
-  G: { xPct: 83, yPct: 22 },
-  H: { xPct: 70, yPct: 8 },
+  Y: { xPct: 50, yPct: 88 },
+  A: { xPct: 20, yPct: 72 },
+  B: { xPct: 10, yPct: 50 },
+  C: { xPct: 14, yPct: 28 },
+  D: { xPct: 32, yPct: 10 },
+  E: { xPct: 80, yPct: 72 },
+  F: { xPct: 90, yPct: 50 },
+  G: { xPct: 86, yPct: 28 },
+  H: { xPct: 68, yPct: 10 },
 };
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)
