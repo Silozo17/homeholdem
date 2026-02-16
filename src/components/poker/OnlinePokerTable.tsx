@@ -209,7 +209,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const positions = SEAT_POSITIONS[Math.min(Math.max(table.max_seats, 2), 9)] || SEAT_POSITIONS[9];
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 flex flex-col overflow-hidden z-[60]">
       {/* Leather background */}
       <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />
       <div className="absolute inset-0 bg-black/30 pointer-events-none" />

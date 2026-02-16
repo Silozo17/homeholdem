@@ -1,8 +1,8 @@
-import { Card, PokerPlayer, GameAction, PlayerAction } from './types';
+import { Card, PokerPlayer, GameAction, BotPersonality, BOT_PERSONALITIES, PersonalityProfile } from './types';
 import { evaluateHand } from './hand-evaluator';
 
 /**
- * Bot AI decision making.
+ * Bot AI decision making with personality-driven behavior.
  * Uses preflop hand scoring when no community cards are dealt,
  * and hand evaluation when community cards are available.
  */
@@ -13,8 +13,11 @@ export function decideBotAction(
   currentBetToCall: number,
   minRaise: number,
   bigBlind: number,
+  dealerIndex?: number,
+  totalPlayers?: number,
 ): GameAction {
   const amountToCall = currentBetToCall - player.currentBet;
+  const profile = BOT_PERSONALITIES[player.personality || 'fish'];
 
   // If no chips left, can't do anything
   if (player.chips <= 0) {
@@ -22,22 +25,56 @@ export function decideBotAction(
   }
 
   // Calculate hand strength
-  const strength = communityCards.length === 0
+  let strength = communityCards.length === 0
     ? getPreflopStrength(player.holeCards)
     : getPostflopStrength(player.holeCards, communityCards);
 
-  // Random bluff factor (0-1)
-  const bluffRoll = Math.random();
-  const bluffChance = communityCards.length === 0 ? 0.10 : 0.08;
+  // Position bonus (Pro personality)
+  if (profile.positionAware && dealerIndex !== undefined && totalPlayers) {
+    const positionBonus = getPositionBonus(player.seatIndex, dealerIndex, totalPlayers);
+    strength += positionBonus;
+  }
 
+  // Board texture adjustment — scary boards reduce effective strength
+  if (communityCards.length >= 3) {
+    const scaryPenalty = getBoardScaryPenalty(communityCards, player.holeCards);
+    strength -= scaryPenalty;
+  }
+
+  strength = Math.max(0, Math.min(100, strength));
+
+  // Random bluff factor
+  const bluffRoll = Math.random();
+
+  // Pot odds check (Pro personality)
+  if (profile.usePotOdds && amountToCall > 0) {
+    const potOdds = amountToCall / (pot + amountToCall);
+    const handEquity = strength / 100;
+    // If pot odds are favorable, lower the fold threshold
+    if (handEquity > potOdds * 1.2) {
+      // Good pot odds — more inclined to call
+      return decideBetAction(player, strength, profile, pot, amountToCall, minRaise, bigBlind, bluffRoll, true);
+    }
+  }
+
+  return decideBetAction(player, strength, profile, pot, amountToCall, minRaise, bigBlind, bluffRoll, false);
+}
+
+function decideBetAction(
+  player: PokerPlayer,
+  strength: number,
+  profile: PersonalityProfile,
+  pot: number,
+  amountToCall: number,
+  minRaise: number,
+  bigBlind: number,
+  bluffRoll: number,
+  favorablePotOdds: boolean,
+): GameAction {
   // No bet to call
   if (amountToCall <= 0) {
-    // Can check or bet
-    if (strength > 75 || bluffRoll < bluffChance) {
-      const raiseAmount = Math.min(
-        Math.max(minRaise, bigBlind * 2),
-        player.chips
-      );
+    if (strength > profile.raiseThreshold || bluffRoll < profile.bluffChance) {
+      const raiseAmount = calculateRaiseSize(profile, pot, minRaise, bigBlind, player.chips);
       return raiseAmount >= player.chips
         ? { type: 'all-in' }
         : { type: 'raise', amount: raiseAmount };
@@ -46,12 +83,9 @@ export function decideBotAction(
   }
 
   // There's a bet to call
-  if (strength > 75) {
+  if (strength > profile.raiseThreshold) {
     // Strong hand: raise
-    const raiseAmount = Math.min(
-      Math.max(minRaise, amountToCall + bigBlind * 2),
-      player.chips
-    );
+    const raiseAmount = calculateRaiseSize(profile, pot, minRaise, bigBlind, player.chips);
     if (raiseAmount >= player.chips) {
       return { type: 'all-in' };
     }
@@ -60,20 +94,96 @@ export function decideBotAction(
       : { type: 'call' };
   }
 
-  if (strength > 40) {
+  if (strength > profile.foldThreshold || favorablePotOdds) {
     // Medium hand: call
     if (amountToCall >= player.chips) {
-      // Big decision: only go all-in with decent strength
-      return strength > 60 ? { type: 'all-in' } : { type: 'fold' };
+      // All-in decision: need stronger hand for bigger commitments
+      const allInThreshold = profile.foldThreshold + 15;
+      return strength > allInThreshold ? { type: 'all-in' } : { type: 'fold' };
     }
     return { type: 'call' };
   }
 
   // Weak hand: fold (with bluff chance)
-  if (bluffRoll < bluffChance && amountToCall <= bigBlind * 2) {
+  if (bluffRoll < profile.bluffChance && amountToCall <= bigBlind * 2) {
     return { type: 'call' };
   }
   return { type: 'fold' };
+}
+
+/**
+ * Calculate raise size based on personality and pot size.
+ */
+function calculateRaiseSize(
+  profile: PersonalityProfile,
+  pot: number,
+  minRaise: number,
+  bigBlind: number,
+  chips: number,
+): number {
+  // Base raise = fraction of pot based on personality
+  const potBasedRaise = Math.round(pot * profile.raiseSizing);
+  // Add some variance (±20%)
+  const variance = 1 + (Math.random() * 0.4 - 0.2);
+  const targetRaise = Math.round(potBasedRaise * variance);
+  // Ensure at least minRaise
+  return Math.min(Math.max(targetRaise, minRaise), chips);
+}
+
+/**
+ * Position bonus: players acting later get a strength bonus.
+ * Returns 0-10 bonus.
+ */
+function getPositionBonus(seatIndex: number, dealerIndex: number, totalPlayers: number): number {
+  // Calculate how many seats after dealer
+  const positionFromDealer = (seatIndex - dealerIndex + totalPlayers) % totalPlayers;
+  const positionRatio = positionFromDealer / totalPlayers;
+  // Later position = higher bonus (0 to 10)
+  return Math.round(positionRatio * 10);
+}
+
+/**
+ * Board texture analysis: detect scary boards and return a penalty.
+ * Scary = flush draws, straight draws, paired boards.
+ */
+function getBoardScaryPenalty(communityCards: Card[], holeCards: Card[]): number {
+  let penalty = 0;
+
+  // Check for flush draw on board (3+ same suit)
+  const suitCounts: Record<string, number> = {};
+  for (const c of communityCards) {
+    suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+  }
+  const maxSuitCount = Math.max(...Object.values(suitCounts));
+  if (maxSuitCount >= 4) {
+    // 4 to a flush on board — very scary unless we have the suit
+    const dominantSuit = Object.entries(suitCounts).find(([, v]) => v >= 4)?.[0];
+    const weHaveSuit = holeCards.some(c => c.suit === dominantSuit);
+    penalty += weHaveSuit ? 0 : 12;
+  } else if (maxSuitCount >= 3) {
+    const dominantSuit = Object.entries(suitCounts).find(([, v]) => v >= 3)?.[0];
+    const weHaveSuit = holeCards.some(c => c.suit === dominantSuit);
+    penalty += weHaveSuit ? 0 : 5;
+  }
+
+  // Check for straight-possible boards (3+ connected ranks)
+  const boardRanks = communityCards.map(c => c.rank).sort((a, b) => a - b);
+  const uniqueRanks = [...new Set(boardRanks)];
+  if (uniqueRanks.length >= 3) {
+    const gaps = uniqueRanks.slice(1).map((r, i) => r - uniqueRanks[i]);
+    const connected = gaps.filter(g => g <= 2).length;
+    if (connected >= 3) penalty += 5;
+    else if (connected >= 2) penalty += 2;
+  }
+
+  // Paired board is slightly less scary (trips less likely)
+  const rankCounts: Record<number, number> = {};
+  for (const c of communityCards) {
+    rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
+  }
+  if (Object.values(rankCounts).some(v => v >= 2)) penalty += 2;
+
+  return penalty;
 }
 
 /**
@@ -137,7 +247,6 @@ function getPostflopStrength(holeCards: Card[], communityCards: Card[]): number 
 
   // Adjust one-pair strength: top pair is stronger
   if (result.rank === 1) {
-    // Check if pair uses at least one hole card and is high
     const pairRank = result.bestCards[0].rank === result.bestCards[1].rank
       ? result.bestCards[0].rank
       : result.bestCards[2].rank;
