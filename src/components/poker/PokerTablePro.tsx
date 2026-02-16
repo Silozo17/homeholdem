@@ -47,6 +47,23 @@ function useIsLandscape() {
   return isLandscape;
 }
 
+/** Lock screen to landscape while game is mounted */
+function useLockLandscape() {
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    const so = screen.orientation;
+    if (so?.lock) {
+      so.lock('landscape').then(() => setLocked(true)).catch(() => {});
+    }
+    return () => {
+      if (locked && so?.unlock) {
+        try { so.unlock(); } catch {}
+      }
+    };
+  }, []);
+  return locked;
+}
+
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
 export function PokerTablePro({
@@ -60,6 +77,7 @@ export function PokerTablePro({
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const isLandscape = useIsLandscape();
+  useLockLandscape();
   const [humanAvatarUrl, setHumanAvatarUrl] = useState<string | null>(null);
 
   // Fetch human player's profile avatar
@@ -155,6 +173,19 @@ export function PokerTablePro({
 
   return (
     <div className="fixed inset-0 overflow-hidden flex flex-col">
+      {/* Portrait block overlay — shown when device is in portrait */}
+      {!isLandscape && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary animate-pulse">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+            <path d="M12 18h.01" />
+          </svg>
+          <p className="text-lg font-bold text-foreground">Rotate Your Device</p>
+          <p className="text-sm text-muted-foreground text-center max-w-[240px]">
+            The poker table works best in landscape mode. Please rotate your phone.
+          </p>
+        </div>
+      )}
       {/* ====== BG LAYERS ====== */}
       <img
         src={leatherBg}
