@@ -4,7 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { LobbySettings } from '@/lib/poker/types';
 import { CardFan } from './CardFan';
 import { PlayerAvatar } from './PlayerAvatar';
-import { ArrowLeft, Zap } from 'lucide-react';
+import { ArrowLeft, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -25,8 +25,8 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
   const [bigBlind, setBigBlind] = useState(100);
   const navigate = useNavigate();
 
-  const handleQuickPlay = () => {
-    onStart({ botCount: 3, startingChips: 10000, smallBlind: 50, bigBlind: 100 });
+  const handleStart = () => {
+    onStart({ botCount, startingChips, smallBlind: bigBlind / 2, bigBlind });
   };
 
   return (
@@ -48,14 +48,14 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
           </p>
         </div>
 
-        {/* Quick Play */}
+        {/* Start Game */}
         <Button
           size="lg"
           className="w-full max-w-sm shimmer-btn text-primary-foreground font-black text-base tracking-wide gap-2"
-          onClick={handleQuickPlay}
+          onClick={handleStart}
         >
-          <Zap className="h-5 w-5" />
-          Quick Play
+          <Play className="h-5 w-5" />
+          Start Game
         </Button>
 
         {/* Settings card */}
@@ -113,14 +113,6 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
             <Slider value={[bigBlind]} min={20} max={500} step={20} onValueChange={([v]) => setBigBlind(v)} />
           </div>
 
-          <Button
-            size="lg"
-            variant="outline"
-            className="w-full font-bold text-base border-primary/30 hover:bg-primary/10"
-            onClick={() => onStart({ botCount, startingChips, smallBlind: bigBlind / 2, bigBlind })}
-          >
-            Custom Game
-          </Button>
         </div>
       </div>
     </div>
