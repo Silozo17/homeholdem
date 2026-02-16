@@ -766,7 +766,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* YOUR TURN badge — positioned above hero cards */}
       {showActions && (
         <div className="absolute pointer-events-none" style={{
-          bottom: isLandscape ? '18%' : '22%',
+          bottom: isLandscape ? 'calc(18% + 40px)' : 'calc(22% + 40px)',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS,
@@ -787,7 +787,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* 5 SEC LEFT warning pill */}
       {lowTimeWarning && (
         <div className="absolute pointer-events-none animate-low-time-pill" style={{
-          bottom: isLandscape ? '22%' : '26%',
+          bottom: isLandscape ? 'calc(22% + 40px)' : 'calc(26% + 40px)',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS + 1,
