@@ -48,11 +48,11 @@ export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 // Coordinates place avatar circles ON the brown rail edge
 const SEATS_LANDSCAPE: Record<SeatKey, { xPct: number; yPct: number }> = {
   Y: { xPct: 50, yPct: 92 },   // bottom center (hero)
-  A: { xPct: 20, yPct: 78 },   // bottom-left
+  A: { xPct: 16, yPct: 78 },   // bottom-left
   B: { xPct: 6,  yPct: 48 },   // left middle
   C: { xPct: 16, yPct: 18 },   // upper-left
   D: { xPct: 34, yPct: 4 },    // top-left
-  E: { xPct: 80, yPct: 78 },   // bottom-right (mirror of A)
+  E: { xPct: 84, yPct: 78 },   // bottom-right (mirror of A)
   F: { xPct: 94, yPct: 48 },   // right middle (mirror of B)
   G: { xPct: 84, yPct: 18 },   // upper-right (mirror of C)
   H: { xPct: 66, yPct: 4 },    // top-right (mirror of D)
@@ -72,15 +72,16 @@ const SEATS_PORTRAIT: Record<SeatKey, { xPct: number; yPct: number }> = {
 };
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)
+// Clockwise order from hero (Y at bottom): E(bot-right) → F(right) → G(upper-right) → H(top-right) → D(top-left) → C(upper-left) → B(left) → A(bot-left)
 const SEAT_PICKS: Record<number, SeatKey[]> = {
   2: ['Y', 'D'],
-  3: ['Y', 'C', 'G'],
-  4: ['Y', 'B', 'D', 'F'],
-  5: ['Y', 'A', 'C', 'G', 'E'],
-  6: ['Y', 'A', 'B', 'D', 'F', 'E'],
-  7: ['Y', 'A', 'B', 'D', 'E', 'F', 'H'],
-  8: ['Y', 'A', 'B', 'C', 'D', 'E', 'G', 'H'],
-  9: ['Y', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+  3: ['Y', 'F', 'B'],
+  4: ['Y', 'F', 'D', 'B'],
+  5: ['Y', 'E', 'G', 'C', 'A'],
+  6: ['Y', 'E', 'F', 'D', 'B', 'A'],
+  7: ['Y', 'E', 'F', 'H', 'D', 'B', 'A'],
+  8: ['Y', 'E', 'G', 'H', 'D', 'C', 'B', 'A'],
+  9: ['Y', 'E', 'F', 'G', 'H', 'D', 'C', 'B', 'A'],
 };
 
 /**
