@@ -125,7 +125,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
   } = useOnlinePokerTable(tableId);
 
-  const [buyInAmount, setBuyInAmount] = useState('');
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
@@ -298,15 +297,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleJoinSeat = async (seatNum: number) => {
-    const amount = parseInt(buyInAmount) || table.max_buy_in;
-    if (amount < table.min_buy_in || amount > table.max_buy_in) {
-      toast({ title: 'Invalid buy-in', description: `Must be between ${table.min_buy_in} and ${table.max_buy_in}`, variant: 'destructive' });
-      return;
-    }
     setJoining(true);
-    try { await joinTable(seatNum, amount); toast({ title: 'Seated!' }); }
-    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
-    finally { setJoining(false); }
+    try {
+      await joinTable(seatNum, table.max_buy_in);
+      toast({ title: 'Seated!' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setJoining(false);
+    }
   };
 
   const handleLeave = async () => {
@@ -836,7 +835,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         )
       )}
 
-      {/* Spectator buy-in overlay */}
+      {/* Spectator overlay */}
       {isSpectator && (
         <div className="absolute bottom-0 left-0 right-0 px-4 py-3"
           style={{
@@ -845,25 +844,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))',
           }}
         >
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Eye className="h-4 w-4 text-foreground/40" />
-            <span className="text-xs text-foreground/50 font-bold">Spectating</span>
-          </div>
-          <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
-            Tap an empty seat to join{hand ? " (you'll play next hand)" : ''}
+          <p className="text-xs text-center font-bold mb-2" style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
+            Tap a glowing seat to join
           </p>
-          <div className="flex items-center gap-2 max-w-xs mx-auto">
-            <Input
-              type="number"
-              placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
-              value={buyInAmount}
-              onChange={(e) => setBuyInAmount(e.target.value)}
-              className="text-center text-sm bg-black/30 border-border/30"
-            />
-          </div>
           <button
             onClick={onLeave}
-            className="flex items-center justify-center gap-1.5 w-full mt-2 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"
             style={{
               background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))',
               color: 'hsl(0 0% 60%)',
@@ -958,20 +944,23 @@ function EmptySeatDisplay({ seatNumber, canJoin, onJoin }: { seatNumber: number;
         canJoin ? 'hover:bg-white/5 cursor-pointer' : 'opacity-20',
       )}
     >
-      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold"
+      <div className={cn(
+        'w-8 h-8 rounded-full flex items-center justify-center text-[9px] font-bold',
+        canJoin && 'animate-seat-pulse-glow',
+      )}
         style={{
           background: 'linear-gradient(135deg, hsl(160 20% 15%), hsl(160 25% 10%))',
-          border: canJoin ? '1.5px dashed hsl(43 74% 49% / 0.4)' : '1px dashed hsl(0 0% 20%)',
-          color: canJoin ? 'hsl(43 74% 49% / 0.7)' : 'hsl(0 0% 30%)',
+          border: canJoin ? '2px solid hsl(43 74% 49% / 0.5)' : '1px dashed hsl(0 0% 20%)',
+          color: canJoin ? 'hsl(43 74% 60%)' : 'hsl(0 0% 30%)',
         }}
       >
         {seatNumber + 1}
       </div>
       {canJoin && (
-        <span className="text-[7px] text-primary/70 font-bold uppercase tracking-wider"
-          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+        <span className="text-[7px] font-bold uppercase tracking-wider"
+          style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 6px hsl(43 74% 49% / 0.4)' }}
         >
-          Sit
+          Open
         </span>
       )}
     </button>

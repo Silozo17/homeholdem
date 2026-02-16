@@ -385,7 +385,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const hasActiveHand = !!tableState?.current_hand;
 
   useEffect(() => {
-    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null) {
+    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
       setAutoStartAttempted(true);
       const jitter = Math.random() * 1000;
       const timer = setTimeout(() => {
@@ -395,7 +395,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       }, 2000 + jitter);
       return () => clearTimeout(timer);
     }
-  }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted]);
+  }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
 
   useEffect(() => {
     if (hasActiveHand) {

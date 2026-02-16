@@ -449,6 +449,12 @@
 .animate-fold-away { animation: fold-away 0.5s ease-in both; }
 .animate-seat-pulse { animation: seat-pulse 0.6s ease-out; }
 
+@keyframes seat-pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px hsl(43 74% 49% / 0.3); }
+  50% { box-shadow: 0 0 12px hsl(43 74% 49% / 0.7), 0 0 20px hsl(43 74% 49% / 0.3); }
+}
+.animate-seat-pulse-glow { animation: seat-pulse-glow 1.5s ease-in-out infinite; }
+
 /* Glass card */
 .glass-card {
   background: hsl(var(--card) / 0.6);
