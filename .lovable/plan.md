@@ -1,58 +1,35 @@
 
-# Add Blind Timer Settings + Manual Deal Button for Multiplayer
 
-## Issue 1: Blind Increase Timer Missing from Table Creation
+# Verify: Manual Deal (First Hand) + Auto-Deal (Subsequent Hands)
 
-The bot lobby (`PlayPokerLobby`) has a "Blind Timer" setting with options (Off, 5m, 10m, 15m, 30m), but the multiplayer "Create Table" dialog in `OnlinePokerLobby` does not. We need to add this setting and store it in the database.
+After reviewing the code, the current logic is **already correct** and properly implements the desired flow:
 
-### Database Migration
-Add a `blind_timer_minutes` column to `poker_tables`:
-```sql
-ALTER TABLE public.poker_tables ADD COLUMN blind_timer_minutes integer NOT NULL DEFAULT 0;
-```
-A value of `0` means "off" (no auto-increase). Values like 5, 10, 15, 30 mean blinds increase every N minutes.
+## How It Works
 
-### Edge Function: `poker-create-table/index.ts`
-- Accept `blind_timer_minutes` from the request body (default 0).
-- Store it in the inserted row.
+1. **First hand**: The "Deal Hand" button appears for the table creator when 2+ players are seated and no hand is active. Clicking it calls `startHand()`. The button disappears once a hand begins.
 
-### UI: `OnlinePokerLobby.tsx`
-- Add a `blindTimer` state (default 0).
-- Add the same pill-button row used in `PlayPokerLobby` (Off / 5m / 10m / 15m / 30m) inside the Create Table dialog.
-- Pass `blind_timer_minutes: blindTimer` to the `poker-create-table` call.
+2. **After each hand completes**: The `hand_result` broadcast triggers a 5-second showdown pause, then:
+   - Clears the current hand state (`current_hand = null`)
+   - Resets `autoStartAttempted = false`
+   - This causes the auto-deal `useEffect` to fire, which waits 2s + random jitter, then calls `startHand()` automatically
 
-### Types: `online-types.ts`
-- Add `blind_timer_minutes: number` to `OnlineTableInfo`.
+3. **Race condition safety**: Only one client succeeds at calling `startHand()` (the server rejects "Hand already in progress"). Failed attempts reset `autoStartAttempted` so the system retries.
 
-**Note**: The actual blind increase logic (incrementing blinds during play) is a deeper server-side feature that would require additional edge function work. This change stores the setting so it can be used later. For now, the setting will be saved and displayed.
+## Potential Issue: Double-Trigger
 
----
+There is one subtle problem. Both the manual Deal button AND the auto-deal useEffect are active simultaneously when 2+ players are seated and no hand exists. If the creator clicks "Deal Hand" while auto-deal is also about to fire, two `startHand()` calls race. The server handles this (rejects the second), but it causes a console error.
 
-## Issue 2: Game Not Starting -- Add Manual "Deal" Button
+### Fix
 
-The auto-deal system has proven unreliable due to race conditions between multiple clients. Adding a manual "Deal" button as a fallback ensures the table creator can always start the game.
+Hide the Deal button once `autoStartAttempted` is true, so the button only appears before the very first auto-deal attempt fires. This makes the button a true "first hand" trigger.
 
-### Changes in `OnlinePokerTable.tsx`
-- At line 545 (where the comment says "Deal button removed"), add a "Deal" button visible only to the **table creator** (`user?.id === tableState?.table.created_by`).
-- The button appears when:
-  - There are 2+ active seated players
-  - No hand is currently in progress
-  - The user is the table creator
-- Clicking it calls `startHand()`.
-- This is a fallback alongside the existing auto-deal logic.
+### Changes
 
-```text
-[ Deal Hand ]  -- shown center-table, below community cards area
-```
+**File: `src/components/poker/OnlinePokerTable.tsx`**
+- Pass `autoStartAttempted` from the hook to the component
+- Change the Deal button condition from `!hand` to `!hand && !autoStartAttempted`
 
----
+**File: `src/hooks/useOnlinePokerTable.ts`**
+- Export `autoStartAttempted` in the return object so the component can read it
 
-## Summary
-
-| # | Change | Files |
-|---|--------|-------|
-| 1 | Add `blind_timer_minutes` column | DB migration |
-| 2 | Accept blind timer in create-table | `poker-create-table/index.ts` |
-| 3 | Add blind timer UI to Create Table dialog | `OnlinePokerLobby.tsx` |
-| 4 | Add `blind_timer_minutes` to types | `online-types.ts` |
-| 5 | Add manual "Deal" button for table creator | `OnlinePokerTable.tsx` |
+This is a minor polish -- 2 small edits, no new files.
