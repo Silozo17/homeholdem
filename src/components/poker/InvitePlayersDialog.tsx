@@ -80,7 +80,6 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
     setSending(memberId);
     try {
       await notifyPokerInvite(memberId, inviterName, tableName, tableId);
-      await notifyPokerInvite(memberId, inviterName, tableName, tableId);
       setSentTo(prev => new Set(prev).add(memberId));
       toast({ title: 'Invite sent!' });
     } catch {
