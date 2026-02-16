@@ -300,33 +300,32 @@ export function PokerTablePro({
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
-        <button onClick={() => setShowQuitConfirm(true)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
-          <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
-        </button>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-              style={{
-                background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 40%))',
-                color: 'hsl(160 30% 8%)',
-                boxShadow: '0 1px 4px rgba(200,160,40,0.3)',
-              }}
-            >
-              #{state.handNumber}
-            </span>
-            <span className="text-[10px] text-foreground/60 font-medium">
-              {state.smallBlind}/{state.bigBlind}
-            </span>
-            {state.blindTimer > 0 && (
-              <BlindTimerCountdown
-                lastBlindIncrease={state.lastBlindIncrease}
-                blindTimer={state.blindTimer}
-                blindLevel={state.blindLevel}
-              />
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowQuitConfirm(true)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+            <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
+          </button>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+            style={{
+              background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 40%))',
+              color: 'hsl(160 30% 8%)',
+              boxShadow: '0 1px 4px rgba(200,160,40,0.3)',
+            }}
+          >
+            #{state.handNumber}
+          </span>
+          <span className="text-[10px] text-foreground/60 font-medium">
+            {state.smallBlind}/{state.bigBlind}
+          </span>
+          {state.blindTimer > 0 && (
+            <BlindTimerCountdown
+              lastBlindIncrease={state.lastBlindIncrease}
+              blindTimer={state.blindTimer}
+              blindLevel={state.blindLevel}
+            />
+          )}
         </div>
+
+        <div />
 
         <button onClick={toggleSound} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
           {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
