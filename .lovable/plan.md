@@ -1,49 +1,79 @@
 
+# Fix Card/Pot Positioning, Reverse Betting Direction, Add Blind Timer
 
-# Make Human Player Cards Bigger and Fan Behind Profile Pic
+## 1. Move Pot Under Dealer & Center Cards
 
-## Problem
-Currently, human player cards use `sm` size (`w-7 h-10` = 28x40px) and render below the nameplate in a flat row. They're too small to read comfortably.
+**Current**: Pot at `top: 28%`, community cards at `top: 44%`.
 
-## Solution
-Reposition the human player's cards to fan out BEHIND the avatar, with the tops of the cards protruding above the profile picture. Use `lg` size cards for much better readability.
+**Fix in `src/components/poker/PokerTablePro.tsx`**:
+- Move pot display to `top: 14%` (directly under the dealer character at `top: 2%`)
+- Keep community cards at `top: 44%` with `transform: translate(-50%, -50%)` — this is the visual center of the felt. If they appear off, it may be because the table image isn't symmetric. Adjust to `top: 42%` for better visual centering.
 
-### Changes to `src/components/poker/PlayerSeat.tsx`
+## 2. Reverse Betting Direction (Make It Clockwise)
 
-Move the `humanCards` element from below the nameplate to INSIDE the avatar container, positioned absolutely behind the avatar. The two cards will be rotated in a fan formation (card 1 rotated -15deg, card 2 rotated +15deg) and shifted upward so the top portions peek above the avatar circle.
+**Problem**: The current `SEAT_PICKS` order is `Y → E(bot-right) → F(right) → G → H → D → C → B → A(bot-left)`. Since the game engine iterates indices 0,1,2,3..., this moves RIGHT first from the hero, which is **anti-clockwise** when viewed from above.
 
-- Card size: change from `sm` to `lg` (`w-12 h-[68px]`)
-- Position: `absolute`, centered horizontally, shifted up so ~30px of card tops show above the avatar
-- Z-index: set to 1 (behind the avatar which is z-index 2), so cards fan behind the profile pic
-- Fan rotation: first card `-15deg`, second card `+15deg`, with slight horizontal offset
-- The avatar itself gets `z-index: 2` so it sits on top of the fanned cards
+**Real poker clockwise** (to the left of each player): `Y(bottom) → A(bot-left) → B(left) → C(upper-left) → D(top-left) → H(top-right) → G(upper-right) → F(right) → E(bot-right)`.
 
-### Visual result
-```text
-       ┌──┐   ┌──┐       <-- card tops peeking above
-        \ │   │ /
-         ┌─────────┐
-         │ (avatar) │     <-- avatar sits on top of cards
-         └─────────┘
-         │ Name    │
-         │ $10,000 │
-         └─────────┘
+**Fix in `src/lib/poker/ui/seatLayout.ts`**: Reverse SEAT_PICKS to follow true clockwise order:
+
+```
+2: ['Y', 'D']
+3: ['Y', 'B', 'F']
+4: ['Y', 'B', 'D', 'F']
+5: ['Y', 'A', 'C', 'G', 'E']
+6: ['Y', 'A', 'B', 'D', 'F', 'E']
+7: ['Y', 'A', 'B', 'D', 'H', 'F', 'E']
+8: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'E']
+9: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'F', 'E']
 ```
 
-### Technical Details
+This ensures that index+1 in the game engine moves to the player's LEFT (clockwise on the table). Dealer button, small blind, and big blind all rotate using `dealerIndex + 1`, so they will now correctly move clockwise too.
 
-**`src/components/poker/PlayerSeat.tsx`**:
-1. Change `cardSize` for human from `sm` to `lg`
-2. Move `humanCards` rendering from line 145 (below nameplate) into the avatar `<div className="relative">` block (line 84)
-3. Position with: `absolute left-1/2 -translate-x-1/2` and `bottom: 30%` (so tops protrude above)
-4. Each card gets `transform: rotate(Xdeg)` for fan effect
-5. Set z-index to 1 on the cards container, and ensure avatar has z-index 2
+## 3. Blind Timer (Blind Level Progression)
 
-**`src/components/poker/PlayerAvatar.tsx`**: Add `relative z-[2]` to the avatar wrapper so it renders on top of the fanned cards behind it.
+Add a blind level system that increases blinds at configurable intervals.
+
+### Changes to `src/lib/poker/types.ts`:
+- Add `blindTimer` to `LobbySettings`: `blindTimer: number` (minutes: 0 = no increase, 5/10/15/30)
+- Add to `GameState`:
+  - `blindLevel: number` (current level index)
+  - `blindTimer: number` (interval in minutes, 0 = off)
+  - `lastBlindIncrease: number` (timestamp of last increase)
+
+### Blind structure (hardcoded levels):
+```
+Level 1: 25/50
+Level 2: 50/100
+Level 3: 75/150
+Level 4: 100/200
+Level 5: 150/300
+Level 6: 200/400
+Level 7: 300/600
+Level 8: 500/1000
+Level 9: 1000/2000
+Level 10: 2000/4000
+```
+
+The starting level is determined by the initial big blind setting chosen in the lobby.
+
+### Changes to `src/hooks/usePokerGame.ts`:
+- In the `DEAL_HAND` case, check if enough time has passed since `lastBlindIncrease`. If `Date.now() - lastBlindIncrease >= blindTimer * 60000`, advance to the next blind level and update `smallBlind`, `bigBlind`, and `lastBlindIncrease`.
+- Initialize `lastBlindIncrease` to `Date.now()` in `START_GAME`.
+
+### Changes to `src/components/poker/PlayPokerLobby.tsx`:
+- Add a "Blind Timer" selector with options: Off, 5 min, 10 min, 15 min, 30 min
+- Pass `blindTimer` in the `LobbySettings` object
+
+### Changes to `src/components/poker/PokerTablePro.tsx`:
+- Display a small "Next blind increase" countdown in the HUD header (near the blinds display) when blind timer is active. Show time remaining until next level.
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/poker/PlayerSeat.tsx` | Move human cards behind avatar as a fan, increase to `lg` size |
-| `src/components/poker/PlayerAvatar.tsx` | Add `z-[2]` to ensure avatar renders above cards |
+| `src/components/poker/PokerTablePro.tsx` | Move pot to under dealer (~14%), adjust card centering, add blind timer countdown display |
+| `src/lib/poker/ui/seatLayout.ts` | Reverse SEAT_PICKS to true clockwise order |
+| `src/lib/poker/types.ts` | Add `blindTimer` to LobbySettings, add blind tracking fields to GameState |
+| `src/hooks/usePokerGame.ts` | Add blind level progression logic in DEAL_HAND, initialize in START_GAME |
+| `src/components/poker/PlayPokerLobby.tsx` | Add blind timer selector (Off/5/10/15/30 min) |
