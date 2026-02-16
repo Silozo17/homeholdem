@@ -122,7 +122,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
-    actionPending, lastActions, handWinners, chatBubbles, sendChat,
+    actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -543,7 +543,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </div>
 
           {/* Manual deal fallback for table creator */}
-          {isCreator && !hand && activeSeats.length >= 2 && (
+          {isCreator && !hand && !autoStartAttempted && activeSeats.length >= 2 && (
             <button
               onClick={() => startHand()}
               className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"
