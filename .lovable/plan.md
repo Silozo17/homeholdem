@@ -1,120 +1,142 @@
 
-# Analysis and Improvements Plan
 
-## 1. Hide Bottom Navigation in Online Poker Game Mode
+# Poker Table Visual Overhaul: Reference-Inspired Redesign
 
-**Problem**: When a user joins/creates an online poker table (or tournament table), the `OnlinePokerTable` component renders inside the `AppLayout` which still shows the `BottomNav`. The table uses `fixed inset-0` but the nav sits on top at z-50.
+## Overview
 
-**Fix**: Add `/online-poker` and `/poker-tournament` to the `hiddenNavRoutes` logic in `AppLayout.tsx`. However, since the nav should only hide when the user is *at a table* (not the lobby), we need a smarter approach. The `OnlinePokerTable` already uses `fixed inset-0`, so the simplest fix is to add the route patterns to `fullscreenRoutes` conditionally, or better: detect when `OnlinePokerTable` is active.
-
-**Approach**: The cleanest solution is to have the `OnlinePoker` and `PokerTournament` pages signal when a table is active. We can do this by checking if the URL contains a query param or by adding these routes to `fullscreenRoutes` and using a state signal. The simplest approach: add `/play-poker` and detect the `activeTableId` state by wrapping `OnlinePokerTable` so it sets a class/attribute on the body, or simply hide the nav from within the component itself using a portal-level z-index override.
-
-**Simplest fix**: The `OnlinePokerTable` already renders as `fixed inset-0` but the `BottomNav` is at `z-50`. The table content is at `z-20`. We should add the online poker and tournament routes to a detection list in `AppLayout`, but only when the table component is mounted. Since both `OnlinePoker` and `PokerTournament` pages manage `activeTableId` state internally and we can't easily pass that to `AppLayout`, the cleanest fix is:
-- Add a CSS-level override: render a `<style>` tag inside `OnlinePokerTable` that hides `.bottom-nav`
-- OR: add a data attribute to the body when table is active and hide nav via CSS
-- OR: simply increase the z-index of the `OnlinePokerTable` overlay above the nav (z-50+)
-
-**Chosen approach**: Set `z-index: 60` on the `OnlinePokerTable` root container so it renders above the bottom nav (z-50). This is the least invasive change.
-
-**File**: `src/components/poker/OnlinePokerTable.tsx` -- Change `<div className="fixed inset-0 flex flex-col overflow-hidden">` to include `z-[60]`.
+Redesign the poker table experience to match the reference image's aesthetic: larger table, avatar-centric player design with cards hidden until showdown, and upgraded sound and animation systems.
 
 ---
 
-## 2. Hand Evaluator and Game Rules Analysis
+## 1. Hide Opponent Cards Until Showdown
 
-**Assessment**: The hand evaluator is well-implemented and thoroughly tested:
-- Correctly handles all 10 hand rankings (High Card through Royal Flush)
-- Ace-low straights (wheel) are properly detected
-- Best-5-of-7 selection via combinations is correct
-- Tiebreaker scoring uses a polynomial encoding (rank * 10^10 + kickers) which correctly orders hands
-- 26 unit tests cover edge cases including kicker comparisons, split pots, and 7-card evaluation
-- Side pot calculation and distribution logic is correct -- uses ascending all-in levels and distributes to eligible players
+**Current behavior**: Bot cards show face-down card backs during play.
+**New behavior**: Opponents show NO cards at all during play. Only the human player sees their own hole cards. At showdown, opponent cards appear with a 3D flip reveal animation replacing/overlapping the avatar.
 
-**Winner/Loser animations**: The `WinnerOverlay` component has two modes:
-- **Hand complete (inline banner)**: Shows gold serif hand name with particle effects, positioned at 22% from top. Includes animated chip counter.
-- **Game over (full overlay)**: Shows trophy, stats grid (hands played, won, best hand, biggest pot, duration), and Play Again/Quit buttons.
-
-**No issues found** with the hand evaluation, winner determination, or animation logic. The rules implementation is correct per standard Texas Hold'em.
+### Changes
+- **`src/components/poker/PlayerSeat.tsx`**: When `showCards` is false AND player is not human, hide the cards element entirely (no face-down cards). Only render cards when `showCards` is true (showdown) or player is human.
+- At showdown, cards animate in with a 3D flip effect overlaying the avatar circle area.
 
 ---
 
-## 3. Bot AI Improvements
+## 2. Redesigned Player Seat (Avatar-Centric Like Reference)
 
-**Current state**: Bots use a simple two-tier system:
-- Preflop: score based on pair bonus, high card, suited/connected bonuses (0-100 scale)
-- Postflop: maps hand rank to a fixed strength score (High Card=15, Pair=35, etc.)
-- Decision thresholds: >75 = strong (raise/call), 40-75 = medium (call), <40 = weak (fold)
-- ~8% bluff chance, no position awareness, no pot odds, no opponent modeling
+Inspired by the reference: circular avatar cropped at bottom by a dark info bar showing name + chip count.
 
-**Improvements**:
-
-### A. Bot Personality System
-Add distinct personality profiles that modify decision-making:
-- **"Shark" (tight-aggressive)**: Higher fold threshold, larger raises, less bluffing
-- **"Maniac" (loose-aggressive)**: Lower fold threshold, frequent raises, high bluff factor
-- **"Rock" (tight-passive)**: High fold threshold, rarely raises, almost no bluffs
-- **"Fish" (loose-passive)**: Calls everything, rarely raises
-- **"Pro" (balanced)**: Uses pot odds, position-aware, mixed strategy
-
-### B. Smarter Decision Making
-- **Pot odds awareness**: Compare call amount to pot size -- call when hand strength justifies the odds
-- **Position bonus**: Players acting later get a small strength bonus (information advantage)
-- **Board texture reading**: Detect scary boards (flush/straight possible) and adjust strength down
-- **Variable raise sizing**: Base raises on pot size (1/2 pot, 3/4 pot, pot-size) instead of fixed BB multiples
-- **Tighter all-in thresholds**: Require stronger hands for large commitments relative to stack
-
-### C. Implementation
-**Files**:
-- `src/lib/poker/bot-ai.ts` -- Add personality types, position awareness, pot odds, variable sizing
-- `src/hooks/usePokerGame.ts` -- Assign random personalities to bots on game start, pass personality to `decideBotAction`
-- `src/lib/poker/types.ts` -- Add `personality` field to `PokerPlayer`
-
----
-
-## 4. Tournament System Analysis
-
-**Current state**: The tournament system has full backend infrastructure:
-- `poker-create-tournament`: Creates tournament with blind structure, registration
-- `poker-register-tournament`: Handles player registration with invite codes
-- `poker-start-tournament`: Seats players round-robin across tables, sets status to 'running'
-- `poker-tournament-state`: Aggregates state (players, tables, blinds, timer)
-- `poker-tournament-eliminate`: Tracks eliminations, handles table balancing/merging
-- `poker-tournament-advance-level`: Manages blind level progression
-
-**The "Start Tournament" button exists** (line 351 in TournamentLobby) and calls `handleStart` which invokes `poker-start-tournament`. After starting, a "Go to My Table" button appears (line 357) that calls `onJoinTable(detail.my_table_id)` which renders `OnlinePokerTable`.
-
-**So the flow works**: Create -> Register -> Start -> Go to My Table -> Play at `OnlinePokerTable`. The tournament creates actual poker tables and assigns players. The user then plays regular online poker hands at their assigned table.
-
-**What may be confusing**: After clicking "Start Tournament", the user needs to click "Go to My Table" as a second step. We could auto-navigate to the table after starting.
-
-**Improvement**: Auto-navigate to the player's table after starting the tournament, removing the extra click.
-
-**File**: `src/components/poker/TournamentLobby.tsx` -- In `handleStart`, after successful start, auto-fetch detail and navigate to `my_table_id`.
-
----
-
-## Summary of Changes
-
-| # | Change | File(s) |
-|---|--------|---------|
-| 1 | Hide bottom nav in online poker game | `src/components/poker/OnlinePokerTable.tsx` |
-| 2 | No changes needed (rules are correct) | -- |
-| 3 | Bot personality system + smarter AI | `src/lib/poker/bot-ai.ts`, `src/lib/poker/types.ts`, `src/hooks/usePokerGame.ts` |
-| 4 | Auto-navigate to table after tournament start | `src/components/poker/TournamentLobby.tsx` |
-
-## Technical Details
-
-### Bot Personality Types
+### New PlayerSeat Layout
 ```text
-Shark:  foldThreshold=50, raiseThreshold=70, bluffChance=0.05, raiseSizing=1.0x pot
-Maniac: foldThreshold=25, raiseThreshold=45, bluffChance=0.20, raiseSizing=1.5x pot  
-Rock:   foldThreshold=60, raiseThreshold=85, bluffChance=0.02, raiseSizing=0.5x pot
-Fish:   foldThreshold=55, raiseThreshold=90, bluffChance=0.03, raiseSizing=0.6x pot
-Pro:    foldThreshold=40, raiseThreshold=65, bluffChance=0.10, raiseSizing=0.75x pot (+ pot odds)
+  ┌──────────────┐
+  │   (avatar     │  <-- Circular avatar, larger (w-14 h-14)
+  │    circle)    │
+  ├──────────────┤
+  │ Name         │  <-- Dark semi-transparent bar
+  │ $10,000      │  <-- Gold chip count
+  └──────────────┘
 ```
 
-### Bot Names with Personalities
-Each bot gets a randomly assigned personality. The bot name stays the same but their play style varies, creating diverse table dynamics. Personality is stored on the `PokerPlayer` type.
+- Avatar is a full circle with a thick ring for active player (gold animated) or all-in (red pulse).
+- Below avatar: a compact dark "nameplate" bar with name + chips, styled with rounded-bottom corners and semi-transparent dark background.
+- At showdown: the two hole cards appear overlapping the top of the avatar (like the reference image shows cards fanning above/beside the avatar).
+- Action badges (Fold, Raise, Check) appear as small floating tags near the nameplate.
+- The turn timer ring wraps the avatar circle.
 
-### Position Awareness (Pro personality)
-Seats closer to the dealer button (later position) get a +5 to +10 strength bonus, simulating the information advantage of acting last.
+### Files
+- **`src/components/poker/PlayerSeat.tsx`**: Complete redesign to avatar-centric layout with nameplate bar. Remove the current vertical/horizontal stack system. All seats use the same layout (avatar + nameplate below), with cards appearing above/overlapping at showdown.
+- **`src/components/poker/PlayerAvatar.tsx`**: Increase default sizes, add thicker active ring, improve gradient quality.
+
+---
+
+## 3. Larger Table (85% Screen Coverage)
+
+### Changes
+- **`src/components/poker/PokerTablePro.tsx`**: Change table wrapper width from `min(78vw, 900px)` to `min(88vw, 1100px)` and max-height from `70vh` to `82vh`. This makes the table dominate the screen.
+- Community cards stay centered within the table at `top: 44%` (adjust if needed to `top: 48%` for visual center).
+- Pot display moves up slightly to `top: 32%`.
+
+---
+
+## 4. Community Cards Centered on Table
+
+Currently cards are at `top: 44%` which is correct. Ensure they remain horizontally and vertically centered within the felt area. Increase card size from `lg` to a new `xl` size for community cards to match the reference's prominent card display.
+
+### Changes
+- **`src/components/poker/CardDisplay.tsx`**: Add `xl` size variant (`w-14 h-[80px]`) for community cards.
+- **`src/components/poker/PokerTablePro.tsx`**: Use `xl` size for community cards.
+
+---
+
+## 5. Seat Position Adjustments
+
+With the larger table, seat positions need slight adjustments to stay on the rail edge.
+
+### Changes
+- **`src/lib/poker/ui/seatLayout.ts`**: Adjust landscape seat coordinates slightly outward to account for the bigger table wrapper. Fine-tune Y seat (hero) to `yPct: 94` and top seats to `yPct: 6` for more spread.
+
+---
+
+## 6. Enhanced Sound Effects
+
+Replace basic oscillator beeps with richer, multi-layered synthesized sounds.
+
+### Changes to `src/hooks/usePokerSounds.ts`
+
+| Sound | Current | Improved |
+|-------|---------|----------|
+| `shuffle` | Single bandpass noise | Layered noise bursts (3 rapid bursts) simulating card riffle |
+| `deal` | Single 1200Hz tone | Quick "snap" - noise burst + high click |
+| `flip` | Single noise burst | 3D pan sweep + whoosh noise for card reveal |
+| `chipClink` | 2 sine tones | 3-4 metallic harmonics with slight randomization |
+| `chipStack` | 3 sequential tones | Cascading ceramic clicks with reverb tail |
+| `check` | Low 200Hz tone | Double-tap "knock" sound (two short filtered noise bursts) |
+| `raise` | Ascending 3-note | Confident ascending chord + subtle chip slide |
+| `allIn` | Low rumble | Dramatic sub-bass drop + rising tension sweep + impact |
+| `win` | C-E-G chord | Full victory fanfare: arpeggio + shimmer sweep + sustained chord |
+| `yourTurn` | Single 880Hz | Gentle 2-note "ding-dong" notification |
+| `fold` | (new) | Soft "swoosh" - filtered descending noise |
+
+---
+
+## 7. Enhanced Visual Animations
+
+### New/Upgraded Animations in `src/index.css`
+
+1. **Card Reveal at Showdown**: New `card-showdown-reveal` - 3D flip from card back to face with a gold flash on completion.
+
+2. **Winning Hand Highlight**: New `winning-cards-glow` - Cards pulse with a gold halo and slight float upward.
+
+3. **Chip Scatter on Win**: New `chips-scatter` - Multiple small chip sprites fly from pot toward the winner's seat position.
+
+4. **Player Elimination**: Improved `fold-away` - Avatar grayscales and shrinks with a subtle smoke/fade particle effect.
+
+5. **Active Player Spotlight**: New `spotlight-pulse` - Subtle radial light behind the active player's seat.
+
+6. **All-In Shockwave**: Improved flash - Expanding ring wave from the player who went all-in.
+
+7. **Card Deal Arc**: Improved `card-deal-from-deck` - Cards fly in an arc from the dealer position rather than straight down.
+
+8. **Pot Growth Animation**: Enhanced `counter-pulse` - Numbers scale up with a gold flash on each pot increase.
+
+---
+
+## 8. Winner Overlay Enhancement
+
+### Changes to `src/components/poker/WinnerOverlay.tsx`
+- The inline hand-complete banner gets gold confetti particles that drift down.
+- Winning player's cards appear prominently in the banner alongside the hand name.
+- Chip count animation is accompanied by a "cha-ching" sound.
+
+---
+
+## Summary of Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/poker/PlayerSeat.tsx` | Complete redesign: avatar-centric with nameplate, hide opponent cards until showdown, showdown card reveal overlay |
+| `src/components/poker/PlayerAvatar.tsx` | Larger sizes, thicker rings, improved styling |
+| `src/components/poker/CardDisplay.tsx` | Add `xl` size for community cards |
+| `src/components/poker/PokerTablePro.tsx` | Bigger table (88vw), adjusted card/pot positioning, use `xl` community cards, pass showdown context |
+| `src/lib/poker/ui/seatLayout.ts` | Adjusted seat coordinates for larger table |
+| `src/hooks/usePokerSounds.ts` | Richer multi-layered synthesized sounds for all events, add 'fold' sound |
+| `src/index.css` | New animations: showdown card reveal, winning glow, chip scatter, spotlight, shockwave, improved existing animations |
+| `src/components/poker/WinnerOverlay.tsx` | Enhanced confetti, winning cards display in banner |
+
