@@ -1,72 +1,51 @@
 
 
-# Premium Sound Effects, Haptic Feedback, Timer Warning & Wake Lock Fix
+# Replace Dealer Icon & Change Game Background
 
-## 1. Premium Coin/Money Sound for Pot Win
+## 1. Add New Assets
 
-**Problem**: The current `win` sound is a basic arpeggio with no coin/money feel.
+Copy both uploaded images into the project:
+- `user-uploads://ChatGPT_Image_Feb_16_2026_11_04_23_PM.png` to `src/assets/dealer/dealer-girl.png`
+- `user-uploads://poker_background.webp` to `src/assets/poker-background.webp`
 
-**Fix**: Replace the `win` sound in `usePokerSounds.ts` with a layered coin cascade effect:
-- 8-10 rapid metallic "clink" tones at high frequencies (3000-5000 Hz) staggered over ~1s to simulate coins pouring
-- Each clink randomized slightly in pitch and timing for realism
-- A satisfying low "thud" bass layer underneath (80-120 Hz)
-- Finish with a shimmer sweep
-- Keep the victory arpeggio but blend it with the coin cascade
+## 2. Replace Dealer Character
 
-## 2. Upgrade All Action Sounds to Premium Quality
+**File**: `src/components/poker/DealerCharacter.tsx`
 
-**File**: `src/hooks/usePokerSounds.ts`
+Replace the circular avatar frame with the full dealer girl image. Instead of a small round icon, render a larger rectangular/transparent PNG image positioned so she appears to be sitting at the edge of the table, leaning forward. Remove the round border, inner ring, and Crown fallback. Keep the spotlight glow, sparkle effects on win, and the "Dealer" label.
 
-Rework each sound event:
+Key styling changes:
+- Remove `rounded-full`, `overflow-hidden`, and circular sizing
+- Use the full image at approximately `clamp(80px, 18vw, 120px)` width with `object-contain`
+- Import from `@/assets/dealer/dealer-girl.png` instead of `dealer-main.png`
 
-- **shuffle**: Add a "bridge" whoosh between riffle bursts + subtle card flutter harmonics
-- **deal**: Layer a sharper "snap" with a brief card-slide noise and a subtle table impact
-- **flip**: Add a dramatic "whomp" bass hit under the reveal for community cards
-- **chipClink**: Add ceramic resonance harmonics with a longer tail and subtle room reverb via delay feedback
-- **chipStack**: Make cascading clicks more dramatic with 6 chips and increasing pitch
-- **check**: Firmer double-knock with wood-like resonance (lower Q bandpass)
-- **raise**: More aggressive ascending power chord with chip slide + impact
-- **allIn**: Add dramatic heartbeat pulses (2x low thumps) before the bass drop + crowd gasp noise
-- **fold**: Deeper swoosh with a "card toss" snap at the end
-- **yourTurn**: Brighter two-tone chime with harmonic overtones
-- **timerWarning**: Urgent triple-beep pattern that escalates in pitch
+## 3. Reposition Dealer on Table
 
-## 3. Haptic Feedback on Your Turn
+**Files**: `src/components/poker/PokerTablePro.tsx`, `src/components/poker/OnlinePokerTable.tsx`
 
-**File**: `src/components/poker/OnlinePokerTable.tsx`
+Move the dealer container from `top: 2%` to `top: -4%` so the girl appears to be sitting behind the table edge, with her lower body hidden by the table felt. This creates the illusion of her sitting in front of the table.
 
-When `isMyTurn` becomes true, trigger `navigator.vibrate()` with a pattern: `[100, 50, 100]` (two short pulses). This is supported on Android PWAs and Chrome. iOS Safari doesn't support it but the call silently fails, so no harm.
+## 4. Replace Background Image
 
-Add haptic to action buttons too — a single short vibration (50ms) on each button press in `handleAction`.
+**Files**: `src/components/poker/PokerTablePro.tsx`, `src/components/poker/OnlinePokerTable.tsx`
 
-## 4. "5 Seconds Left" Warning Popup
+Replace the `leatherBg` import with the new `poker-background.webp`. Change:
+```
+import leatherBg from '@/assets/leather-bg.jpg';
+```
+to:
+```
+import pokerBg from '@/assets/poker-background.webp';
+```
 
-**Files**: `src/components/poker/TurnTimer.tsx`, `src/components/poker/PlayerSeat.tsx`, `src/components/poker/OnlinePokerTable.tsx`
-
-Add a callback `onLowTime` to `TurnTimer` that fires when remaining time hits 5 seconds. In `OnlinePokerTable.tsx`, track a `lowTimeWarning` state. When triggered for the hero player:
-
-- Show a floating pill "5 SEC LEFT!" that fades in above the betting controls, pulses red for 2 seconds, then fades out
-- Play the `timerWarning` sound
-- Trigger a longer haptic vibration pattern `[200, 100, 200]`
-
-The pill uses CSS animation: fade-in for 300ms, hold for 2s with red pulse, fade-out for 300ms.
-
-## 5. Fix Wake Lock for PWA
-
-**Problem**: The visibility change handler in `useWakeLock.ts` checks `wakeLockRef.current !== null`, but when the screen goes off, the OS automatically releases the wake lock and the `release` event fires, setting `wakeLockRef.current` to... well it doesn't set it to null, but the lock object is now "released". When the user returns, `wakeLockRef.current` is still the old released lock object (not null), so the check passes. However, `requestWakeLock()` creates a NEW lock but doesn't clear the old ref properly. Actually the deeper issue: the `release` event handler only updates state but doesn't null out the ref. So on visibility change, `wakeLockRef.current !== null` is true, but it should re-acquire regardless.
-
-**Fix**:
-1. In the `release` event listener, also set `wakeLockRef.current = null` so the ref accurately reflects the state
-2. Change the visibility handler to re-acquire wake lock whenever the page becomes visible AND we're in "should be locked" mode. Add a `shouldBeActive` ref that's set to `true` on `requestWakeLock()` and `false` on `releaseWakeLock()`. The visibility handler checks `shouldBeActive.current` instead of `wakeLockRef.current !== null`
-3. Add a periodic re-acquire check (every 30s) as a safety net for edge cases where the lock silently drops
+Update both `<img>` tags that render the background to use `pokerBg` instead of `leatherBg`.
 
 ## Summary
 
 | # | Change | Files |
 |---|--------|-------|
-| 1 | Premium coin cascade win sound | `usePokerSounds.ts` |
-| 2 | Upgraded all action sounds | `usePokerSounds.ts` |
-| 3 | Haptic feedback on your turn + actions | `OnlinePokerTable.tsx` |
-| 4 | "5 SEC LEFT" fade-in warning popup | `TurnTimer.tsx`, `OnlinePokerTable.tsx`, `index.css` |
-| 5 | Fix wake lock for PWA | `useWakeLock.ts` |
+| 1 | Copy new assets | `src/assets/dealer/dealer-girl.png`, `src/assets/poker-background.webp` |
+| 2 | Redesign dealer character | `DealerCharacter.tsx` |
+| 3 | Reposition dealer on table | `PokerTablePro.tsx`, `OnlinePokerTable.tsx` |
+| 4 | Replace background image | `PokerTablePro.tsx`, `OnlinePokerTable.tsx` |
 
