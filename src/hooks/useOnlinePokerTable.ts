@@ -13,6 +13,13 @@ export interface RevealedCard {
   cards: Card[];
 }
 
+export interface HandWinner {
+  player_id: string;
+  display_name: string;
+  amount: number;
+  hand_name: string;
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 async function callEdge(fn: string, body: any, method = 'POST') {
@@ -48,6 +55,9 @@ interface UseOnlinePokerTableReturn {
   amountToCall: number;
   canCheck: boolean;
   revealedCards: RevealedCard[];
+  actionPending: boolean;
+  lastActions: Record<string, string>;
+  handWinners: HandWinner[];
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -64,10 +74,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revealedCards, setRevealedCards] = useState<RevealedCard[]>([]);
+  const [actionPending, setActionPending] = useState(false);
+  const [lastActions, setLastActions] = useState<Record<string, string>>({});
+  const [handWinners, setHandWinners] = useState<HandWinner[]>([]);
   const channelRef = useRef<any>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartAttemptedRef = useRef(false);
+  const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevHandIdRef = useRef<string | null>(null);
 
   const userId = user?.id;
 
@@ -76,13 +91,25 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const hand = tableState?.current_hand;
   const currentActorId = hand?.current_actor_id ??
     tableState?.seats.find(s => s.seat === hand?.current_actor_seat)?.player_id ?? null;
-  const isMyTurn = !!userId && currentActorId === userId && !!hand && hand.phase !== 'complete' && hand.phase !== 'showdown';
+  const rawIsMyTurn = !!userId && currentActorId === userId && !!hand && hand.phase !== 'complete' && hand.phase !== 'showdown';
+  const isMyTurn = rawIsMyTurn && !actionPending;
 
   const mySeat = tableState?.seats.find(s => s.player_id === userId);
   const myCurrentBet = mySeat?.current_bet ?? 0;
   const currentBet = hand?.current_bet ?? 0;
   const amountToCall = Math.max(0, currentBet - myCurrentBet);
   const canCheck = amountToCall === 0;
+
+  // Clear lastActions when hand_id changes
+  useEffect(() => {
+    const currentHandId = hand?.hand_id ?? null;
+    if (currentHandId !== prevHandIdRef.current) {
+      if (currentHandId && currentHandId !== prevHandIdRef.current) {
+        setLastActions({});
+      }
+      prevHandIdRef.current = currentHandId;
+    }
+  }, [hand?.hand_id]);
 
   // Fetch full state from HTTP endpoint
   const refreshState = useCallback(async () => {
@@ -110,6 +137,25 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
     const channel = supabase.channel(`poker:table:${tableId}`)
       .on('broadcast', { event: 'game_state' }, ({ payload }) => {
+        // Clear actionPending on any game_state broadcast
+        setActionPending(false);
+        if (actionPendingFallbackRef.current) {
+          clearTimeout(actionPendingFallbackRef.current);
+          actionPendingFallbackRef.current = null;
+        }
+
+        // Accumulate last actions from seats
+        const seats: OnlineSeatInfo[] = payload.seats || [];
+        setLastActions(prev => {
+          const next = { ...prev };
+          for (const s of seats) {
+            if (s.player_id && s.last_action) {
+              next[s.player_id] = s.last_action;
+            }
+          }
+          return next;
+        });
+
         // Merge broadcast state into local state
         setTableState(prev => {
           if (!prev) return prev;
@@ -130,12 +176,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             blinds: payload.blinds || { small: prev.table.small_blind, big: prev.table.big_blind, ante: prev.table.ante },
             current_actor_id: payload.current_actor_id ?? null,
           };
-          const seats: OnlineSeatInfo[] = payload.seats || prev.seats;
-          return { ...prev, current_hand: broadcastHand, seats };
+          return { ...prev, current_hand: broadcastHand, seats: seats.length > 0 ? seats : prev.seats };
         });
       })
       .on('broadcast', { event: 'seat_change' }, () => {
-        // Refetch full state on seat changes
         refreshState();
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
@@ -143,7 +187,19 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const revealed: RevealedCard[] = payload.revealed_cards || [];
         setRevealedCards(revealed);
 
-        // Update hand phase to 'complete' + seats, but keep hand visible
+        // Store winners
+        const winners: HandWinner[] = (payload.winners || []).map((w: any) => {
+          const seatData = (payload.seats || []).find((s: any) => s.player_id === w.player_id);
+          return {
+            player_id: w.player_id,
+            display_name: seatData?.display_name || 'Unknown',
+            amount: w.amount || 0,
+            hand_name: w.hand_name || '',
+          };
+        });
+        setHandWinners(winners);
+
+        // Update hand phase to 'complete' + seats
         setTableState(prev => {
           if (!prev) return prev;
           return {
@@ -164,8 +220,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           });
           setMyCards(null);
           setRevealedCards([]);
+          setHandWinners([]);
           showdownTimerRef.current = null;
-          // Auto-deal next hand (server rejects duplicates)
           autoStartAttemptedRef.current = false;
         }, 5000);
       })
@@ -193,13 +249,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     })();
   }, [hand?.hand_id, userId, mySeatNumber]);
 
-  // Timeout auto-ping: if it's not my turn and the deadline passes, trigger timeout
+  // Timeout auto-ping
   useEffect(() => {
     if (timeoutTimerRef.current) clearTimeout(timeoutTimerRef.current);
     if (!hand?.action_deadline || !userId || isMyTurn || !mySeatNumber) return;
 
     const deadline = new Date(hand.action_deadline).getTime();
-    const delay = deadline - Date.now() + 2000; // 2s grace
+    const delay = deadline - Date.now() + 2000;
     if (delay <= 0) return;
 
     timeoutTimerRef.current = setTimeout(() => {
@@ -211,7 +267,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     };
   }, [hand?.action_deadline, isMyTurn, userId, mySeatNumber]);
 
-
   // Actions
   const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
     await callEdge('poker-join-table', { table_id: tableId, seat_number: seatNumber, buy_in_amount: buyIn });
@@ -219,7 +274,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   }, [tableId, refreshState]);
 
   const leaveTable = useCallback(async () => {
-    // Don't call if we're not actually seated
     if (mySeatNumber === null) return;
     await callEdge('poker-leave-table', { table_id: tableId });
     await refreshState();
@@ -227,7 +281,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   const startHand = useCallback(async () => {
     const data = await callEdge('poker-start-hand', { table_id: tableId });
-    // Hole cards come via separate fetch triggered by hand_id change
     if (data.state) {
       setTableState(prev => prev ? {
         ...prev,
@@ -254,14 +307,31 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   }, [tableId]);
 
   const sendAction = useCallback(async (action: string, amount?: number) => {
-    if (!hand) return;
-    await callEdge('poker-action', {
-      table_id: tableId,
-      hand_id: hand.hand_id,
-      action,
-      amount: amount ?? 0,
-    });
-  }, [tableId, hand]);
+    if (!hand || actionPending) return;
+    setActionPending(true);
+    // Safety fallback: clear after 3s if no broadcast arrives
+    if (actionPendingFallbackRef.current) clearTimeout(actionPendingFallbackRef.current);
+    actionPendingFallbackRef.current = setTimeout(() => {
+      setActionPending(false);
+      actionPendingFallbackRef.current = null;
+    }, 3000);
+    try {
+      await callEdge('poker-action', {
+        table_id: tableId,
+        hand_id: hand.hand_id,
+        action,
+        amount: amount ?? 0,
+      });
+    } catch (err) {
+      // Clear pending on error so user can retry
+      setActionPending(false);
+      if (actionPendingFallbackRef.current) {
+        clearTimeout(actionPendingFallbackRef.current);
+        actionPendingFallbackRef.current = null;
+      }
+      throw err;
+    }
+  }, [tableId, hand, actionPending]);
 
   const pingTimeout = useCallback(async () => {
     if (!hand) return;
@@ -271,7 +341,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     });
   }, [tableId, hand]);
 
-  // Auto-deal: when 2+ seated players and no active hand, start automatically
+  // Auto-deal
   const seatedCount = tableState?.seats.filter(s => s.player_id && s.status !== 'eliminated').length ?? 0;
   const hasActiveHand = !!tableState?.current_hand;
 
@@ -285,7 +355,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [seatedCount, hasActiveHand, mySeatNumber, startHand]);
 
-  // Reset auto-start flag when a new hand begins
   useEffect(() => {
     if (hasActiveHand) {
       autoStartAttemptedRef.current = true;
@@ -302,6 +371,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     amountToCall,
     canCheck,
     revealedCards,
+    actionPending,
+    lastActions,
+    handWinners,
     joinTable,
     leaveTable,
     startHand,
