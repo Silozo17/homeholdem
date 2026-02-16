@@ -1,60 +1,116 @@
 
 
-## Ensure All Poker Animations Work Properly
+## Fix: Game Freezing After a Few Hands
 
-After auditing every animation in the codebase, the CSS keyframes are all properly defined. The issues are with how they're applied and their visual impact.
+### Root Cause Analysis
 
-### Issues Found
+Three interrelated bugs cause the freeze:
 
-**1. Community card reveal is too subtle**
-Community cards (flop/turn/river) are always rendered face-up so they only get `animate-card-reveal` (scale 0.85 to 1.0 over 0.35s). This is barely visible -- needs a more dramatic entrance matching the premium feel.
+**Bug 1: Missing `hand_result` fallback (PRIMARY FREEZE CAUSE)**
 
-**Fix**: Enhance the `card-reveal` keyframe to include a slight vertical slide and a brief scale overshoot for a satisfying "pop":
-```css
-@keyframes card-reveal {
-  0% { opacity: 0; transform: scale(0.5) translateY(8px); }
-  60% { opacity: 1; transform: scale(1.08) translateY(-2px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-.animate-card-reveal { animation: card-reveal 0.4s ease-out both; }
-```
+When a hand completes, the server sends TWO broadcasts in sequence:
+1. `game_state` with `phase: "complete"` 
+2. `hand_result` with winners, revealed cards, etc.
 
-**2. Winner glow overrides reveal animation**
-When `isWinner` is true, `CardDisplay` applies both `animate-card-reveal` and `animate-winner-glow`. Since both classes set the CSS `animation` shorthand, the winner glow (later in the stylesheet) completely overrides the reveal. Winner cards skip the entrance animation.
+If `hand_result` is dropped by Realtime (network hiccup, timing issue), the client gets stuck:
+- `current_hand` has `phase: "complete"` but is never set to `null`
+- `hasActiveHand` stays `true` forever
+- Auto-deal never fires because it requires `!hasActiveHand`
+- The game appears permanently frozen -- no new hand, no winner display, nothing
 
-**Fix**: Use `animationName` composition in the style attribute instead of conflicting classes. When `isWinner` is true, apply both animations via comma-separated inline style, so both run:
-```
-animation: card-reveal 0.4s ease-out both, winner-glow 1.5s ease-in-out 0.4s infinite
-```
+There is NO fallback for this scenario anywhere in the code.
 
-**3. Dealing card-back sprites need a visible card-back texture**
-The deal animation sprites use the CSS class `card-back-premium` which renders a gradient pattern. This works but could be more visible. No change needed here -- this is working correctly.
+**Bug 2: Auto-deal retry storm (visible in logs)**
 
-**4. Opponent showdown reveal works**
-The `animate-showdown-reveal` class on opponent cards does a 3D rotateY flip -- this is defined and connected correctly. No fix needed.
+When `startHand` fails (e.g., "Hand already in progress" from both clients racing, or "Need at least 2 players with chips" after a bust-out):
+1. The catch block sets `autoStartAttempted = false`
+2. This immediately re-triggers the auto-deal effect
+3. After 2s + jitter, it calls `startHand` again
+4. It fails again, resets, retries...
+5. The 6-second "safety net" resets `autoStartAttempted` to `false`, which *continues* the loop instead of stopping it
 
-**5. Chip-to-winner animation works**
-`ChipAnimation` uses `chip-sweep` keyframe with CSS custom properties. Connected correctly. No fix needed.
+The logs show ~30 boots in 50 seconds, confirming this infinite retry loop. This hammers the server and wastes resources.
 
-**6. Winner banner works**
-`animate-winner-banner` fades in then out after 2s. Connected correctly. No fix needed.
+**Bug 3: Dead `checkKicked` effect (minor)**
 
-**7. Phase flash, spotlight pulse, all-in shockwave all work**
-All CSS classes are defined and applied correctly.
+Lines 126-132 contain a no-op effect that runs every render for no reason (already identified in the previous plan but not yet removed).
 
 ---
 
-### Files to Modify
+### Fixes
 
-| File | Change |
-|------|--------|
-| `src/index.css` | Enhance `card-reveal` keyframe for more dramatic entrance |
-| `src/components/poker/CardDisplay.tsx` | Fix winner glow + reveal animation conflict using inline animation composition |
+**Fix 1: Add `complete` phase fallback timer**
+
+In the `game_state` broadcast handler, when `phase === 'complete'` is received, start a 5-second fallback timer. If `hand_result` never arrives within that window, force the same cleanup (clear hand, clear winners, reset auto-start). This guarantees the game always recovers even if a broadcast is dropped.
+
+**File**: `src/hooks/useOnlinePokerTable.ts`
+
+In the `game_state` handler (around line 144), after updating state, add:
+```typescript
+if (payload.phase === 'complete') {
+  // Fallback: if hand_result never arrives, force cleanup
+  if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+  showdownTimerRef.current = setTimeout(() => {
+    setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
+    setMyCards(null);
+    setRevealedCards([]);
+    setHandWinners([]);
+    showdownTimerRef.current = null;
+    setAutoStartAttempted(false);
+  }, 6000); // 6s fallback -- hand_result handler will cancel and replace with 3.5s timer
+}
+```
+
+The `hand_result` handler already clears `showdownTimerRef` and starts a 3.5s timer, so this 6s fallback only fires if `hand_result` was missed.
+
+**Fix 2: Cap auto-deal retries**
+
+Add a retry counter ref. If `startHand` fails 3 times in a row, stop retrying and require manual start. Reset the counter when a hand successfully starts.
+
+**File**: `src/hooks/useOnlinePokerTable.ts`
+
+Add: `const autoStartRetriesRef = useRef(0);`
+
+In the auto-deal effect catch:
+```typescript
+startHandRef.current().catch(() => {
+  autoStartTimerRef.current = null;
+  autoStartRetriesRef.current += 1;
+  if (autoStartRetriesRef.current < 3) {
+    setAutoStartAttempted(false); // allow retry
+  }
+  // else: stay attempted=true, stop retrying
+});
+```
+
+Reset on successful hand start:
+```typescript
+useEffect(() => {
+  if (hasActiveHand) {
+    setAutoStartAttempted(true);
+    setHandHasEverStarted(true);
+    autoStartRetriesRef.current = 0; // reset retries on success
+  }
+}, [hasActiveHand]);
+```
+
+**Fix 3: Remove dead `checkKicked` effect**
+
+Remove lines 126-132 in `OnlinePokerTable.tsx` (the no-op `checkKicked` effect).
+
+---
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/hooks/useOnlinePokerTable.ts` | Add `complete` phase fallback timer in `game_state` handler; cap auto-deal retries to 3; add retry counter ref |
+| `src/components/poker/OnlinePokerTable.tsx` | Remove dead `checkKicked` effect (lines 126-132) |
 
 ### What Does NOT Change
-- No logic changes
-- No layout changes
+- No visual/UI changes
+- No animation changes
+- No edge function changes
+- No database changes
 - No seat positioning changes
-- Dealing animation (card sprites flying from dealer) -- already working
-- Showdown reveal, chip animations, winner banner -- all working
-- All other animations untouched
+
