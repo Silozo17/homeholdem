@@ -215,7 +215,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId && currentHandId !== prevHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
       setDealing(true);
-      const timer = setTimeout(() => setDealing(false), 2000);
+      const timer = setTimeout(() => setDealing(false), 3000);
       prevHandIdRef.current = currentHandId;
       return () => clearTimeout(timer);
     }
@@ -634,7 +634,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               const pos = posArr[screenPos];
               if (!pos) return null;
               return [0, 1].map(cardIdx => {
-                const delay = (cardIdx * activeSeatCount + screenPos) * 0.18;
+                const delay = (cardIdx * activeSeatCount + screenPos) * 0.243;
                 return (
                   <div
                     key={`deal-${screenPos}-${cardIdx}`}
@@ -643,7 +643,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                       left: '50%',
                       top: '2%',
                       zIndex: Z.EFFECTS,
-                      animation: `deal-card-fly 0.4s ease-out ${delay}s both`,
+                      animation: `deal-card-fly 0.54s ease-out ${delay}s both`,
                       ['--deal-dx' as any]: `${pos.xPct - 50}vw`,
                       ['--deal-dy' as any]: `${pos.yPct - 2}vh`,
                     }}
