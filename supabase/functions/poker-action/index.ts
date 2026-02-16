@@ -96,14 +96,8 @@ function getCombinations<T>(arr: T[], k: number): T[][] {
 }
 
 // ── Helpers ──
-function nextActiveSeat(seats: any[], fromSeat: number, maxSeats: number, excludeStatuses: string[] = ["sitting_out", "disconnected"]): number | null {
-  for (let i = 1; i <= maxSeats; i++) {
-    const s = (fromSeat + i) % maxSeats;
-    const seat = seats.find((se: any) => se.seat_number === s && se.player_id && !excludeStatuses.includes(se.status));
-    if (seat) return s;
-  }
-  return null;
-}
+
+
 
 interface SeatState {
   seat_id: string;
