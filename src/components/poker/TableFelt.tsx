@@ -15,13 +15,16 @@ export function TableFelt({ children, className }: TableFeltProps) {
   if (!children) {
     // Visual-only mode: just the image
     return (
-      <img
-        src={tableBase}
-        alt="Poker table"
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
-        draggable={false}
-        style={{ zIndex: 1 }}
-      />
+      <>
+        <div className="absolute inset-0 bg-black pointer-events-none" style={{ zIndex: 0 }} />
+        <img
+          src={tableBase}
+          alt="Poker table"
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+          draggable={false}
+          style={{ zIndex: 1 }}
+        />
+      </>
     );
   }
 
