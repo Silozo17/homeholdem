@@ -12,10 +12,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // This is a cron job — verify service role auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)) {
-      // Also accept if called with anon key (for testing)
       console.log("Warning: poker-check-timeouts called without service role key");
     }
 
@@ -24,7 +22,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Find hands where action deadline has passed (with 10s grace period)
+    // ── 1. Auto-fold stuck hands ──
     const cutoff = new Date(Date.now() - 10_000).toISOString();
 
     const { data: stuckHands, error } = await admin
@@ -40,20 +38,10 @@ Deno.serve(async (req) => {
       throw error;
     }
 
-    if (!stuckHands || stuckHands.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No stuck hands found" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(`Found ${stuckHands.length} stuck hand(s) to auto-fold`);
-
     const results: any[] = [];
 
-    for (const stuckHand of stuckHands) {
+    for (const stuckHand of (stuckHands || [])) {
       try {
-        // Find the current actor
         const { data: actorSeat } = await admin
           .from("poker_seats")
           .select("player_id")
@@ -66,12 +54,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Call poker-action internally with service role to force fold
         const actionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/poker-action`;
-
-        // We need to impersonate the actor or use service role
-        // Since poker-action checks auth, we'll use service role and the action
-        // will be processed as a timeout fold via deadline check
         const response = await fetch(actionUrl, {
           method: "POST",
           headers: {
@@ -87,32 +70,60 @@ Deno.serve(async (req) => {
         });
 
         const result = await response.json();
-        results.push({
-          hand_id: stuckHand.id,
-          status: response.status,
-          result,
+        results.push({ hand_id: stuckHand.id, status: response.status, result });
+        console.log(`Auto-folded hand ${stuckHand.id}: ${response.status}`);
+      } catch (handErr) {
+        console.error(`Error processing stuck hand ${stuckHand.id}:`, handErr);
+        results.push({ hand_id: stuckHand.id, status: 500, error: handErr.message });
+      }
+    }
+
+    // ── 2. Auto-kick players with 2+ consecutive timeouts ──
+    const { data: timeoutSeats } = await admin
+      .from("poker_seats")
+      .select("id, table_id, player_id, seat_number, consecutive_timeouts")
+      .gte("consecutive_timeouts", 2)
+      .not("player_id", "is", null);
+
+    const kickResults: any[] = [];
+    for (const seat of (timeoutSeats || [])) {
+      try {
+        console.log(`Auto-kicking player ${seat.player_id} from table ${seat.table_id} (${seat.consecutive_timeouts} timeouts)`);
+        
+        const leaveUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/poker-leave-table`;
+        const response = await fetch(leaveUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            table_id: seat.table_id,
+            player_id: seat.player_id,
+          }),
         });
 
-        console.log(
-          `Auto-folded hand ${stuckHand.id}: ${response.status}`
-        );
-      } catch (handErr) {
-        console.error(
-          `Error processing stuck hand ${stuckHand.id}:`,
-          handErr
-        );
-        results.push({
-          hand_id: stuckHand.id,
-          status: 500,
-          error: handErr.message,
+        const result = await response.json();
+        kickResults.push({ player_id: seat.player_id, table_id: seat.table_id, status: response.status });
+
+        // Broadcast seat_change so other clients update
+        const channel = admin.channel(`poker:table:${seat.table_id}`);
+        await channel.send({
+          type: "broadcast",
+          event: "seat_change",
+          payload: { action: "leave", seat: seat.seat_number, player_id: seat.player_id },
         });
+      } catch (kickErr: any) {
+        console.error(`Error kicking player ${seat.player_id}:`, kickErr);
+        kickResults.push({ player_id: seat.player_id, status: 500, error: kickErr.message });
       }
     }
 
     return new Response(
       JSON.stringify({
-        message: `Processed ${results.length} stuck hand(s)`,
+        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s)`,
         results,
+        kickResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
