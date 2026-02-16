@@ -12,7 +12,7 @@ export interface SeatPos {
 
 // Portrait: ry reduced so top seat doesn't hit dealer, rx reduced so sides don't clip
 export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 38, ry: 34 };
-export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 48, rx: 42, ry: 34 };
+export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 40, ry: 36 };
 
 /**
  * Angle maps per player count.
@@ -40,11 +40,11 @@ const landscapeAngles: Record<number, number[]> = {
   6: [90, 148, 200, 240, 340, 32],
   7: [90, 140, 180, 220, 250, 320, 20],
   8: [90, 135, 170, 210, 250, 290, 330, 25],
-  9: [90, 130, 160, 195, 230, 50, 310, 340, 20],
+  9: [90, 130, 165, 200, 230, 50, 335, 310, 15],
 };
 
 // Very small push — seats should sit ON the rail, not far outside
-const PUSH_DISTANCE = 2;
+const PUSH_DISTANCE = 5;
 
 /**
  * Compute seat positions anchored to the table rail ellipse.
@@ -62,8 +62,8 @@ export function getSeatPositions(
     const p = pointOnEllipsePct(ellipse, theta);
     const pushed = offsetFromCenterPct(ellipse, p.xPct, p.yPct, PUSH_DISTANCE);
     return {
-      xPct: clampPct(pushed.xPct, 5, 95),
-      yPct: clampPct(pushed.yPct, 5, 95),
+      xPct: clampPct(pushed.xPct, 3, 97),
+      yPct: clampPct(pushed.yPct, 3, 97),
     };
   });
 }

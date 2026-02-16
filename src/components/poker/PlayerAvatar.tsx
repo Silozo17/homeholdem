@@ -29,7 +29,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, size = 'md'
     <div className={cn(
       'relative rounded-full flex items-center justify-center font-bold select-none',
       size === 'md' ? 'w-11 h-11 text-sm' : 'w-8 h-8 text-xs',
-      isOut && 'opacity-40',
+      isOut && 'opacity-70',
     )}>
       {/* Animated ring for current player */}
       {isCurrentPlayer && !isOut && (
