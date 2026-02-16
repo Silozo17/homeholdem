@@ -34,7 +34,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isFolded = player.status === 'folded';
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
-  const cardSize = compact ? 'xs' : 'sm';
+  const cardSize = compact ? 'md' : 'lg';
   const humanCardSize = compact ? 'sm' : '2xl';
 
   // Only show cards for: human player always, opponents only at showdown
@@ -43,16 +43,17 @@ export const PlayerSeat = memo(function PlayerSeat({
 
   // Opponent showdown cards (overlay the avatar)
   const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0 ? (
-    <div className="absolute left-1/2 -translate-x-1/2 -top-1 flex gap-0.5 animate-showdown-reveal" style={{ zIndex: 2 }}>
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex animate-showdown-reveal" style={{ zIndex: 2 }}>
       {player.holeCards.map((card, i) => (
-        <CardDisplay
-          key={i}
-          card={shouldShowCards ? card : undefined}
-          faceDown={!shouldShowCards}
-          size={cardSize}
-          dealDelay={i * 0.15}
-          className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
-        />
+        <div key={i} style={{ transform: `rotate(${i === 0 ? -8 : 8}deg) translateX(${i === 0 ? -4 : 4}px)` }}>
+          <CardDisplay
+            card={shouldShowCards ? card : undefined}
+            faceDown={!shouldShowCards}
+            size={cardSize}
+            dealDelay={i * 0.15}
+            className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
+          />
+        </div>
       ))}
     </div>
   ) : null;
