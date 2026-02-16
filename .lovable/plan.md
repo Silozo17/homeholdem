@@ -1,65 +1,76 @@
 
-# Fix All-In Betting Round Logic
 
-## Root Cause
+# Fix Online Poker Bugs: Landscape, Table Visibility, and Invites
 
-There is a critical bug on **line 311** of `usePokerGame.ts`:
+## Bug 1: Android users cannot rotate to landscape
 
-```
-if (actionable.length <= 1 || roundComplete) {
-  return advancePhase(...)
-}
-```
+**Root cause (two issues):**
 
-When you go all-in, your status changes to `'all-in'`. The opponent is still `'active'`, making `actionable.length === 1`. Because this condition uses `<= 1` with an **OR**, it immediately advances the phase **before the opponent gets to act** (call or fold). This causes:
+1. `manifest.json` has `"orientation": "portrait"` which tells Android PWAs to lock to portrait mode, preventing rotation entirely.
+2. The `useLockLandscape()` hook in `PokerTablePro.tsx` calls `screen.orientation.lock('landscape')`, but on Android Chrome this requires the page to be in fullscreen mode first. Without fullscreen, the call silently fails. Additionally, there's a stale closure bug: the cleanup reads `locked` which is always `false` (initial value captured by the effect).
 
-1. **Cards shown prematurely** -- the phase advances through flop/turn/river into showdown without the opponent ever responding to the all-in.
-2. **Money not awarded** -- the opponent never called, so their `totalBetThisHand` is lower than yours. The side pot calculator sees mismatched contributions and may not properly credit winnings.
+**Fix:**
+- Change `manifest.json` orientation from `"portrait"` to `"any"` so the PWA allows rotation.
+- Update `useLockLandscape()` to request fullscreen before attempting orientation lock, and use a ref instead of state for the cleanup flag. Wrap both in proper error handling since not all devices support these APIs.
 
-## The Fix
+**Files:** `public/manifest.json`, `src/components/poker/PokerTablePro.tsx`
 
-### File: `src/hooks/usePokerGame.ts`
+---
 
-**Change 1 (line 311):** Replace `actionable.length <= 1` with `actionable.length === 0`
+## Bug 2: Created tables not visible to other players
 
-When `actionable.length === 0`, everyone is all-in or folded -- nobody CAN act, so auto-advance is correct. When `actionable.length === 1`, that player still needs to respond to the bet.
+**Root cause:** The RLS policy on `poker_tables` only shows tables where:
+- `table_type = 'public'`, OR
+- `created_by = auth.uid()`, OR
+- User is a club member (for club tables), OR
+- User is already seated
 
-**Change 2 (lines 301-309):** Improve the `roundComplete` check to handle the case where the last raiser went all-in (and is no longer 'active', so `nextActivePlayerIndex` will never land on them):
+For `friends` type tables, no other player can see them in the lobby until they are seated (chicken-and-egg problem). They can only join via invite code.
 
-```typescript
-const raiserIsAllIn = lastRaiserIndex !== null 
-  && players[lastRaiserIndex]?.status === 'all-in';
-const allActiveActed = getActionablePlayers(players)
-  .every(p => p.lastAction !== undefined);
+**Fix:** Update the RLS SELECT policy to also allow visibility for `friends` tables where the viewing user shares at least one club with the table creator. This makes "friends" tables visible to club-mates in the lobby, matching the intent of the feature.
 
-const roundComplete = allEqualBets && (
-  // Standard: we've come back to the raiser
-  (lastRaiserIndex !== null 
-    && players[lastRaiserIndex]?.status === 'active' 
-    && nextIdx === lastRaiserIndex) ||
-  // Raiser went all-in: round done when all remaining 
-  // active players have acted and matched
-  (raiserIsAllIn && allActiveActed) ||
-  // No raiser (check-around): everyone acted
-  (lastRaiserIndex === null && allActiveActed)
-);
+New policy condition adds:
+```sql
+OR (
+  table_type = 'friends' AND EXISTS (
+    SELECT 1 FROM club_members cm1
+    JOIN club_members cm2 ON cm1.club_id = cm2.club_id
+    WHERE cm1.user_id = auth.uid() AND cm2.user_id = poker_tables.created_by
+  )
+)
 ```
 
-This ensures:
-- After you go all-in, opponent gets their turn (call/fold)
-- After opponent calls, `allEqualBets = true` and `allActiveActed = true` since the raiser is all-in, so the round properly advances
-- After opponent folds, `foldedOut` catches it (line 293) and goes to showdown
+**Database migration required.**
 
-### No other files need changes
+---
 
-The useEffect all-in runout check (line 551, `getActionablePlayers(state.players).length <= 1`) is correct for its purpose: once betting is resolved and 0-1 active players remain, the board auto-runs. The bug was only in the reducer skipping the opponent's turn entirely.
+## Bug 3: Invite button broken on mobile PWA
 
-## Summary of Scenarios After Fix
+**Root causes (three issues):**
 
-| Scenario | Before (broken) | After (fixed) |
-|----------|----------|-------|
-| You all-in, opponent hasn't acted | Skips opponent, runs board | Opponent gets turn to call/fold |
-| Opponent calls all-in (both all-in) | N/A (never reached) | `actionable === 0`, auto-advance, runout |
-| Opponent calls with chips remaining | N/A | `allEqualBets + raiserAllIn + allActed` = advance, then useEffect runs board |
-| Opponent folds | N/A | `foldedOut` triggers showdown, you win pot |
-| Check-around (no raises) | Works | Still works (unchanged path) |
+1. **Duplicate notification call:** In `InvitePlayersDialog.tsx` lines 82-83, `notifyPokerInvite()` is called twice per invite click (copy-paste bug). Each invite sends two push notifications.
+
+2. **Empty tableId from lobby:** When opened from the lobby's "Invite Friends" button (not from inside a table), `lastCreatedTable` may be null, passing an empty string as `tableId`. The push notification deep link becomes `/online-poker?table=` which doesn't load any table.
+
+3. **Deep link not handled:** The `OnlinePoker` page reads `clubId` from URL params but never reads the `table` query parameter from the invite deep link, so even valid invite links don't auto-join the table.
+
+**Fix:**
+- Remove the duplicate `notifyPokerInvite` call (line 83).
+- In the lobby, disable the standalone "Invite Friends" button or only show it when a table has been created in the current session.
+- In `OnlinePoker.tsx`, read the `table` query param from the URL and auto-set it as `activeTableId` so invite deep links work.
+
+**Files:** `src/components/poker/InvitePlayersDialog.tsx`, `src/components/poker/OnlinePokerLobby.tsx`, `src/pages/OnlinePoker.tsx`
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `public/manifest.json` | Change `"orientation"` from `"portrait"` to `"any"` |
+| `src/components/poker/PokerTablePro.tsx` | Fix `useLockLandscape` to request fullscreen first, fix stale closure |
+| Database migration | Update `poker_tables` SELECT RLS to include friends-of-clubs visibility |
+| `src/components/poker/InvitePlayersDialog.tsx` | Remove duplicate `notifyPokerInvite` call |
+| `src/components/poker/OnlinePokerLobby.tsx` | Only show "Invite Friends" button when a table exists in session |
+| `src/pages/OnlinePoker.tsx` | Read `?table=` query param and auto-join that table on load |
+
