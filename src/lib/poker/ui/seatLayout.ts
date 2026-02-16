@@ -62,9 +62,9 @@ const SEAT_PICKS: Record<number, (keyof typeof SEATS_LANDSCAPE)[]> = {
   4: ['Y', 'B', 'D', 'F'],
   5: ['Y', 'A', 'C', 'G', 'E'],
   6: ['Y', 'A', 'B', 'D', 'F', 'E'],
-  7: ['Y', 'A', 'B', 'D', 'H', 'F', 'E'],
-  8: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'E'],
-  9: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'F', 'E'],
+  7: ['Y', 'A', 'B', 'D', 'E', 'F', 'H'],
+  8: ['Y', 'A', 'B', 'C', 'D', 'E', 'G', 'H'],
+  9: ['Y', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
 };
 
 /**
