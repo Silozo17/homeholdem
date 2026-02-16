@@ -51,7 +51,7 @@ export function TurnTimer({
           onLowTime?.();
         }
       }
-    }, 50);
+    }, 200);
 
     return () => clearInterval(interval);
   }, [active, duration, onTimeout, onLowTime]);

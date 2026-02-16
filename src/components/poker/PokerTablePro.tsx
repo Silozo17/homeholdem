@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, BLIND_LEVELS } from '@/lib/poker/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,55 +32,7 @@ interface PokerTableProProps {
   onQuit: () => void;
 }
 
-function useIsLandscape() {
-  const [isLandscape, setIsLandscape] = useState(
-    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
-  );
-  useEffect(() => {
-    const handler = () => setIsLandscape(window.innerWidth > window.innerHeight);
-    window.addEventListener('resize', handler);
-    window.addEventListener('orientationchange', handler);
-    return () => {
-      window.removeEventListener('resize', handler);
-      window.removeEventListener('orientationchange', handler);
-    };
-  }, []);
-  return isLandscape;
-}
-
-/** Lock screen to landscape while game is mounted (requests fullscreen first for Android) */
-function useLockLandscape() {
-  const lockedRef = { current: false };
-  useEffect(() => {
-    let cancelled = false;
-    async function lock() {
-      try {
-        // Android Chrome requires fullscreen before orientation lock
-        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-          await document.documentElement.requestFullscreen().catch(() => {});
-        }
-        const so = screen.orientation;
-        if (so?.lock) {
-          await so.lock('landscape');
-          if (!cancelled) lockedRef.current = true;
-        }
-      } catch {
-        // Not all devices support orientation lock
-      }
-    }
-    lock();
-    return () => {
-      cancelled = true;
-      if (lockedRef.current) {
-        try { screen.orientation?.unlock(); } catch {}
-      }
-      if (document.fullscreenElement) {
-        try { document.exitFullscreen(); } catch {}
-      }
-    };
-  }, []);
-}
-
+import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
 function BlindTimerCountdown({ lastBlindIncrease, blindTimer, blindLevel }: { lastBlindIncrease: number; blindTimer: number; blindLevel: number }) {
@@ -208,9 +160,17 @@ export function PokerTablePro({
   }, [onAction, play]);
 
   const ellipse = getDefaultEllipse(isLandscape);
-  const positions = getSeatPositions(state.players.length, isLandscape);
+  const positions = useMemo(() => getSeatPositions(state.players.length, isLandscape), [state.players.length, isLandscape]);
   const currentPlayerIdx = state.currentPlayerIndex;
   const isMobileLandscape = isLandscape && typeof window !== 'undefined' && window.innerWidth < 900;
+
+  // Stable particle positions (avoid jitter from Math.random() in render)
+  const particlePositions = useMemo(() =>
+    Array.from({ length: 8 }, (_, i) => ({
+      left: 20 + ((i * 37 + 13) % 60),
+      top: 30 + ((i * 23 + 7) % 30),
+    })), []
+  );
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
@@ -420,16 +380,16 @@ export function PokerTablePro({
             </span>
           </div>
 
-          {/* Showdown particles */}
+          {/* Showdown particles (stable positions) */}
           {state.phase === 'hand_complete' && !isGameOver && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS }}>
-              {Array.from({ length: 8 }).map((_, i) => (
+              {particlePositions.map((p, i) => (
                 <div
                   key={i}
                   className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
                   style={{
-                    left: `${20 + Math.random() * 60}%`,
-                    top: `${30 + Math.random() * 30}%`,
+                    left: `${p.left}%`,
+                    top: `${p.top}%`,
                     background: 'radial-gradient(circle, hsl(43 74% 60%), hsl(43 74% 49% / 0))',
                     animationDelay: `${i * 0.2}s`,
                     boxShadow: '0 0 4px hsl(43 74% 49% / 0.6)',
