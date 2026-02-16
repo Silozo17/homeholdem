@@ -16,7 +16,7 @@ export function TableFelt({ children, className }: TableFeltProps) {
     // Visual-only mode: just the image
     return (
       <>
-        <div className="absolute inset-0 bg-black pointer-events-none" style={{ zIndex: 0 }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }} />
         <img
           src={tableBase}
           alt="Poker table"
