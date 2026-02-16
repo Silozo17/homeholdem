@@ -73,6 +73,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const [maxSeats, setMaxSeats] = useState(6);
   const [bigBlind, setBigBlind] = useState(100);
   const [maxBuyIn, setMaxBuyIn] = useState(10000);
+  const [blindTimer, setBlindTimer] = useState(0);
 
   const fetchTables = useCallback(async () => {
     try {
@@ -132,6 +133,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         min_buy_in: Math.round(maxBuyIn / 10),
         max_buy_in: maxBuyIn,
         club_id: clubId || null,
+        blind_timer_minutes: blindTimer,
       });
       setCreateOpen(false);
       setTableName('');
@@ -299,6 +301,25 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                     <span className="font-bold text-primary">{maxBuyIn.toLocaleString()}</span>
                   </div>
                   <Slider value={[maxBuyIn]} min={1000} max={100000} step={1000} onValueChange={([v]) => setMaxBuyIn(v)} />
+                </div>
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Blind Timer</span>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[{ label: 'Off', value: 0 }, { label: '5m', value: 5 }, { label: '10m', value: 10 }, { label: '15m', value: 15 }, { label: '30m', value: 30 }].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setBlindTimer(opt.value)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-full text-xs font-bold transition-all',
+                          blindTimer === opt.value
+                            ? 'bg-primary text-primary-foreground shadow-md'
+                            : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleCreate} disabled={creating}>
                   {creating ? 'Creating...' : 'Create & Sit Down'}

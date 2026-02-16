@@ -1362,6 +1362,7 @@ export type Database = {
         Row: {
           ante: number
           big_blind: number
+          blind_timer_minutes: number
           club_id: string | null
           created_at: string
           created_by: string
@@ -1380,6 +1381,7 @@ export type Database = {
         Insert: {
           ante?: number
           big_blind?: number
+          blind_timer_minutes?: number
           club_id?: string | null
           created_at?: string
           created_by?: string
@@ -1398,6 +1400,7 @@ export type Database = {
         Update: {
           ante?: number
           big_blind?: number
+          blind_timer_minutes?: number
           club_id?: string | null
           created_at?: string
           created_by?: string

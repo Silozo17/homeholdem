@@ -542,7 +542,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             )}
           </div>
 
-          {/* Deal button removed — auto-deal handles hand progression */}
+          {/* Manual deal fallback for table creator */}
+          {isCreator && !hand && activeSeats.length >= 2 && (
+            <button
+              onClick={() => startHand()}
+              className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"
+              style={{ zIndex: Z.ACTIONS, bottom: '28%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <Play className="h-3 w-3 inline mr-1" />
+              Deal Hand
+            </button>
+          )}
 
           {/* Showdown particles */}
           {isShowdown && (

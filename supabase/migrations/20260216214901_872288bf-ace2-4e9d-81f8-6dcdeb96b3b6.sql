@@ -1,0 +1,1 @@
+ALTER TABLE public.poker_tables ADD COLUMN blind_timer_minutes integer NOT NULL DEFAULT 0;
