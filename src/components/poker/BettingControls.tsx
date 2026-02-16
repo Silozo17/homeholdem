@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { X, Check, PhoneIncoming, TrendingUp, Flame } from 'lucide-react';
 
 interface BettingControlsProps {
   canCheck: boolean;
@@ -118,7 +119,7 @@ export function BettingControls({
           )}
           onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
-          Fold
+          <X size={14} /> Fold
         </button>
         <button
           className="h-11 rounded-xl font-bold text-sm flex items-center justify-center active:scale-[0.92] transition-all"
@@ -136,7 +137,7 @@ export function BettingControls({
             else onAction({ type: 'call' });
           }}
         >
-          {callLabel}
+          {canCheck ? <Check size={14} /> : amountToCall >= playerChips ? <Flame size={14} /> : <PhoneIncoming size={14} />} {callLabel}
         </button>
         {canRaise && (
           <button
@@ -153,7 +154,7 @@ export function BettingControls({
             }}
             onClick={handleRaiseTap}
           >
-            {raiseLabel}
+            {showRaiseSlider && raiseAmount >= maxRaiseTotal ? <Flame size={14} /> : <TrendingUp size={14} />} {raiseLabel}
           </button>
         )}
       </div>
@@ -212,7 +213,7 @@ export function BettingControls({
           )}
           onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
-          Fold
+          <X size={14} /> Fold
         </button>
         <button
           className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
@@ -230,7 +231,7 @@ export function BettingControls({
             else onAction({ type: 'call' });
           }}
         >
-          {callLabel}
+          {canCheck ? <Check size={14} /> : amountToCall >= playerChips ? <Flame size={14} /> : <PhoneIncoming size={14} />} {callLabel}
         </button>
         {canRaise && (
           <button
@@ -247,7 +248,7 @@ export function BettingControls({
             }}
             onClick={handleRaiseTap}
           >
-            {raiseLabel}
+            {showRaiseSlider && raiseAmount >= maxRaiseTotal ? <Flame size={14} /> : <TrendingUp size={14} />} {raiseLabel}
           </button>
         )}
       </div>
