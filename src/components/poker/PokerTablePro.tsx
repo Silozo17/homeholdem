@@ -211,6 +211,10 @@ export function PokerTablePro({
             aspectRatio: '16 / 9',
             width: isLandscape ? 'min(96vw, 1100px)' : 'min(96vw, 900px)',
             maxHeight: isLandscape ? '85vh' : '75vh',
+            overflow: 'visible',
+            background: 'none',
+            border: 'none',
+            outline: 'none',
           }}
         >
           {/* Table image */}
