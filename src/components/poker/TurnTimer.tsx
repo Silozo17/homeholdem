@@ -14,9 +14,9 @@ interface TurnTimerProps {
 }
 
 export function TurnTimer({
-  duration = 15,
+  duration = 30,
   size = 36,
-  strokeWidth = 2.5,
+  strokeWidth = 4,
   onTimeout,
   active,
 }: TurnTimerProps) {
@@ -54,8 +54,10 @@ export function TurnTimer({
 
   // Color: gold -> orange -> red as timer runs down
   const remaining = 1 - progress;
-  const hue = remaining > 0.5 ? 43 : remaining > 0.2 ? 25 : 0;
-  const lightness = remaining > 0.2 ? 49 : 45;
+  const hue = remaining > 0.5 ? 43 : remaining > 0.3 ? 25 : 0;
+  const lightness = remaining > 0.3 ? 49 : 45;
+  const isLow = remaining < 0.33;
+  const isCritical = remaining < 0.2;
 
   return (
     <svg
@@ -70,7 +72,7 @@ export function TurnTimer({
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="hsl(0 0% 100% / 0.1)"
+        stroke="hsl(0 0% 100% / 0.25)"
         strokeWidth={strokeWidth}
       />
       {/* Progress ring */}
@@ -86,7 +88,12 @@ export function TurnTimer({
         strokeDashoffset={dashOffset}
         style={{
           transition: 'stroke-dashoffset 0.05s linear, stroke 0.3s ease',
-          filter: remaining < 0.2 ? `drop-shadow(0 0 4px hsl(0 70% 50% / 0.6))` : 'none',
+          filter: isCritical
+            ? `drop-shadow(0 0 8px hsl(0 70% 50% / 0.8))`
+            : isLow
+            ? `drop-shadow(0 0 5px hsl(${hue} 70% 50% / 0.5))`
+            : `drop-shadow(0 0 3px hsl(43 74% 49% / 0.3))`,
+          ...(isCritical ? { animation: 'pulse 0.6s ease-in-out infinite' } : {}),
         }}
       />
     </svg>
