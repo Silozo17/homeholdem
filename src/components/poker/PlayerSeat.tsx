@@ -7,25 +7,38 @@ import { TurnTimer } from './TurnTimer';
 import { PokerChip } from './PokerChip';
 import { cn } from '@/lib/utils';
 
+export type TableHalf = 'top' | 'bottom';
+
 interface PlayerSeatProps {
   player: PokerPlayer;
   isCurrentPlayer: boolean;
   showCards: boolean;
   isHuman: boolean;
   isShowdown: boolean;
-  tableHalf?: 'top' | 'bottom';
+  tableHalf: TableHalf;
   avatarUrl?: string | null;
   seatDealOrder?: number;
   onTimeout?: () => void;
 }
 
-export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, showCards, isHuman, isShowdown, tableHalf = 'bottom', avatarUrl, seatDealOrder = 0, onTimeout }: PlayerSeatProps) {
+/**
+ * PlayerSeat uses a "anchor-centered" layout:
+ * - The avatar circle is always the anchor point (centered at 0,0 of parent).
+ * - Info (cards, name, chips, badges) renders ABOVE for top-half seats
+ *   and BELOW for bottom-half seats.
+ * - The whole component is positioned so the avatar center = the rail point.
+ */
+export const PlayerSeat = memo(function PlayerSeat({
+  player, isCurrentPlayer, showCards, isHuman, isShowdown,
+  tableHalf, avatarUrl, seatDealOrder = 0, onTimeout,
+}: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
   const isTop = tableHalf === 'top';
 
-  const avatarBlock = (
-    <div className="relative">
+  // ── Avatar circle (the anchor) ──
+  const avatarCircle = (
+    <div className="relative flex items-center justify-center">
       <PlayerAvatar
         name={player.name}
         index={player.seatIndex}
@@ -43,94 +56,110 @@ export const PlayerSeat = memo(function PlayerSeat({ player, isCurrentPlayer, sh
     </div>
   );
 
-  const cardsBlock = player.holeCards.length > 0 ? (
-    <div className="relative flex gap-0.5 mt-0.5">
-      {player.holeCards.map((card, i) => {
-        const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
-        return (
-          <CardDisplay
-            key={i}
-            card={showCards ? card : undefined}
-            faceDown={!showCards}
-            size="md"
-            dealDelay={dealDelay}
-            className={isOut ? 'animate-fold-away' : ''}
-          />
-        );
-      })}
-      {isFolded && player.holeCards.length > 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-destructive/90 border border-destructive/30">
-            Fold
+  // ── Info stack (cards, name, chips, badges) ──
+  const infoStack = (
+    <div className="flex flex-col items-center gap-0.5">
+      {/* Cards */}
+      {player.holeCards.length > 0 && (
+        <div className="relative flex gap-0.5">
+          {player.holeCards.map((card, i) => {
+            const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
+            return (
+              <CardDisplay
+                key={i}
+                card={showCards ? card : undefined}
+                faceDown={!showCards}
+                size="md"
+                dealDelay={dealDelay}
+                className={isOut ? 'animate-fold-away' : ''}
+              />
+            );
+          })}
+          {isFolded && player.holeCards.length > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-destructive/90 border border-destructive/30">
+                Fold
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Name */}
+      <p className={cn(
+        'text-[11px] font-bold truncate max-w-[72px] leading-tight',
+        isHuman ? 'text-primary' : 'text-foreground/90',
+      )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+        {player.name}
+      </p>
+
+      {/* Chips */}
+      <p className="text-[10px] text-primary/80 font-semibold leading-none"
+        style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
+      >
+        {player.chips.toLocaleString()}
+      </p>
+
+      {/* Action badge */}
+      {player.lastAction && (
+        <span className={cn(
+          'text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in leading-tight',
+          player.lastAction.startsWith('Fold') && 'bg-destructive/20 text-destructive border border-destructive/30',
+          (player.lastAction.startsWith('Raise') || player.lastAction.startsWith('All-in')) && 'bg-destructive/30 text-destructive border border-destructive/30',
+          (player.lastAction.startsWith('Call') || player.lastAction.startsWith('Check')) && 'bg-secondary/80 text-secondary-foreground',
+          player.lastAction.includes('!') && 'bg-primary/30 text-primary animate-winner-glow border border-primary/30',
+        )} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          {player.lastAction}
+        </span>
+      )}
+
+      {/* Current bet */}
+      {player.currentBet > 0 && !isShowdown && (
+        <div className="flex items-center gap-0.5 animate-fade-in">
+          <PokerChip size="xs" />
+          <span className="text-[10px] font-bold text-primary" style={{ textShadow: '0 0 4px hsl(43 74% 49% / 0.4)' }}>
+            {player.currentBet.toLocaleString()}
           </span>
         </div>
       )}
     </div>
-  ) : null;
-
-  const nameBlock = (
-    <p className={cn(
-      'text-[11px] font-bold truncate max-w-[72px] leading-tight',
-      isHuman ? 'text-primary' : 'text-foreground/90',
-    )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-      {player.name}
-    </p>
   );
 
-  const chipsBlock = (
-    <p className="text-[10px] text-primary/80 font-semibold leading-none"
-      style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
-    >
-      {player.chips.toLocaleString()}
-    </p>
-  );
-
-  const actionBadge = player.lastAction ? (
-    <span className={cn(
-      'text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in leading-tight',
-      player.lastAction.startsWith('Fold') && 'bg-destructive/20 text-destructive border border-destructive/30',
-      (player.lastAction.startsWith('Raise') || player.lastAction.startsWith('All-in')) && 'bg-destructive/30 text-destructive border border-destructive/30',
-      (player.lastAction.startsWith('Call') || player.lastAction.startsWith('Check')) && 'bg-secondary/80 text-secondary-foreground',
-      player.lastAction.includes('!') && 'bg-primary/30 text-primary animate-winner-glow border border-primary/30',
-    )} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-      {player.lastAction}
-    </span>
-  ) : null;
-
-  const betBlock = player.currentBet > 0 && !isShowdown ? (
-    <div className="flex items-center gap-0.5 mt-0.5 animate-fade-in">
-      <PokerChip size="xs" />
-      <span className="text-[10px] font-bold text-primary" style={{ textShadow: '0 0 4px hsl(43 74% 49% / 0.4)' }}>
-        {player.currentBet.toLocaleString()}
-      </span>
-    </div>
-  ) : null;
-
-  // Top-half: info above avatar. Bottom-half: avatar on top, info below.
+  /*
+   * Layout: The avatar is always the center anchor.
+   * We use negative margin / absolute offset to keep the avatar at (0,0)
+   * while the info stack extends outward.
+   *
+   * Structure:
+   *   <wrapper centered at parent (0,0)>
+   *     {top ? infoStack : null}
+   *     avatarCircle  ← this is at the anchor point
+   *     {bottom ? infoStack : null}
+   *   </wrapper>
+   *
+   * The wrapper uses transform to center the AVATAR (not the whole block).
+   * For top-half: translate(-50%, -100% + half-avatar-height)
+   *   → avatar center sits at the anchor, info extends upward
+   * For bottom-half: translate(-50%, -half-avatar-height)
+   *   → avatar center sits at the anchor, info extends downward
+   *
+   * Avatar height = 44px (w-11 h-11), so half = 22px.
+   */
   return (
-    <div className={cn(
-      'flex flex-col items-center gap-0.5 transition-all duration-300',
-      isOut && 'opacity-60',
-    )}>
-      {isTop ? (
-        <>
-          {betBlock}
-          {actionBadge}
-          {chipsBlock}
-          {nameBlock}
-          {cardsBlock}
-          {avatarBlock}
-        </>
-      ) : (
-        <>
-          {avatarBlock}
-          {cardsBlock}
-          {nameBlock}
-          {chipsBlock}
-          {actionBadge}
-          {betBlock}
-        </>
+    <div
+      className={cn(
+        'flex flex-col items-center gap-1 transition-all duration-300',
+        isOut && 'opacity-60',
       )}
+      style={{
+        transform: isTop
+          ? 'translate(-50%, calc(-100% + 22px))'  // anchor at avatar center (bottom of block)
+          : 'translate(-50%, -22px)',                // anchor at avatar center (top of block)
+      }}
+    >
+      {isTop && infoStack}
+      {avatarCircle}
+      {!isTop && infoStack}
     </div>
   );
 });

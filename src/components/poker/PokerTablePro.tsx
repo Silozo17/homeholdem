@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { PlayerSeat } from './PlayerSeat';
+import { SeatAnchor } from './SeatAnchor';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
@@ -342,15 +343,11 @@ export function PokerTablePro({
               : i;
 
             return (
-              <div
+              <SeatAnchor
                 key={player.id}
-                className="absolute"
-                style={{
-                  left: `${pos.xPct}%`,
-                  top: `${pos.yPct}%`,
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: isHuman ? Z.SEATS + 1 : Z.SEATS,
-                }}
+                xPct={pos.xPct}
+                yPct={pos.yPct}
+                zIndex={isHuman ? Z.SEATS + 1 : Z.SEATS}
               >
                 <PlayerSeat
                   player={player}
@@ -363,7 +360,7 @@ export function PokerTablePro({
                   seatDealOrder={seatDealOrder}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
                 />
-              </div>
+              </SeatAnchor>
             );
           })}
         </div>
