@@ -35,7 +35,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
   const cardSize = compact ? 'md' : 'lg';
-  const humanCardSize = compact ? 'sm' : '2xl';
+  const humanCardSize = compact ? 'lg' : '2xl';
 
   // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
@@ -60,7 +60,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
   // Human player cards (fanned behind avatar)
   const humanCards = isHuman && player.holeCards.length > 0 ? (
-    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%' }}>
+    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%', transform: 'translateX(-50%) scale(1.3)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
         return (
@@ -123,7 +123,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Nameplate bar */}
       <div className={cn(
-        'flex flex-col items-center rounded-b-lg px-2 py-0.5 -mt-1',
+        'flex flex-col items-center rounded-b-lg px-2 py-0.5 mt-0.5',
         compact ? 'min-w-[60px]' : 'min-w-[76px]',
       )} style={{
         background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.75), hsl(0 0% 0% / 0.6))',
