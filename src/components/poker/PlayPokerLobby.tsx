@@ -45,7 +45,7 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
       </header>
       <div className="h-14 safe-area-top shrink-0" />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-4">
+      <div className="flex-1 flex flex-col items-center justify-start pt-4 px-4 space-y-3">
         {/* Hero */}
         <CardFan compact />
         <div className="text-center space-y-1 relative z-10">

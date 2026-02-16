@@ -5,7 +5,7 @@ export function CardFan({ className, compact }: { className?: string; compact?: 
   const rotations = [-20, -7, 7, 20];
 
   return (
-    <div className={cn('relative flex items-center justify-center overflow-hidden', className)} style={{ minHeight: compact ? 56 : 96 }}>
+    <div className={cn('relative flex items-center justify-center', compact ? 'overflow-hidden' : 'overflow-visible', className)} style={{ minHeight: compact ? 56 : 112 }}>
       {suits.map((suit, i) => (
         <div
           key={suit}

@@ -213,7 +213,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
     const isRunning = t.status === 'running';
 
     return (
-      <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+      <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom overflow-x-hidden">
         <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
           <div className="container relative flex items-center justify-center h-14 px-4">
             <Button variant="ghost" size="icon" onClick={() => { setSelectedId(null); setDetail(null); }} className="absolute left-4 text-muted-foreground">
@@ -230,7 +230,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         </header>
         <div className="h-14 safe-area-top shrink-0" />
 
-        <div className="flex-1 px-4 space-y-4">
+        <div className="flex-1 px-4 pt-4 space-y-4">
           <div className="text-center space-y-1">
             <h1 className="text-xl font-black text-shimmer">{t.name}</h1>
             <Badge variant={isRunning ? 'default' : 'secondary'} className="text-[10px]">
@@ -365,7 +365,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
   // List view
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom overflow-x-hidden">
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-14 px-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(clubId ? `/club/${clubId}` : '/poker')} className="absolute left-4 text-muted-foreground">
@@ -382,7 +382,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       </header>
       <div className="h-14 safe-area-top shrink-0" />
 
-      <div className="flex-1 px-4 space-y-5">
+      <div className="flex-1 px-4 pt-4 space-y-5">
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
             <Trophy className="inline h-6 w-6 mr-2 text-primary" />

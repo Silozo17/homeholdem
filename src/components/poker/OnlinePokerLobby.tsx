@@ -185,7 +185,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom overflow-x-hidden">
       {/* Standard fixed header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-14 px-4">
@@ -203,7 +203,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       </header>
       <div className="h-14 safe-area-top shrink-0" />
 
-      <div className="flex-1 px-4 space-y-5">
+      <div className="flex-1 px-4 pt-4 space-y-5">
         {/* Hero */}
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
