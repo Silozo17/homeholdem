@@ -1,46 +1,49 @@
 
 
-# Fix Betting Order, Card Centering, and Seat Adjustments
+# Make Human Player Cards Bigger and Fan Behind Profile Pic
 
-## 1. Clockwise Betting Order
+## Problem
+Currently, human player cards use `sm` size (`w-7 h-10` = 28x40px) and render below the nameplate in a flat row. They're too small to read comfortably.
 
-**Problem**: Players are mapped to seats in order Y, A, B, C, D, E, F, G, H. Visually this jumps from top-left (D) to bottom-right (E), creating a non-clockwise betting pattern.
+## Solution
+Reposition the human player's cards to fan out BEHIND the avatar, with the tops of the cards protruding above the profile picture. Use `lg` size cards for much better readability.
 
-**Fix**: Reorder `SEAT_PICKS` in `src/lib/poker/ui/seatLayout.ts` so array indices follow a clockwise visual order around the table starting from the hero (Y at bottom center):
+### Changes to `src/components/poker/PlayerSeat.tsx`
 
+Move the `humanCards` element from below the nameplate to INSIDE the avatar container, positioned absolutely behind the avatar. The two cards will be rotated in a fan formation (card 1 rotated -15deg, card 2 rotated +15deg) and shifted upward so the top portions peek above the avatar circle.
+
+- Card size: change from `sm` to `lg` (`w-12 h-[68px]`)
+- Position: `absolute`, centered horizontally, shifted up so ~30px of card tops show above the avatar
+- Z-index: set to 1 (behind the avatar which is z-index 2), so cards fan behind the profile pic
+- Fan rotation: first card `-15deg`, second card `+15deg`, with slight horizontal offset
+- The avatar itself gets `z-index: 2` so it sits on top of the fanned cards
+
+### Visual result
 ```text
-Current:   Y → A(bot-left) → B(left) → C(upper-left) → D(top-left) → E(bot-right) → F(right) → G(upper-right) → H(top-right)
-Fixed:     Y → E(bot-right) → F(right) → G(upper-right) → H(top-right) → D(top-left) → C(upper-left) → B(left) → A(bot-left)
+       ┌──┐   ┌──┐       <-- card tops peeking above
+        \ │   │ /
+         ┌─────────┐
+         │ (avatar) │     <-- avatar sits on top of cards
+         └─────────┘
+         │ Name    │
+         │ $10,000 │
+         └─────────┘
 ```
 
-This means player index 1 (first bot after hero) sits at bottom-right, index 2 at right, etc., going clockwise. Since betting follows array index order, the visual action will now move clockwise around the table.
+### Technical Details
 
-All player count configurations (2-9) will be updated to follow the same clockwise principle.
+**`src/components/poker/PlayerSeat.tsx`**:
+1. Change `cardSize` for human from `sm` to `lg`
+2. Move `humanCards` rendering from line 145 (below nameplate) into the avatar `<div className="relative">` block (line 84)
+3. Position with: `absolute left-1/2 -translate-x-1/2` and `bottom: 30%` (so tops protrude above)
+4. Each card gets `transform: rotate(Xdeg)` for fan effect
+5. Set z-index to 1 on the cards container, and ensure avatar has z-index 2
 
-## 2. Center Community Cards on Table
+**`src/components/poker/PlayerAvatar.tsx`**: Add `relative z-[2]` to the avatar wrapper so it renders on top of the fanned cards behind it.
 
-**Fix**: Add vertical centering with `transform: translate(-50%, -50%)` and adjust `top` to `44%` so cards sit in the true visual center of the felt area.
-
-**File**: `src/components/poker/PokerTablePro.tsx` (line 305-306)
-
-## 3. Adjust Bottom-Left and Bottom-Right Seats Only
-
-**Current positions**:
-- A (bottom-left): xPct 20
-- E (bottom-right): xPct 80
-
-**New positions** (spread wider):
-- A (bottom-left): xPct 16
-- E (bottom-right): xPct 84
-
-No other seat positions will be changed.
-
-**File**: `src/lib/poker/ui/seatLayout.ts` (lines 51 and 55 only)
-
-## Summary of Files
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/lib/poker/ui/seatLayout.ts` | Reorder SEAT_PICKS for clockwise betting; adjust A and E xPct values |
-| `src/components/poker/PokerTablePro.tsx` | Center community cards vertically on table |
-
+| `src/components/poker/PlayerSeat.tsx` | Move human cards behind avatar as a fan, increase to `lg` size |
+| `src/components/poker/PlayerAvatar.tsx` | Add `z-[2]` to ensure avatar renders above cards |
