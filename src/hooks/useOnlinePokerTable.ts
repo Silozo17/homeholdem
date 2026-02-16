@@ -252,12 +252,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         }, 5000);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
+        // Skip if this is our own message (already added locally in sendChat)
+        if (payload.player_id === userId) return;
         const id = `chat-${chatIdCounter.current++}`;
         const bubble: ChatBubble = { player_id: payload.player_id, text: payload.text, id };
         setChatBubbles(prev => [...prev, bubble]);
         setTimeout(() => {
           setChatBubbles(prev => prev.filter(b => b.id !== id));
-        }, 3000);
+        }, 4000);
       })
       .subscribe();
 
@@ -408,7 +410,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     setChatBubbles(prev => [...prev, bubble]);
     setTimeout(() => {
       setChatBubbles(prev => prev.filter(b => b.id !== id));
-    }, 3000);
+    }, 4000);
   }, [userId]);
 
   return {
