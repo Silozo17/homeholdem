@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOnlinePokerTable } from '@/hooks/useOnlinePokerTable';
+import { useOnlinePokerTable, RevealedCard } from '@/hooks/useOnlinePokerTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { CardDisplay } from './CardDisplay';
@@ -95,13 +95,15 @@ function toPokerPlayer(
   isDealer: boolean,
   heroCards?: Card[] | null,
   isHero?: boolean,
+  revealedCards?: Card[] | null,
 ): PokerPlayer {
+  const holeCards = isHero && heroCards ? heroCards : (revealedCards ?? []);
   return {
     id: seat.player_id!,
     name: isHero ? 'You' : seat.display_name,
     chips: seat.stack,
     status: seat.status === 'folded' ? 'folded' : seat.status === 'all-in' ? 'all-in' : 'active',
-    holeCards: isHero && heroCards ? heroCards : [],
+    holeCards,
     currentBet: seat.current_bet ?? 0,
     totalBetThisHand: 0,
     lastAction: seat.last_action ?? undefined,
@@ -115,7 +117,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { user } = useAuth();
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
-    amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction,
+    amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -539,19 +541,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               );
             }
 
-            // Build PokerPlayer from OnlineSeatInfo
+            // Build PokerPlayer from OnlineSeatInfo, with revealed cards for opponents at showdown
+            const opponentRevealed = !isMe
+              ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null
+              : null;
             const player = toPokerPlayer(
               seatData!,
               !!isDealer,
               isMe ? myCards : null,
               isMe,
+              opponentRevealed,
             );
 
-            // For opponents: show face-down cards via holeCards if has_cards
-            if (!isMe && seatData!.has_cards && !!hand && !isFolded) {
-              // Add placeholder cards so PlayerSeat renders face-down cards at showdown
-              // For non-showdown, PlayerSeat hides opponent cards anyway
-            }
 
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
