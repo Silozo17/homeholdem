@@ -7,7 +7,8 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash } from 'lucide-react';
+import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus } from 'lucide-react';
+import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const [inviteCode, setInviteCode] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>(clubId ? 'club' : 'all');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [lastCreatedTable, setLastCreatedTable] = useState<{ id: string; name: string } | null>(null);
 
   const [tableName, setTableName] = useState('');
   const [tableType, setTableType] = useState<'public' | 'friends' | 'club'>(clubId ? 'club' : 'friends');
@@ -113,6 +116,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       });
       setCreateOpen(false);
       setTableName('');
+      setLastCreatedTable({ id: data.table.id, name: tableName.trim() });
+      setInviteOpen(true); // Auto-open invite dialog after creating
       onJoinTable(data.table.id);
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -294,6 +299,25 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           )}
         </div>
 
+        {/* Invite Friends button */}
+        <div className="flex gap-2 animate-slide-up-fade stagger-2">
+          <button
+            onClick={() => {
+              setLastCreatedTable(null);
+              setInviteOpen(true);
+            }}
+            className="flex-1 glass-card rounded-2xl p-4 flex items-center gap-3 text-left group active:scale-[0.98] transition-all"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <UserPlus className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-foreground text-sm">Invite Friends</p>
+              <p className="text-[10px] text-muted-foreground truncate">Send push invite to club members</p>
+            </div>
+          </button>
+        </div>
+
         {/* Filter tabs (not for club view) */}
         {!clubId && (
           <Tabs value={activeFilter} onValueChange={setActiveFilter} className="animate-slide-up-fade stagger-2">
@@ -352,6 +376,15 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           )}
         </div>
       </div>
+
+      {/* Invite dialog */}
+      <InvitePlayersDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        tableId={lastCreatedTable?.id || ''}
+        tableName={lastCreatedTable?.name || 'Poker Table'}
+        clubId={clubId}
+      />
     </div>
   );
 }

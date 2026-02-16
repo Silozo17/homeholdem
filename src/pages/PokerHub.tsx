@@ -8,24 +8,24 @@ export default function PokerHub() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
+    <div className="flex flex-col h-[100dvh] overflow-hidden poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
       {/* Header */}
-      <div className="flex items-center px-3 py-2">
+      <div className="flex items-center px-3 py-1.5 shrink-0">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="text-foreground/70">
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center px-4 pb-24 space-y-6">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 space-y-3 overflow-hidden">
         {/* Hero */}
-        <CardFan />
-        <div className="text-center space-y-1">
-          <h1 className="text-3xl font-black text-shimmer">Poker</h1>
-          <p className="text-sm text-muted-foreground">Choose your game mode</p>
+        <CardFan className="h-20" />
+        <div className="text-center space-y-0.5">
+          <h1 className="text-2xl font-black text-shimmer">Poker</h1>
+          <p className="text-xs text-muted-foreground">Choose your game mode</p>
         </div>
 
         {/* Game mode cards */}
-        <div className="w-full max-w-md space-y-3">
+        <div className="w-full max-w-md space-y-2.5">
           <GameModeCard
             icon={Bot}
             title="Play with Bots"
@@ -34,6 +34,7 @@ export default function PokerHub() {
             accentClass="bg-amber-500/15"
             ctaLabel="Configure & Play"
             onClick={() => navigate('/play-poker')}
+            compact
           />
           <GameModeCard
             icon={Users}
@@ -43,6 +44,7 @@ export default function PokerHub() {
             accentClass="bg-emerald-500/15"
             ctaLabel="Find Table"
             onClick={() => navigate('/online-poker')}
+            compact
           />
           <GameModeCard
             icon={Trophy}
@@ -52,6 +54,7 @@ export default function PokerHub() {
             accentClass="bg-purple-500/15"
             ctaLabel="Browse Tournaments"
             onClick={() => navigate('/poker-tournament')}
+            compact
           />
         </div>
       </div>
