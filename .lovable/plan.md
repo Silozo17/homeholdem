@@ -1,51 +1,23 @@
 
 
-# Replace Dealer Icon & Change Game Background
+## Fix: Card Dealing Animation Not Visible
 
-## 1. Add New Assets
+### Problem
+The sequential card reveal system causes a visual glitch. When the human player's cards are dealt:
+1. Cards first appear face-down with the `card-deal-from-deck` fly-in animation (correct)
+2. After the deal delay, cards switch to face-up -- but this causes React to switch from the "faceDown" render branch to the "face-up" render branch in `CardDisplay`
+3. The face-up branch also has the `animate-card-deal-deck` class, so the card replays the fly-in animation (starting from opacity 0, translating from -60px above), making the dealing animation invisible or broken
 
-Copy both uploaded images into the project:
-- `user-uploads://ChatGPT_Image_Feb_16_2026_11_04_23_PM.png` to `src/assets/dealer/dealer-girl.png`
-- `user-uploads://poker_background.webp` to `src/assets/poker-background.webp`
+### Solution
+Remove the deal-from-deck animation from the face-up card render path in `CardDisplay`. The deal animation should only play on the face-down card back. When the card flips to face-up, it should use a simple fade-in or instant appearance instead.
 
-## 2. Replace Dealer Character
+### Technical Changes
 
-**File**: `src/components/poker/DealerCharacter.tsx`
+**File: `src/components/poker/CardDisplay.tsx`**
+- Remove the `animate-card-deal-deck` class from the face-up card branch (line 60)
+- Remove the `animationDelay` style from the face-up card branch (line 65)
+- Add a quick fade-in class (`animate-fade-in` or a subtle scale) so the reveal feels smooth rather than jarring
+- Keep the `animate-card-deal-deck` on the face-down branch (line 33) -- this is the actual dealing animation and should remain
 
-Replace the circular avatar frame with the full dealer girl image. Instead of a small round icon, render a larger rectangular/transparent PNG image positioned so she appears to be sitting at the edge of the table, leaning forward. Remove the round border, inner ring, and Crown fallback. Keep the spotlight glow, sparkle effects on win, and the "Dealer" label.
-
-Key styling changes:
-- Remove `rounded-full`, `overflow-hidden`, and circular sizing
-- Use the full image at approximately `clamp(80px, 18vw, 120px)` width with `object-contain`
-- Import from `@/assets/dealer/dealer-girl.png` instead of `dealer-main.png`
-
-## 3. Reposition Dealer on Table
-
-**Files**: `src/components/poker/PokerTablePro.tsx`, `src/components/poker/OnlinePokerTable.tsx`
-
-Move the dealer container from `top: 2%` to `top: -4%` so the girl appears to be sitting behind the table edge, with her lower body hidden by the table felt. This creates the illusion of her sitting in front of the table.
-
-## 4. Replace Background Image
-
-**Files**: `src/components/poker/PokerTablePro.tsx`, `src/components/poker/OnlinePokerTable.tsx`
-
-Replace the `leatherBg` import with the new `poker-background.webp`. Change:
-```
-import leatherBg from '@/assets/leather-bg.jpg';
-```
-to:
-```
-import pokerBg from '@/assets/poker-background.webp';
-```
-
-Update both `<img>` tags that render the background to use `pokerBg` instead of `leatherBg`.
-
-## Summary
-
-| # | Change | Files |
-|---|--------|-------|
-| 1 | Copy new assets | `src/assets/dealer/dealer-girl.png`, `src/assets/poker-background.webp` |
-| 2 | Redesign dealer character | `DealerCharacter.tsx` |
-| 3 | Reposition dealer on table | `PokerTablePro.tsx`, `OnlinePokerTable.tsx` |
-| 4 | Replace background image | `PokerTablePro.tsx`, `OnlinePokerTable.tsx` |
+This is a one-file, two-line change that preserves the dealing animation on face-down cards while preventing the animation replay when cards flip face-up.
 
