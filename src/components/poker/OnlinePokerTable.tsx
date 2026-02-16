@@ -28,7 +28,7 @@ import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
-import leatherBg from '@/assets/leather-bg.jpg';
+import pokerBg from '@/assets/poker-background.webp';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -393,7 +393,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* ====== BG LAYERS — same as PokerTablePro ====== */}
       <img
-        src={leatherBg}
+        src={pokerBg}
         alt=""
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         draggable={false}
@@ -518,7 +518,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           <TableFelt />
 
           {/* Dealer character — top center */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '2%', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '-4%', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 

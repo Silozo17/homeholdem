@@ -18,7 +18,7 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import leatherBg from '@/assets/leather-bg.jpg';
+import pokerBg from '@/assets/poker-background.webp';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface PokerTableProProps {
@@ -262,7 +262,7 @@ export function PokerTablePro({
 
       {/* ====== BG LAYERS ====== */}
       <img
-        src={leatherBg}
+        src={pokerBg}
         alt=""
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         draggable={false}
@@ -352,7 +352,7 @@ export function PokerTablePro({
           <TableFelt />
 
           {/* Dealer character — top center of table */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '2%', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '-4%', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
