@@ -37,7 +37,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
 
   return (
     <div className={cn(
-      'relative rounded-full flex items-center justify-center font-bold select-none',
+      'relative rounded-full flex items-center justify-center font-bold select-none z-[2]',
       sizeMap[size],
       isOut && 'opacity-70 grayscale-[30%]',
     )}>
