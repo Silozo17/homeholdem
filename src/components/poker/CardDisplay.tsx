@@ -6,13 +6,14 @@ import cardBackPremium from '@/assets/poker/card-back-premium.png';
 interface CardDisplayProps {
   card?: Card;
   faceDown?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
   dealDelay?: number;
   isWinner?: boolean;
 }
 
 const sizeClasses = {
+  xs: 'w-6 h-[34px]',
   sm: 'w-7 h-10',
   md: 'w-10 h-14',
   lg: 'w-12 h-[68px]',
@@ -41,6 +42,7 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
   const rankStr = RANK_NAMES[card.rank];
   const suitStr = SUIT_SYMBOLS[card.suit];
   const textSizes = {
+    xs: { rank: 'text-[7px]', suit: 'text-[6px]', center: 'text-xs' },
     sm: { rank: 'text-[9px]', suit: 'text-[8px]', center: 'text-sm' },
     md: { rank: 'text-[11px]', suit: 'text-[10px]', center: 'text-lg' },
     lg: { rank: 'text-xs', suit: 'text-[11px]', center: 'text-xl' },

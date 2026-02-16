@@ -30,15 +30,15 @@ export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 // ── 9 fixed seat positions (landscape) ──────────────────────────────
 // Mapped from the reference screenshot yellow markers
 const SEATS_LANDSCAPE = {
-  Y: { xPct: 50, yPct: 92 },    // bottom center (You)
-  A: { xPct: 22, yPct: 78 },    // bottom-left
-  B: { xPct: 10, yPct: 50 },    // left middle
-  C: { xPct: 14, yPct: 24 },    // upper-left
-  D: { xPct: 32, yPct: 6 },     // top-left
-  E: { xPct: 78, yPct: 78 },    // bottom-right   (mirror of A)
-  F: { xPct: 90, yPct: 50 },    // right middle   (mirror of B)
-  G: { xPct: 86, yPct: 24 },    // upper-right    (mirror of C)
-  H: { xPct: 68, yPct: 6 },     // top-right      (mirror of D)
+  Y: { xPct: 50, yPct: 95 },    // bottom center (You)
+  A: { xPct: 18, yPct: 82 },    // bottom-left
+  B: { xPct: 6, yPct: 50 },     // left middle
+  C: { xPct: 10, yPct: 20 },    // upper-left
+  D: { xPct: 30, yPct: 2 },     // top-left
+  E: { xPct: 82, yPct: 82 },    // bottom-right   (mirror of A)
+  F: { xPct: 94, yPct: 50 },    // right middle   (mirror of B)
+  G: { xPct: 90, yPct: 20 },    // upper-right    (mirror of C)
+  H: { xPct: 70, yPct: 2 },     // top-right      (mirror of D)
 };
 
 // Portrait uses tighter positions — sides pulled inward to avoid clipping
