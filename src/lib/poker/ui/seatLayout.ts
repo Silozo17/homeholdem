@@ -1,9 +1,6 @@
 /**
- * Seat positions for the poker table using ellipse-anchored placement.
- * All coordinates are percentages of the TABLE WRAPPER, not the viewport.
- *
- * The ellipse represents the table rail. Seats are pushed slightly
- * outward from the rail so they sit "on" it visually.
+ * Seat positions anchored to an ellipse matching the table rail.
+ * All coordinates are % of the TABLE WRAPPER, not the viewport.
  */
 
 import { type Ellipse, pointOnEllipsePct, offsetFromCenterPct, clampPct } from './ellipse';
@@ -13,52 +10,44 @@ export interface SeatPos {
   yPct: number;
 }
 
-// Default ellipse params matching the premium table asset
-// The table oval sits roughly centered with these proportions
-// Ellipse matching the table rail. Seats pushed outward will land on/outside the rail.
-// rx/ry sized so pushed seats stay within visible screen bounds.
-export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 34, ry: 30 };
-export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 40, ry: 32 };
+// Portrait: ry reduced so top seat doesn't hit dealer, rx reduced so sides don't clip
+export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 38, ry: 34 };
+export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 48, rx: 42, ry: 34 };
 
 /**
  * Angle maps per player count.
- * In CSS coordinates (y-down): 90° = bottom, 270° = top, 0° = right, 180° = left.
- * Local player (seat 0) is always at the bottom (90°).
+ * CSS coords: 90° = bottom, 270° = top, 0° = right, 180° = left.
+ * Seat 0 (human) is always at bottom (90°).
+ *
+ * Top-center (270°) is reserved for the dealer character — no player seat goes there.
  */
 const portraitAngles: Record<number, number[]> = {
   2: [90, 270],
-  3: [90, 210, 330],
-  4: [90, 180, 270, 0],
-  5: [90, 150, 210, 270, 330],
-  6: [90, 140, 200, 270, 340, 40],
-  7: [90, 130, 170, 210, 270, 330, 10],
-  8: [90, 125, 160, 200, 240, 290, 330, 35],
-  9: [90, 120, 150, 195, 235, 270, 305, 345, 30],
+  3: [90, 200, 340],
+  4: [90, 180, 0, 270],
+  5: [90, 155, 210, 330, 25],
+  6: [90, 145, 200, 250, 310, 35],
+  7: [90, 140, 185, 225, 270, 315, 30],
+  8: [90, 135, 175, 215, 255, 295, 335, 30],
+  9: [90, 130, 160, 200, 240, 270, 300, 340, 20],
 };
 
 const landscapeAngles: Record<number, number[]> = {
   2: [90, 270],
   3: [90, 210, 330],
   4: [90, 195, 270, 345],
-  5: [90, 150, 210, 270, 330],
-  6: [90, 145, 200, 270, 340, 35],
-  7: [90, 135, 170, 210, 270, 330, 10],
-  8: [90, 130, 165, 195, 235, 280, 330, 30],
-  9: [90, 125, 155, 190, 225, 270, 315, 345, 25],
+  5: [90, 155, 210, 330, 25],
+  6: [90, 148, 200, 270, 340, 32],
+  7: [90, 140, 180, 220, 270, 320, 20],
+  8: [90, 135, 170, 210, 250, 290, 330, 25],
+  9: [90, 130, 160, 195, 230, 270, 310, 340, 20],
 };
 
-/**
- * How far (in %) to push each seat outward from the ellipse rail.
- * Bigger = further from the felt center.
- */
-const PUSH_DISTANCE = 6;
+// Very small push — seats should sit ON the rail, not far outside
+const PUSH_DISTANCE = 2;
 
 /**
  * Compute seat positions anchored to the table rail ellipse.
- *
- * @param playerCount - number of players (2-9)
- * @param isLandscape - orientation
- * @param ellipseOverride - optional custom ellipse params
  */
 export function getSeatPositions(
   playerCount: number,
@@ -73,8 +62,8 @@ export function getSeatPositions(
     const p = pointOnEllipsePct(ellipse, theta);
     const pushed = offsetFromCenterPct(ellipse, p.xPct, p.yPct, PUSH_DISTANCE);
     return {
-      xPct: clampPct(pushed.xPct, 6, 94),
-      yPct: clampPct(pushed.yPct, 2, 98),
+      xPct: clampPct(pushed.xPct, 5, 95),
+      yPct: clampPct(pushed.yPct, 5, 95),
     };
   });
 }

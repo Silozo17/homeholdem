@@ -8,14 +8,13 @@ interface TableFeltProps {
 
 /**
  * TableFelt renders the premium table asset image.
- * When used in PokerTablePro: no children (visual only).
- * When used in OnlinePokerTable: accepts children for legacy layout.
+ * In PokerTablePro: no children (visual only).
+ * In OnlinePokerTable: accepts children for legacy layout.
  */
 export function TableFelt({ children, className }: TableFeltProps) {
-  return (
-    <div className={`relative w-full h-full ${className ?? ''}`}>
-      {/* Dark backing so table transparency doesn't show checkerboard */}
-      <div className="absolute inset-0 bg-background rounded-3xl" style={{ zIndex: 0 }} />
+  if (!children) {
+    // Visual-only mode: just the image
+    return (
       <img
         src={tableBase}
         alt="Poker table"
@@ -23,11 +22,23 @@ export function TableFelt({ children, className }: TableFeltProps) {
         draggable={false}
         style={{ zIndex: 1 }}
       />
-      {children && (
-        <div className="absolute inset-0" style={{ zIndex: 5 }}>
-          {children}
-        </div>
-      )}
+    );
+  }
+
+  // Legacy mode with children (OnlinePokerTable)
+  return (
+    <div className={`relative w-full h-full ${className ?? ''}`}>
+      <div className="absolute inset-0 bg-black rounded-3xl" style={{ zIndex: 0 }} />
+      <img
+        src={tableBase}
+        alt="Poker table"
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+        draggable={false}
+        style={{ zIndex: 1 }}
+      />
+      <div className="absolute inset-0" style={{ zIndex: 5 }}>
+        {children}
+      </div>
     </div>
   );
 }
