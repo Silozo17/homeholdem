@@ -35,7 +35,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
   const cardSize = compact ? 'xs' : 'sm';
-  const humanCardSize = compact ? 'sm' : 'lg';
+  const humanCardSize = compact ? 'sm' : '2xl';
 
   // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
@@ -62,22 +62,17 @@ export const PlayerSeat = memo(function PlayerSeat({
     <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
-        const rotation = i === 0 ? -15 : 15;
-        const xOffset = i === 0 ? -8 : 8;
         return (
-          <CardDisplay
-            key={i}
-            card={card}
-            size={humanCardSize}
-            dealDelay={dealDelay}
-            className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
-          />
+          <div key={i} style={{ transform: `rotate(${i === 0 ? -8 : 8}deg) translateX(${i === 0 ? -4 : 4}px)` }}>
+            <CardDisplay
+              card={card}
+              size={humanCardSize}
+              dealDelay={dealDelay}
+              className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
+            />
+          </div>
         );
-      }).map((el, i) => (
-        <div key={i} style={{ transform: `rotate(${i === 0 ? -15 : 15}deg) translateX(${i === 0 ? -8 : 8}px)` }}>
-          {el}
-        </div>
-      ))}
+      })}
     </div>
   ) : null;
 

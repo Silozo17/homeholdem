@@ -6,7 +6,7 @@ import cardBackPremium from '@/assets/poker/card-back-premium.png';
 interface CardDisplayProps {
   card?: Card;
   faceDown?: boolean;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
   dealDelay?: number;
   isWinner?: boolean;
@@ -18,6 +18,7 @@ const sizeClasses = {
   md: 'w-10 h-14',
   lg: 'w-12 h-[68px]',
   xl: 'w-14 h-[80px]',
+  '2xl': 'w-[96px] h-[136px]',
 };
 
 export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, size = 'md', className, dealDelay = 0, isWinner }: CardDisplayProps) {
@@ -48,6 +49,7 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
     md: { rank: 'text-[11px]', suit: 'text-[10px]', center: 'text-lg' },
     lg: { rank: 'text-xs', suit: 'text-[11px]', center: 'text-xl' },
     xl: { rank: 'text-sm', suit: 'text-xs', center: 'text-2xl' },
+    '2xl': { rank: 'text-lg', suit: 'text-base', center: 'text-4xl' },
   };
 
   return (
