@@ -1,17 +1,26 @@
 
-# Adjust Pot and Community Card Vertical Positions
+# Improve Opponent Showdown Cards: Fan Layout, 1.5x Bigger, Centered
 
-Two small positioning tweaks in `src/components/poker/PokerTablePro.tsx`:
+## Current Issue
+Opponent showdown cards use size `xs`/`sm` (compact-dependent), are laid out flat side-by-side with `gap-0.5`, and positioned with `-top-1` which shifts them off-center vertically.
 
-1. **Pot display**: Move from `top: 14%` down to `top: 20%` so the dealer character no longer overlaps it.
-2. **Community cards**: Move from `top: 42%` down to `top: 48%` to better center them vertically on the felt.
-3. **Phase indicator** and **hand name** will also shift down proportionally (from `60%`/`62%` to `66%`/`68%`) to maintain spacing below the cards.
+## Changes in `src/components/poker/PlayerSeat.tsx`
 
-### File: `src/components/poker/PokerTablePro.tsx`
+### 1. Increase size 1.5x
+- Currently: `cardSize` is `xs` (compact) or `sm` (normal)
+- New: `md` (compact) or `lg` (normal) — each is roughly 1.5x the current size
 
-| Element | Current | New |
-|---------|---------|-----|
-| Pot display | `top: 14%` | `top: 20%` |
-| Community cards | `top: 42%` | `top: 48%` |
-| Hand name reveal | `top: 60%` | `top: 66%` |
-| Phase indicator | `top: 62%` | `top: 68%` |
+### 2. Fan layout with overlap
+- Replace the flat `flex gap-0.5` with overlapping rotated cards, similar to the human player's fan:
+  - Card 0: `rotate(-8deg) translateX(-4px)`
+  - Card 1: `rotate(8deg) translateX(4px)`
+- Remove the gap so cards overlap naturally
+
+### 3. Center on avatar
+- Change positioning from `-top-1` to `top-1/2 -translate-y-1/2` so the fan is vertically centered on the avatar circle, not offset to the side/top
+
+## File to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/poker/PlayerSeat.tsx` | Update opponent showdown card size, add fan rotation/overlap, center on avatar |
