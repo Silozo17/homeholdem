@@ -249,7 +249,7 @@ export function PokerTablePro({
                 <CardDisplay
                   key={`${card.suit}-${card.rank}-${i}`}
                   card={card}
-                  size="md"
+                  size="lg"
                   dealDelay={dealDelay}
                   isWinner={false}
                 />
@@ -331,10 +331,7 @@ export function PokerTablePro({
             return (
               <div
                 key={player.id}
-                className={cn(
-                  'absolute transition-opacity duration-300',
-                  !isShowdown && !isActive && state.phase !== 'dealing' && state.phase !== 'idle' ? 'opacity-60' : 'opacity-100',
-                )}
+                className="absolute"
                 style={{
                   left: `${pos.xPct}%`,
                   top: `${pos.yPct}%`,
@@ -349,6 +346,7 @@ export function PokerTablePro({
                   isHuman={isHuman}
                   isShowdown={isShowdown}
                   seatDealOrder={seatDealOrder}
+                  onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
                 />
               </div>
             );
