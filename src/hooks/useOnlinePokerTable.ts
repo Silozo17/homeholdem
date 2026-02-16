@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/lib/poker/types';
+import { callEdge } from '@/lib/poker/callEdge';
 import {
   OnlineTableState,
   OnlineHandInfo,
@@ -24,31 +25,6 @@ export interface ChatBubble {
   player_id: string;
   text: string;
   id: string;
-}
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
-async function callEdge(fn: string, body: any, method = 'POST') {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new Error('Not authenticated');
-
-  const url = method === 'GET' && body
-    ? `${SUPABASE_URL}/functions/v1/${fn}?${new URLSearchParams(body).toString()}`
-    : `${SUPABASE_URL}/functions/v1/${fn}`;
-
-  const res = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
-    ...(method !== 'GET' ? { body: JSON.stringify(body) } : {}),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Edge function error');
-  return data;
 }
 
 interface UseOnlinePokerTableReturn {
@@ -96,8 +72,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevHandIdRef = useRef<string | null>(null);
   const chatIdCounter = useRef(0);
+  const chatBubbleTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [handHasEverStarted, setHandHasEverStarted] = useState(false);
+  const startHandRef = useRef<() => Promise<void>>(null as any);
 
   const userId = user?.id;
 
@@ -128,6 +106,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       prevHandIdRef.current = currentHandId;
     }
   }, [hand?.hand_id]);
+
+  // Helper to schedule a chat bubble removal with cleanup tracking
+  const scheduleBubbleRemoval = useCallback((id: string) => {
+    const timer = setTimeout(() => {
+      setChatBubbles(prev => prev.filter(b => b.id !== id));
+      chatBubbleTimers.current.delete(timer);
+    }, 6000);
+    chatBubbleTimers.current.add(timer);
+  }, []);
 
   // Fetch full state from HTTP endpoint
   const refreshState = useCallback(async () => {
@@ -168,7 +155,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           const next = { ...prev };
           for (const s of seats) {
             if (s.player_id && s.last_action) {
-              // Capitalize first letter so PlayerSeat CSS class matching works
               const raw = s.last_action;
               next[s.player_id] = raw.charAt(0).toUpperCase() + raw.slice(1);
             }
@@ -205,7 +191,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           return;
         }
         if (payload?.action === 'leave' && payload?.seat != null) {
-          // Immediately remove the departed player from local state
           setTableState(prev => {
             if (!prev) return prev;
             return {
@@ -218,15 +203,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             };
           });
         }
-        // Still refresh for full consistency
         refreshState();
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
-        // Store revealed cards for showdown display
         const revealed: RevealedCard[] = payload.revealed_cards || [];
         setRevealedCards(revealed);
 
-        // Store winners
         const currentSeats = tableStateRef.current?.seats || [];
         const winners: HandWinner[] = (payload.winners || []).map((w: any) => {
           const seatData = currentSeats.find((s) => s.player_id === w.player_id);
@@ -239,7 +221,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         });
         setHandWinners(winners);
 
-        // Update hand phase to 'complete' + seats
         setTableState(prev => {
           if (!prev) return prev;
           return {
@@ -249,10 +230,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Clear showdown timer if one exists
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
 
-        // After 3.5s pause, clear hand and auto-start next
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
             if (!prev) return prev;
@@ -266,16 +245,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         }, 3500);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
-        // Skip if this is our own message (already added locally in sendChat)
         if (payload.player_id === userId) return;
         const id = `chat-${chatIdCounter.current++}`;
         const bubble: ChatBubble = { player_id: payload.player_id, text: payload.text, id };
         setChatBubbles(prev => [...prev, bubble]);
-      setTimeout(() => {
-        setChatBubbles(prev => prev.filter(b => b.id !== id));
-      }, 6000);
-    })
-    .subscribe();
+        scheduleBubbleRemoval(id);
+      })
+      .subscribe();
 
     channelRef.current = channel;
 
@@ -283,8 +259,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       supabase.removeChannel(channel);
       channelRef.current = null;
       if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+      // Clean up all chat bubble timers
+      chatBubbleTimers.current.forEach(t => clearTimeout(t));
+      chatBubbleTimers.current.clear();
     };
-  }, [tableId, refreshState]);
+  }, [tableId, refreshState, scheduleBubbleRemoval]);
 
   // Fetch my cards when a new hand starts
   useEffect(() => {
@@ -356,10 +335,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [tableId]);
 
+  // Keep startHandRef always pointing to the latest startHand
+  useEffect(() => { startHandRef.current = startHand; }, [startHand]);
+
   const sendAction = useCallback(async (action: string, amount?: number) => {
     if (!hand || actionPending) return;
     setActionPending(true);
-    // Safety fallback: clear after 3s if no broadcast arrives
     if (actionPendingFallbackRef.current) clearTimeout(actionPendingFallbackRef.current);
     actionPendingFallbackRef.current = setTimeout(() => {
       setActionPending(false);
@@ -373,7 +354,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         amount: amount ?? 0,
       });
     } catch (err) {
-      // Clear pending on error so user can retry
       setActionPending(false);
       if (actionPendingFallbackRef.current) {
         clearTimeout(actionPendingFallbackRef.current);
@@ -402,7 +382,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       autoStartTimerRef.current = setTimeout(() => {
         autoStartTimerRef.current = null;
         setAutoStartAttempted(true);
-        startHand().catch(() => {
+        // Use ref to always call the latest version of startHand
+        startHandRef.current().catch(() => {
           autoStartTimerRef.current = null;
           setAutoStartAttempted(false);
         });
@@ -414,7 +395,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         }
       };
     }
-  }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
+  }, [seatedCount, hasActiveHand, mySeatNumber, autoStartAttempted, handHasEverStarted]);
 
   useEffect(() => {
     if (hasActiveHand) {
@@ -423,10 +404,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [hasActiveHand]);
 
-  // Fix #6: Reset autoStartAttempted when hand clears (prevents freeze)
+  // Fallback reset: wait longer than showdown timer (3.5s) + buffer
   useEffect(() => {
     if (!hasActiveHand && autoStartAttempted && handHasEverStarted) {
-      // Wait longer than showdown timer (3.5s) + buffer to avoid conflicts
       const fallback = setTimeout(() => {
         setAutoStartAttempted(false);
       }, 4500);
@@ -455,14 +435,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       event: 'chat_emoji',
       payload: { player_id: userId, text },
     });
-    // Add bubble locally since Supabase doesn't echo broadcasts to sender
     const id = `chat-${chatIdCounter.current++}`;
     const bubble: ChatBubble = { player_id: userId, text, id };
     setChatBubbles(prev => [...prev, bubble]);
-    setTimeout(() => {
-      setChatBubbles(prev => prev.filter(b => b.id !== id));
-    }, 6000);
-  }, [userId]);
+    scheduleBubbleRemoval(id);
+  }, [userId, scheduleBubbleRemoval]);
 
   return {
     tableState,

@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
 import { WinnerOverlay } from './WinnerOverlay';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
@@ -16,6 +15,8 @@ import { QuickChat } from './QuickChat';
 import { getSeatPositions, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { Z } from './z';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
+import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
+import { callEdge } from '@/lib/poker/callEdge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -29,63 +30,6 @@ import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
 import pokerBg from '@/assets/poker-background.webp';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
-async function callEdge(fn: string, body: any) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new Error('Not authenticated');
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Edge function error');
-  return data;
-}
-
-function useIsLandscape() {
-  const [isLandscape, setIsLandscape] = useState(
-    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
-  );
-  useEffect(() => {
-    const handler = () => setIsLandscape(window.innerWidth > window.innerHeight);
-    window.addEventListener('resize', handler);
-    window.addEventListener('orientationchange', handler);
-    return () => {
-      window.removeEventListener('resize', handler);
-      window.removeEventListener('orientationchange', handler);
-    };
-  }, []);
-  return isLandscape;
-}
-
-function useLockLandscape() {
-  const lockedRef = { current: false };
-  useEffect(() => {
-    let cancelled = false;
-    async function lock() {
-      try {
-        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-          await document.documentElement.requestFullscreen().catch(() => {});
-        }
-        const so = screen.orientation;
-        if (so?.lock) {
-          await so.lock('landscape');
-          if (!cancelled) lockedRef.current = true;
-        }
-      } catch {}
-    }
-    lock();
-    return () => {
-      cancelled = true;
-      if (lockedRef.current) { try { screen.orientation?.unlock(); } catch {} }
-      if (document.fullscreenElement) { try { document.exitFullscreen(); } catch {} }
-    };
-  }, []);
-}
 
 interface OnlinePokerTableProps {
   tableId: string;
@@ -268,6 +212,48 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   const handleReconnect = useCallback(() => { window.location.reload(); }, []);
 
+  // ── Memoized derived values (must be before early returns) ──
+  const table = tableState?.table;
+  const seats = tableState?.seats ?? [];
+  const hand = tableState?.current_hand ?? null;
+  const maxSeats = table?.max_seats ?? 9;
+  const heroSeat = mySeatNumber ?? 0;
+
+  const rotatedSeats = useMemo<(OnlineSeatInfo | null)[]>(() => Array.from(
+    { length: maxSeats },
+    (_, i) => {
+      const actualSeat = (heroSeat + i) % maxSeats;
+      return seats.find(s => s.seat === actualSeat) || null;
+    }
+  ), [maxSeats, heroSeat, seats]);
+
+  const activeScreenPositions = useMemo(() => {
+    const pos: number[] = [];
+    rotatedSeats.forEach((sd, sp) => { if (sd?.player_id) pos.push(sp); });
+    return pos;
+  }, [rotatedSeats]);
+
+  const positions = useMemo(() => getSeatPositions(maxSeats, isLandscape), [maxSeats, isLandscape]);
+  const totalPot = useMemo(() => hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0, [hand?.pots]);
+  const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete' || revealedCards.length > 0;
+
+  const particlePositions = useMemo(() =>
+    Array.from({ length: 8 }, (_, i) => ({
+      left: 20 + ((i * 37 + 13) % 60),
+      top: 30 + ((i * 23 + 7) % 30),
+    })), []
+  );
+  const confettiPositions = useMemo(() =>
+    Array.from({ length: 24 }, (_, i) => ({
+      left: 10 + ((i * 31 + 11) % 80),
+      top: 10 + ((i * 17 + 5) % 30),
+      w: 6 + (i % 7),
+      h: 6 + ((i * 3) % 7),
+      round: i % 2 === 0,
+      dur: 1.5 + (i % 5) * 0.2,
+    })), []
+  );
+
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -276,7 +262,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     );
   }
 
-  if (error || !tableState) {
+  if (error || !tableState || !table) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-4">
         <p className="text-destructive">{error || 'Table not found'}</p>
@@ -285,12 +271,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     );
   }
 
-  const { table, seats, current_hand: hand } = tableState;
   const isSeated = mySeatNumber !== null;
   const isSpectator = !isSeated;
   const isCreator = user?.id === table.created_by;
   const activeSeats = seats.filter(s => s.player_id);
-  const totalPot = hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const mySeat = seats.find(s => s.player_id === user?.id);
   const canModerate = isCreator && !hand;
   const isMobileLandscape = isLandscape && typeof window !== 'undefined' && window.innerWidth < 900;
@@ -342,7 +326,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleAction = async (action: any) => {
-    // Haptic tap on every action
     if ('vibrate' in navigator) navigator.vibrate(50);
     if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
@@ -356,22 +339,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     }
   };
-
-
-  // ── Rotated seats: hero always at screen position 0 ──
-  const maxSeats = table.max_seats;
-  const heroSeat = mySeatNumber ?? 0;
-  const rotatedSeats: (OnlineSeatInfo | null)[] = Array.from(
-    { length: maxSeats },
-    (_, i) => {
-      const actualSeat = (heroSeat + i) % maxSeats;
-      return seats.find(s => s.seat === actualSeat) || null;
-    }
-  );
-
-  // Use same seat positions as bot table
-  const positions = getSeatPositions(maxSeats, isLandscape);
-  const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete' || revealedCards.length > 0;
 
   const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded';
 
@@ -577,16 +544,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </button>
           )}
 
-          {/* Showdown particles */}
+          {/* Showdown particles (stable positions) */}
           {isShowdown && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS }}>
-              {Array.from({ length: 8 }).map((_, i) => (
+              {particlePositions.map((p, i) => (
                 <div
                   key={i}
                   className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
                   style={{
-                    left: `${20 + Math.random() * 60}%`,
-                    top: `${30 + Math.random() * 30}%`,
+                    left: `${p.left}%`,
+                    top: `${p.top}%`,
                     background: 'radial-gradient(circle, hsl(43 74% 60%), hsl(43 74% 49% / 0))',
                     animationDelay: `${i * 0.2}s`,
                     boxShadow: '0 0 4px hsl(43 74% 49% / 0.6)',
@@ -624,22 +591,22 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           )}
 
-          {/* Confetti when human wins */}
+          {/* Confetti when human wins (stable positions) */}
           {handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id) && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
-              {Array.from({ length: 24 }).map((_, i) => (
+              {confettiPositions.map((c, i) => (
                 <div
                   key={i}
                   className="absolute animate-confetti-drift"
                   style={{
-                    left: `${10 + Math.random() * 80}%`,
-                    top: `${10 + Math.random() * 30}%`,
-                    width: `${6 + Math.random() * 6}px`,
-                    height: `${6 + Math.random() * 6}px`,
+                    left: `${c.left}%`,
+                    top: `${c.top}%`,
+                    width: `${c.w}px`,
+                    height: `${c.h}px`,
                     background: ['hsl(43 74% 49%)', 'hsl(0 70% 50%)', 'hsl(210 80% 55%)', 'hsl(142 70% 45%)', 'hsl(280 60% 55%)'][i % 5],
-                    borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                    borderRadius: c.round ? '50%' : '2px',
                     animationDelay: `${i * 0.08}s`,
-                    animationDuration: `${1.5 + Math.random()}s`,
+                    animationDuration: `${c.dur}s`,
                   }}
                 />
               ))}
@@ -785,11 +752,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape}
                   avatarUrl={seatData!.avatar_url}
-                  seatDealOrder={(() => {
-                    const activeScreenPositions: number[] = [];
-                    rotatedSeats.forEach((sd, sp) => { if (sd?.player_id) activeScreenPositions.push(sp); });
-                    return activeScreenPositions.indexOf(screenPos);
-                  })()}
+                  seatDealOrder={activeScreenPositions.indexOf(screenPos)}
                   totalActivePlayers={activeSeats.length}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
