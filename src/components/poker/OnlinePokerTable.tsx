@@ -585,7 +585,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* YOUR TURN badge — same positioning as PokerTablePro */}
       {showActions && (
         <div className="absolute pointer-events-none" style={{
-          bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
+          bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'calc(env(safe-area-inset-bottom, 0px) + 140px)',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS,
