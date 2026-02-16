@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOnlinePokerTable, RevealedCard } from '@/hooks/useOnlinePokerTable';
+import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
+import { WinnerOverlay } from './WinnerOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { CardDisplay } from './CardDisplay';
@@ -96,6 +97,7 @@ function toPokerPlayer(
   heroCards?: Card[] | null,
   isHero?: boolean,
   revealedCards?: Card[] | null,
+  lastActionOverride?: string,
 ): PokerPlayer {
   const holeCards = isHero && heroCards ? heroCards : (revealedCards ?? []);
   return {
@@ -106,7 +108,7 @@ function toPokerPlayer(
     holeCards,
     currentBet: seat.current_bet ?? 0,
     totalBetThisHand: 0,
-    lastAction: seat.last_action ?? undefined,
+    lastAction: lastActionOverride ?? seat.last_action ?? undefined,
     isDealer,
     isBot: false,
     seatIndex: seat.seat,
@@ -118,6 +120,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
+    actionPending, lastActions, handWinners,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -287,9 +290,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   // Use same seat positions as bot table
   const positions = getSeatPositions(maxSeats, isLandscape);
-  const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete';
+  const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete' || revealedCards.length > 0;
 
-  const showActions = isMyTurn && mySeat && mySeat.status !== 'folded';
+  const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded';
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
@@ -501,6 +504,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
+          {/* Winner banner during showdown pause */}
+          {handWinners.length > 0 && (
+            <WinnerOverlay
+              winners={handWinners.map(w => ({
+                name: w.player_id === user?.id ? 'You' : w.display_name,
+                hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] },
+                chips: w.amount,
+              }))}
+              isGameOver={false}
+              onNextHand={() => {}}
+              onQuit={() => {}}
+            />
+          )}
           {/* ====== SEATS — using SeatAnchor + PlayerSeat, same as PokerTablePro ====== */}
           {rotatedSeats.map((seatData, screenPos) => {
             const actualSeatNumber = (heroSeat + screenPos) % maxSeats;
@@ -529,12 +545,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const opponentRevealed = !isMe
               ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null
               : null;
+            const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
             const player = toPokerPlayer(
               seatData!,
               !!isDealer,
               isMe ? myCards : null,
               isMe,
               opponentRevealed,
+              playerLastAction,
             );
 
 
