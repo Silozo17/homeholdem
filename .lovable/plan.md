@@ -1,61 +1,62 @@
 
 
-# Add Quit Confirmation Dialog to Online Multiplayer Table
+# Fix: Multiplayer Poker Actions Not Working & No Turn Order
 
-## Problem
+## Problems Found
 
-The back button on the MP table immediately leaves or calls `handleLeave` without any confirmation. The bot table (`PokerTablePro`) already has a proper quit confirmation dialog and browser back-button interception -- the MP table has neither.
+There are two bugs preventing actions from working and causing all players to see buttons simultaneously:
 
-## Changes
+### Bug 1: `current_actor_seat` missing from broadcast
 
-### File: `src/components/poker/OnlinePokerTable.tsx`
+The server broadcasts `current_actor_id` but does NOT include `current_actor_seat`. The client hook tries to read `payload.current_actor_seat` which is always `undefined`, so after any broadcast update, the hand's `current_actor_seat` becomes `null`. This breaks:
+- `isMyTurn` detection (falls back to `current_actor_id` but that path has issues)
+- `isCurrentActor` check in the UI (compares against `hand.current_actor_seat`)
+- The spotlight ring around the active player disappears
+- Without proper turn detection, `showActions` may not display for the right player
 
-**1. Add `showQuitConfirm` state** (near other state declarations around line 130):
+### Bug 2: `current_actor_seat` missing from broadcast payload on server
+
+In `poker-action/index.ts`, the broadcast `publicState` object (line 581-610) includes `current_actor_id` but omits `current_actor_seat`. It needs to include `current_actor_seat: nextActorSeat`.
+
+### Bug 3: Folded status lost on reconnect
+
+The `poker-table-state` endpoint returns seat status directly from the DB. But the action handler resets folded seats back to `"active"` in the DB (line 538). So on reconnect/refresh mid-hand, a folded player appears as "active" with action buttons visible. The status should be derived from the actions log.
+
+## Fix Plan
+
+### File 1: `supabase/functions/poker-action/index.ts`
+
+Add `current_actor_seat` to the broadcast payload:
+
 ```typescript
-const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+// Line ~581: Add to publicState object
+current_actor_seat: nextActorSeat,  // ADD THIS LINE
+current_actor_id: nextActorSeat !== null ? ...
 ```
 
-**2. Intercept browser back button** (same pattern as `PokerTablePro`):
-```typescript
-useEffect(() => {
-  const handlePopState = (e: PopStateEvent) => {
-    e.preventDefault();
-    window.history.pushState(null, '', window.location.href);
-    setShowQuitConfirm(true);
-  };
-  window.history.pushState(null, '', window.location.href);
-  window.addEventListener('popstate', handlePopState);
-  return () => window.removeEventListener('popstate', handlePopState);
-}, []);
-```
+### File 2: `supabase/functions/poker-table-state/index.ts`
 
-**3. Change back button click** (line 321) from directly calling `handleLeave`/`onLeave` to opening the dialog:
-```typescript
-<button onClick={() => setShowQuitConfirm(true)} ...>
-```
+Derive folded/all-in status from actions log so reconnecting players see correct state:
 
-**4. Add AlertDialog** (before the closing `</div>` of the component, matching the bot table's dialog):
-```tsx
-<AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
-  <AlertDialogContent className="z-[70]">
-    <AlertDialogHeader>
-      <AlertDialogTitle>Leave Table?</AlertDialogTitle>
-      <AlertDialogDescription>
-        Are you sure you want to leave? You will forfeit your seat.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <div className="flex gap-3 justify-end">
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction
-        onClick={isSeated ? handleLeave : onLeave}
-        className="bg-red-600 hover:bg-red-700"
-      >
-        Leave Table
-      </AlertDialogAction>
-    </div>
-  </AlertDialogContent>
-</AlertDialog>
-```
+- Query `poker_actions` for the current hand
+- For each seat, check if any action is `fold` -- if so, mark status as `"folded"`
+- Check if any player went all-in by looking at their stack (0) and action history
+- Include `current_bet` (per-round bet) and `last_action` in the seat info
 
-**5. Import** `AlertDialog` components (already used elsewhere in the file for kick/close dialogs -- just verify the imports are present).
+### File 3: `src/hooks/useOnlinePokerTable.ts`
+
+No changes needed -- the hook already reads both `current_actor_seat` and `current_actor_id` from broadcasts. Once the server sends `current_actor_seat`, everything will work.
+
+## Summary
+
+| File | Change |
+|------|--------|
+| `supabase/functions/poker-action/index.ts` | Add `current_actor_seat: nextActorSeat` to broadcast payload |
+| `supabase/functions/poker-table-state/index.ts` | Derive seat status from actions log; include `current_bet` and `last_action` per seat |
+
+After these fixes:
+- Only the player whose turn it is will see fold/call/raise buttons
+- The active player spotlight will correctly highlight the current actor
+- Reconnecting mid-hand will show correct folded/active states
+- Turn order will be properly enforced (server already validates, this fixes the client display)
 
