@@ -328,7 +328,7 @@ export function PokerTablePro({
           {/* Pot display — under dealer */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: '14%', zIndex: Z.CARDS }}
+            style={{ top: '20%', zIndex: Z.CARDS }}
           >
             <PotDisplay pot={state.pot} />
           </div>
@@ -336,7 +336,7 @@ export function PokerTablePro({
           {/* Community cards */}
           <div
             className="absolute left-1/2 flex gap-1.5 items-center"
-            style={{ top: '42%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
+            style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => {
               const isFlop = i < 3;
@@ -360,7 +360,7 @@ export function PokerTablePro({
 
           {/* Hand name at showdown */}
           {showHandName && (
-            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: '60%', zIndex: Z.EFFECTS }}>
+            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: '66%', zIndex: Z.EFFECTS }}>
               <span
                 className="text-xl font-black uppercase tracking-wider animate-hand-name-reveal"
                 style={{
@@ -378,7 +378,7 @@ export function PokerTablePro({
           )}
 
           {/* Phase indicator */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '62%', zIndex: Z.CARDS }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '68%', zIndex: Z.CARDS }}>
             <span className={cn(
               'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
               (state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') && 'animate-phase-flash',
