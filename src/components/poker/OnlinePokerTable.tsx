@@ -210,7 +210,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const isSpectator = !isSeated;
   const isCreator = user?.id === table.created_by;
   const activeSeats = seats.filter(s => s.player_id);
-  const canStartHand = (isCreator || isSeated) && !hand && activeSeats.length >= 2;
   const totalPot = hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const mySeat = seats.find(s => s.player_id === user?.id);
   const canModerate = isCreator && !hand;
@@ -458,7 +457,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             })}
             {(!hand || (hand.community_cards || []).length === 0) && (
               <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                {canStartHand ? 'Ready to deal' : 'Waiting for cards...'}
+                {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
               </div>
             )}
           </div>
@@ -476,27 +475,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               <span className="text-[9px] text-foreground/20 italic font-medium"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
               >
-                {canStartHand ? 'Ready to deal' : 'Waiting for players...'}
+                {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
               </span>
             )}
           </div>
 
-          {/* Deal button */}
-          {!hand && canStartHand && (
-            <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '78%', zIndex: Z.EFFECTS }}>
-              <button onClick={startHand}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full font-bold text-xs active:scale-90 transition-all"
-                style={{
-                  background: 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))',
-                  color: 'hsl(160 30% 8%)',
-                  boxShadow: '0 3px 12px rgba(200,160,40,0.4), 0 0 20px hsl(43 74% 49% / 0.2)',
-                  border: '1px solid hsl(43 70% 55%)',
-                }}
-              >
-                <Play className="h-3.5 w-3.5" /> Deal Hand
-              </button>
-            </div>
-          )}
+          {/* Deal button removed — auto-deal handles hand progression */}
 
           {/* Showdown particles */}
           {isShowdown && (
