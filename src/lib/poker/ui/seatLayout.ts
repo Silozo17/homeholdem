@@ -40,7 +40,7 @@ const landscapeAngles: Record<number, number[]> = {
   6: [90, 148, 200, 240, 340, 32],
   7: [90, 140, 180, 220, 250, 320, 20],
   8: [90, 135, 170, 210, 250, 290, 330, 25],
-  9: [90, 130, 160, 195, 230, 250, 310, 340, 20],
+  9: [90, 130, 160, 195, 230, 50, 310, 340, 20],
 };
 
 // Very small push — seats should sit ON the rail, not far outside
