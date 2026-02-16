@@ -76,6 +76,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [handHasEverStarted, setHandHasEverStarted] = useState(false);
   const startHandRef = useRef<() => Promise<void>>(null as any);
+  const autoStartRetriesRef = useRef(0);
 
   const userId = user?.id;
 
@@ -184,6 +185,19 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
           return { ...prev, current_hand: broadcastHand, seats: seats.length > 0 ? seats : prev.seats };
         });
+
+        // Fallback: if hand_result never arrives after complete, force cleanup after 6s
+        if (payload.phase === 'complete') {
+          if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+          showdownTimerRef.current = setTimeout(() => {
+            setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
+            setMyCards(null);
+            setRevealedCards([]);
+            setHandWinners([]);
+            showdownTimerRef.current = null;
+            setAutoStartAttempted(false);
+          }, 6000);
+        }
       })
       .on('broadcast', { event: 'seat_change' }, ({ payload }) => {
         if (payload?.action === 'table_closed') {
@@ -385,7 +399,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Use ref to always call the latest version of startHand
         startHandRef.current().catch(() => {
           autoStartTimerRef.current = null;
-          setAutoStartAttempted(false);
+          autoStartRetriesRef.current += 1;
+          if (autoStartRetriesRef.current < 3) {
+            setAutoStartAttempted(false);
+          }
+          // else: stay attempted=true, stop retrying
         });
       }, 2000 + jitter);
       return () => {
@@ -401,6 +419,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (hasActiveHand) {
       setAutoStartAttempted(true);
       setHandHasEverStarted(true);
+      autoStartRetriesRef.current = 0;
     }
   }, [hasActiveHand]);
 
