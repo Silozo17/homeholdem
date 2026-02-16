@@ -58,14 +58,16 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
         sizeClasses[size],
         'rounded-lg flex flex-col relative select-none',
         'shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.8)]',
-        'animate-card-reveal',
-        isWinner && 'animate-winner-glow ring-1 ring-primary/60',
+        !isWinner && 'animate-card-reveal',
+        isWinner && 'ring-1 ring-primary/60',
         className,
       )}
       style={{
         background: 'linear-gradient(165deg, hsl(0 0% 100%) 0%, hsl(40 20% 96%) 60%, hsl(40 15% 92%) 100%)',
         border: '1px solid hsl(40 20% 85%)',
-        animationDelay: `${dealDelay}s`,
+        ...(isWinner
+          ? { animation: `card-reveal 0.4s ease-out both, winner-glow 1.5s ease-in-out 0.4s infinite`, animationDelay: `${dealDelay}s, ${dealDelay + 0.4}s` }
+          : { animationDelay: `${dealDelay}s` }),
       }}
     >
       {/* Top-left corner */}
