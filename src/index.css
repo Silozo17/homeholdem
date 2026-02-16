@@ -531,8 +531,8 @@
 
 /* Card deal from deck animation */
 @keyframes card-deal-from-deck {
-  0% { opacity: 0; transform: translate(0, -80px) scale(0.4) rotateZ(-20deg); }
-  60% { opacity: 1; }
+  0% { opacity: 0; transform: translate(0, -60px) scale(0.3) rotateZ(-15deg); }
+  40% { opacity: 1; }
   100% { opacity: 1; transform: translate(0, 0) scale(1) rotateZ(0deg); }
 }
 

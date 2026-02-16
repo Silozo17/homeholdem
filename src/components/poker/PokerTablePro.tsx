@@ -439,6 +439,7 @@ export function PokerTablePro({
                   compact={isMobileLandscape}
                   avatarUrl={isHuman ? humanAvatarUrl : undefined}
                   seatDealOrder={seatDealOrder}
+                  totalActivePlayers={activeIndices.length}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
                 />
               </SeatAnchor>
