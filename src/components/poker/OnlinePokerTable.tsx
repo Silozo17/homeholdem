@@ -19,6 +19,7 @@ import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, Use
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import leatherBg from '@/assets/leather-bg.jpg';
@@ -73,6 +74,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  // Keep screen awake during game
+  const { requestWakeLock, releaseWakeLock } = useWakeLock();
+  useEffect(() => {
+    requestWakeLock();
+    return () => { releaseWakeLock(); };
+  }, [requestWakeLock, releaseWakeLock]);
 
   // Sound triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
@@ -274,7 +282,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   <MoreVertical className="h-3.5 w-3.5 text-foreground/80" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-[70]">
                 {canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
                   <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
                     <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}

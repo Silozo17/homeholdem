@@ -258,7 +258,6 @@ export async function notifyPokerInvite(
     body: `${inviterName} invited you to play at ${tableName}`,
     url: `/online-poker?table=${tableId}`,
     tag: `poker-invite-${tableId}`,
-    notificationType: 'rsvp_updates',
   });
 }
 

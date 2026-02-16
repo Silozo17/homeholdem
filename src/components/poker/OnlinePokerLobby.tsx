@@ -102,6 +102,17 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
 
   useEffect(() => { fetchTables(); }, [fetchTables]);
 
+  // Realtime subscription for auto-refresh when tables change
+  useEffect(() => {
+    const channel = supabase
+      .channel('poker-tables-lobby')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poker_tables' }, () => {
+        fetchTables();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchTables]);
+
   const handleCreate = async () => {
     if (!tableName.trim()) { toast({ title: 'Enter a table name', variant: 'destructive' }); return; }
     setCreating(true);
