@@ -260,13 +260,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const handleAction = (action: any) => {
+  const handleAction = async (action: any) => {
     if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
     else if (action.type === 'raise') play('chipStack');
     else if (action.type === 'all-in') play('allIn');
     const actionType = action.type === 'all-in' ? 'all_in' : action.type;
-    sendAction(actionType, action.amount);
+    try {
+      await sendAction(actionType, action.amount);
+    } catch (err: any) {
+      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
+    }
   };
 
   // ── Rotated seats: hero always at screen position 0 ──
