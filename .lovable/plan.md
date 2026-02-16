@@ -1,104 +1,72 @@
 
 
-# 7 Multiplayer Poker Improvements
+# Premium Sound Effects, Haptic Feedback, Timer Warning & Wake Lock Fix
 
-## 1. Sequential Card Reveal During Deal Animation
+## 1. Premium Coin/Money Sound for Pot Win
 
-**Problem**: Both hole cards appear instantly when the deal animation starts, rather than revealing one at a time as the animated card-back reaches the player.
+**Problem**: The current `win` sound is a basic arpeggio with no coin/money feel.
 
-**Root Cause**: In `PlayerSeat.tsx`, the human's hole cards render immediately with only a CSS `dealDelay` on the CardDisplay animation. The card content (face) is visible from the start -- the `dealDelay` only delays the entrance animation, not the rendering.
+**Fix**: Replace the `win` sound in `usePokerSounds.ts` with a layered coin cascade effect:
+- 8-10 rapid metallic "clink" tones at high frequencies (3000-5000 Hz) staggered over ~1s to simulate coins pouring
+- Each clink randomized slightly in pitch and timing for realism
+- A satisfying low "thud" bass layer underneath (80-120 Hz)
+- Finish with a shimmer sweep
+- Keep the victory arpeggio but blend it with the coin cascade
 
-**Fix**: Add a state-based reveal in `PlayerSeat.tsx` where each card stays `faceDown` until its deal delay has elapsed. Use a `setTimeout` per card that matches the `dealDelay` timing to flip from face-down to face-up.
+## 2. Upgrade All Action Sounds to Premium Quality
 
-**Files**: `src/components/poker/PlayerSeat.tsx`
+**File**: `src/hooks/usePokerSounds.ts`
 
----
+Rework each sound event:
 
-## 2. Turn Timer Ring Not Visible
+- **shuffle**: Add a "bridge" whoosh between riffle bursts + subtle card flutter harmonics
+- **deal**: Layer a sharper "snap" with a brief card-slide noise and a subtle table impact
+- **flip**: Add a dramatic "whomp" bass hit under the reveal for community cards
+- **chipClink**: Add ceramic resonance harmonics with a longer tail and subtle room reverb via delay feedback
+- **chipStack**: Make cascading clicks more dramatic with 6 chips and increasing pitch
+- **check**: Firmer double-knock with wood-like resonance (lower Q bandpass)
+- **raise**: More aggressive ascending power chord with chip slide + impact
+- **allIn**: Add dramatic heartbeat pulses (2x low thumps) before the bass drop + crowd gasp noise
+- **fold**: Deeper swoosh with a "card toss" snap at the end
+- **yourTurn**: Brighter two-tone chime with harmonic overtones
+- **timerWarning**: Urgent triple-beep pattern that escalates in pitch
 
-**Problem**: The `TurnTimer` SVG ring is not showing for online multiplayer.
+## 3. Haptic Feedback on Your Turn
 
-**Root Cause**: In `PlayerSeat.tsx` line 114-116, the `TurnTimer` is rendered with `size={80}` but positioned via `absolute inset-0` with `transform: translate(-50%, -50%)` centered on the avatar. The SVG `width/height` is 80px, but the parent `div` (the avatar wrapper) is much smaller than 80px in practice, causing the SVG to be clipped or hidden behind other elements due to z-index. The `inset-0` class sets `top/left/right/bottom: 0`, but the style override `left: 50%; top: 50%; transform: translate(-50%, -50%)` conflicts, and the SVG may render outside the visible bounds.
+**File**: `src/components/poker/OnlinePokerTable.tsx`
 
-**Fix**: In `TurnTimer.tsx`, remove the conflicting `inset-0` class and ensure the SVG is properly centered over the avatar with correct z-index. Set `z-index: 10` on the SVG to ensure it renders above the avatar image.
+When `isMyTurn` becomes true, trigger `navigator.vibrate()` with a pattern: `[100, 50, 100]` (two short pulses). This is supported on Android PWAs and Chrome. iOS Safari doesn't support it but the call silently fails, so no harm.
 
-**Files**: `src/components/poker/TurnTimer.tsx`
+Add haptic to action buttons too — a single short vibration (50ms) on each button press in `handleAction`.
 
----
+## 4. "5 Seconds Left" Warning Popup
 
-## 3. Move "YOUR TURN" Pill Above Cards
+**Files**: `src/components/poker/TurnTimer.tsx`, `src/components/poker/PlayerSeat.tsx`, `src/components/poker/OnlinePokerTable.tsx`
 
-**Problem**: The "YOUR TURN" pill overlaps the player's profile icon at the bottom of the screen.
+Add a callback `onLowTime` to `TurnTimer` that fires when remaining time hits 5 seconds. In `OnlinePokerTable.tsx`, track a `lowTimeWarning` state. When triggered for the hero player:
 
-**Fix**: In `OnlinePokerTable.tsx`, reposition the "YOUR TURN" badge from its current bottom-positioned absolute placement to sit above the hero's hole cards. Place it above the table scene at approximately 60-65% from the top, centered horizontally, so it floats above the two cards but below the community cards area.
+- Show a floating pill "5 SEC LEFT!" that fades in above the betting controls, pulses red for 2 seconds, then fades out
+- Play the `timerWarning` sound
+- Trigger a longer haptic vibration pattern `[200, 100, 200]`
 
-**Files**: `src/components/poker/OnlinePokerTable.tsx`
+The pill uses CSS animation: fade-in for 300ms, hold for 2s with red pulse, fade-out for 300ms.
 
----
+## 5. Fix Wake Lock for PWA
 
-## 4. Reduce Post-Hand Pause Duration
+**Problem**: The visibility change handler in `useWakeLock.ts` checks `wakeLockRef.current !== null`, but when the screen goes off, the OS automatically releases the wake lock and the `release` event fires, setting `wakeLockRef.current` to... well it doesn't set it to null, but the lock object is now "released". When the user returns, `wakeLockRef.current` is still the old released lock object (not null), so the check passes. However, `requestWakeLock()` creates a NEW lock but doesn't clear the old ref properly. Actually the deeper issue: the `release` event handler only updates state but doesn't null out the ref. So on visibility change, `wakeLockRef.current !== null` is true, but it should re-acquire regardless.
 
-**Problem**: The pause between hand completion and next deal is too long.
-
-**Root Cause**: In `useOnlinePokerTable.ts` line 256, the showdown timer is set to `7000ms` (7 seconds). Combined with the auto-deal timer of `2000-3000ms`, total pause is ~9-10 seconds.
-
-**Fix**: Reduce the showdown timer from `7000ms` to `3500ms` (half). The auto-deal timer adds another ~2s, so total gap becomes ~5.5s -- enough to see results but fast enough to keep the game moving.
-
-**Files**: `src/hooks/useOnlinePokerTable.ts`
-
----
-
-## 5. Auto-Remove Inactive/Disconnected Players
-
-**Problem**: Players who exit the app or close their PWA remain visible at the table.
-
-**Fix**: Track consecutive timeout folds per player. When a player's turn times out (auto-fold via `poker-check-timeouts`), increment a counter. After 2 consecutive timeout folds, auto-kick the player by calling the leave-table logic server-side. This is implemented in the `poker-action` edge function where timeout folds are processed.
-
-Additionally, add a `last_activity_at` timestamp to `poker_seats` (via migration), updated on every action. The `poker-check-timeouts` cron job will also check for players inactive for over 2 minutes and auto-remove them.
-
-**Files**:
-- `supabase/functions/poker-action/index.ts` (track consecutive timeouts)
-- `supabase/functions/poker-check-timeouts/index.ts` (check inactivity + auto-kick)
-- Database migration: add `consecutive_timeouts` and `last_activity_at` columns to `poker_seats`
-
----
-
-## 6. Investigate Game Freeze After Multiple Hands
-
-**Problem**: After several hands, the dealer stops dealing and the game freezes.
-
-**Root Cause analysis**: Most likely the `autoStartAttempted` state gets stuck at `true` and never resets. The reset happens in the `showdownTimerRef` callback (line 265: `setAutoStartAttempted(false)`), but if a hand completes without a `hand_result` broadcast (e.g., all opponents fold pre-showdown and the server sends `game_state` with phase `complete` instead of `hand_result`), the showdown timer never fires, and `autoStartAttempted` stays `true` forever.
-
-**Fix**: Add a fallback reset: whenever `current_hand` becomes `null` (hand cleared), ensure `autoStartAttempted` is reset to `false`. Also, in the `game_state` broadcast handler, if the incoming phase is `complete`, trigger the same cleanup logic as `hand_result` with a shorter delay.
-
-**Files**: `src/hooks/useOnlinePokerTable.ts`
-
----
-
-## 7. Make Chip-to-Winner Animation Visible
-
-**Problem**: The chip fly animation from pot to winner is not visually noticeable.
-
-**Root Cause**: The `ChipAnimation` component uses CSS custom properties (`--chip-dx`, `--chip-dy`) with percentage values, but the keyframe `chip-fly-custom` uses `translate(var(--chip-dx), var(--chip-dy))` where the percentage is relative to the element itself (4px chip), not the container. So the chips barely move.
-
-**Fix**: 
-1. Change `ChipAnimation` positioning to use `calc()` with explicit pixel-based movement derived from container dimensions.
-2. Stagger the 6 chips with slight delays (0, 50ms, 100ms...) and randomized paths for a more dramatic "pot sweep" effect.
-3. Make chips larger (w-5 h-5) with a brighter gold trail/glow.
-
-**Files**: `src/components/poker/ChipAnimation.tsx`, `src/index.css`
-
----
+**Fix**:
+1. In the `release` event listener, also set `wakeLockRef.current = null` so the ref accurately reflects the state
+2. Change the visibility handler to re-acquire wake lock whenever the page becomes visible AND we're in "should be locked" mode. Add a `shouldBeActive` ref that's set to `true` on `requestWakeLock()` and `false` on `releaseWakeLock()`. The visibility handler checks `shouldBeActive.current` instead of `wakeLockRef.current !== null`
+3. Add a periodic re-acquire check (every 30s) as a safety net for edge cases where the lock silently drops
 
 ## Summary
 
-| # | Issue | Files |
-|---|-------|-------|
-| 1 | Sequential card reveal | `PlayerSeat.tsx` |
-| 2 | Turn timer not visible | `TurnTimer.tsx` |
-| 3 | YOUR TURN pill position | `OnlinePokerTable.tsx` |
-| 4 | Reduce post-hand pause | `useOnlinePokerTable.ts` |
-| 5 | Auto-remove disconnected players | `poker-action`, `poker-check-timeouts`, DB migration |
-| 6 | Game freeze after many hands | `useOnlinePokerTable.ts` |
-| 7 | Chip animation visibility | `ChipAnimation.tsx`, `index.css` |
+| # | Change | Files |
+|---|--------|-------|
+| 1 | Premium coin cascade win sound | `usePokerSounds.ts` |
+| 2 | Upgraded all action sounds | `usePokerSounds.ts` |
+| 3 | Haptic feedback on your turn + actions | `OnlinePokerTable.tsx` |
+| 4 | "5 SEC LEFT" fade-in warning popup | `TurnTimer.tsx`, `OnlinePokerTable.tsx`, `index.css` |
+| 5 | Fix wake lock for PWA | `useWakeLock.ts` |
 
