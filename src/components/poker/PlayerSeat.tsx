@@ -17,6 +17,7 @@ interface PlayerSeatProps {
   cardsPlacement: CardsPlacement;
   avatarUrl?: string | null;
   seatDealOrder?: number;
+  totalActivePlayers?: number;
   compact?: boolean;
   onTimeout?: () => void;
 }
@@ -28,7 +29,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, compact = false, onTimeout,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, onTimeout,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -45,7 +46,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0 ? (
     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex animate-showdown-reveal" style={{ zIndex: 2 }}>
       {player.holeCards.map((card, i) => (
-        <div key={i} style={{ transform: `rotate(${i === 0 ? -8 : 8}deg) translateX(${i === 0 ? -4 : 4}px)` }}>
+        <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-10px' : '0' }}>
           <CardDisplay
             card={shouldShowCards ? card : undefined}
             faceDown={!shouldShowCards}
@@ -60,11 +61,11 @@ export const PlayerSeat = memo(function PlayerSeat({
 
   // Human player cards (fanned behind avatar)
   const humanCards = isHuman && player.holeCards.length > 0 ? (
-    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
+   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
-        const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
+        const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
         return (
-          <div key={i} style={{ transform: `rotate(${i === 0 ? -5 : 5}deg) translateX(${i === 0 ? -1 : 1}px)` }}>
+          <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-12px' : '0' }}>
             <CardDisplay
               card={card}
               size={humanCardSize}
