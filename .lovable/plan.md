@@ -1,51 +1,19 @@
 
+# Add Delete Table Button for Table Owners in Lobby
 
-# Fix: Actions Failing + Lobby Not Showing Live Players
+## What changes
 
-## Root Causes
+Add a delete (trash) icon button on each table card in the lobby that only appears for the table creator. Tapping it shows a confirmation dialog, then calls the existing `poker-moderate-table` edge function with `action: 'close'` to remove all seats and mark the table as closed.
 
-### 1. `poker-action` still crashes -- duplicate `nextActiveSeat` function
-The file has TWO definitions of `nextActiveSeat`:
-- **Line 99**: generic version using `any[]` parameter
-- **Line 644**: typed version using `SeatState[]` parameter
+## Technical details
 
-This causes `SyntaxError: Identifier 'nextActiveSeat' has already been declared` on every boot. Every call/fold/raise returns 500.
+### File: `src/components/poker/OnlinePokerLobby.tsx`
 
-**Fix**: Remove the first generic version (lines 99-106). The typed version at line 644 is the one actually used by `processAction`.
+1. Import `Trash2` from lucide-react and `AlertDialog` components
+2. Add state for `deleteTarget` (table id + name being deleted)
+3. On each table card, if `t.created_by === user?.id`, render a small trash icon button (with `e.stopPropagation()` to prevent joining the table)
+4. Clicking it sets `deleteTarget`, which opens an `AlertDialog` confirmation
+5. On confirm, call the existing `callEdge('poker-moderate-table', { table_id, action: 'close' })`, then refresh the table list
+6. Filter out `closed` tables from the lobby list (if not already filtered)
 
-### 2. Lobby doesn't show live player counts or detect leaves
-The lobby subscribes to `postgres_changes` on `poker_tables` but NOT on `poker_seats`. So:
-- When a player joins or leaves, the seat count doesn't update
-- Tables show stale player counts until manual refresh
-
-**Fix**: Add a second Realtime subscription on `poker_seats` that triggers `fetchTables()` on any insert/delete.
-
-## Changes
-
-### File 1: `supabase/functions/poker-action/index.ts`
-- Delete lines 99-106 (the first `nextActiveSeat` function)
-- Keep the typed version at line 644
-
-### File 2: `src/components/poker/OnlinePokerLobby.tsx`
-- Add `poker_seats` to the existing Realtime channel so the lobby auto-refreshes when players join or leave
-
-```typescript
-// Update the existing channel subscription (line ~107-113)
-const channel = supabase
-  .channel('poker-tables-lobby')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'poker_tables' }, () => {
-    fetchTables();
-  })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'poker_seats' }, () => {
-    fetchTables();
-  })
-  .subscribe();
-```
-
-## Summary
-
-| File | Change |
-|------|--------|
-| `poker-action/index.ts` | Remove duplicate `nextActiveSeat` (lines 99-106) so the function boots |
-| `OnlinePokerLobby.tsx` | Subscribe to `poker_seats` changes for live player count updates |
-
+No new edge functions or database changes needed -- reuses the existing `poker-moderate-table` close action.
