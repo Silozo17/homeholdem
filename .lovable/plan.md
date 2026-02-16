@@ -1,41 +1,60 @@
 
 
-## Fix: YOUR TURN Pill Position + Restore Card Animations
+## Ensure All Poker Animations Work Properly
 
-### 1. YOUR TURN Pill -- Move Up 40px
+After auditing every animation in the codebase, the CSS keyframes are all properly defined. The issues are with how they're applied and their visual impact.
 
-The "YOUR TURN" badge is at `bottom: 18%` (landscape) / `bottom: 22%` (portrait). To shift it up by 40px, change these to `calc(18% + 40px)` and `calc(22% + 40px)` respectively. Same adjustment for the "5 SEC LEFT" pill (currently `bottom: 22%` / `bottom: 26%`).
+### Issues Found
 
-**File**: `src/components/poker/OnlinePokerTable.tsx` (line 769, line 790)
+**1. Community card reveal is too subtle**
+Community cards (flop/turn/river) are always rendered face-up so they only get `animate-card-reveal` (scale 0.85 to 1.0 over 0.35s). This is barely visible -- needs a more dramatic entrance matching the premium feel.
+
+**Fix**: Enhance the `card-reveal` keyframe to include a slight vertical slide and a brief scale overshoot for a satisfying "pop":
+```css
+@keyframes card-reveal {
+  0% { opacity: 0; transform: scale(0.5) translateY(8px); }
+  60% { opacity: 1; transform: scale(1.08) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-card-reveal { animation: card-reveal 0.4s ease-out both; }
+```
+
+**2. Winner glow overrides reveal animation**
+When `isWinner` is true, `CardDisplay` applies both `animate-card-reveal` and `animate-winner-glow`. Since both classes set the CSS `animation` shorthand, the winner glow (later in the stylesheet) completely overrides the reveal. Winner cards skip the entrance animation.
+
+**Fix**: Use `animationName` composition in the style attribute instead of conflicting classes. When `isWinner` is true, apply both animations via comma-separated inline style, so both run:
+```
+animation: card-reveal 0.4s ease-out both, winner-glow 1.5s ease-in-out 0.4s infinite
+```
+
+**3. Dealing card-back sprites need a visible card-back texture**
+The deal animation sprites use the CSS class `card-back-premium` which renders a gradient pattern. This works but could be more visible. No change needed here -- this is working correctly.
+
+**4. Opponent showdown reveal works**
+The `animate-showdown-reveal` class on opponent cards does a 3D rotateY flip -- this is defined and connected correctly. No fix needed.
+
+**5. Chip-to-winner animation works**
+`ChipAnimation` uses `chip-sweep` keyframe with CSS custom properties. Connected correctly. No fix needed.
+
+**6. Winner banner works**
+`animate-winner-banner` fades in then out after 2s. Connected correctly. No fix needed.
+
+**7. Phase flash, spotlight pulse, all-in shockwave all work**
+All CSS classes are defined and applied correctly.
 
 ---
 
-### 2. Restore Card Animations
+### Files to Modify
 
-The problem: when the last fix removed `animate-fade-in` from the face-up branch of `CardDisplay.tsx`, it left NO animation at all. This means:
-- Community cards (flop/turn/river) appear instantly with no transition -- they are always rendered face-up
-- Player hole cards that flip from face-down to face-up also have no visual transition
+| File | Change |
+|------|--------|
+| `src/index.css` | Enhance `card-reveal` keyframe for more dramatic entrance |
+| `src/components/poker/CardDisplay.tsx` | Fix winner glow + reveal animation conflict using inline animation composition |
 
-**Fix**: Add a subtle but visible reveal animation to the face-up card branch. Instead of `animate-fade-in` (which has a `translateY(10px)` that causes jumping), add a custom `animate-card-reveal` class that uses only a quick scale-up + opacity fade with no translation. This keeps cards in place while giving a premium feel.
-
-**File**: `src/index.css` -- Add new keyframe:
-```css
-@keyframes card-reveal {
-  0% { opacity: 0; transform: scale(0.85); }
-  100% { opacity: 1; transform: scale(1); }
-}
-.animate-card-reveal { animation: card-reveal 0.35s ease-out both; }
-```
-
-**File**: `src/components/poker/CardDisplay.tsx` (line 59) -- Add `'animate-card-reveal'` to the face-up card's className. Also pass through `dealDelay` as `animationDelay` so community cards stagger their reveal (flop cards already pass `dealDelay`).
-
-### Technical Details
-
-| File | Line(s) | Change |
-|------|---------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | 769 | `bottom: isLandscape ? 'calc(18% + 40px)' : 'calc(22% + 40px)'` |
-| `src/components/poker/OnlinePokerTable.tsx` | 790 | `bottom: isLandscape ? 'calc(22% + 40px)' : 'calc(26% + 40px)'` |
-| `src/index.css` | After line 547 | Add `card-reveal` keyframe + class |
-| `src/components/poker/CardDisplay.tsx` | 59-64 | Add `animate-card-reveal` class and `animationDelay: dealDelay + 's'` style |
-
-No other changes. No logic, layout, or feature modifications.
+### What Does NOT Change
+- No logic changes
+- No layout changes
+- No seat positioning changes
+- Dealing animation (card sprites flying from dealer) -- already working
+- Showdown reveal, chip animations, winner banner -- all working
+- All other animations untouched
