@@ -73,7 +73,7 @@ export function PokerTable({
             showCards={isShowdown && (bot.status === 'active' || bot.status === 'all-in')}
             isHuman={false}
             isShowdown={isShowdown}
-            tableHalf="top"
+            cardsPlacement="above"
           />
         ))}
       </div>

@@ -12,7 +12,7 @@ import { WinnerOverlay } from './WinnerOverlay';
 import { TableFelt } from './TableFelt';
 import { DealerCharacter } from './DealerCharacter';
 import { DebugOverlay } from './DebugOverlay';
-import { getSeatPositions, getDefaultEllipse } from '@/lib/poker/ui/seatLayout';
+import { getSeatPositions, getDefaultEllipse, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -144,7 +144,6 @@ export function PokerTablePro({
     onAction(action);
   }, [onAction, play]);
 
-  // Ellipse-anchored seat positions
   const ellipse = getDefaultEllipse(isLandscape);
   const positions = getSeatPositions(state.players.length, isLandscape);
   const currentPlayerIdx = state.currentPlayerIndex;
@@ -173,8 +172,8 @@ export function PokerTablePro({
   const showActions = isHumanTurn && humanPlayer && humanPlayer.status === 'active';
 
   return (
-    <div className="fixed inset-0 overflow-hidden flex flex-col">
-      {/* Portrait block overlay — shown when device is in portrait */}
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Portrait block overlay */}
       {!isLandscape && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary animate-pulse">
@@ -187,6 +186,7 @@ export function PokerTablePro({
           </p>
         </div>
       )}
+
       {/* ====== BG LAYERS ====== */}
       <img
         src={leatherBg}
@@ -214,41 +214,51 @@ export function PokerTablePro({
         />
       )}
 
-      {/* ====== HEADER BAR — absolute overlay ====== */}
+      {/* ====== HEADER BAR — safe-area aware ====== */}
       <div
-        className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 h-10"
+        className="absolute top-0 left-0 right-0 flex items-center justify-between px-3"
         style={{
           zIndex: Z.HEADER,
-          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+          paddingLeft: isLandscape ? 'calc(env(safe-area-inset-left, 0px) + 8px)' : undefined,
+          paddingRight: isLandscape ? 'calc(env(safe-area-inset-right, 0px) + 8px)' : undefined,
+          height: 'auto',
+          paddingBottom: '6px',
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
         <button onClick={() => setShowQuitConfirm(true)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
           <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-            style={{
-              background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 40%))',
-              color: 'hsl(160 30% 8%)',
-              boxShadow: '0 1px 4px rgba(200,160,40,0.3)',
-            }}
-          >
-            #{state.handNumber}
-          </span>
-          <span className="text-[10px] text-foreground/60 font-medium">
-            {state.smallBlind}/{state.bigBlind}
-          </span>
+
+        {/* Dealer character — sits in HUD band, not inside seat area */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+              style={{
+                background: 'linear-gradient(135deg, hsl(43 74% 49%), hsl(43 60% 40%))',
+                color: 'hsl(160 30% 8%)',
+                boxShadow: '0 1px 4px rgba(200,160,40,0.3)',
+              }}
+            >
+              #{state.handNumber}
+            </span>
+            <span className="text-[10px] text-foreground/60 font-medium">
+              {state.smallBlind}/{state.bigBlind}
+            </span>
+          </div>
+          <DealerCharacter expression={dealerExpression} />
         </div>
+
         <button onClick={toggleSound} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
           {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
         </button>
       </div>
 
-      {/* ====== TABLE SCENE — table wrapper fills most of screen ====== */}
+      {/* ====== TABLE SCENE ====== */}
       <div
-        className="flex-1 flex items-center justify-center relative"
-        style={{ zIndex: Z.TABLE, marginTop: '-2vh' }}
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ zIndex: Z.TABLE }}
       >
         {/* Table wrapper — ALL game elements positioned inside this */}
         <div
@@ -266,14 +276,6 @@ export function PokerTablePro({
           {/* Debug overlay */}
           {isDebug && <DebugOverlay ellipse={ellipse} seatPositions={positions} />}
 
-          {/* Dealer — positioned at top center of the table */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: '2%', zIndex: Z.DEALER }}
-          >
-            <DealerCharacter expression={dealerExpression} />
-          </div>
-
           {/* Pot display */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
@@ -288,7 +290,6 @@ export function PokerTablePro({
             style={{ top: '44%', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => {
-              // Flop cards (0-2) stagger quickly, turn (3) and river (4) appear solo
               const isFlop = i < 3;
               const dealDelay = isFlop ? i * 0.18 : 0.1;
               return (
@@ -356,7 +357,7 @@ export function PokerTablePro({
             </div>
           )}
 
-          {/* ====== SEATS on ellipse rail ====== */}
+          {/* ====== SEATS — hard-mapped placement ====== */}
           {state.players.map((player, i) => {
             const pos = positions[i];
             if (!pos) return null;
@@ -365,10 +366,8 @@ export function PokerTablePro({
             const isActive = currentPlayerIdx === i && !isShowdown;
 
             // Calculate dealing order: clockwise from dealer
-            const activePlayers = state.players.filter(p => p.status !== 'eliminated');
-            const dealerIdx = state.dealerIndex;
             const activeIndices = state.players.map((p, idx) => p.status !== 'eliminated' ? idx : -1).filter(idx => idx !== -1);
-            const dealerPosInActive = activeIndices.indexOf(dealerIdx);
+            const dealerPosInActive = activeIndices.indexOf(state.dealerIndex);
             const myPosInActive = activeIndices.indexOf(i);
             const seatDealOrder = myPosInActive >= 0 && dealerPosInActive >= 0
               ? (myPosInActive - dealerPosInActive - 1 + activeIndices.length) % activeIndices.length
@@ -387,8 +386,7 @@ export function PokerTablePro({
                   showCards={showCards}
                   isHuman={isHuman}
                   isShowdown={isShowdown}
-                  tableHalf={pos.yPct < 55 ? 'top' : 'bottom'}
-                  sidePosition={pos.xPct < 25 ? 'left' : pos.xPct > 75 ? 'right' : 'center'}
+                  cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape}
                   avatarUrl={isHuman ? humanAvatarUrl : undefined}
                   seatDealOrder={seatDealOrder}
@@ -402,7 +400,12 @@ export function PokerTablePro({
 
       {/* YOUR TURN badge */}
       {showActions && (
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)', zIndex: Z.ACTIONS }}>
+        <div className="absolute pointer-events-none" style={{
+          bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
+          left: isLandscape ? '50%' : '50%',
+          transform: 'translateX(-50%)',
+          zIndex: Z.ACTIONS,
+        }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{
               background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
@@ -416,27 +419,52 @@ export function PokerTablePro({
         </div>
       )}
 
-      {/* ====== ACTION BAR — absolute at bottom ====== */}
+      {/* ====== ACTION CONTROLS ====== */}
       {showActions && (
-        <div
-          className="absolute bottom-0 left-0 right-0 px-3 pt-1"
-          style={{
-            zIndex: Z.ACTIONS,
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)',
-            background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))',
-          }}
-        >
-          <BettingControls
-            canCheck={canCheck}
-            amountToCall={amountToCall}
-            minRaise={state.minRaise}
-            maxBet={maxBet}
-            playerChips={humanPlayer!.chips}
-            bigBlind={state.bigBlind}
-            pot={state.pot}
-            onAction={handleAction}
-          />
-        </div>
+        isLandscape ? (
+          /* Landscape: right-side vertical panel */
+          <div
+            className="absolute"
+            style={{
+              zIndex: Z.ACTIONS,
+              right: 'calc(env(safe-area-inset-right, 0px) + 10px)',
+              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+            }}
+          >
+            <BettingControls
+              landscape
+              canCheck={canCheck}
+              amountToCall={amountToCall}
+              minRaise={state.minRaise}
+              maxBet={maxBet}
+              playerChips={humanPlayer!.chips}
+              bigBlind={state.bigBlind}
+              pot={state.pot}
+              onAction={handleAction}
+            />
+          </div>
+        ) : (
+          /* Portrait: full-width bottom bar */
+          <div
+            className="absolute bottom-0 left-0 right-0 px-3 pt-1"
+            style={{
+              zIndex: Z.ACTIONS,
+              paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)',
+              background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))',
+            }}
+          >
+            <BettingControls
+              canCheck={canCheck}
+              amountToCall={amountToCall}
+              minRaise={state.minRaise}
+              maxBet={maxBet}
+              playerChips={humanPlayer!.chips}
+              bigBlind={state.bigBlind}
+              pot={state.pot}
+              onAction={handleAction}
+            />
+          </div>
+        )
       )}
 
       {/* ====== OVERLAYS ====== */}

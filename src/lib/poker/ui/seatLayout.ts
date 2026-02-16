@@ -1,9 +1,9 @@
 /**
  * Fixed seat positions for the poker table.
  * All coordinates are % of the TABLE WRAPPER, not the viewport.
- * 
- * 9 canonical seats (from the reference layout):
- *   Y (You)     = bottom center
+ *
+ * 9 canonical seats:
+ *   Y (You)     = bottom center (hero)
  *   A (Alex)    = bottom-left
  *   B (Blake)   = left middle
  *   C (Casey)   = upper-left
@@ -12,8 +12,6 @@
  *   F (Frankie) = right middle
  *   G (Gray)    = upper-right
  *   H (Harper)  = top-right
- *
- * Fewer players pick a balanced subset of these same positions.
  */
 
 import { type Ellipse } from './ellipse';
@@ -21,28 +19,47 @@ import { type Ellipse } from './ellipse';
 export interface SeatPos {
   xPct: number;
   yPct: number;
+  /** Which of the 9 canonical seat keys this position maps to */
+  seatKey: SeatKey;
 }
+
+export type SeatKey = 'Y' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+
+export type CardsPlacement = 'above' | 'below' | 'left' | 'right';
+
+/** Hard-mapped card placement per seat – NO inference from coordinates */
+export const CARDS_PLACEMENT: Record<SeatKey, CardsPlacement> = {
+  Y: 'below',
+  A: 'below',
+  E: 'below',
+  B: 'left',
+  C: 'left',
+  F: 'right',
+  G: 'right',
+  D: 'above',
+  H: 'above',
+};
 
 // Portrait: ry reduced so top seat doesn't hit dealer, rx reduced so sides don't clip
 export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 38, ry: 34 };
 export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 
 // ── 9 fixed seat positions (landscape) ──────────────────────────────
-// Mapped from the reference screenshot yellow markers
-const SEATS_LANDSCAPE = {
-  Y: { xPct: 50, yPct: 95 },    // bottom center (You)
-  A: { xPct: 18, yPct: 82 },    // bottom-left
-  B: { xPct: 6, yPct: 50 },     // left middle
-  C: { xPct: 10, yPct: 20 },    // upper-left
-  D: { xPct: 30, yPct: 2 },     // top-left
-  E: { xPct: 82, yPct: 82 },    // bottom-right   (mirror of A)
-  F: { xPct: 94, yPct: 50 },    // right middle   (mirror of B)
-  G: { xPct: 90, yPct: 20 },    // upper-right    (mirror of C)
-  H: { xPct: 70, yPct: 2 },     // top-right      (mirror of D)
+// Coordinates place avatar circles ON the brown rail edge
+const SEATS_LANDSCAPE: Record<SeatKey, { xPct: number; yPct: number }> = {
+  Y: { xPct: 50, yPct: 92 },   // bottom center (hero)
+  A: { xPct: 24, yPct: 78 },   // bottom-left
+  B: { xPct: 12, yPct: 50 },   // left middle
+  C: { xPct: 22, yPct: 22 },   // upper-left
+  D: { xPct: 36, yPct: 10 },   // top-left
+  E: { xPct: 76, yPct: 78 },   // bottom-right (mirror of A)
+  F: { xPct: 88, yPct: 50 },   // right middle (mirror of B)
+  G: { xPct: 78, yPct: 22 },   // upper-right (mirror of C)
+  H: { xPct: 64, yPct: 10 },   // top-right (mirror of D)
 };
 
-// Portrait uses tighter positions — sides pulled inward to avoid clipping
-const SEATS_PORTRAIT = {
+// Portrait uses tighter positions
+const SEATS_PORTRAIT: Record<SeatKey, { xPct: number; yPct: number }> = {
   Y: { xPct: 50, yPct: 88 },
   A: { xPct: 20, yPct: 72 },
   B: { xPct: 10, yPct: 50 },
@@ -55,8 +72,7 @@ const SEATS_PORTRAIT = {
 };
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)
-// Picks are chosen for visual balance / symmetry
-const SEAT_PICKS: Record<number, (keyof typeof SEATS_LANDSCAPE)[]> = {
+const SEAT_PICKS: Record<number, SeatKey[]> = {
   2: ['Y', 'D'],
   3: ['Y', 'C', 'G'],
   4: ['Y', 'B', 'D', 'F'],
@@ -69,6 +85,7 @@ const SEAT_PICKS: Record<number, (keyof typeof SEATS_LANDSCAPE)[]> = {
 
 /**
  * Get fixed seat positions for the given player count.
+ * Returns SeatPos with xPct, yPct, and seatKey for hard-mapped lookups.
  */
 export function getSeatPositions(
   playerCount: number,
@@ -79,7 +96,10 @@ export function getSeatPositions(
   const picks = SEAT_PICKS[count] ?? SEAT_PICKS[9];
   const seats = isLandscape ? SEATS_LANDSCAPE : SEATS_PORTRAIT;
 
-  return picks.map((key) => seats[key]);
+  return picks.map((key) => ({
+    ...seats[key],
+    seatKey: key,
+  }));
 }
 
 /**
