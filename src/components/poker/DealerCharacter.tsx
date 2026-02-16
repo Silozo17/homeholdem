@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Crown, Sparkles } from 'lucide-react';
-import dealerPortrait from '@/assets/dealer/dealer-main.png';
+import { Sparkles } from 'lucide-react';
+import dealerGirl from '@/assets/dealer/dealer-girl.png';
 
 interface DealerCharacterProps {
   className?: string;
@@ -15,52 +15,37 @@ export function DealerCharacter({ className, expression = 'neutral' }: DealerCha
     <div className={cn('flex flex-col items-center gap-0.5 relative', className)}>
       {/* Spotlight glow */}
       <div
-        className="absolute -top-4 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full pointer-events-none"
+        className="absolute -top-6 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, hsl(43 74% 49% / 0.15) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, hsl(43 74% 49% / 0.18) 0%, transparent 70%)',
         }}
       />
 
-      {/* Dealer avatar frame */}
+      {/* Dealer image */}
       <div
         className={cn(
-          'relative rounded-full flex items-center justify-center dealer-breathe overflow-hidden',
+          'relative flex items-center justify-center dealer-breathe',
           expression === 'surprise' && 'scale-110',
         )}
         style={{
-          width: 'clamp(40px, 10vw, 56px)',
-          height: 'clamp(40px, 10vw, 56px)',
-          border: '2px solid hsl(43 74% 49% / 0.7)',
-          boxShadow: `
-            0 0 16px hsl(43 74% 49% / 0.25),
-            0 0 32px hsl(43 74% 49% / 0.1),
-            inset 0 2px 4px rgba(255,255,255,0.1),
-            inset 0 -2px 4px rgba(0,0,0,0.3)
-          `,
+          width: 'clamp(80px, 18vw, 120px)',
           transition: 'transform 0.5s ease',
-          background: 'linear-gradient(135deg, hsl(160 25% 12%), hsl(160 30% 8%))',
+          filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))',
         }}
       >
         {!imgFailed ? (
           <img
-            src={dealerPortrait}
+            src={dealerGirl}
             alt="Dealer"
-            className="absolute inset-0 w-full h-full object-cover rounded-full"
+            className="w-full h-auto object-contain"
             draggable={false}
             onError={() => setImgFailed(true)}
           />
         ) : (
-          <Crown
-            className="w-5 h-5 relative z-[1] text-primary/80"
-            style={{ filter: 'drop-shadow(0 0 6px hsl(43 74% 49% / 0.5))' }}
-          />
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-primary text-xl font-bold">D</span>
+          </div>
         )}
-
-        {/* Inner ring */}
-        <div
-          className="absolute inset-[2px] rounded-full pointer-events-none"
-          style={{ border: '1px dashed hsl(43 74% 49% / 0.25)' }}
-        />
 
         {/* Sparkles on win */}
         {expression === 'smile' && (
