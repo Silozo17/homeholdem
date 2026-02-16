@@ -481,27 +481,27 @@ export function usePokerGame() {
       botTimeoutRef.current = null;
     }
 
-    // Auto-deal on 'dealing' phase
+    // Auto-deal on 'dealing' phase — slight pause for card shuffle feel
     if (state.phase === 'dealing') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'DEAL_HAND' });
-      }, 500);
+      }, 800);
       return;
     }
 
-    // Auto-showdown
+    // Auto-showdown — pause for drama
     if (state.phase === 'showdown') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'SHOWDOWN' });
-      }, 1000);
+      }, 1500);
       return;
     }
 
-    // Auto-advance after hand_complete (no more "Next Hand" button needed)
+    // Auto-advance after hand_complete — longer pause to admire results
     if (state.phase === 'hand_complete') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'NEXT_HAND' });
-      }, 2500);
+      }, 3000);
       return;
     }
 
@@ -525,7 +525,7 @@ export function usePokerGame() {
           state.bigBlind,
         );
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, 800 + Math.random() * 700); // 0.8-1.5s delay
+      }, 1000 + Math.random() * 800); // 1.0-1.8s delay for more realistic pacing
     }
   }, [state.phase, state.currentPlayerIndex, state.handNumber]);
 
