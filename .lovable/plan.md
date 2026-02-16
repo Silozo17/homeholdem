@@ -1,74 +1,110 @@
 
 
-# Fix: Rotate Online Poker Seats to Hero Perspective
+# Unify Online Multiplayer Table with Bot Table Layout
 
 ## Problem
 
-The online poker table renders all players at screen positions matching their raw seat number (0-8). Your seat is hidden from the loop and shown at the bottom, but everyone else stays at their absolute positions. This means:
+The online multiplayer (MP) table and the bot table (`PokerTablePro`) use completely different layout systems, resulting in a visually inconsistent experience:
 
-- If you sit in seat 3, other players appear at positions 0, 1, 2, 4, 5... on screen
-- The visual gap where seat 3 was is just skipped
-- Other players do NOT rotate around you -- they see the same layout you do
-
-The correct behavior: each player should always see themselves at position 0 (bottom center), with other players arranged clockwise in their correct relative order.
+| Aspect | Bot Table (PokerTablePro) | MP Table (OnlinePokerTable) |
+|--------|--------------------------|----------------------------|
+| **Table wrapper** | 16:9 aspect ratio, `min(88vw, 1100px)` width, `82vh` max-height | `TableFelt` with children (legacy mode), no fixed aspect ratio |
+| **Seat positions** | `getSeatPositions()` from `seatLayout.ts` (9-anchor system with precise rail coordinates) | Hardcoded `SEAT_POSITIONS` object with different coordinates |
+| **Seat component** | `PlayerSeat` (rich: avatar, nameplate bar, card fan, dealer button, timer, bet chip) via `SeatAnchor` | Inline `OnlineSeatDisplay` (simpler: basic avatar, plain text name/stack) |
+| **Hero rendering** | Inline with all seats at position 0 (bottom center) | Separated into a bottom panel outside the table |
+| **Orientation** | Landscape-locked with portrait blocker | No orientation handling |
+| **Z-index system** | `Z` constants from `z.ts` | Hardcoded `z-10`, `z-20`, etc. |
+| **Background** | Leather image + radial gradient vignette | Leather image + flat `bg-black/30` |
 
 ## Solution
 
-Rotate the seat-to-position mapping so that the hero's seat index always maps to position 0 (bottom center). All other seats shift by the same offset, preserving clockwise order.
+Refactor `OnlinePokerTable.tsx` to adopt the same layout architecture as `PokerTablePro`:
 
-### File: `src/components/poker/OnlinePokerTable.tsx`
+### 1. Replace Table Layout with 16:9 Wrapper Pattern
 
-Replace the current direct mapping:
+Remove the `<TableFelt className="...">` children mode. Instead use the same structure as the bot table:
 
-```typescript
-// CURRENT (broken): raw seat index = screen position
-const allSeats = Array.from({ length: table.max_seats }, (_, i) => 
-  seats.find(s => s.seat === i) || null
-);
-// Then: allSeats[seatIndex] -> positions[seatIndex]
+```
+<div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: Z.TABLE }}>
+  <div className="relative" style={{
+    aspectRatio: '16 / 9',
+    width: isLandscape ? 'min(88vw, 1100px)' : 'min(96vw, 1100px)',
+    maxHeight: isLandscape ? '82vh' : '80vh',
+    overflow: 'visible',
+  }}>
+    <TableFelt />  {/* visual-only mode, no children */}
+    {/* Dealer, pot, cards, seats all positioned inside */}
+  </div>
+</div>
 ```
 
-With a rotated mapping:
+### 2. Replace Seat Positions with `seatLayout.ts`
+
+Remove the hardcoded `SEAT_POSITIONS` object. Import and use `getSeatPositions()` and `CARDS_PLACEMENT` from `seatLayout.ts`. Use `SeatAnchor` for positioning, which centers children at `(xPct%, yPct%)` with `translate(-50%, -50%)`.
+
+### 3. Render Hero Inline (Not in Separate Bottom Panel)
+
+Stop separating "my seat" into a bottom panel. Render the hero at position 0 (bottom center) just like all other seats, using `SeatAnchor`. This ensures consistent visual treatment -- same avatar size, same nameplate, same card display.
+
+The hero's hole cards will display using the same fanned-behind-avatar pattern as in the bot table, and betting controls will overlay at the bottom of the screen (same positioning as bot table).
+
+### 4. Adapt PlayerSeat for Online Data
+
+Create a thin adapter that maps `OnlineSeatInfo` to the `PokerPlayer` shape expected by `PlayerSeat`:
 
 ```typescript
-// NEW: rotate so hero's seat maps to position 0 (bottom center)
-const maxSeats = table.max_seats;
-const heroSeat = mySeatNumber ?? 0;
-
-// Build array of seats rotated so hero is at index 0
-const rotatedSeats: (OnlineSeatInfo | null)[] = Array.from(
-  { length: maxSeats },
-  (_, i) => {
-    const actualSeat = (heroSeat + i) % maxSeats;
-    return seats.find(s => s.seat === actualSeat) || null;
-  }
-);
+function toPokerPlayer(seat: OnlineSeatInfo, isDealer: boolean): PokerPlayer {
+  return {
+    id: seat.player_id!,
+    name: seat.display_name,
+    chips: seat.stack,
+    status: seat.status === 'folded' ? 'folded' : seat.status === 'all-in' ? 'all-in' : 'active',
+    holeCards: [], // filled separately for hero
+    currentBet: seat.current_bet ?? 0,
+    lastAction: seat.last_action ?? null,
+    isDealer,
+    seatIndex: seat.seat,
+  };
+}
 ```
 
-Then in the rendering loop, use `rotatedSeats` instead of `allSeats`. The `seatIndex` now becomes the screen position index (0 = bottom center = hero), and each element contains the actual seat data for the player who should appear at that position.
+For the hero, inject `myCards` into `holeCards`. For opponents, keep empty (cards show face-down via `has_cards`).
 
-The key changes in the rendering loop:
-- Use `rotatedSeats` instead of `allSeats`
-- For `isCurrentActor` and `isDealer`, compare using the original seat number from `seatData.seat` (not the rotated index)
-- For `handleJoinSeat`, pass the actual seat number `(heroSeat + seatIndex) % maxSeats` instead of the rotated index
-- When spectating (not seated), skip rotation (heroSeat defaults to 0, so no change)
+### 5. Add Landscape Lock and Portrait Blocker
 
-### Summary of changes
+Import `useIsLandscape` and `useLockLandscape` (same hooks used in `PokerTablePro`). Add the portrait rotation prompt overlay.
 
-| Location | Change |
-|----------|--------|
-| Lines 213-215 | Replace `allSeats` with `rotatedSeats` that offsets by `mySeatNumber` |
-| Lines 372-412 | Update seat rendering loop to use `rotatedSeats`, derive actual seat number for game logic comparisons |
+### 6. Use Z Constants
 
-### How it works after the fix
+Replace all hardcoded z-index values with imports from `z.ts`.
 
-Example: 6-seat table. You are in seat 3, Kris in seat 4, Pete in seat 2.
+### 7. Use Same Background Treatment
 
-**Your view:** You at position 0 (bottom), Kris at position 1 (your left), Pete at position 5 (your right) -- correct clockwise order.
+Replace `bg-black/30` with the radial gradient vignette used in the bot table.
 
-**Kris's view:** Kris at position 0 (bottom), seat 5 at position 1 (Kris's left), you at position 5 (Kris's right) -- correct clockwise order.
+## Files to Modify
 
-**Pete's view:** Pete at position 0 (bottom), you at position 1 (Pete's left) -- correct clockwise order.
+| File | Change |
+|------|--------|
+| `src/components/poker/OnlinePokerTable.tsx` | Major refactor: replace layout, seat system, hero rendering, add landscape lock, use Z constants |
 
-Each player always sees themselves centered at the bottom with others arranged in proper relative order.
+## What Stays the Same
+
+- Seat rotation logic (hero perspective) -- already implemented, will continue to work
+- All game actions (join, leave, start hand, send action, kick, close)
+- Header bar with table name, invite, sound, admin menu
+- Connection overlay, invite dialog, kick/close dialogs
+- Sound triggers and dealer expression changes
+- Buy-in input for spectators (moved to overlay on empty seat tap)
+
+## Visual Result After Fix
+
+Both tables will look identical:
+- Same premium table asset at 16:9 with leather background
+- Same avatar sizes (xl/2xl) positioned on the rail edge
+- Same nameplate bars below avatars
+- Same card fan behind hero's avatar
+- Same dealer character at top center
+- Same pot and community card positioning
+- Same landscape-first orientation
 
