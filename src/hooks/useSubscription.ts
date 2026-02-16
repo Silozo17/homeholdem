@@ -25,7 +25,7 @@ export function useSubscription() {
   });
 
   const checkSubscription = useCallback(async () => {
-    if (!session?.access_token) {
+    if (!user) {
       setState(prev => ({ ...prev, loading: false }));
       return;
     }
@@ -33,9 +33,17 @@ export function useSubscription() {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
+      // Always get a fresh session to avoid expired token errors
+      const { data: sessionData } = await supabase.auth.getSession();
+      const freshToken = sessionData?.session?.access_token;
+      if (!freshToken) {
+        setState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
 
@@ -61,7 +69,7 @@ export function useSubscription() {
         // Preserve previous subscription values - don't reset on network errors
       }));
     }
-  }, [session?.access_token]);
+  }, [user]);
 
   // Check subscription on mount and when user changes
   useEffect(() => {
