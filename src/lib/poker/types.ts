@@ -114,6 +114,12 @@ export interface GameState {
   blindLevel: number;
   blindTimer: number; // minutes, 0 = off
   lastBlindIncrease: number; // timestamp
+  lastHandWinners: Array<{
+    playerId: string;
+    name: string;
+    handName: string;
+    chipsWon: number;
+  }>;
 }
 
 export const BLIND_LEVELS = [
