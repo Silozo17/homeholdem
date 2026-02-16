@@ -20,6 +20,12 @@ export interface HandWinner {
   hand_name: string;
 }
 
+export interface ChatBubble {
+  player_id: string;
+  text: string;
+  id: string;
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 async function callEdge(fn: string, body: any, method = 'POST') {
@@ -58,6 +64,7 @@ interface UseOnlinePokerTableReturn {
   actionPending: boolean;
   lastActions: Record<string, string>;
   handWinners: HandWinner[];
+  chatBubbles: ChatBubble[];
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -65,6 +72,7 @@ interface UseOnlinePokerTableReturn {
   sendAction: (action: string, amount?: number) => Promise<void>;
   pingTimeout: () => Promise<void>;
   refreshState: () => Promise<void>;
+  sendChat: (text: string) => void;
 }
 
 export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn {
@@ -77,6 +85,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [actionPending, setActionPending] = useState(false);
   const [lastActions, setLastActions] = useState<Record<string, string>>({});
   const [handWinners, setHandWinners] = useState<HandWinner[]>([]);
+  const [chatBubbles, setChatBubbles] = useState<ChatBubble[]>([]);
   const channelRef = useRef<any>(null);
   const tableStateRef = useRef<OnlineTableState | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +93,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const autoStartAttemptedRef = useRef(false);
   const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevHandIdRef = useRef<string | null>(null);
+  const chatIdCounter = useRef(0);
 
   const userId = user?.id;
 
@@ -154,7 +164,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           const next = { ...prev };
           for (const s of seats) {
             if (s.player_id && s.last_action) {
-              next[s.player_id] = s.last_action;
+              // Capitalize first letter so PlayerSeat CSS class matching works
+              const raw = s.last_action;
+              next[s.player_id] = raw.charAt(0).toUpperCase() + raw.slice(1);
             }
           }
           return next;
@@ -229,6 +241,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           showdownTimerRef.current = null;
           autoStartAttemptedRef.current = false;
         }, 5000);
+      })
+      .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
+        const id = `chat-${chatIdCounter.current++}`;
+        const bubble: ChatBubble = { player_id: payload.player_id, text: payload.text, id };
+        setChatBubbles(prev => [...prev, bubble]);
+        setTimeout(() => {
+          setChatBubbles(prev => prev.filter(b => b.id !== id));
+        }, 3000);
       })
       .subscribe();
 
@@ -366,6 +386,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [hasActiveHand]);
 
+  const sendChat = useCallback((text: string) => {
+    if (!channelRef.current || !userId) return;
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'chat_emoji',
+      payload: { player_id: userId, text },
+    });
+  }, [userId]);
+
   return {
     tableState,
     myCards,
@@ -379,11 +408,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     actionPending,
     lastActions,
     handWinners,
+    chatBubbles,
     joinTable,
     leaveTable,
     startHand,
     sendAction,
     pingTimeout,
     refreshState,
+    sendChat,
   };
 }
