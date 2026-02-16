@@ -8,6 +8,7 @@ import { PokerChip } from './PokerChip';
 import { cn } from '@/lib/utils';
 
 export type TableHalf = 'top' | 'bottom';
+export type SidePosition = 'left' | 'right' | 'center';
 
 interface PlayerSeatProps {
   player: PokerPlayer;
@@ -16,6 +17,7 @@ interface PlayerSeatProps {
   isHuman: boolean;
   isShowdown: boolean;
   tableHalf: TableHalf;
+  sidePosition?: SidePosition;
   avatarUrl?: string | null;
   seatDealOrder?: number;
   onTimeout?: () => void;
@@ -31,7 +33,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  tableHalf, avatarUrl, seatDealOrder = 0, onTimeout,
+  tableHalf, sidePosition = 'center', avatarUrl, seatDealOrder = 0, onTimeout,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -131,16 +133,22 @@ export const PlayerSeat = memo(function PlayerSeat({
         )}
       </div>
 
-      {/* Info stack — absolutely positioned above or below the avatar */}
+      {/* Info stack — absolutely positioned based on sidePosition */}
       <div
         className="flex flex-col items-center"
         style={{
           position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          ...(isTop
-            ? { bottom: '100%', marginBottom: '4px' }
-            : { top: '100%', marginTop: '4px' }),
+          ...(sidePosition === 'left'
+            ? { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: '4px' }
+            : sidePosition === 'right'
+            ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: '4px' }
+            : {
+                left: '50%',
+                transform: 'translateX(-50%)',
+                ...(isTop
+                  ? { bottom: '100%', marginBottom: '4px' }
+                  : { top: '100%', marginTop: '4px' }),
+              }),
         }}
       >
         {infoStack}

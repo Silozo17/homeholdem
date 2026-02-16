@@ -254,8 +254,8 @@ export function PokerTablePro({
           className="relative"
           style={{
             aspectRatio: '16 / 9',
-            width: isLandscape ? 'min(96vw, 1100px)' : 'min(96vw, 900px)',
-            maxHeight: isLandscape ? '85vh' : '75vh',
+            width: isLandscape ? 'min(78vw, 900px)' : 'min(96vw, 900px)',
+            maxHeight: isLandscape ? '70vh' : '75vh',
             overflow: 'visible',
           }}
         >
@@ -387,6 +387,7 @@ export function PokerTablePro({
                   isHuman={isHuman}
                   isShowdown={isShowdown}
                   tableHalf={pos.yPct < 55 ? 'top' : 'bottom'}
+                  sidePosition={pos.xPct < 25 ? 'left' : pos.xPct > 75 ? 'right' : 'center'}
                   avatarUrl={isHuman ? humanAvatarUrl : undefined}
                   seatDealOrder={seatDealOrder}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}
@@ -399,7 +400,7 @@ export function PokerTablePro({
 
       {/* YOUR TURN badge */}
       {showActions && (
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 82px)', zIndex: Z.ACTIONS }}>
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{
               background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
