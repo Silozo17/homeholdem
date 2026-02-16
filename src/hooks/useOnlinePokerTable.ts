@@ -8,6 +8,11 @@ import {
   OnlineSeatInfo,
 } from '@/lib/poker/online-types';
 
+export interface RevealedCard {
+  player_id: string;
+  cards: Card[];
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 async function callEdge(fn: string, body: any, method = 'POST') {
@@ -42,6 +47,7 @@ interface UseOnlinePokerTableReturn {
   isMyTurn: boolean;
   amountToCall: number;
   canCheck: boolean;
+  revealedCards: RevealedCard[];
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -57,8 +63,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [myCards, setMyCards] = useState<Card[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revealedCards, setRevealedCards] = useState<RevealedCard[]>([]);
   const channelRef = useRef<any>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = user?.id;
 
@@ -129,17 +137,34 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Refetch full state on seat changes
         refreshState();
       })
-      .on('broadcast', { event: 'hand_complete' }, ({ payload }) => {
-        // Hand finished — update state and clear cards
+      .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
+        // Store revealed cards for showdown display
+        const revealed: RevealedCard[] = payload.revealed_cards || [];
+        setRevealedCards(revealed);
+
+        // Update hand phase to 'complete' + seats, but keep hand visible
         setTableState(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            current_hand: null,
+            current_hand: prev.current_hand ? { ...prev.current_hand, phase: 'complete' } : null,
             seats: payload.seats || prev.seats,
           };
         });
-        setMyCards(null);
+
+        // Clear showdown timer if one exists
+        if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+
+        // After 5s pause, clear hand so Deal button reappears
+        showdownTimerRef.current = setTimeout(() => {
+          setTableState(prev => {
+            if (!prev) return prev;
+            return { ...prev, current_hand: null };
+          });
+          setMyCards(null);
+          setRevealedCards([]);
+          showdownTimerRef.current = null;
+        }, 5000);
       })
       .subscribe();
 
@@ -148,6 +173,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     return () => {
       supabase.removeChannel(channel);
       channelRef.current = null;
+      if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
     };
   }, [tableId, refreshState]);
 
@@ -250,6 +276,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     isMyTurn,
     amountToCall,
     canCheck,
+    revealedCards,
     joinTable,
     leaveTable,
     startHand,
