@@ -172,7 +172,7 @@ export function PokerTablePro({
   const showActions = isHumanTurn && humanPlayer && humanPlayer.status === 'active';
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className="fixed inset-0 overflow-hidden z-[60]">
       {/* Portrait block overlay */}
       {!isLandscape && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
