@@ -122,7 +122,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
-    actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted,
+    actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
   } = useOnlinePokerTable(tableId);
 
   const [buyInAmount, setBuyInAmount] = useState('');
@@ -215,7 +215,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId && currentHandId !== prevHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
       setDealing(true);
-      const timer = setTimeout(() => setDealing(false), 3000);
+      const timer = setTimeout(() => setDealing(false), 4500);
       prevHandIdRef.current = currentHandId;
       return () => clearTimeout(timer);
     }
@@ -237,13 +237,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const winnerPos = positionsArr[screenIdx];
     if (!winnerPos) return;
     // Spawn 4 chip animations from pot (50, 20) to winner seat
-    const newChips = Array.from({ length: 4 }, (_, i) => ({
+    const newChips = Array.from({ length: 6 }, (_, i) => ({
       id: chipAnimIdRef.current++,
       toX: winnerPos.xPct,
       toY: winnerPos.yPct,
     }));
     setChipAnimations(newChips);
-    const timer = setTimeout(() => setChipAnimations([]), 800);
+    const timer = setTimeout(() => setChipAnimations([]), 1200);
     return () => clearTimeout(timer);
   }, [handWinners, tableState, mySeatNumber]);
 
@@ -543,7 +543,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </div>
 
           {/* Manual deal fallback for table creator */}
-          {isCreator && !hand && !autoStartAttempted && activeSeats.length >= 2 && (
+          {isCreator && !hand && !autoStartAttempted && !handHasEverStarted && activeSeats.length >= 2 && (
             <button
               onClick={() => startHand()}
               className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"
@@ -631,20 +631,27 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               fromY={20}
               toX={chip.toX}
               toY={chip.toY}
-              duration={600}
+              duration={900}
             />
           ))}
 
           {/* Deal animation: cards fly from dealer to seats */}
           {dealing && (() => {
-            const activeSeatCount = activeSeats.length;
             const posArr = positions;
+            // Build ordered list of active screen positions for round-robin dealing
+            const activeScreenPositions: number[] = [];
+            rotatedSeats.forEach((seatData, screenPos) => {
+              if (seatData?.player_id) activeScreenPositions.push(screenPos);
+            });
+            const activeSeatCount = activeScreenPositions.length;
             return rotatedSeats.map((seatData, screenPos) => {
               if (!seatData?.player_id) return null;
               const pos = posArr[screenPos];
               if (!pos) return null;
+              const seatOrder = activeScreenPositions.indexOf(screenPos);
               return [0, 1].map(cardIdx => {
-                const delay = (cardIdx * activeSeatCount + screenPos) * 0.243;
+                // Round-robin: first card to each player in order, then second card
+                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;
                 return (
                   <div
                     key={`deal-${screenPos}-${cardIdx}`}
@@ -653,7 +660,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                       left: '50%',
                       top: '2%',
                       zIndex: Z.EFFECTS,
-                      animation: `deal-card-fly 0.54s ease-out ${delay}s both`,
+                      animation: `deal-card-fly 0.7s ease-out ${delay}s both`,
                       ['--deal-dx' as any]: `${pos.xPct - 50}vw`,
                       ['--deal-dy' as any]: `${pos.yPct - 2}vh`,
                     }}
@@ -714,7 +721,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 <SeatAnchor key={`empty-${actualSeatNumber}`} xPct={pos.xPct} yPct={pos.yPct} zIndex={Z.SEATS}>
                   <EmptySeatDisplay
                     seatNumber={actualSeatNumber}
-                    canJoin={!isSeated && !hand}
+                    canJoin={!isSeated}
                     onJoin={() => handleJoinSeat(actualSeatNumber)}
                   />
                 </SeatAnchor>
@@ -842,26 +849,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             <Eye className="h-4 w-4 text-foreground/40" />
             <span className="text-xs text-foreground/50 font-bold">Spectating</span>
           </div>
-          {!hand ? (
-            <>
-              <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
-                Tap an empty seat to join
-              </p>
-              <div className="flex items-center gap-2 max-w-xs mx-auto">
-                <Input
-                  type="number"
-                  placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
-                  value={buyInAmount}
-                  onChange={(e) => setBuyInAmount(e.target.value)}
-                  className="text-center text-sm bg-black/30 border-border/30"
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-[10px] text-center text-foreground/30 font-medium">
-              Wait for the current hand to finish before joining
-            </p>
-          )}
+          <p className="text-[10px] text-center text-foreground/40 mb-2 font-medium">
+            Tap an empty seat to join{hand ? " (you'll play next hand)" : ''}
+          </p>
+          <div className="flex items-center gap-2 max-w-xs mx-auto">
+            <Input
+              type="number"
+              placeholder={`Buy-in (${table.min_buy_in}-${table.max_buy_in})`}
+              value={buyInAmount}
+              onChange={(e) => setBuyInAmount(e.target.value)}
+              className="text-center text-sm bg-black/30 border-border/30"
+            />
+          </div>
           <button
             onClick={onLeave}
             className="flex items-center justify-center gap-1.5 w-full mt-2 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"

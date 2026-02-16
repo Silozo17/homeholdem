@@ -46,11 +46,11 @@ export function ChipAnimation({
     >
       {/* Mini chip */}
       <div
-        className="w-3 h-3 rounded-full"
+        className="w-4 h-4 rounded-full"
         style={{
           background: `radial-gradient(circle at 35% 35%, ${color}, color-mix(in srgb, ${color} 60%, black))`,
-          boxShadow: `0 1px 4px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.3)`,
-          border: `1px solid color-mix(in srgb, ${color} 70%, white)`,
+          boxShadow: `0 1px 6px rgba(200,160,40,0.6), 0 0 10px rgba(200,160,40,0.3), inset 0 1px 2px rgba(255,255,255,0.4)`,
+          border: `1.5px solid color-mix(in srgb, ${color} 70%, white)`,
         }}
       />
     </div>

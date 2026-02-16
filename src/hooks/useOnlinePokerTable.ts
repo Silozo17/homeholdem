@@ -74,6 +74,7 @@ interface UseOnlinePokerTableReturn {
   refreshState: () => Promise<void>;
   sendChat: (text: string) => void;
   autoStartAttempted: boolean;
+  handHasEverStarted: boolean;
 }
 
 export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn {
@@ -95,6 +96,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevHandIdRef = useRef<string | null>(null);
   const chatIdCounter = useRef(0);
+  const [handHasEverStarted, setHandHasEverStarted] = useState(false);
 
   const userId = user?.id;
 
@@ -250,7 +252,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setHandWinners([]);
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
-        }, 5000);
+        }, 7000);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
         // Skip if this is our own message (already added locally in sendChat)
@@ -260,7 +262,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         setChatBubbles(prev => [...prev, bubble]);
       setTimeout(() => {
         setChatBubbles(prev => prev.filter(b => b.id !== id));
-      }, 5000);
+      }, 6000);
     })
     .subscribe();
 
@@ -398,6 +400,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   useEffect(() => {
     if (hasActiveHand) {
       setAutoStartAttempted(true);
+      setHandHasEverStarted(true);
     }
   }, [hasActiveHand]);
 
@@ -414,7 +417,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     setChatBubbles(prev => [...prev, bubble]);
     setTimeout(() => {
       setChatBubbles(prev => prev.filter(b => b.id !== id));
-    }, 5000);
+    }, 6000);
   }, [userId]);
 
   return {
@@ -439,5 +442,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     refreshState,
     sendChat,
     autoStartAttempted,
+    handHasEverStarted,
   };
 }
