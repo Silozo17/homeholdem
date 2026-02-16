@@ -352,7 +352,7 @@ export function PokerTablePro({
           <TableFelt />
 
           {/* Dealer character — top center of table */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 'calc(-4% - 22px)', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 'calc(-4% - 52px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
