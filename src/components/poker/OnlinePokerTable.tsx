@@ -128,6 +128,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const isLandscape = useIsLandscape();
   useLockLandscape();
 
@@ -136,6 +137,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     requestWakeLock();
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
+
+  // Intercept browser back button
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+      setShowQuitConfirm(true);
+    };
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Sound triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
@@ -318,7 +331,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
-        <button onClick={isSeated ? handleLeave : onLeave}
+        <button onClick={() => setShowQuitConfirm(true)}
           className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
         >
           <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
@@ -723,6 +736,27 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         tableName={table.name}
         clubId={table.club_id}
       />
+
+      {/* Quit confirmation dialog */}
+      <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
+        <AlertDialogContent className="z-[70]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Table?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave? You will forfeit your seat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={isSeated ? handleLeave : onLeave}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Leave Table
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
