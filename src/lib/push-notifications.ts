@@ -245,6 +245,23 @@ export async function notifyRebuyAddon(
   });
 }
 
+// Poker game invite
+export async function notifyPokerInvite(
+  userId: string,
+  inviterName: string,
+  tableName: string,
+  tableId: string
+) {
+  return sendPushNotification({
+    userIds: [userId],
+    title: 'Poker Invite',
+    body: `${inviterName} invited you to play at ${tableName}`,
+    url: `/online-poker?table=${tableId}`,
+    tag: `poker-invite-${tableId}`,
+    notificationType: 'rsvp_updates',
+  });
+}
+
 // Broadcast notification from club owner
 export async function sendBroadcastPush(
   userIds: string[],

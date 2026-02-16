@@ -15,8 +15,9 @@ import { ConnectionOverlay } from './ConnectionOverlay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
@@ -71,6 +72,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   // Sound triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
@@ -250,6 +252,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
             </button>
           )}
+          <button onClick={() => setInviteOpen(true)}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+          >
+            <UserPlus className="h-3.5 w-3.5 text-foreground/80" />
+          </button>
           <button onClick={toggleSound}
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
           >
@@ -572,6 +579,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* Connection lost overlay */}
       <ConnectionOverlay isDisconnected={isDisconnected} onReconnect={handleReconnect} />
+
+      {/* Invite players dialog */}
+      <InvitePlayersDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        tableId={tableId}
+        tableName={table.name}
+        clubId={table.club_id}
+      />
     </div>
   );
 }

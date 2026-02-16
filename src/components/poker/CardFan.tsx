@@ -5,7 +5,7 @@ export function CardFan({ className }: { className?: string }) {
   const rotations = [-20, -7, 7, 20];
 
   return (
-    <div className={cn('relative flex items-center justify-center h-32', className)}>
+    <div className={cn('relative flex items-center justify-center', className)}>
       {suits.map((suit, i) => (
         <div
           key={suit}
