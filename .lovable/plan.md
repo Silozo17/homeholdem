@@ -1,33 +1,30 @@
 
+# Fix "Winner Unknown" in Multiplayer Showdown
 
-# Fix "Your Turn" Pill Position & Add Icons to Betting Buttons
+## Root Cause
 
-## Issue 1: "YOUR TURN" pill overlaps the player avatar
+The `hand_result` broadcast from the server contains only `winners`, `revealed_cards`, `pots`, and `state_version` -- it does **not** include a `seats` array. But the client code on line 192 of `useOnlinePokerTable.ts` tries to look up `payload.seats` to find display names:
 
-The pill is positioned at `bottom: calc(env(safe-area-inset-bottom) + 100px)` in portrait mode, which places it right over the hero seat area.
+```typescript
+const seatData = (payload.seats || []).find(...)
+```
 
-**Fix**: Move it higher so it sits just above the betting controls bar instead of on top of the player. Change the bottom offset from `100px` to `140px` in portrait, placing it clearly above the action buttons and below the player avatar zone.
+Since `payload.seats` is always `undefined`, `seatData` is always `undefined`, so every winner falls back to `'Unknown'`.
 
-## Issue 2: Fold/Check/Call/Raise buttons have no icons
+## Fix
 
-The buttons are text-only, making them hard to distinguish at a glance during fast gameplay.
+In `src/hooks/useOnlinePokerTable.ts`, inside the `hand_result` handler (around line 191-199), look up the display name from the existing `tableState.seats` (which is populated by previous `game_state` broadcasts) instead of from `payload.seats`.
 
-**Fix**: Add Lucide icons to each button:
-- **Fold**: `X` icon (clear "no" signal)
-- **Check**: `Check` icon (tick mark)
-- **Call**: `PhoneCall` or `ArrowRight` icon (matching action)
-- **Raise**: `TrendingUp` icon (upward arrow)
-- **All-in**: `Flame` icon (dramatic emphasis)
+Change:
+```typescript
+const seatData = (payload.seats || []).find((s: any) => s.player_id === w.player_id);
+```
 
-Icons will be small (14px) and placed before the text label in both portrait and landscape layouts.
+To:
+```typescript
+const seatData = tableState?.seats.find((s) => s.player_id === w.player_id);
+```
 
-## Technical Detail
+This ensures the winner's display name comes from the already-known seat data that the client has been tracking throughout the hand.
 
-### File: `src/components/poker/BettingControls.tsx`
-- Import `X, Check, PhoneCall, TrendingUp, Flame` from `lucide-react`
-- Add the appropriate icon (`<Icon size={14} />`) inside each button, before the text label
-- Apply to both portrait and landscape button variants
-
-### File: `src/components/poker/OnlinePokerTable.tsx`
-- Line 588: Change portrait bottom from `100px` to `140px` to push the "YOUR TURN" pill above the controls bar and away from the avatar
-
+Single line change in one file.
