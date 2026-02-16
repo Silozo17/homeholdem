@@ -1,45 +1,55 @@
 
-# Fix Player Seat Positions to Match Table Rail
 
-## Problem
-The current seat coordinates (e.g., B at x=4%, F at x=96%, D/H at y=0%) place players far outside the visible table rail. The table image uses `object-contain` inside a 16:9 wrapper, so it doesn't fill the full wrapper -- meaning coordinates at the extreme edges (0-4% and 96-100%) land in the dark leather background, not on the table rail.
+# Fix Seat Positions, Layout Direction, and Profile Avatars
 
-## Solution: New Coordinates Matched to Table Rail
+## 3 Changes Required
 
-Only 1 file needs to change: `src/lib/poker/ui/seatLayout.ts`
+### 1. Fine-tune seat coordinates in `seatLayout.ts`
 
-Replace all seat coordinates with values that hug the actual table rail oval. All positions are perfectly mirrored left-right around x=50%:
+Based on the screenshot, the avatar circle center (anchor) needs to sit exactly on the brown table rail edge. Current vs target:
 
-**Landscape positions (% of wrapper):**
-```text
-        D(35,5)     [Dealer]    E(65,5)
-    C(18,18)                        F(82,18)
-  B(10,44)                            G(90,44)
-    A(24,76)                        H(76,76)
-                  Y(50,88)
-```
+| Seat | Current | Target | Direction |
+|------|---------|--------|-----------|
+| Y | (50, 83) | (50, 86) | Down ~3% |
+| A | (20, 68) | (24, 70) | Right 4%, down 2% |
+| E | (80, 68) | (76, 70) | Left 4%, down 2% |
+| F | (88, 47) | (84, 50) | Left 4%, down 3% |
+| B | (12, 47) | (16, 50) | Right 4%, down 3% (mirror of F) |
+| C | (17, 22) | (20, 22) | Right 3% (keep y) |
+| G | (83, 22) | (80, 22) | Left 3% (mirror of C) |
+| D | (30, 5) | (33, 8) | Right 3%, down 3% |
+| H | (70, 5) | (67, 8) | Left 3%, down 3% (mirror of D) |
 
-| Seat | Current         | New          | What changed                     |
-|------|----------------|--------------|----------------------------------|
-| Y    | (50, 98)       | (50, 88)     | Pulled up from below table       |
-| A    | (20, 82)       | (24, 76)     | Moved right + up onto rail curve |
-| B    | (4, 48)        | (10, 44)     | Pulled in from far-left edge     |
-| C    | (12, 16)       | (18, 18)     | Pulled in from edge              |
-| D    | (32, 0)        | (35, 5)      | Pulled down from above table     |
-| E    | (80, 82)       | (76, 76)     | Mirror of A                      |
-| F    | (96, 48)       | (90, 44)     | Pulled in from far-right edge    |
-| G    | (88, 16)       | (82, 18)     | Mirror of C                      |
-| H    | (68, 0)        | (65, 5)      | Mirror of D                      |
+Portrait positions adjusted proportionally.
 
-**Symmetry verification** -- every pair sums to 100% on x-axis:
-- A(24) + H(76) = 100
-- B(10) + G(90) = 100
-- C(18) + F(82) = 100
-- D(35) + E(65) = 100
+### 2. Flip card/name/chip layout for top-half players in `PlayerSeat.tsx`
 
-Portrait positions will follow the same proportional adjustment, pulled inward.
+Add a `tableHalf` prop (`'top' | 'bottom'`) to `PlayerSeat`:
+- **Bottom half** (Y, A, E): Current order -- Avatar on top, then cards, name, chips below
+- **Top half** (B, C, D, F, G, H): Reversed -- chips, name, cards above, then Avatar at bottom
+
+This is done by conditionally using `flex-col-reverse` when `tableHalf === 'top'`.
+
+### 3. Show user's profile avatar for the human player in `PlayerAvatar.tsx`
+
+- Add an optional `avatarUrl` prop to `PlayerAvatar`
+- When provided, render an `<img>` inside the circle instead of the letter initial
+- In `PokerTablePro.tsx`, fetch the current user's profile avatar from the database and pass it to the human player's `PlayerSeat`
+
+---
 
 ## Technical Details
-- File: `src/lib/poker/ui/seatLayout.ts`
-- Update `SEATS_LANDSCAPE` and `SEATS_PORTRAIT` coordinate maps
-- No other files change -- the `getSeatPositions` function and `SEAT_PICKS` mapping remain the same
+
+**Files to modify:**
+
+1. **`src/lib/poker/ui/seatLayout.ts`** -- Update `SEATS_LANDSCAPE` and `SEATS_PORTRAIT` coordinate maps with the corrected values above.
+
+2. **`src/components/poker/PlayerSeat.tsx`** -- Add `tableHalf: 'top' | 'bottom'` prop. Wrap content in `flex-col` or `flex-col-reverse` based on half. Move the avatar render block so it appears last (at bottom) for top-half players.
+
+3. **`src/components/poker/PlayerAvatar.tsx`** -- Add optional `avatarUrl?: string` prop. When present, show `<img>` with `object-cover rounded-full` instead of the letter initial.
+
+4. **`src/components/poker/PokerTablePro.tsx`** -- 
+   - Fetch user's avatar_url from the `profiles` table using their auth ID
+   - Determine `tableHalf` per seat (seats D, C, B, H, G, F = top; Y, A, E = bottom) based on yPct threshold (e.g., < 55% = top)
+   - Pass `avatarUrl` and `tableHalf` through to `PlayerSeat`
+
