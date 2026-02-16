@@ -35,6 +35,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
   const cardSize = compact ? 'xs' : 'sm';
+  const humanCardSize = compact ? 'sm' : 'lg';
 
   // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
@@ -56,21 +57,27 @@ export const PlayerSeat = memo(function PlayerSeat({
     </div>
   ) : null;
 
-  // Human player cards (rendered below the nameplate)
+  // Human player cards (fanned behind avatar)
   const humanCards = isHuman && player.holeCards.length > 0 ? (
-    <div className="flex gap-0.5 justify-center mt-0.5" style={{ zIndex: 2 }}>
+    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: '30%' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
+        const rotation = i === 0 ? -15 : 15;
+        const xOffset = i === 0 ? -8 : 8;
         return (
           <CardDisplay
             key={i}
             card={card}
-            size={cardSize}
+            size={humanCardSize}
             dealDelay={dealDelay}
             className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
           />
         );
-      })}
+      }).map((el, i) => (
+        <div key={i} style={{ transform: `rotate(${i === 0 ? -15 : 15}deg) translateX(${i === 0 ? -8 : 8}px)` }}>
+          {el}
+        </div>
+      ))}
     </div>
   ) : null;
 
@@ -113,6 +120,9 @@ export const PlayerSeat = memo(function PlayerSeat({
 
         {/* Opponent showdown cards overlaying avatar */}
         {opponentShowdownCards}
+
+        {/* Human player cards fanned behind avatar */}
+        {humanCards}
       </div>
 
       {/* Nameplate bar */}
@@ -141,8 +151,7 @@ export const PlayerSeat = memo(function PlayerSeat({
         </p>
       </div>
 
-      {/* Human player cards below nameplate */}
-      {humanCards}
+      {/* Action badge (floating near nameplate) */}
 
       {/* Action badge (floating near nameplate) */}
       {player.lastAction && (
