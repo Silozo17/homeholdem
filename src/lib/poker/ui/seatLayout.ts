@@ -12,7 +12,7 @@ export interface SeatPos {
 
 // Portrait: ry reduced so top seat doesn't hit dealer, rx reduced so sides don't clip
 export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 38, ry: 34 };
-export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 40, ry: 36 };
+export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 
 /**
  * Angle maps per player count.
@@ -33,14 +33,17 @@ const portraitAngles: Record<number, number[]> = {
 };
 
 const landscapeAngles: Record<number, number[]> = {
-  2: [90, 315],
+  2: [90, 270],
   3: [90, 210, 330],
-  4: [90, 195, 345, 15],
-  5: [90, 155, 210, 330, 25],
-  6: [90, 150, 200, 340, 20, 240],
-  7: [90, 145, 190, 220, 320, 350, 40],
-  8: [90, 140, 175, 210, 330, 350, 10, 40],
-  9: [90, 135, 170, 205, 235, 55, 325, 350, 10],
+  4: [90, 200, 340, 20],
+  5: [90, 160, 210, 330, 20],
+  6: [90, 150, 200, 340, 10, 50],
+  7: [90, 145, 195, 225, 315, 345, 35],
+  8: [90, 140, 180, 215, 325, 0, 35, 55],
+  //        You  Alex  Blake Casey Drew  Ellis Gray  Frankie Harper
+  //  idx:   0    1     2     3     4     5     6     7       8
+  //  Mirror pairs: 1↔5(Alex/Ellis), 2↔8(Blake/Harper), 3↔7(Casey/Frankie), 4↔6(Drew/Gray)
+  9: [90, 140, 180, 215, 240, 40, 0, 325, 300],
 };
 
 // Very small push — seats should sit ON the rail, not far outside
