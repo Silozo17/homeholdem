@@ -47,21 +47,37 @@ function useIsLandscape() {
   return isLandscape;
 }
 
-/** Lock screen to landscape while game is mounted */
+/** Lock screen to landscape while game is mounted (requests fullscreen first for Android) */
 function useLockLandscape() {
-  const [locked, setLocked] = useState(false);
+  const lockedRef = { current: false };
   useEffect(() => {
-    const so = screen.orientation;
-    if (so?.lock) {
-      so.lock('landscape').then(() => setLocked(true)).catch(() => {});
+    let cancelled = false;
+    async function lock() {
+      try {
+        // Android Chrome requires fullscreen before orientation lock
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
+        const so = screen.orientation;
+        if (so?.lock) {
+          await so.lock('landscape');
+          if (!cancelled) lockedRef.current = true;
+        }
+      } catch {
+        // Not all devices support orientation lock
+      }
     }
+    lock();
     return () => {
-      if (locked && so?.unlock) {
-        try { so.unlock(); } catch {}
+      cancelled = true;
+      if (lockedRef.current) {
+        try { screen.orientation?.unlock(); } catch {}
+      }
+      if (document.fullscreenElement) {
+        try { document.exitFullscreen(); } catch {}
       }
     };
   }, []);
-  return locked;
 }
 
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
