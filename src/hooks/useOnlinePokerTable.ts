@@ -90,7 +90,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const tableStateRef = useRef<OnlineTableState | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoStartAttemptedRef = useRef(false);
+  const [autoStartAttempted, setAutoStartAttempted] = useState(false);
   const actionPendingFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevHandIdRef = useRef<string | null>(null);
   const chatIdCounter = useRef(0);
@@ -248,7 +248,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setRevealedCards([]);
           setHandWinners([]);
           showdownTimerRef.current = null;
-          autoStartAttemptedRef.current = false;
+          setAutoStartAttempted(false);
         }, 5000);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
@@ -380,18 +380,18 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const hasActiveHand = !!tableState?.current_hand;
 
   useEffect(() => {
-    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttemptedRef.current && mySeatNumber !== null) {
-      autoStartAttemptedRef.current = true;
+    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null) {
+      setAutoStartAttempted(true);
       const timer = setTimeout(() => {
         startHand().catch(() => {});
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [seatedCount, hasActiveHand, mySeatNumber, startHand]);
+  }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted]);
 
   useEffect(() => {
     if (hasActiveHand) {
-      autoStartAttemptedRef.current = true;
+      setAutoStartAttempted(true);
     }
   }, [hasActiveHand]);
 
@@ -402,6 +402,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       event: 'chat_emoji',
       payload: { player_id: userId, text },
     });
+    // Add bubble locally since Supabase doesn't echo broadcasts to sender
+    const id = `chat-${chatIdCounter.current++}`;
+    const bubble: ChatBubble = { player_id: userId, text, id };
+    setChatBubbles(prev => [...prev, bubble]);
+    setTimeout(() => {
+      setChatBubbles(prev => prev.filter(b => b.id !== id));
+    }, 3000);
   }, [userId]);
 
   return {
