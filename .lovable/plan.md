@@ -1,71 +1,48 @@
 
 
-# Fix Player Leave Sync, Timer Duration & Visibility
-
-Three issues to address:
+# Fix: Next Hand Not Starting, Deal Animation Speed, Emoji Display
 
 ---
 
-## 1. Player Leave Not Reflected Live + Lobby Stale Count + Cannot Delete Table
+## Issue 1: Next Hand Doesn't Start After Showdown
 
-**Root cause**: When a player leaves (no active hand), `poker-leave-table` deletes the seat and broadcasts `seat_change`. The client's `seat_change` handler calls `refreshState()`, which fetches the full table state. However, there are two problems:
+**Root cause**: The auto-deal logic (line 382) uses `autoStartAttemptedRef` (a ref) to prevent duplicate starts. After showdown, the 5-second timer (line 242-252) resets `autoStartAttemptedRef.current = false`. However, since refs don't trigger React re-renders, the `useEffect` at line 382 never re-runs -- its dependencies (`seatedCount`, `hasActiveHand`, `mySeatNumber`, `startHand`) haven't changed, so the effect is stale.
 
-- **The leaving player's client** calls `leaveTable()` then immediately calls `onLeave()` (line 308), navigating away before the broadcast reaches other clients. This part works for the leaver but the **remaining player** may not see the update if `refreshState` fails silently or the broadcast doesn't trigger properly.
-- **Lobby stale count**: The lobby counts seats by querying `poker_seats` rows. If the leaving player's seat was deleted but the lobby's Realtime subscription on `poker_seats` didn't fire (e.g., RLS filtering), the count stays stale. The lobby already subscribes to `postgres_changes` on `poker_seats` -- this should work, but only if RLS allows the querying user to see the row deletion.
-- **Cannot delete table**: The `poker-moderate-table` "close" action checks for an active hand (`completed_at IS NULL`). If a hand was abandoned (player left mid-hand and the hand was never formally completed), the stale hand row blocks deletion.
-
-**Fixes**:
-
-### File: `supabase/functions/poker-leave-table/index.ts`
-- After deleting the seat, check how many seats remain. If 0 or 1 remain, broadcast a notification so the remaining player knows the table is empty.
-- If 0 seats remain, auto-close the table (set status to 'closed') so the lobby cleans up.
-- When leaving mid-hand with only 1 other player remaining, auto-complete the hand (mark `completed_at`) so the remaining player can delete the table.
-
-### File: `src/hooks/useOnlinePokerTable.ts`
-- In the `seat_change` handler, if the payload includes `action: 'table_closed'`, auto-navigate the user away.
-- If the payload includes a remaining player count of 1, show a toast: "All other players have left."
-
-### File: `src/components/poker/OnlinePokerTable.tsx`
-- Listen for the "table empty" notification from the hook and show a toast + option to leave.
+**Fix in `src/hooks/useOnlinePokerTable.ts`**:
+- Replace `autoStartAttemptedRef` with a state variable (`autoStartAttempted`) so that setting it to `false` triggers a re-render.
+- This causes the auto-deal `useEffect` to re-evaluate and call `startHand()` after the showdown pause.
 
 ---
 
-## 2. Revert Timer to 30 Seconds
+## Issue 2: Deal Animation Too Fast
 
-The timer was changed to 15s in the last update. Revert all three locations:
+**Root cause**: The animation uses `0.4s` duration and `0.18s` inter-card delay. Slowing by 35% means multiplying durations by ~1.35.
 
-### File: `src/components/poker/TurnTimer.tsx`
-- Line 17: Change default `duration` from `15` back to `30`.
-
-### File: `supabase/functions/poker-start-hand/index.ts`
-- Line 355: Change `15_000` back to `30_000`.
-
-### File: `supabase/functions/poker-action/index.ts`
-- Line 517: Change `15_000` back to `30_000`.
+**Fix in `src/components/poker/OnlinePokerTable.tsx`**:
+- Change deal animation duration from `0.4s` to `0.54s` (line 646).
+- Change inter-card delay from `0.18s` to `0.243s` (line 637).
+- Extend the `dealing` state timeout from `2000ms` to `3000ms` (line 218) to accommodate the slower animation.
 
 ---
 
-## 3. Make Timer Ring More Prominent / Visible
+## Issue 3: Emojis Not Displaying
 
-The current timer is a thin 2.5px SVG ring that's hard to see during gameplay. Make it much more prominent:
+**Root cause**: `sendChat` uses `channelRef.current.send()` to broadcast a `chat_emoji` event. By default, Supabase Realtime does **not** echo broadcasts back to the sender. So:
+- The sender never sees their own emoji.
+- Other players DO receive it (if they're subscribed), but only the sender-side is broken from the sender's perspective.
 
-### File: `src/components/poker/TurnTimer.tsx`
-- Increase default `strokeWidth` from `2.5` to `4`.
-- Increase default `size` from `36` to match the avatar size passed from PlayerSeat (already `56`/`80` on line 115 of PlayerSeat -- so the size is correct, but the stroke is too thin).
-- Add a pulsing glow effect when below 30% remaining (not just 20%).
-- Make the background ring more visible: increase opacity from `0.1` to `0.25`.
-- Add a subtle pulsing animation to the ring when time is low (below 10s remaining) using a CSS class or inline animation.
+Actually, there's a second issue: if only two people are playing and testing from the same perspective, nobody sees anything because the channel needs `config: { broadcast: { self: true } }` or the sender must manually add the bubble locally.
 
-### File: `src/components/poker/PlayerSeat.tsx`
-- Line 115: Pass `strokeWidth={4}` to `TurnTimer` so the ring is clearly visible around the avatar.
+**Fix in `src/hooks/useOnlinePokerTable.ts`**:
+- In the `sendChat` callback, after broadcasting, also add the bubble to `chatBubbles` locally (same logic as the listener). This ensures the sender always sees their own message immediately, regardless of Supabase echo settings.
 
 ---
 
 ## Summary
 
-| # | Fix | Files | 
-|---|-----|-------|
-| 1 | Player leave reflected live + lobby sync + table deletion | `poker-leave-table/index.ts`, `useOnlinePokerTable.ts`, `OnlinePokerTable.tsx` |
-| 2 | Timer back to 30s | `TurnTimer.tsx`, `poker-start-hand/index.ts`, `poker-action/index.ts` |
-| 3 | Timer ring more visible | `TurnTimer.tsx`, `PlayerSeat.tsx` |
+| # | Issue | File | Change |
+|---|-------|------|--------|
+| 1 | Next hand stuck on "Starting soon" | `useOnlinePokerTable.ts` | Replace `autoStartAttemptedRef` with state |
+| 2 | Deal animation too fast | `OnlinePokerTable.tsx` | Multiply durations by 1.35 |
+| 3 | Emojis invisible | `useOnlinePokerTable.ts` | Add local bubble on send |
 
