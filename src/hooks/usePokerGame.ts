@@ -1,12 +1,14 @@
 import { useReducer, useCallback, useRef, useEffect } from 'react';
 import {
   Card, PokerPlayer, GameState, GamePhase, GameAction, LobbySettings,
-  HAND_RANK_NAMES,
+  HAND_RANK_NAMES, BotPersonality,
 } from '@/lib/poker/types';
 import { createDeck, shuffle, deal } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
 import { decideBotAction } from '@/lib/poker/bot-ai';
 import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
+
+const ALL_PERSONALITIES: BotPersonality[] = ['shark', 'maniac', 'rock', 'fish', 'pro'];
 
 // --- Action types ---
 type Action =
@@ -85,6 +87,7 @@ function reducer(state: GameState, action: Action): GameState {
       });
 
       for (let i = 0; i < botCount; i++) {
+        const personality = ALL_PERSONALITIES[i % ALL_PERSONALITIES.length];
         players.push({
           id: `bot-${i}`,
           name: BOT_NAMES[i] || `Bot ${i + 1}`,
@@ -96,6 +99,7 @@ function reducer(state: GameState, action: Action): GameState {
           isBot: true,
           isDealer: false,
           seatIndex: i + 1,
+          personality,
         });
       }
 
@@ -522,6 +526,8 @@ export function usePokerGame() {
           maxBet,
           state.minRaise,
           state.bigBlind,
+          state.dealerIndex,
+          state.players.filter(p => p.status !== 'eliminated').length,
         );
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
       }, 1500 + Math.random() * 1500); // 1.5-3.0s delay for realistic pacing

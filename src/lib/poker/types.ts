@@ -38,6 +38,25 @@ export interface HandResult {
 
 export type PlayerStatus = 'active' | 'folded' | 'all-in' | 'eliminated';
 
+export type BotPersonality = 'shark' | 'maniac' | 'rock' | 'fish' | 'pro';
+
+export interface PersonalityProfile {
+  foldThreshold: number;
+  raiseThreshold: number;
+  bluffChance: number;
+  raiseSizing: number; // multiplier of pot
+  usePotOdds: boolean;
+  positionAware: boolean;
+}
+
+export const BOT_PERSONALITIES: Record<BotPersonality, PersonalityProfile> = {
+  shark:  { foldThreshold: 50, raiseThreshold: 70, bluffChance: 0.05, raiseSizing: 1.0, usePotOdds: false, positionAware: false },
+  maniac: { foldThreshold: 25, raiseThreshold: 45, bluffChance: 0.20, raiseSizing: 1.5, usePotOdds: false, positionAware: false },
+  rock:   { foldThreshold: 60, raiseThreshold: 85, bluffChance: 0.02, raiseSizing: 0.5, usePotOdds: false, positionAware: false },
+  fish:   { foldThreshold: 55, raiseThreshold: 90, bluffChance: 0.03, raiseSizing: 0.6, usePotOdds: false, positionAware: false },
+  pro:    { foldThreshold: 40, raiseThreshold: 65, bluffChance: 0.10, raiseSizing: 0.75, usePotOdds: true, positionAware: true },
+};
+
 export interface PokerPlayer {
   id: string;
   name: string;
@@ -50,6 +69,7 @@ export interface PokerPlayer {
   isDealer: boolean;
   seatIndex: number;
   lastAction?: string;
+  personality?: BotPersonality;
 }
 
 export type GamePhase =

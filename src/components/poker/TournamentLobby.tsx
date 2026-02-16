@@ -193,7 +193,13 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
     try {
       const data = await callEdge('poker-start-tournament', { tournament_id: tid });
       toast({ title: 'Tournament started!', description: `${data.player_count} players across ${data.table_count} tables` });
-      fetchDetail(tid);
+      // Auto-navigate to the player's table
+      const detailData = await callEdge('poker-tournament-state', { tournament_id: tid });
+      if (detailData.my_table_id) {
+        onJoinTable(detailData.my_table_id);
+      } else {
+        setDetail(detailData);
+      }
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
