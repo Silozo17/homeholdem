@@ -117,18 +117,27 @@ Deno.serve(async (req) => {
       },
     });
 
-    // If no players remain, auto-close the table
+    // If no players remain, broadcast close then cascade-delete the table
     if (remainingAfterLeave === 0) {
-      await admin
-        .from("poker_tables")
-        .update({ status: "closed" })
-        .eq("id", table_id);
-
       await channel.send({
         type: "broadcast",
         event: "seat_change",
         payload: { action: "table_closed" },
       });
+
+      // Cascade delete all related data
+      const { data: hands } = await admin
+        .from("poker_hands")
+        .select("id")
+        .eq("table_id", table_id);
+      const handIds = (hands || []).map((h: any) => h.id);
+      if (handIds.length > 0) {
+        await admin.from("poker_hole_cards").delete().in("hand_id", handIds);
+        await admin.from("poker_actions").delete().in("hand_id", handIds);
+        await admin.from("poker_hands").delete().eq("table_id", table_id);
+      }
+      await admin.from("poker_seats").delete().eq("table_id", table_id);
+      await admin.from("poker_tables").delete().eq("id", table_id);
     }
 
     return new Response(
