@@ -257,11 +257,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const id = `chat-${chatIdCounter.current++}`;
         const bubble: ChatBubble = { player_id: payload.player_id, text: payload.text, id };
         setChatBubbles(prev => [...prev, bubble]);
-        setTimeout(() => {
-          setChatBubbles(prev => prev.filter(b => b.id !== id));
-        }, 4000);
-      })
-      .subscribe();
+      setTimeout(() => {
+        setChatBubbles(prev => prev.filter(b => b.id !== id));
+      }, 5000);
+    })
+    .subscribe();
 
     channelRef.current = channel;
 
@@ -384,9 +384,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   useEffect(() => {
     if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null) {
       setAutoStartAttempted(true);
+      const jitter = Math.random() * 1000;
       const timer = setTimeout(() => {
-        startHand().catch(() => {});
-      }, 2000);
+        startHand().catch(() => {
+          setAutoStartAttempted(false);
+        });
+      }, 2000 + jitter);
       return () => clearTimeout(timer);
     }
   }, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted]);
@@ -410,7 +413,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     setChatBubbles(prev => [...prev, bubble]);
     setTimeout(() => {
       setChatBubbles(prev => prev.filter(b => b.id !== id));
-    }, 4000);
+    }, 5000);
   }, [userId]);
 
   return {
