@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CardFan } from './CardFan';
+import { Logo } from '@/components/layout/Logo';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -211,17 +213,24 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
     const isRunning = t.status === 'running';
 
     return (
-      <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
-        <div className="flex items-center justify-between px-3 py-2">
-          <Button variant="ghost" size="icon" onClick={() => { setSelectedId(null); setDetail(null); }} className="text-foreground/70">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => fetchDetail(selectedId)}>
-            <RefreshCw className={cn('h-4 w-4', detailLoading && 'animate-spin')} />
-          </Button>
-        </div>
+      <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+        <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
+          <div className="container relative flex items-center justify-center h-14 px-4">
+            <Button variant="ghost" size="icon" onClick={() => { setSelectedId(null); setDetail(null); }} className="absolute left-4 text-muted-foreground">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Logo size="sm" />
+            <div className="absolute right-4 flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => fetchDetail(selectedId)}>
+                <RefreshCw className={cn('h-4 w-4', detailLoading && 'animate-spin')} />
+              </Button>
+              <NotificationBell />
+            </div>
+          </div>
+        </header>
+        <div className="h-14 safe-area-top shrink-0" />
 
-        <div className="flex-1 px-4 pb-24 space-y-4">
+        <div className="flex-1 px-4 space-y-4">
           <div className="text-center space-y-1">
             <h1 className="text-xl font-black text-shimmer">{t.name}</h1>
             <Badge variant={isRunning ? 'default' : 'secondary'} className="text-[10px]">
@@ -356,17 +365,24 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
   // List view
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
-      <div className="flex items-center justify-between px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate(clubId ? `/club/${clubId}` : '/poker')} className="text-foreground/70">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={() => { setLoading(true); fetchTournaments(); }}>
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-        </Button>
-      </div>
+    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
+        <div className="container relative flex items-center justify-center h-14 px-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(clubId ? `/club/${clubId}` : '/poker')} className="absolute left-4 text-muted-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Logo size="sm" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => { setLoading(true); fetchTournaments(); }}>
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            </Button>
+            <NotificationBell />
+          </div>
+        </div>
+      </header>
+      <div className="h-14 safe-area-top shrink-0" />
 
-      <div className="flex-1 px-4 pb-24 space-y-5">
+      <div className="flex-1 px-4 space-y-5">
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
             <Trophy className="inline h-6 w-6 mr-2 text-primary" />
