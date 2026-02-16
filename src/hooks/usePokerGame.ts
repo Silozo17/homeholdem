@@ -19,7 +19,8 @@ type Action =
   | { type: 'ADVANCE_PHASE' }
   | { type: 'SHOWDOWN' }
   | { type: 'NEXT_HAND' }
-  | { type: 'QUIT' };
+  | { type: 'QUIT' }
+  | { type: 'RESET' };
 
 const BOT_NAMES = ['Alex', 'Blake', 'Casey', 'Drew', 'Ellis', 'Frankie', 'Gray', 'Harper'];
 
@@ -438,6 +439,9 @@ function reducer(state: GameState, action: Action): GameState {
     case 'QUIT':
       return { ...state, phase: 'game_over' };
 
+    case 'RESET':
+      return createInitialState();
+
     default:
       return state;
   }
@@ -596,6 +600,10 @@ export function usePokerGame() {
     dispatch({ type: 'QUIT' });
   }, []);
 
+  const resetGame = useCallback(() => {
+    dispatch({ type: 'RESET' });
+  }, []);
+
   const isHumanTurn = 
     (state.phase === 'preflop' || state.phase === 'flop' ||
      state.phase === 'turn' || state.phase === 'river') &&
@@ -613,6 +621,7 @@ export function usePokerGame() {
     playerAction,
     nextHand,
     quitGame,
+    resetGame,
     isHumanTurn,
     humanPlayer,
     amountToCall,

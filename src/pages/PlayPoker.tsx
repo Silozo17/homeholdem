@@ -9,6 +9,7 @@ export default function PlayPoker() {
     playerAction,
     nextHand,
     quitGame,
+    resetGame,
     isHumanTurn,
     amountToCall,
     canCheck,
@@ -28,7 +29,7 @@ export default function PlayPoker() {
       maxBet={maxBet}
       onAction={playerAction}
       onNextHand={nextHand}
-      onQuit={quitGame}
+      onQuit={resetGame}
     />
   );
 }
