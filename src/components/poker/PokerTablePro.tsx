@@ -14,6 +14,7 @@ import { getSeatPositions } from '@/lib/poker/ui/seatLayout';
 import { usePokerSounds, PokerSoundEvent } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Z } from './z';
 import leatherBg from '@/assets/leather-bg.jpg';
 
 interface PokerTableProProps {
@@ -153,19 +154,19 @@ export function PokerTablePro({
   return (
     <TableStage>
       {/* Leather background */}
-      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} style={{ zIndex: 0 }} />
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" style={{ zIndex: 0 }} />
+      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} style={{ zIndex: Z.BG }} />
+      <div className="absolute inset-0 bg-black/30 pointer-events-none" style={{ zIndex: Z.BG }} />
 
       {/* All-in flash */}
       {showAllinFlash && (
-        <div className="absolute inset-0 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash pointer-events-none" style={{ zIndex: 25 }} />
+        <div className="absolute inset-0 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash pointer-events-none" style={{ zIndex: Z.ALLIN_FLASH }} />
       )}
 
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 h-9 shrink-0 relative"
         style={{
-          zIndex: 40,
+          zIndex: Z.HEADER,
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.5), hsl(0 0% 0% / 0.3))',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid hsl(43 74% 49% / 0.15)',
@@ -194,12 +195,12 @@ export function PokerTablePro({
       </div>
 
       {/* Main table area — fills remaining space */}
-      <div className="flex-1 relative" style={{ zIndex: 1 }}>
+      <div className="flex-1 relative" style={{ zIndex: Z.TABLE }}>
         <TableFelt className="absolute inset-0">
-          {/* Dealer inside the oval, top-center of felt */}
+          {/* Dealer above the table, top-center */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: isLandscape ? '28%' : '30%', zIndex: 10 }}
+            style={{ top: isLandscape ? '22%' : '24%', zIndex: Z.DEALER, position: 'absolute' }}
           >
             <DealerCharacter expression={dealerExpression} />
           </div>
@@ -207,7 +208,7 @@ export function PokerTablePro({
           {/* Pot */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: isLandscape ? '38%' : '42%', zIndex: 5 }}
+            style={{ top: isLandscape ? '36%' : '38%', zIndex: Z.CARDS }}
           >
             <PotDisplay pot={state.pot} />
           </div>
@@ -215,7 +216,7 @@ export function PokerTablePro({
           {/* Community cards */}
           <div
             className="absolute left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
-            style={{ top: isLandscape ? '48%' : '50%', zIndex: 5 }}
+            style={{ top: isLandscape ? '46%' : '48%', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => (
               <CardDisplay
@@ -235,7 +236,7 @@ export function PokerTablePro({
 
           {/* Hand name at showdown */}
           {showHandName && (
-            <div className="absolute left-1/2 top-1/2 animate-hand-name-reveal pointer-events-none" style={{ transform: 'translate(-50%, -50%)', zIndex: 20 }}>
+            <div className="absolute left-1/2 top-1/2 animate-hand-name-reveal pointer-events-none" style={{ transform: 'translate(-50%, -50%)', zIndex: Z.EFFECTS }}>
               <span
                 className="text-xl font-black uppercase tracking-wider"
                 style={{
@@ -254,7 +255,7 @@ export function PokerTablePro({
 
           {/* Showdown particles */}
           {state.phase === 'hand_complete' && !isGameOver && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 20 }}>
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
@@ -272,7 +273,7 @@ export function PokerTablePro({
           )}
 
           {/* Phase indicator */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '60%' : '60%', zIndex: 5 }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '57%' : '58%', zIndex: Z.CARDS }}>
             <span className={cn(
               'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
               (state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') && 'animate-phase-flash',
@@ -300,7 +301,7 @@ export function PokerTablePro({
                   left: `${pos.xPct}%`,
                   top: `${pos.yPct}%`,
                   transform: 'translate(-50%, -50%)',
-                  zIndex: 15,
+                  zIndex: Z.SEATS,
                 }}
               >
                 <PlayerSeat
@@ -321,7 +322,7 @@ export function PokerTablePro({
         <div
           className="px-3 pb-2 pt-1 shrink-0 relative"
           style={{
-            zIndex: 50,
+            zIndex: Z.ACTIONS,
             paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
             background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))',
           }}
@@ -341,7 +342,7 @@ export function PokerTablePro({
 
       {/* YOUR TURN badge */}
       {isHumanTurn && humanPlayer && humanPlayer.status === 'active' && (
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)', zIndex: 50 }}>
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{
               background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
