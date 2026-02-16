@@ -15,6 +15,7 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
 import leatherBg from '@/assets/leather-bg.jpg';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface PokerTableProProps {
   state: GameState;
@@ -52,6 +53,7 @@ export function PokerTablePro({
   const isShowdown = state.phase === 'hand_complete' || state.phase === 'showdown';
   const isGameOver = state.phase === 'game_over';
   const [showAllinFlash, setShowAllinFlash] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const isLandscape = useIsLandscape();
 
@@ -177,7 +179,7 @@ export function PokerTablePro({
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
-        <button onClick={onQuit} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+        <button onClick={() => setShowQuitConfirm(true)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
           <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
         </button>
         <div className="flex items-center gap-2">
@@ -400,6 +402,24 @@ export function PokerTablePro({
       {isGameOver && winners.length > 0 && (
         <WinnerOverlay winners={winners} isGameOver={true} stats={gameStats} onNextHand={onNextHand} onQuit={onQuit} />
       )}
+
+      {/* Quit Confirmation Dialog */}
+      <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exit Game?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to exit? This will end the game.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={onQuit} className="bg-red-600 hover:bg-red-700">
+              Exit Game
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
