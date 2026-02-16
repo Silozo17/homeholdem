@@ -1,55 +1,74 @@
 
 
-# Fix Seat Positions, Layout Direction, and Profile Avatars
+# Fix Mobile Landscape Table Size and Seat Positions
 
-## 3 Changes Required
+## Problem
 
-### 1. Fine-tune seat coordinates in `seatLayout.ts`
+From the screenshots, two major issues:
 
-Based on the screenshot, the avatar circle center (anchor) needs to sit exactly on the brown table rail edge. Current vs target:
+1. **Table is too large** -- the table wrapper uses `min(96vw, 1100px)` and `maxHeight: 85vh`, which fills nearly the entire screen. This leaves no room for seat info stacks (cards, names, chips) around the edges -- they clip off-screen on the left (B, C), right (F, G), and bottom (Y, A, E).
 
-| Seat | Current | Target | Direction |
-|------|---------|--------|-----------|
-| Y | (50, 83) | (50, 86) | Down ~3% |
-| A | (20, 68) | (24, 70) | Right 4%, down 2% |
-| E | (80, 68) | (76, 70) | Left 4%, down 2% |
-| F | (88, 47) | (84, 50) | Left 4%, down 3% |
-| B | (12, 47) | (16, 50) | Right 4%, down 3% (mirror of F) |
-| C | (17, 22) | (20, 22) | Right 3% (keep y) |
-| G | (83, 22) | (80, 22) | Left 3% (mirror of C) |
-| D | (30, 5) | (33, 8) | Right 3%, down 3% |
-| H | (70, 5) | (67, 8) | Left 3%, down 3% (mirror of D) |
+2. **Seat positions don't account for the action bar** -- when the Fold/Call/Raise buttons appear, they cover the bottom ~15% of the screen, hiding the human player's cards and info entirely.
 
-Portrait positions adjusted proportionally.
+## Solution
 
-### 2. Flip card/name/chip layout for top-half players in `PlayerSeat.tsx`
+### 1. Shrink the table wrapper in landscape mode
 
-Add a `tableHalf` prop (`'top' | 'bottom'`) to `PlayerSeat`:
-- **Bottom half** (Y, A, E): Current order -- Avatar on top, then cards, name, chips below
-- **Top half** (B, C, D, F, G, H): Reversed -- chips, name, cards above, then Avatar at bottom
+In `src/components/poker/PokerTablePro.tsx`, reduce the table wrapper dimensions:
 
-This is done by conditionally using `flex-col-reverse` when `tableHalf === 'top'`.
+- Width: `min(96vw, 1100px)` --> `min(78vw, 900px)`
+- maxHeight: `85vh` --> `70vh`
 
-### 3. Show user's profile avatar for the human player in `PlayerAvatar.tsx`
+This creates ~11% breathing room on each side and ~15% at top/bottom for seat info stacks to render without clipping.
 
-- Add an optional `avatarUrl` prop to `PlayerAvatar`
-- When provided, render an `<img>` inside the circle instead of the letter initial
-- In `PokerTablePro.tsx`, fetch the current user's profile avatar from the database and pass it to the human player's `PlayerSeat`
+### 2. Adjust landscape seat coordinates
 
----
+Since the table wrapper is now smaller relative to the viewport, seats positioned as % of the wrapper will automatically scale. However, positions still need tuning to sit precisely on the rail of the now-smaller table. The key changes in `src/lib/poker/ui/seatLayout.ts`:
 
-## Technical Details
+| Seat | Current | New | Rationale |
+|------|---------|-----|-----------|
+| Y | (50, 86) | (50, 92) | Push further down -- more room above for table, but still within wrapper |
+| A | (24, 70) | (22, 78) | Lower and slightly left to sit on bottom-left rail |
+| B | (16, 50) | (10, 50) | Pull further left to rail edge |
+| C | (20, 22) | (14, 24) | Pull further left and slightly down |
+| D | (33, 8) | (32, 6) | Slightly up to clear dealer |
+| E | (76, 70) | (78, 78) | Mirror of A |
+| F | (84, 50) | (90, 50) | Mirror of B |
+| G | (80, 22) | (86, 24) | Mirror of C |
+| H | (67, 8) | (68, 6) | Mirror of D |
 
-**Files to modify:**
+These coordinates place circles on the rail when the wrapper is 78vw wide. Since the wrapper now has overflow:visible, info stacks extending outside the wrapper into the viewport breathing room will be fully visible.
 
-1. **`src/lib/poker/ui/seatLayout.ts`** -- Update `SEATS_LANDSCAPE` and `SEATS_PORTRAIT` coordinate maps with the corrected values above.
+### 3. Handle left/right seat info stacks clipping
 
-2. **`src/components/poker/PlayerSeat.tsx`** -- Add `tableHalf: 'top' | 'bottom'` prop. Wrap content in `flex-col` or `flex-col-reverse` based on half. Move the avatar render block so it appears last (at bottom) for top-half players.
+For seats B and F (far left/right), the info stack extending outward can still clip the viewport edge. Add a `tableSide` concept alongside `tableHalf`:
 
-3. **`src/components/poker/PlayerAvatar.tsx`** -- Add optional `avatarUrl?: string` prop. When present, show `<img>` with `object-cover rounded-full` instead of the letter initial.
+In `PlayerSeat.tsx`:
+- Seats with `xPct < 25` (B, C): position info stack to the **right** of the avatar instead of above/below
+- Seats with `xPct > 75` (F, G): position info stack to the **left** of the avatar
+- All other seats: keep current above/below behavior
 
-4. **`src/components/poker/PokerTablePro.tsx`** -- 
-   - Fetch user's avatar_url from the `profiles` table using their auth ID
-   - Determine `tableHalf` per seat (seats D, C, B, H, G, F = top; Y, A, E = bottom) based on yPct threshold (e.g., < 55% = top)
-   - Pass `avatarUrl` and `tableHalf` through to `PlayerSeat`
+This prevents horizontal overflow on edge seats.
+
+### 4. Leave room for the action bar
+
+The action bar covers the bottom ~60px of the screen. The "YOUR TURN" badge and human player's info must not overlap with it. The fix:
+- Move the "YOUR TURN" badge higher (bottom offset from 82px to 100px)
+- The human seat (Y at 92% of a 70vh wrapper) should naturally clear the action bar since the wrapper itself doesn't extend to the screen bottom
+
+## Files to Modify
+
+1. **`src/components/poker/PokerTablePro.tsx`**
+   - Shrink table wrapper: width to `min(78vw, 900px)`, maxHeight to `70vh`
+   - Raise "YOUR TURN" badge offset
+   - Pass `xPct` to PlayerSeat so it can determine left/right side
+
+2. **`src/lib/poker/ui/seatLayout.ts`**
+   - Update all 9 SEATS_LANDSCAPE coordinates to the new values
+
+3. **`src/components/poker/PlayerSeat.tsx`**
+   - Accept new `sidePosition` prop (`'left' | 'right' | 'center'`)
+   - For `left` seats: info stack positioned to the right of the avatar (using `left: 100%`)
+   - For `right` seats: info stack positioned to the left (using `right: 100%`)
+   - For `center` seats: keep current above/below behavior based on `tableHalf`
 
