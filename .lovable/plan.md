@@ -1,40 +1,29 @@
 
+# Make Human Player Cards Bigger and Lower Nameplates
 
-# Fix Game Over Stats Screen for Both Orientations
+## Changes in `src/components/poker/PlayerSeat.tsx`
 
-## Problem
-1. The Game Over overlay (`WinnerOverlay`) uses a fixed vertical layout (`max-w-sm`, tall card with stacked sections) that doesn't fit well in landscape mode -- content overflows or gets cut off.
-2. When the user rotates to portrait to read the stats, the "Rotate Your Device" blocker in `PokerTablePro` (z-index 9999) covers everything, making the stats unreadable in any orientation.
+### 1. Double the human card size
+- Current: `humanCardSize` is `'sm'` (compact) or `'2xl'` (normal)
+- New: `'lg'` (compact) or `'2xl'` (normal) -- this roughly doubles the compact size from `w-7 h-10` to `w-12 h-[68px]`
+- For normal mode, bump to a custom scale using `transform: scale(1.5)` on the card container, since `'2xl'` is already the largest defined size
 
-## Solution
+### 2. Lower all nameplates by 2px
+- Change the nameplate margin from `-mt-1` to `mt-0` (adds ~2px gap) so the active player spotlight glow no longer covers the player name
 
-### 1. Disable the landscape lock when game is over (`PokerTablePro.tsx`)
-- When the game state is `game_over`, skip rendering the "Rotate Your Device" portrait-block overlay so the user can view the stats screen in portrait mode comfortably.
-- The `WinnerOverlay` already renders at `z-50` with its own full-screen backdrop, so it takes over the entire screen regardless.
-
-### 2. Make the Game Over overlay responsive to landscape (`WinnerOverlay.tsx`)
-- Add landscape-aware layout so the card reorganizes horizontally when in landscape:
-  - Use a landscape media query approach: in landscape, switch the inner card to a horizontal two-column layout (winner info + stats side by side) with reduced vertical spacing and smaller trophy.
-  - Reduce padding and font sizes slightly in landscape to prevent overflow.
-  - Add `overflow-y-auto max-h-[100dvh]` to the inner card so it scrolls if needed on very small screens.
-- Keep the current vertical layout for portrait, which already works well.
-
-## Files to Modify
+## File to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/poker/PokerTablePro.tsx` | Skip portrait-block overlay when game phase is `game_over` |
-| `src/components/poker/WinnerOverlay.tsx` | Add landscape-responsive layout with horizontal flow and scroll safety |
+| `src/components/poker/PlayerSeat.tsx` | Increase `humanCardSize` and adjust nameplate margin |
 
 ## Technical Details
 
-**PokerTablePro.tsx**: The component already receives `phase` from the game state. Wrap the portrait overlay condition: `{!isLandscape && phase !== 'game_over' && (...)}`.
+**Card size change (line 38)**:
+- From: `const humanCardSize = compact ? 'sm' : '2xl';`
+- To: `const humanCardSize = compact ? 'lg' : '2xl';`
+- Additionally, add `transform: scale(1.3)` to the human cards container to push the size up further regardless of mode
 
-**WinnerOverlay.tsx**: 
-- Add `overflow-y-auto` and `max-h-[90dvh]` to the inner card container for scroll safety
-- Use Tailwind `landscape:` modifier to switch to a more compact horizontal layout:
-  - `landscape:max-w-2xl landscape:flex-row` on the inner container to go side-by-side
-  - Reduce trophy size and spacing in landscape
-  - Stats grid stays 2-col but with tighter padding
-  - Buttons row stays at the bottom spanning full width
-
+**Nameplate spacing (line 126)**:
+- From: `'-mt-1'` on the nameplate div
+- To: `'mt-0.5'` to push the nameplate 2px lower and clear the active glow ring
