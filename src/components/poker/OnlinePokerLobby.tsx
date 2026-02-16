@@ -7,7 +7,8 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus } from 'lucide-react';
+import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const [activeFilter, setActiveFilter] = useState<string>(clubId ? 'club' : 'all');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [lastCreatedTable, setLastCreatedTable] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [tableName, setTableName] = useState('');
   const [tableType, setTableType] = useState<'public' | 'friends' | 'club'>(clubId ? 'club' : 'friends');
@@ -164,8 +167,23 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
     } finally { setJoiningByCode(false); }
   };
 
+  const handleDeleteTable = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await callEdge('poker-moderate-table', { table_id: deleteTarget.id, action: 'close' });
+      toast({ title: 'Table deleted' });
+      fetchTables();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const filteredTables = tables.filter(t => {
-    if (clubId) return true; // Club view shows all club tables
+    if (clubId) return true;
     if (activeFilter === 'all') return true;
     if (activeFilter === 'public') return t.table_type === 'public';
     if (activeFilter === 'friends') return t.table_type === 'friends';
@@ -382,12 +400,23 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                   <SeatDots filled={t.player_count} total={t.max_seats} />
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <span className={cn(
-                    'text-[10px] px-2 py-0.5 rounded-full font-medium',
-                    t.status === 'playing' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'
-                  )}>
-                    {t.status === 'playing' ? 'In Game' : 'Open'}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    {t.created_by === user?.id && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, name: t.name }); }}
+                        className="p-1 rounded-md hover:bg-destructive/10 transition-colors"
+                        aria-label="Delete table"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    )}
+                    <span className={cn(
+                      'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                      t.status === 'playing' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'
+                    )}>
+                      {t.status === 'playing' ? 'In Game' : 'Open'}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Users className="h-3 w-3" />
                     <span>{t.player_count}/{t.max_seats}</span>
@@ -398,6 +427,24 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           )}
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete table?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will close "{deleteTarget?.name}" and remove all players. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTable} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Invite dialog */}
       <InvitePlayersDialog
