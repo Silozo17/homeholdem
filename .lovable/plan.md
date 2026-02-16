@@ -1,83 +1,42 @@
 
 
-# Fix: Auto-Deal Stops After First Hand
+# Fix: Chat Bubbles Disappear After 1.5s Instead of 6s
 
 ## Root Cause
 
-The auto-deal `useEffect` has a React cleanup race condition. Setting `setAutoStartAttempted(true)` as state causes an immediate re-render, which triggers the effect's cleanup function (`clearTimeout(timer)`) before the 2-second timer ever fires. The `startHand()` call is cancelled every time.
+The CSS animation `animate-float-up` has a duration of **1.5 seconds** and uses `animation-fill-mode: both`, which means the bubble reaches `opacity: 0` at 1.5s and stays invisible. The React timer removes it from state after 6s, but visually it vanishes at 1.5s.
+
+```css
+/* Current (broken) */
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+.animate-float-up { animation: float-up 1.5s ease-out both; }
+```
 
 ## Fix
 
-Move `setAutoStartAttempted(true)` **inside** the timeout callback so no re-render happens before `startHand()` fires. Use a ref (`autoStartAttemptedRef`) for the guard to prevent double-firing without causing re-renders.
+Change the animation so the bubble stays fully visible for most of the 6 seconds, then fades out near the end.
 
-### File: `src/hooks/useOnlinePokerTable.ts`
+### File: `src/index.css`
 
-Replace the auto-deal effect (lines 397-408):
+Update the keyframes and duration:
 
-```typescript
-// BEFORE (broken):
-useEffect(() => {
-  if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
-    setAutoStartAttempted(true);  // <-- causes re-render, cleanup kills timer
-    const jitter = Math.random() * 1000;
-    const timer = setTimeout(() => {
-      startHand().catch(() => {
-        setAutoStartAttempted(false);
-      });
-    }, 2000 + jitter);
-    return () => clearTimeout(timer);
-  }
-}, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
+```css
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(-8px); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+.animate-float-up { animation: float-up 6s ease-out both; }
 ```
 
-```typescript
-// AFTER (fixed):
-useEffect(() => {
-  if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
-    const jitter = Math.random() * 1000;
-    const timer = setTimeout(() => {
-      setAutoStartAttempted(true);  // <-- moved inside timeout, no early re-render
-      startHand().catch(() => {
-        setAutoStartAttempted(false);
-      });
-    }, 2000 + jitter);
-    return () => clearTimeout(timer);
-  }
-}, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
-```
-
-Also add a ref-based guard to prevent double-firing if the effect re-runs before the timeout:
-
-```typescript
-// Add ref near other refs:
-const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-// Updated effect:
-useEffect(() => {
-  if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
-    if (autoStartTimerRef.current) return; // Already waiting
-    const jitter = Math.random() * 1000;
-    autoStartTimerRef.current = setTimeout(() => {
-      autoStartTimerRef.current = null;
-      setAutoStartAttempted(true);
-      startHand().catch(() => {
-        setAutoStartAttempted(false);
-      });
-    }, 2000 + jitter);
-    return () => {
-      if (autoStartTimerRef.current) {
-        clearTimeout(autoStartTimerRef.current);
-        autoStartTimerRef.current = null;
-      }
-    };
-  }
-}, [seatedCount, hasActiveHand, mySeatNumber, startHand, autoStartAttempted, handHasEverStarted]);
-```
+This keeps the bubble visible for ~4.5 seconds (75% of 6s), then fades out over the final 1.5 seconds -- matching the 6-second React timer exactly.
 
 ## Summary
 
 | Change | File |
 |--------|------|
-| Move `setAutoStartAttempted(true)` inside timeout + add ref guard | `src/hooks/useOnlinePokerTable.ts` |
+| Extend `float-up` animation to 6s with late fade-out | `src/index.css` |
 
-One file, one fix. The `startHand()` call will no longer be cancelled by React's cleanup cycle.
