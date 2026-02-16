@@ -6,21 +6,32 @@ interface TableFeltProps {
   className?: string;
 }
 
+/**
+ * The oval poker table rendered inside a flex-1 container.
+ * Uses aspect-ratio to force a wide ellipse centred in available space.
+ * Children are positioned absolutely over the full area (not just the oval).
+ */
 export function TableFelt({ children, className }: TableFeltProps) {
   return (
     <div className={`relative w-full h-full ${className ?? ''}`}>
-      {/* Dark background fill */}
+      {/* Dark room background */}
       <div className="absolute inset-0 bg-background" />
 
-      {/* Constrained oval wrapper — forces a wide, flat poker-table ellipse */}
+      {/* Oval table — centred with aspect-ratio constraint */}
       <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
-          aspectRatio: '2.2 / 1',
-          maxHeight: '55vh',
+          /* Centre the oval */
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          /* Force a wide oval regardless of viewport */
+          width: 'min(92%, 700px)',
+          aspectRatio: '2.1 / 1',
+          maxHeight: '48vh',
         }}
       >
-        {/* Wood rail border */}
+        {/* Wood rail */}
         <div
           className="absolute inset-0 rounded-[50%]"
           style={{
@@ -41,42 +52,28 @@ export function TableFelt({ children, className }: TableFeltProps) {
           }}
         />
 
-        {/* Rail highlight line */}
+        {/* Rail highlight */}
         <div
           className="absolute inset-[2px] rounded-[50%] pointer-events-none"
-          style={{
-            border: '1px solid hsl(20 30% 28% / 0.5)',
-          }}
+          style={{ border: '1px solid hsl(20 30% 28% / 0.5)' }}
         />
 
-        {/* Felt surface inside the rail */}
-        <div
-          className="absolute rounded-[50%] overflow-hidden"
-          style={{
-            inset: '6%',
-          }}
-        >
-          {/* Felt texture image */}
+        {/* Felt surface */}
+        <div className="absolute rounded-[50%] overflow-hidden" style={{ inset: '6%' }}>
           <img
             src={feltTexture}
             alt=""
             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
             draggable={false}
           />
-
-          {/* Center spotlight */}
+          {/* Centre spotlight */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: `radial-gradient(
-                ellipse 60% 50% at 50% 45%,
-                hsl(160 50% 25% / 0.3) 0%,
-                transparent 60%
-              )`,
+              background: `radial-gradient(ellipse 60% 50% at 50% 45%, hsl(160 50% 25% / 0.3) 0%, transparent 60%)`,
             }}
           />
-
-          {/* Vignette shadow on felt */}
+          {/* Vignette */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -84,16 +81,14 @@ export function TableFelt({ children, className }: TableFeltProps) {
               borderRadius: '50%',
             }}
           />
-
-          {/* Deeper edge vignette */}
+          {/* Edge vignette */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 45%, rgba(0,0,0,0.5) 100%)',
             }}
           />
-
-          {/* Gold betting line ellipse */}
+          {/* Betting line */}
           <div
             className="absolute pointer-events-none"
             style={{
@@ -105,10 +100,8 @@ export function TableFelt({ children, className }: TableFeltProps) {
         </div>
       </div>
 
-      {/* Content — positioned children overlay the entire area */}
-      <div className="absolute inset-0">
-        {children}
-      </div>
+      {/* Content layer — covers full area */}
+      <div className="absolute inset-0">{children}</div>
     </div>
   );
 }
