@@ -117,121 +117,130 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
         backdropFilter: 'blur(16px)',
       }}
     >
-      <div className="rounded-2xl p-6 max-w-sm w-full text-center space-y-5 animate-scale-in"
+      <div className="rounded-2xl p-6 landscape:p-4 max-w-sm landscape:max-w-2xl w-full text-center animate-scale-in overflow-y-auto max-h-[90dvh]"
         style={{
           background: 'linear-gradient(180deg, hsl(160 25% 14% / 0.9), hsl(160 30% 8% / 0.95))',
           border: '1px solid hsl(43 74% 49% / 0.3)',
           boxShadow: '0 0 60px hsl(43 74% 49% / 0.15), 0 20px 60px rgba(0,0,0,0.5)',
         }}
       >
-        {/* Trophy / Title */}
-        <div className="relative flex justify-center">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center animate-winner-glow"
-            style={{ background: 'radial-gradient(circle, hsl(43 74% 49% / 0.2), transparent)' }}
-          >
-            <Trophy className="w-10 h-10 text-primary" style={{ filter: 'drop-shadow(0 0 12px hsl(43 74% 49% / 0.6))' }} />
-          </div>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
-              style={{
-                left: `${25 + Math.random() * 50}%`,
-                bottom: '10%',
-                background: 'radial-gradient(circle, hsl(43 74% 65%), hsl(43 74% 49% / 0))',
-                animationDelay: `${i * 0.3}s`,
-                boxShadow: '0 0 4px hsl(43 74% 49% / 0.5)',
-              }}
-            />
-          ))}
-        </div>
-
-        <h2 className="text-2xl font-black text-shimmer">
-          {humanWon ? 'You Won!' : 'Game Over'}
-        </h2>
-        {!humanWon && (
-          <p className="text-sm text-muted-foreground -mt-3">You busted out</p>
-        )}
-
-        {/* Winners */}
-        <div className="space-y-2">
-          {winners.map((w, i) => (
-            <div key={i} className="rounded-xl p-3" style={{
-              background: 'linear-gradient(135deg, hsl(160 25% 16% / 0.8), hsl(160 30% 12% / 0.9))',
-              border: '1px solid hsl(43 74% 49% / 0.2)',
-            }}>
-              <p className="font-bold text-foreground">{w.name}</p>
-              {w.hand.name !== 'N/A' && (
-                <p className="text-xs font-semibold"
-                  style={{
-                    fontFamily: 'Georgia, serif',
-                    background: 'linear-gradient(135deg, hsl(43 74% 60%), hsl(43 90% 70%))',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >{w.hand.name}</p>
-              )}
-              <p className="text-lg font-black text-foreground">
-                <AnimatedChips target={w.chips} /> chips
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {[
-              { label: 'Hands', value: stats.handsPlayed },
-              { label: 'Won', value: stats.handsWon, highlight: true },
-              { label: 'Best Hand', value: stats.bestHandName || 'N/A', highlight: true, small: true },
-              { label: 'Biggest Pot', value: stats.biggestPot.toLocaleString() },
-            ].map((s, i) => (
-              <div key={i} className="rounded-lg p-2.5" style={{
-                background: 'hsl(160 25% 14% / 0.6)',
-                border: '1px solid hsl(160 20% 22% / 0.5)',
-              }}>
-                <p className="text-muted-foreground">{s.label}</p>
-                <p className={cn(
-                  'font-bold',
-                  s.highlight ? 'text-primary' : 'text-foreground',
-                  s.small ? 'text-[11px]' : 'text-lg',
-                )}>{s.value}</p>
+        {/* Inner flex container: vertical in portrait, horizontal in landscape */}
+        <div className="flex flex-col landscape:flex-row landscape:gap-6 landscape:items-start space-y-5 landscape:space-y-0">
+          {/* Left column: Trophy + Winners */}
+          <div className="flex flex-col items-center landscape:flex-1 landscape:min-w-0 space-y-3">
+            {/* Trophy / Title */}
+            <div className="relative flex justify-center">
+              <div className="w-16 h-16 landscape:w-12 landscape:h-12 rounded-full flex items-center justify-center animate-winner-glow"
+                style={{ background: 'radial-gradient(circle, hsl(43 74% 49% / 0.2), transparent)' }}
+              >
+                <Trophy className="w-8 h-8 landscape:w-6 landscape:h-6 text-primary" style={{ filter: 'drop-shadow(0 0 12px hsl(43 74% 49% / 0.6))' }} />
               </div>
-            ))}
-            <div className="col-span-2 rounded-lg p-2.5" style={{
-              background: 'hsl(160 25% 14% / 0.6)',
-              border: '1px solid hsl(160 20% 22% / 0.5)',
-            }}>
-              <p className="text-muted-foreground">Duration</p>
-              <p className="font-bold text-foreground">{formatTime(stats.duration)}</p>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
+                  style={{
+                    left: `${25 + Math.random() * 50}%`,
+                    bottom: '10%',
+                    background: 'radial-gradient(circle, hsl(43 74% 65%), hsl(43 74% 49% / 0))',
+                    animationDelay: `${i * 0.3}s`,
+                    boxShadow: '0 0 4px hsl(43 74% 49% / 0.5)',
+                  }}
+                />
+              ))}
+            </div>
+
+            <h2 className="text-2xl landscape:text-xl font-black text-shimmer">
+              {humanWon ? 'You Won!' : 'Game Over'}
+            </h2>
+            {!humanWon && (
+              <p className="text-sm text-muted-foreground -mt-2">You busted out</p>
+            )}
+
+            {/* Winners */}
+            <div className="space-y-2 w-full">
+              {winners.map((w, i) => (
+                <div key={i} className="rounded-xl p-3 landscape:p-2" style={{
+                  background: 'linear-gradient(135deg, hsl(160 25% 16% / 0.8), hsl(160 30% 12% / 0.9))',
+                  border: '1px solid hsl(43 74% 49% / 0.2)',
+                }}>
+                  <p className="font-bold text-foreground">{w.name}</p>
+                  {w.hand.name !== 'N/A' && (
+                    <p className="text-xs font-semibold"
+                      style={{
+                        fontFamily: 'Georgia, serif',
+                        background: 'linear-gradient(135deg, hsl(43 74% 60%), hsl(43 90% 70%))',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      }}
+                    >{w.hand.name}</p>
+                  )}
+                  <p className="text-lg landscape:text-base font-black text-foreground">
+                    <AnimatedChips target={w.chips} /> chips
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
-            active:scale-[0.92] transition-transform"
-            style={{
-              background: 'linear-gradient(180deg, hsl(160 20% 20%), hsl(160 25% 15%))',
-              color: 'hsl(0 0% 80%)',
-              border: '1px solid hsl(160 20% 28%)',
-            }}
-            onClick={onQuit}
-          >
-            <X className="w-4 h-4" />
-            Close Game
-          </button>
-          <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
-            shimmer-btn text-primary-foreground active:scale-[0.92] transition-transform"
-            style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
-            onClick={onNextHand}
-          >
-            <Play className="w-4 h-4" />
-            Play Again
-          </button>
+          {/* Right column: Stats + Actions */}
+          <div className="flex flex-col landscape:flex-1 landscape:min-w-0 space-y-4 landscape:space-y-3">
+            {/* Stats */}
+            {stats && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {[
+                  { label: 'Hands', value: stats.handsPlayed },
+                  { label: 'Won', value: stats.handsWon, highlight: true },
+                  { label: 'Best Hand', value: stats.bestHandName || 'N/A', highlight: true, small: true },
+                  { label: 'Biggest Pot', value: stats.biggestPot.toLocaleString() },
+                ].map((s, i) => (
+                  <div key={i} className="rounded-lg p-2.5 landscape:p-2" style={{
+                    background: 'hsl(160 25% 14% / 0.6)',
+                    border: '1px solid hsl(160 20% 22% / 0.5)',
+                  }}>
+                    <p className="text-muted-foreground">{s.label}</p>
+                    <p className={cn(
+                      'font-bold',
+                      s.highlight ? 'text-primary' : 'text-foreground',
+                      s.small ? 'text-[11px]' : 'text-lg landscape:text-base',
+                    )}>{s.value}</p>
+                  </div>
+                ))}
+                <div className="col-span-2 rounded-lg p-2.5 landscape:p-2" style={{
+                  background: 'hsl(160 25% 14% / 0.6)',
+                  border: '1px solid hsl(160 20% 22% / 0.5)',
+                }}>
+                  <p className="text-muted-foreground">Duration</p>
+                  <p className="font-bold text-foreground">{formatTime(stats.duration)}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
+                active:scale-[0.92] transition-transform"
+                style={{
+                  background: 'linear-gradient(180deg, hsl(160 20% 20%), hsl(160 25% 15%))',
+                  color: 'hsl(0 0% 80%)',
+                  border: '1px solid hsl(160 20% 28%)',
+                }}
+                onClick={onQuit}
+              >
+                <X className="w-4 h-4" />
+                Close Game
+              </button>
+              <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
+                shimmer-btn text-primary-foreground active:scale-[0.92] transition-transform"
+                style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
+                onClick={onNextHand}
+              >
+                <Play className="w-4 h-4" />
+                Play Again
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
