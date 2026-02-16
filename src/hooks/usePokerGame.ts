@@ -1,7 +1,7 @@
 import { useReducer, useCallback, useRef, useEffect } from 'react';
 import {
   Card, PokerPlayer, GameState, GamePhase, GameAction, LobbySettings,
-  HAND_RANK_NAMES, BotPersonality,
+  HAND_RANK_NAMES, BotPersonality, BLIND_LEVELS,
 } from '@/lib/poker/types';
 import { createDeck, shuffle, deal } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
@@ -44,6 +44,9 @@ function createInitialState(): GameState {
     bestHandName: '',
     startTime: Date.now(),
     startingChips: 10000,
+    blindLevel: 0,
+    blindTimer: 0,
+    lastBlindIncrease: Date.now(),
   };
 }
 
@@ -69,7 +72,7 @@ function nextActivePlayerIndex(players: PokerPlayer[], fromIndex: number): numbe
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'START_GAME': {
-      const { botCount, startingChips, smallBlind, bigBlind } = action.settings;
+      const { botCount, startingChips, smallBlind, bigBlind, blindTimer } = action.settings;
       const players: PokerPlayer[] = [];
 
       // Human player at seat 0
@@ -105,6 +108,10 @@ function reducer(state: GameState, action: Action): GameState {
 
       players[0].isDealer = true;
 
+      // Find starting blind level
+      const startLevel = BLIND_LEVELS.findIndex(l => l.big >= bigBlind);
+      const blindLevel = startLevel >= 0 ? startLevel : 0;
+
       return {
         ...state,
         phase: 'dealing',
@@ -120,10 +127,29 @@ function reducer(state: GameState, action: Action): GameState {
         biggestPot: 0,
         bestHandRank: 0,
         bestHandName: '',
+        blindLevel,
+        blindTimer: blindTimer || 0,
+        lastBlindIncrease: Date.now(),
       };
     }
 
     case 'DEAL_HAND': {
+      // Check blind level progression
+      let currentSmallBlind = state.smallBlind;
+      let currentBigBlind = state.bigBlind;
+      let blindLevel = state.blindLevel;
+      let lastBlindIncrease = state.lastBlindIncrease;
+
+      if (state.blindTimer > 0 && Date.now() - state.lastBlindIncrease >= state.blindTimer * 60000) {
+        const nextLevel = Math.min(blindLevel + 1, BLIND_LEVELS.length - 1);
+        if (nextLevel !== blindLevel) {
+          blindLevel = nextLevel;
+          currentSmallBlind = BLIND_LEVELS[nextLevel].small;
+          currentBigBlind = BLIND_LEVELS[nextLevel].big;
+          lastBlindIncrease = Date.now();
+        }
+      }
+
       // Reset for new hand
       let deck = shuffle(createDeck());
       const players: PokerPlayer[] = state.players.map(p => ({
@@ -153,12 +179,12 @@ function reducer(state: GameState, action: Action): GameState {
       const sbIndex = nextActivePlayerIndex(players, state.dealerIndex);
       const bbIndex = nextActivePlayerIndex(players, sbIndex);
 
-      const sbAmount = Math.min(state.smallBlind, players[sbIndex].chips);
+      const sbAmount = Math.min(currentSmallBlind, players[sbIndex].chips);
       players[sbIndex].chips -= sbAmount;
       players[sbIndex].currentBet = sbAmount;
       players[sbIndex].totalBetThisHand = sbAmount;
 
-      const bbAmount = Math.min(state.bigBlind, players[bbIndex].chips);
+      const bbAmount = Math.min(currentBigBlind, players[bbIndex].chips);
       players[bbIndex].chips -= bbAmount;
       players[bbIndex].currentBet = bbAmount;
       players[bbIndex].totalBetThisHand = bbAmount;
@@ -178,9 +204,13 @@ function reducer(state: GameState, action: Action): GameState {
         communityCards: [],
         pot,
         currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
-        minRaise: state.bigBlind,
+        minRaise: currentBigBlind,
         handNumber: state.handNumber + 1,
-        lastRaiserIndex: bbIndex, // BB is the "raiser" preflop
+        lastRaiserIndex: bbIndex,
+        smallBlind: currentSmallBlind,
+        bigBlind: currentBigBlind,
+        blindLevel,
+        lastBlindIncrease,
       };
     }
 
