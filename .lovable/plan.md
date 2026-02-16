@@ -1,70 +1,132 @@
 
 
-## Fix 4 Issues: YOUR TURN Position, Game Freeze, Header Layout, Card Dealing Animation
+## Production Hardening: Code Cleanup, Deduplication, and Stability
 
-### 1. YOUR TURN Badge Position (OnlinePokerTable)
+### Analysis Summary
 
-**Problem**: The "YOUR TURN" badge is positioned at `bottom: calc(50% + 60px)` which places it near the center of the screen (by the pot/dealer area), instead of above the hero's cards at the bottom.
-
-**Fix**: Change the positioning to place it just above the hero's cards. In landscape, the hero sits at ~92% yPct, so the badge should be near the bottom of the viewport, above the betting controls but near the player's cards. Use `bottom: 18%` (landscape) / `bottom: 22%` (portrait) so it sits above the hero's card fan.
-
-**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 800-804)
-- Also adjust the "5 SEC LEFT" pill similarly (lines 821-825)
+After a thorough audit of the poker game codebase, I identified **duplicated code**, **resource-straining patterns**, **potential freeze vectors**, and **cleanup opportunities**. All changes preserve existing behavior -- no features are removed or altered.
 
 ---
 
-### 2. Game Freeze After 2-3 Hands (useOnlinePokerTable)
+### 1. Deduplicate `callEdge` Helper (4 copies -> 1 shared utility)
 
-**Problem**: The auto-deal system has a known race condition. After a hand completes, the `showdownTimerRef` clears the hand after 3.5s and resets `autoStartAttempted`. But the fallback reset at line ~470 (1.5s timeout) can conflict with the showdown timer, creating a state where auto-deal never triggers.
+The `callEdge` function for calling backend functions is copy-pasted in 4 separate files, each slightly different:
+- `src/hooks/useOnlinePokerTable.ts` (supports GET + POST)
+- `src/components/poker/OnlinePokerTable.tsx` (POST only)
+- `src/components/poker/OnlinePokerLobby.tsx` (POST only)
+- `src/components/poker/TournamentLobby.tsx` (POST only)
 
-**Root Causes**:
-- The showdown timer resets `autoStartAttempted` to false, but the fallback effect (lines 453-460) also runs and can set a competing timeout.
-- If `autoStartAttempted` is reset before `hasActiveHand` fully clears, the auto-start fires, fails (hand still clearing), and then `autoStartAttempted` stays true permanently.
-- The `autoStartTimerRef` check (`if (autoStartTimerRef.current) return`) prevents new attempts if a previous timer reference wasn't cleaned up.
-
-**Fix** (in `src/hooks/useOnlinePokerTable.ts`):
-- Make the auto-deal effect more robust by:
-  1. Always clear `autoStartTimerRef.current` in the cleanup function
-  2. Add a guard: if `startHand` fails, reset both the ref and the state
-  3. Increase the fallback reset delay from 1.5s to 4.5s (after showdown 3.5s + buffer) to avoid conflicts
-  4. Add a second safety net: if `seatedCount >= 2`, no active hand, and `autoStartAttempted` is true for more than 6 seconds, force reset
+**Fix**: Extract into a single `src/lib/poker/callEdge.ts` utility and import everywhere. The version in `useOnlinePokerTable.ts` is the most complete (supports GET). All 4 files will import from the shared module.
 
 ---
 
-### 3. Move Table Name and Blinds to Left of Header (OnlinePokerTable)
+### 2. Deduplicate `useIsLandscape` and `useLockLandscape` Hooks (2 copies -> 1)
 
-**Problem**: In `OnlinePokerTable.tsx`, the table name and blinds are in the center of the header, but user wants them next to the back arrow on the left (matching `PokerTablePro` layout).
+Both `PokerTablePro.tsx` and `OnlinePokerTable.tsx` define identical copies of:
+- `useIsLandscape()` -- orientation detection hook
+- `useLockLandscape()` -- fullscreen + orientation lock hook
 
-**Fix** (in `src/components/poker/OnlinePokerTable.tsx`, lines 422-443):
-- Group the back arrow, table name, hand number badge, and blinds text together in a single `flex items-center gap-2` div on the left side
-- Remove the center div that currently holds these elements
-
----
-
-### 4. Card Dealing Animation Must Always Be Visible
-
-**Problem**: The last edit replaced `animate-card-deal-deck` with `animate-fade-in` on face-up cards. But this means when cards are revealed sequentially (face-down then face-up), the face-up state loses the dealing fly-in. The face-down card shows the fly-in correctly, but when it transitions to face-up, it just fades in instead of staying in place.
-
-**Fix**: The face-up card should NOT replay any translation animation. It should simply appear in-place instantly (no animation class at all, or just opacity:1). The dealing animation was already played during the face-down phase. The `animate-fade-in` adds a `translateY(10px)` which causes a slight visual jump.
-
-**File**: `src/components/poker/CardDisplay.tsx` (line 60)
-- Replace `animate-fade-in` with no animation class (just show the card immediately)
-- The dealing fly-in animation (`animate-card-deal-deck`) on the face-down branch (line 33) remains as-is -- this is the visible dealing animation
-- The deal animation in `OnlinePokerTable.tsx` (lines 664-698) also remains -- those are the flying card-back sprites from dealer to each seat
-
-**File**: `src/components/poker/PlayerSeat.tsx`
-- Ensure the `seatDealOrder` and `totalActivePlayers` props are passed correctly in `OnlinePokerTable.tsx` for multiplayer (currently they are NOT passed, defaulting to 0 and 1). This means online cards skip the sequential reveal timing.
-
-**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 780-791)
-- Pass `seatDealOrder` and `totalActivePlayers` to `PlayerSeat` in the multiplayer table, calculated from the active seat positions, so the round-robin dealing timing matches the flying card sprites.
+**Fix**: Extract into `src/hooks/useOrientation.ts` and import in both table components. The `useLockLandscape` hook also has a subtle bug: it uses `const lockedRef = { current: false }` (plain object) instead of `useRef(false)`, meaning the cleanup function may not read the updated value. Will fix this during extraction.
 
 ---
 
-### Summary of Files to Modify
+### 3. Fix `useLockLandscape` Bug (plain object instead of `useRef`)
+
+Both copies use:
+```typescript
+const lockedRef = { current: false }; // BAD: recreated every render
+```
+This means `lockedRef.current` is never `true` in the cleanup function, so `screen.orientation.unlock()` is never called. 
+
+**Fix**: Use `useRef(false)` instead.
+
+---
+
+### 4. Remove Dead Code in `OnlinePokerTable.tsx`
+
+Lines 182-188 contain a `checkKicked` effect that does nothing:
+```typescript
+useEffect(() => {
+  if (!tableState || !user) return;
+  const checkKicked = () => {
+    if (mySeatNumber !== null) return;
+  };
+  checkKicked();
+}, [tableState, user, mySeatNumber]);
+```
+This effect runs, defines an empty function, calls it, and discards the result. 
+
+**Fix**: Remove entirely.
+
+---
+
+### 5. Eliminate Render-Time Computation in Seat Loop
+
+In `OnlinePokerTable.tsx` (lines 788-792), the `seatDealOrder` is computed inside a render-time IIFE that loops through all seats for **every seat rendered**. This is O(n^2) per render.
+
+**Fix**: Compute `activeScreenPositions` once before the `.map()` and pass the precomputed index.
+
+---
+
+### 6. Stabilize `Math.random()` in Render (Particle/Confetti Elements)
+
+Both table components generate `Math.random()` values during render for particle positions (showdown particles, confetti). This causes layout jitter on every re-render since positions change randomly each time React renders.
+
+**Fix**: Use `useMemo` with a stable seed to pre-compute particle positions once per showdown event.
+
+---
+
+### 7. Memoize Expensive Derived Values
+
+In `OnlinePokerTable.tsx`, these values are recomputed every render:
+- `rotatedSeats` array
+- `positions` array (calls `getSeatPositions`)
+- `totalPot` sum
+
+**Fix**: Wrap in `useMemo` with proper dependencies.
+
+---
+
+### 8. TurnTimer Interval Optimization
+
+`TurnTimer.tsx` runs `setInterval` at 50ms (20fps) for the circular progress animation. On mobile, this causes unnecessary re-renders. CSS transitions are already handling the visual smoothness.
+
+**Fix**: Reduce interval to 200ms (5fps) -- the CSS `transition: stroke-dashoffset 0.05s linear` already interpolates visually. This reduces timer-related re-renders by 75%.
+
+---
+
+### 9. Prevent Memory Leak in Chat Bubbles
+
+`useOnlinePokerTable.ts` creates a `setTimeout` for each chat bubble (6s auto-remove) but never cleans it up on unmount. If the component unmounts mid-bubble, the timeout fires on an unmounted component.
+
+**Fix**: Track chat bubble timeouts in a ref and clear them on cleanup.
+
+---
+
+### 10. Guard Against Stale Closures in Auto-Deal
+
+The auto-deal `useEffect` (lines 398-417) depends on `startHand` which is a `useCallback` depending on `tableId`. If `tableId` changes mid-timer (unlikely but possible), the stale closure fires with the wrong table. 
+
+**Fix**: Use a ref for `startHand` to always call the latest version.
+
+---
+
+### Files Modified
 
 | File | Changes |
 |------|---------|
-| `src/components/poker/OnlinePokerTable.tsx` | Move header items left; fix YOUR TURN/5SEC position; pass dealing props to PlayerSeat |
-| `src/hooks/useOnlinePokerTable.ts` | Harden auto-deal to prevent game freeze |
-| `src/components/poker/CardDisplay.tsx` | Remove `animate-fade-in` from face-up cards (no animation needed) |
+| `src/lib/poker/callEdge.ts` | **NEW** -- shared edge function caller |
+| `src/hooks/useOrientation.ts` | **NEW** -- shared `useIsLandscape` + `useLockLandscape` |
+| `src/hooks/useOnlinePokerTable.ts` | Import shared `callEdge`, fix chat bubble cleanup, ref-based startHand |
+| `src/components/poker/OnlinePokerTable.tsx` | Import shared utils, remove dead code, memoize computations, fix particles |
+| `src/components/poker/PokerTablePro.tsx` | Import shared hooks, memoize particles |
+| `src/components/poker/OnlinePokerLobby.tsx` | Import shared `callEdge` |
+| `src/components/poker/TournamentLobby.tsx` | Import shared `callEdge` |
+| `src/components/poker/TurnTimer.tsx` | Reduce interval frequency |
+
+### What This Does NOT Change
+- No visual changes to any screen
+- No changes to game logic or edge functions
+- No changes to seat positions, card animations, or dealer placement
+- No changes to authentication, routing, or database queries
 
