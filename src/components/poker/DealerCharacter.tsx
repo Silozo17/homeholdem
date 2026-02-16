@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Crown, Sparkles } from 'lucide-react';
-import dealerPortrait from '@/assets/poker/dealer-portrait.png';
+import dealerPortrait from '@/assets/dealer/dealer-main.png';
 
 interface DealerCharacterProps {
   className?: string;
@@ -12,34 +12,35 @@ export function DealerCharacter({ className, expression = 'neutral' }: DealerCha
   const [imgFailed, setImgFailed] = useState(false);
 
   return (
-    <div className={cn('flex flex-col items-center gap-0.5', className)}>
-      {/* Spotlight glow behind dealer */}
+    <div className={cn('flex flex-col items-center gap-0.5 relative', className)}>
+      {/* Spotlight glow */}
       <div
-        className="absolute -top-6 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full pointer-events-none"
+        className="absolute -top-4 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, hsl(43 74% 49% / 0.12) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, hsl(43 74% 49% / 0.15) 0%, transparent 70%)',
         }}
       />
 
       {/* Dealer avatar frame */}
       <div
         className={cn(
-          'relative w-14 h-14 rounded-full flex items-center justify-center dealer-breathe overflow-hidden',
+          'relative rounded-full flex items-center justify-center dealer-breathe overflow-hidden',
           expression === 'surprise' && 'scale-110',
         )}
         style={{
-          background: 'linear-gradient(135deg, hsl(160 25% 12%), hsl(160 30% 8%))',
-          border: '2px solid hsl(43 74% 49% / 0.6)',
+          width: 'clamp(40px, 10vw, 56px)',
+          height: 'clamp(40px, 10vw, 56px)',
+          border: '2px solid hsl(43 74% 49% / 0.7)',
           boxShadow: `
-            0 0 20px hsl(43 74% 49% / 0.2),
-            0 0 40px hsl(43 74% 49% / 0.1),
+            0 0 16px hsl(43 74% 49% / 0.25),
+            0 0 32px hsl(43 74% 49% / 0.1),
             inset 0 2px 4px rgba(255,255,255,0.1),
             inset 0 -2px 4px rgba(0,0,0,0.3)
           `,
           transition: 'transform 0.5s ease',
+          background: 'linear-gradient(135deg, hsl(160 25% 12%), hsl(160 30% 8%))',
         }}
       >
-        {/* Portrait image */}
         {!imgFailed ? (
           <img
             src={dealerPortrait}
@@ -55,15 +56,13 @@ export function DealerCharacter({ className, expression = 'neutral' }: DealerCha
           />
         )}
 
-        {/* Inner decorative ring */}
+        {/* Inner ring */}
         <div
-          className="absolute inset-[3px] rounded-full pointer-events-none"
-          style={{
-            border: '1px dashed hsl(43 74% 49% / 0.3)',
-          }}
+          className="absolute inset-[2px] rounded-full pointer-events-none"
+          style={{ border: '1px dashed hsl(43 74% 49% / 0.25)' }}
         />
 
-        {/* Sparkle on win */}
+        {/* Sparkles on win */}
         {expression === 'smile' && (
           <>
             <Sparkles className="absolute -top-1 -right-1 w-3 h-3 text-primary animate-sparkle z-10" />

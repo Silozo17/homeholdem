@@ -7,8 +7,10 @@ import { PotDisplay } from './PotDisplay';
 import { BettingControls } from './BettingControls';
 import { WinnerOverlay } from './WinnerOverlay';
 import { TableFelt } from './TableFelt';
+import { TableStage } from './TableStage';
 import { DealerCharacter } from './DealerCharacter';
 import { TurnTimer } from './TurnTimer';
+import { getSeatPositions } from '@/lib/poker/ui/seatLayout';
 import { usePokerSounds, PokerSoundEvent } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,136 +34,31 @@ function useIsLandscape() {
   useEffect(() => {
     const handler = () => setIsLandscape(window.innerWidth > window.innerHeight);
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    window.addEventListener('orientationchange', handler);
+    return () => {
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler);
+    };
   }, []);
   return isLandscape;
 }
 
-const SEAT_POSITIONS_PORTRAIT: Record<number, { x: number; y: number }[]> = {
-  2: [
-    { x: 50, y: 86 },
-    { x: 50, y: 18 },
-  ],
-  3: [
-    { x: 50, y: 86 },
-    { x: 15, y: 40 },
-    { x: 85, y: 40 },
-  ],
-  4: [
-    { x: 50, y: 86 },
-    { x: 88, y: 52 },
-    { x: 50, y: 18 },
-    { x: 12, y: 52 },
-  ],
-  5: [
-    { x: 50, y: 86 },
-    { x: 88, y: 58 },
-    { x: 78, y: 18 },
-    { x: 22, y: 18 },
-    { x: 12, y: 58 },
-  ],
-  6: [
-    { x: 50, y: 86 },
-    { x: 88, y: 62 },
-    { x: 82, y: 18 },
-    { x: 50, y: 14 },
-    { x: 18, y: 18 },
-    { x: 12, y: 62 },
-  ],
-  7: [
-    { x: 50, y: 86 },
-    { x: 88, y: 65 },
-    { x: 87, y: 30 },
-    { x: 65, y: 16 },
-    { x: 35, y: 16 },
-    { x: 13, y: 30 },
-    { x: 12, y: 65 },
-  ],
-  8: [
-    { x: 50, y: 86 },
-    { x: 88, y: 65 },
-    { x: 90, y: 30 },
-    { x: 68, y: 16 },
-    { x: 32, y: 16 },
-    { x: 10, y: 30 },
-    { x: 12, y: 65 },
-    { x: 75, y: 86 },
-  ],
-  9: [
-    { x: 50, y: 86 },
-    { x: 88, y: 70 },
-    { x: 90, y: 38 },
-    { x: 74, y: 16 },
-    { x: 50, y: 12 },
-    { x: 26, y: 16 },
-    { x: 10, y: 38 },
-    { x: 12, y: 70 },
-    { x: 25, y: 86 },
-  ],
-};
-
-const SEAT_POSITIONS_LANDSCAPE: Record<number, { x: number; y: number }[]> = {
-  2: [
-    { x: 50, y: 85 },
-    { x: 50, y: 8 },
-  ],
-  3: [
-    { x: 50, y: 85 },
-    { x: 10, y: 40 },
-    { x: 90, y: 40 },
-  ],
-  4: [
-    { x: 50, y: 85 },
-    { x: 92, y: 50 },
-    { x: 50, y: 8 },
-    { x: 8, y: 50 },
-  ],
-  5: [
-    { x: 50, y: 85 },
-    { x: 92, y: 55 },
-    { x: 78, y: 8 },
-    { x: 22, y: 8 },
-    { x: 8, y: 55 },
-  ],
-  6: [
-    { x: 50, y: 85 },
-    { x: 92, y: 60 },
-    { x: 82, y: 8 },
-    { x: 50, y: 3 },
-    { x: 18, y: 8 },
-    { x: 8, y: 60 },
-  ],
-  7: [
-    { x: 50, y: 85 },
-    { x: 93, y: 62 },
-    { x: 90, y: 20 },
-    { x: 65, y: 3 },
-    { x: 35, y: 3 },
-    { x: 10, y: 20 },
-    { x: 7, y: 62 },
-  ],
-  8: [
-    { x: 50, y: 85 },
-    { x: 93, y: 62 },
-    { x: 92, y: 22 },
-    { x: 68, y: 3 },
-    { x: 32, y: 3 },
-    { x: 8, y: 22 },
-    { x: 7, y: 62 },
-    { x: 72, y: 85 },
-  ],
-  9: [
-    { x: 50, y: 85 },
-    { x: 93, y: 68 },
-    { x: 94, y: 30 },
-    { x: 75, y: 3 },
-    { x: 50, y: 0 },
-    { x: 25, y: 3 },
-    { x: 6, y: 30 },
-    { x: 7, y: 68 },
-    { x: 28, y: 85 },
-  ],
-};
+/*
+ * Z-index layering model:
+ *  0  - leather bg + dark overlay
+ *  1  - TableFelt (rail, felt, vignette, betting line)
+ *  5  - Pot display
+ *  5  - Community cards
+ *  5  - Phase indicator
+ *  10 - Dealer character
+ *  15 - Player seats
+ *  20 - Hand name reveal / particles
+ *  25 - All-in flash
+ *  30 - Winner overlay
+ *  40 - Header bar
+ *  50 - Action bar (betting controls)
+ *  50 - YOUR TURN badge
+ */
 
 export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
@@ -172,20 +69,15 @@ export function PokerTablePro({
   const [showAllinFlash, setShowAllinFlash] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
 
-  // Track previous phase for sound triggers
   const [prevPhase, setPrevPhase] = useState(state.phase);
   const [prevHandNumber, setPrevHandNumber] = useState(state.handNumber);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
-
-  // Showdown hand name display
   const [showHandName, setShowHandName] = useState<string | null>(null);
 
-  // Sound triggers on phase changes
+  // Sound triggers
   useEffect(() => {
     if (state.phase !== prevPhase) {
-      if (state.phase === 'dealing' || (state.phase === 'preflop' && prevPhase === 'dealing')) {
-        play('shuffle');
-      }
+      if (state.phase === 'dealing' || (state.phase === 'preflop' && prevPhase === 'dealing')) play('shuffle');
       if (state.phase === 'flop') play('flip');
       if (state.phase === 'turn' || state.phase === 'river') play('flip');
       if (state.phase === 'hand_complete') {
@@ -195,48 +87,37 @@ export function PokerTablePro({
       }
       setPrevPhase(state.phase);
     }
-    if (state.handNumber !== prevHandNumber) {
-      setPrevHandNumber(state.handNumber);
-    }
+    if (state.handNumber !== prevHandNumber) setPrevHandNumber(state.handNumber);
   }, [state.phase, state.handNumber, prevPhase, prevHandNumber, play]);
 
-  // Play "your turn" sound
-  useEffect(() => {
-    if (isHumanTurn) play('yourTurn');
-  }, [isHumanTurn, play]);
+  useEffect(() => { if (isHumanTurn) play('yourTurn'); }, [isHumanTurn, play]);
 
-  // All-in flash + sound
   useEffect(() => {
     const anyAllIn = state.players.some(p => p.lastAction?.startsWith('All-in'));
     if (anyAllIn) {
       setShowAllinFlash(true);
       play('allIn');
       setDealerExpression('surprise');
-      const t = setTimeout(() => {
-        setShowAllinFlash(false);
-        setDealerExpression('neutral');
-      }, 600);
+      const t = setTimeout(() => { setShowAllinFlash(false); setDealerExpression('neutral'); }, 600);
       return () => clearTimeout(t);
     }
   }, [state.players.map(p => p.lastAction).join(','), play]);
 
-  // Show hand name during showdown
   useEffect(() => {
     if (state.phase === 'hand_complete') {
       const remaining = state.players.filter(p => p.status === 'active' || p.status === 'all-in');
       if (remaining.length > 1 && state.communityCards.length >= 3) {
-        const winnerResults = remaining
+        const best = remaining
           .map(p => ({ player: p, hand: evaluateHand([...p.holeCards, ...state.communityCards]) }))
           .sort((a, b) => b.hand.score - a.hand.score);
-        if (winnerResults[0]) {
-          setShowHandName(winnerResults[0].hand.name);
+        if (best[0]) {
+          setShowHandName(best[0].hand.name);
           setTimeout(() => setShowHandName(null), 2200);
         }
       }
     }
   }, [state.phase]);
 
-  // Sound on player actions
   const handleAction = useCallback((action: any) => {
     if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
@@ -246,9 +127,8 @@ export function PokerTablePro({
   }, [onAction, play]);
 
   const isLandscape = useIsLandscape();
-  const seatMap = isLandscape ? SEAT_POSITIONS_LANDSCAPE : SEAT_POSITIONS_PORTRAIT;
-  const playerCount = state.players.length;
-  const positions = seatMap[Math.min(Math.max(playerCount, 2), 9)] || seatMap[9];
+  const positions = getSeatPositions(state.players.length, isLandscape);
+  const currentPlayerIdx = state.currentPlayerIndex;
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
@@ -270,22 +150,22 @@ export function PokerTablePro({
     duration: Date.now() - state.startTime,
   }), [state.handsPlayed, state.handsWon, state.bestHandName, state.biggestPot, state.startTime]);
 
-  const currentPlayerIdx = state.currentPlayerIndex;
-
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden">
+    <TableStage>
       {/* Leather background */}
-      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+      <img src={leatherBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} style={{ zIndex: 0 }} />
+      <div className="absolute inset-0 bg-black/30 pointer-events-none" style={{ zIndex: 0 }} />
 
       {/* All-in flash */}
       {showAllinFlash && (
-        <div className="absolute inset-0 z-30 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-destructive/0 via-primary/15 to-destructive/0 allin-flash pointer-events-none" style={{ zIndex: 25 }} />
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-3 h-9 z-20 safe-area-top shrink-0 relative"
+      <div
+        className="flex items-center justify-between px-3 h-9 shrink-0 relative"
         style={{
+          zIndex: 40,
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.5), hsl(0 0% 0% / 0.3))',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid hsl(43 74% 49% / 0.15)',
@@ -308,33 +188,35 @@ export function PokerTablePro({
             {state.smallBlind}/{state.bigBlind}
           </span>
         </div>
-        <button
-          onClick={toggleSound}
-          className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-        >
-          {soundEnabled ? (
-            <Volume2 className="h-3.5 w-3.5 text-foreground/80" />
-          ) : (
-            <VolumeX className="h-3.5 w-3.5 text-foreground/40" />
-          )}
+        <button onClick={toggleSound} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+          {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
         </button>
       </div>
 
-      {/* Main table area */}
-      <div className="flex-1 relative z-10">
+      {/* Main table area — fills remaining space */}
+      <div className="flex-1 relative" style={{ zIndex: 1 }}>
         <TableFelt className="absolute inset-0">
-          {/* Dealer character at top center */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '4%' }}>
+          {/* Dealer inside the oval, top-center of felt */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{ top: isLandscape ? '28%' : '30%', zIndex: 10 }}
+          >
             <DealerCharacter expression={dealerExpression} />
           </div>
 
-          {/* Pot display */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '40%' }}>
+          {/* Pot */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{ top: isLandscape ? '38%' : '42%', zIndex: 5 }}
+          >
             <PotDisplay pot={state.pot} />
           </div>
 
           {/* Community cards */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex gap-1.5 items-center" style={{ top: '50%' }}>
+          <div
+            className="absolute left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
+            style={{ top: isLandscape ? '48%' : '50%', zIndex: 5 }}
+          >
             {state.communityCards.map((card, i) => (
               <CardDisplay
                 key={`${card.suit}-${card.rank}-${i}`}
@@ -351,12 +233,9 @@ export function PokerTablePro({
             )}
           </div>
 
-          {/* Hand name reveal at showdown */}
+          {/* Hand name at showdown */}
           {showHandName && (
-            <div
-              className="absolute left-1/2 top-1/2 z-30 animate-hand-name-reveal pointer-events-none"
-              style={{ transform: 'translate(-50%, -50%)' }}
-            >
+            <div className="absolute left-1/2 top-1/2 animate-hand-name-reveal pointer-events-none" style={{ transform: 'translate(-50%, -50%)', zIndex: 20 }}>
               <span
                 className="text-xl font-black uppercase tracking-wider"
                 style={{
@@ -373,9 +252,9 @@ export function PokerTablePro({
             </div>
           )}
 
-          {/* Gold shimmer particles during showdown */}
+          {/* Showdown particles */}
           {state.phase === 'hand_complete' && !isGameOver && (
-            <div className="absolute inset-0 z-25 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 20 }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
@@ -393,7 +272,7 @@ export function PokerTablePro({
           )}
 
           {/* Phase indicator */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ top: '62%' }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '60%' : '60%', zIndex: 5 }}>
             <span className={cn(
               'text-[9px] text-foreground/40 uppercase tracking-[0.2em] font-bold',
               (state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') && 'animate-phase-flash',
@@ -404,7 +283,8 @@ export function PokerTablePro({
 
           {/* Player seats */}
           {state.players.map((player, i) => {
-            const pos = positions[i] || { x: 50, y: 50 };
+            const pos = positions[i];
+            if (!pos) return null;
             const isHuman = player.id === 'human';
             const showCards = isHuman || (isShowdown && (player.status === 'active' || player.status === 'all-in'));
             const isActive = currentPlayerIdx === i && !isShowdown;
@@ -413,13 +293,14 @@ export function PokerTablePro({
               <div
                 key={player.id}
                 className={cn(
-                  'absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300',
-                  // Dim non-active seats when it's someone's turn
+                  'absolute transition-opacity duration-300',
                   !isShowdown && !isActive && state.phase !== 'dealing' && state.phase !== 'idle' ? 'seat-dimmed' : 'seat-active',
                 )}
                 style={{
-                  left: `${pos.x}%`,
-                  top: `${pos.y}%`,
+                  left: `${pos.xPct}%`,
+                  top: `${pos.yPct}%`,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 15,
                 }}
               >
                 <PlayerSeat
@@ -435,10 +316,15 @@ export function PokerTablePro({
         </TableFelt>
       </div>
 
-      {/* Betting controls */}
+      {/* Action bar — always at bottom, above everything */}
       {isHumanTurn && humanPlayer && humanPlayer.status === 'active' && (
-        <div className="px-3 pb-2 pt-1 z-20 safe-area-bottom shrink-0 relative"
-          style={{ background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))' }}
+        <div
+          className="px-3 pb-2 pt-1 shrink-0 relative"
+          style={{
+            zIndex: 50,
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
+            background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.7))',
+          }}
         >
           <BettingControls
             canCheck={canCheck}
@@ -453,9 +339,9 @@ export function PokerTablePro({
         </div>
       )}
 
-      {/* YOUR TURN indicator */}
+      {/* YOUR TURN badge */}
       {isHumanTurn && humanPlayer && humanPlayer.status === 'active' && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20">
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)', zIndex: 50 }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{
               background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
@@ -469,15 +355,13 @@ export function PokerTablePro({
         </div>
       )}
 
-      {/* Winner banner */}
+      {/* Winner overlay */}
       {state.phase === 'hand_complete' && !isGameOver && winners.length > 0 && (
         <WinnerOverlay winners={winners} isGameOver={false} onNextHand={onNextHand} onQuit={onQuit} />
       )}
-
-      {/* Game over overlay */}
       {isGameOver && winners.length > 0 && (
         <WinnerOverlay winners={winners} isGameOver={true} stats={gameStats} onNextHand={onNextHand} onQuit={onQuit} />
       )}
-    </div>
+    </TableStage>
   );
 }
