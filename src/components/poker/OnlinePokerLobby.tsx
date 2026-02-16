@@ -109,6 +109,9 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'poker_tables' }, () => {
         fetchTables();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poker_seats' }, () => {
+        fetchTables();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchTables]);
