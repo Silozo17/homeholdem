@@ -343,7 +343,7 @@ export function PokerTablePro({
           className="relative"
           style={{
             aspectRatio: '16 / 9',
-            width: isLandscape ? 'min(88vw, 1100px)' : 'min(96vw, 1100px)',
+            width: isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)',
             maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
           }}
@@ -352,7 +352,7 @@ export function PokerTablePro({
           <TableFelt />
 
           {/* Dealer character — top center of table */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 'calc(-4% - 52px)', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 'calc(-4% - 62px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
