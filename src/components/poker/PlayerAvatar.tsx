@@ -5,6 +5,7 @@ interface PlayerAvatarProps {
   index: number;
   status: 'active' | 'folded' | 'all-in' | 'eliminated';
   isCurrentPlayer: boolean;
+  avatarUrl?: string | null;
   size?: 'sm' | 'md';
 }
 
@@ -20,7 +21,7 @@ const AVATAR_COLORS = [
   'hsl(220 70% 55%)',
 ];
 
-export function PlayerAvatar({ name, index, status, isCurrentPlayer, size = 'md' }: PlayerAvatarProps) {
+export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md' }: PlayerAvatarProps) {
   const initial = name.charAt(0).toUpperCase();
   const color = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const isOut = status === 'folded' || status === 'eliminated';
@@ -49,7 +50,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, size = 'md'
       {/* Avatar body */}
       <div
         className={cn(
-          'relative rounded-full flex items-center justify-center w-full h-full z-[1]',
+          'relative rounded-full flex items-center justify-center w-full h-full z-[1] overflow-hidden',
         )}
         style={{
           background: isOut
@@ -63,7 +64,11 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, size = 'md'
           border: isOut ? '2px solid hsl(160 10% 30%)' : `2px solid color-mix(in srgb, ${color} 60%, white)`,
         }}
       >
-        {initial}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
       </div>
       {/* Status dot */}
       <span className={cn(
