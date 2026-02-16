@@ -87,6 +87,18 @@ export function PokerTablePro({
       .then(({ data }) => { if (data?.avatar_url) setHumanAvatarUrl(data.avatar_url); });
   }, [user?.id]);
 
+  // Intercept browser back button
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+      setShowQuitConfirm(true);
+    };
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [prevPhase, setPrevPhase] = useState(state.phase);
   const [prevHandNumber, setPrevHandNumber] = useState(state.handNumber);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
@@ -232,7 +244,6 @@ export function PokerTablePro({
           <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
         </button>
 
-        {/* Dealer character — sits in HUD band, not inside seat area */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
@@ -248,7 +259,6 @@ export function PokerTablePro({
               {state.smallBlind}/{state.bigBlind}
             </span>
           </div>
-          <DealerCharacter expression={dealerExpression} />
         </div>
 
         <button onClick={toggleSound} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
@@ -273,6 +283,11 @@ export function PokerTablePro({
         >
           {/* Table image */}
           <TableFelt />
+
+          {/* Dealer character — top center of table */}
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '2%', zIndex: Z.DEALER }}>
+            <DealerCharacter expression={dealerExpression} />
+          </div>
 
           {/* Debug overlay */}
           {isDebug && <DebugOverlay ellipse={ellipse} seatPositions={positions} />}
@@ -478,7 +493,7 @@ export function PokerTablePro({
 
       {/* Quit Confirmation Dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
             <AlertDialogTitle>Exit Game?</AlertDialogTitle>
             <AlertDialogDescription>

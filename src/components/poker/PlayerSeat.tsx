@@ -24,6 +24,7 @@ interface PlayerSeatProps {
 /**
  * PlayerSeat — avatar-centric design with nameplate bar.
  * Opponents see NO cards until showdown, then cards overlay the avatar with a 3D flip.
+ * Human player cards render BELOW the nameplate.
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
@@ -32,45 +33,44 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
   const isAllIn = player.status === 'all-in';
-  const avatarSize = compact ? 'sm' : 'lg';
+  const avatarSize = compact ? 'lg' : 'xl';
   const cardSize = compact ? 'xs' : 'sm';
 
   // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
-  // ── Cards element (only rendered for human or at showdown) ──
-  const cardsEl = shouldRenderCards && player.holeCards.length > 0 ? (
-    <div className={cn(
-      'absolute left-1/2 -translate-x-1/2 flex gap-0.5',
-      isShowdown && !isHuman ? 'animate-showdown-reveal' : '',
-      isHuman ? '-bottom-1' : '-top-1',
-    )} style={{ zIndex: 2 }}>
+  // Opponent showdown cards (overlay the avatar)
+  const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0 ? (
+    <div className="absolute left-1/2 -translate-x-1/2 -top-1 flex gap-0.5 animate-showdown-reveal" style={{ zIndex: 2 }}>
+      {player.holeCards.map((card, i) => (
+        <CardDisplay
+          key={i}
+          card={shouldShowCards ? card : undefined}
+          faceDown={!shouldShowCards}
+          size={cardSize}
+          dealDelay={i * 0.15}
+          className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
+        />
+      ))}
+    </div>
+  ) : null;
+
+  // Human player cards (rendered below the nameplate)
+  const humanCards = isHuman && player.holeCards.length > 0 ? (
+    <div className="flex gap-0.5 justify-center mt-0.5" style={{ zIndex: 2 }}>
       {player.holeCards.map((card, i) => {
-        const dealDelay = isShowdown && !isHuman
-          ? i * 0.15
-          : (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
+        const dealDelay = (i * player.holeCards.length + seatDealOrder) * 0.15 + 0.1;
         return (
           <CardDisplay
             key={i}
-            card={shouldShowCards ? card : undefined}
-            faceDown={!shouldShowCards}
+            card={card}
             size={cardSize}
             dealDelay={dealDelay}
-            className={cn(
-              isOut && !isShowdown ? 'animate-fold-away' : '',
-              isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : '',
-            )}
+            className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
           />
         );
       })}
-      {isFolded && player.holeCards.length > 0 && !isShowdown && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-destructive/90 border border-destructive/30">
-            Fold
-          </span>
-        </div>
-      )}
     </div>
   ) : null;
 
@@ -84,10 +84,10 @@ export const PlayerSeat = memo(function PlayerSeat({
       <div className="relative">
         {/* Active player spotlight glow */}
         {isCurrentPlayer && !isOut && (
-          <div className="absolute inset-[-6px] rounded-full pointer-events-none"
+          <div className="absolute inset-[-8px] rounded-full pointer-events-none"
             style={{
               background: 'radial-gradient(circle, hsl(43 74% 49% / 0.25), transparent 70%)',
-              filter: 'blur(4px)',
+              filter: 'blur(6px)',
             }}
           />
         )}
@@ -108,17 +108,17 @@ export const PlayerSeat = memo(function PlayerSeat({
 
         {/* Turn timer wraps the avatar */}
         {isCurrentPlayer && !isOut && (
-          <TurnTimer active={true} size={compact ? 40 : 56} strokeWidth={2.5} onTimeout={onTimeout} />
+          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={2.5} onTimeout={onTimeout} />
         )}
 
-        {/* Cards overlaying avatar area */}
-        {cardsEl}
+        {/* Opponent showdown cards overlaying avatar */}
+        {opponentShowdownCards}
       </div>
 
       {/* Nameplate bar */}
       <div className={cn(
         'flex flex-col items-center rounded-b-lg px-2 py-0.5 -mt-1',
-        compact ? 'min-w-[52px]' : 'min-w-[68px]',
+        compact ? 'min-w-[60px]' : 'min-w-[76px]',
       )} style={{
         background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.75), hsl(0 0% 0% / 0.6))',
         backdropFilter: 'blur(8px)',
@@ -128,18 +128,21 @@ export const PlayerSeat = memo(function PlayerSeat({
         borderTop: 'none',
       }}>
         <p className={cn(
-          compact ? 'text-[8px] max-w-[48px]' : 'text-[10px] max-w-[64px]',
+          compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[72px]',
           'font-bold truncate leading-tight',
           isHuman ? 'text-primary' : 'text-foreground/90',
         )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
           {player.name}
         </p>
-        <p className={cn(compact ? 'text-[7px]' : 'text-[9px]', 'text-primary/80 font-semibold leading-none')}
+        <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-primary/80 font-semibold leading-none')}
           style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
         >
           {player.chips.toLocaleString()}
         </p>
       </div>
+
+      {/* Human player cards below nameplate */}
+      {humanCards}
 
       {/* Action badge (floating near nameplate) */}
       {player.lastAction && (

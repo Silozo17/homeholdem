@@ -1,6 +1,6 @@
 import { HandResult as HandResultType } from '@/lib/poker/types';
 import { useEffect, useState } from 'react';
-import { Trophy, Play, LogOut } from 'lucide-react';
+import { Trophy, Play, LogOut, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WinnerOverlayProps {
@@ -39,6 +39,9 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
     const secs = Math.floor((ms % 60000) / 1000);
     return `${mins}m ${secs}s`;
   };
+
+  // Determine if the human player won or lost (for game over)
+  const humanWon = isGameOver && winners.some(w => w.name === 'You');
 
   // Inline banner for hand_complete — gold serif hand name + particles
   if (!isGameOver) {
@@ -121,14 +124,13 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
           boxShadow: '0 0 60px hsl(43 74% 49% / 0.15), 0 20px 60px rgba(0,0,0,0.5)',
         }}
       >
-        {/* Trophy with shimmer */}
+        {/* Trophy / Title */}
         <div className="relative flex justify-center">
           <div className="w-20 h-20 rounded-full flex items-center justify-center animate-winner-glow"
             style={{ background: 'radial-gradient(circle, hsl(43 74% 49% / 0.2), transparent)' }}
           >
             <Trophy className="w-10 h-10 text-primary" style={{ filter: 'drop-shadow(0 0 12px hsl(43 74% 49% / 0.6))' }} />
           </div>
-          {/* Particles around trophy */}
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -144,7 +146,12 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
           ))}
         </div>
 
-        <h2 className="text-2xl font-black text-shimmer">Game Over</h2>
+        <h2 className="text-2xl font-black text-shimmer">
+          {humanWon ? 'You Won!' : 'Game Over'}
+        </h2>
+        {!humanWon && (
+          <p className="text-sm text-muted-foreground -mt-3">You busted out</p>
+        )}
 
         {/* Winners */}
         <div className="space-y-2">
@@ -214,13 +221,13 @@ export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }
             }}
             onClick={onQuit}
           >
-            <LogOut className="w-4 h-4" />
-            Quit
+            <X className="w-4 h-4" />
+            Close Game
           </button>
           <button className="flex-1 h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5
             shimmer-btn text-primary-foreground active:scale-[0.92] transition-transform"
             style={{ boxShadow: '0 4px 20px rgba(200,160,40,0.3)' }}
-            onClick={onQuit}
+            onClick={onNextHand}
           >
             <Play className="w-4 h-4" />
             Play Again
