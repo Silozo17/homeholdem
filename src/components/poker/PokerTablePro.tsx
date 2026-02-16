@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { GameState } from '@/lib/poker/types';
+import { GameState, BLIND_LEVELS } from '@/lib/poker/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
@@ -65,6 +65,32 @@ function useLockLandscape() {
 }
 
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+
+function BlindTimerCountdown({ lastBlindIncrease, blindTimer, blindLevel }: { lastBlindIncrease: number; blindTimer: number; blindLevel: number }) {
+  const [remaining, setRemaining] = useState('');
+  useEffect(() => {
+    const update = () => {
+      const elapsed = Date.now() - lastBlindIncrease;
+      const total = blindTimer * 60000;
+      const left = Math.max(0, total - elapsed);
+      const mins = Math.floor(left / 60000);
+      const secs = Math.floor((left % 60000) / 1000);
+      setRemaining(`${mins}:${secs.toString().padStart(2, '0')}`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [lastBlindIncrease, blindTimer]);
+
+  if (blindLevel >= BLIND_LEVELS.length - 1) return null;
+  const next = BLIND_LEVELS[blindLevel + 1];
+
+  return (
+    <span className="text-[9px] text-primary/70 font-medium">
+      ⏱ {remaining} → {next.small}/{next.big}
+    </span>
+  );
+}
 
 export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
@@ -258,6 +284,13 @@ export function PokerTablePro({
             <span className="text-[10px] text-foreground/60 font-medium">
               {state.smallBlind}/{state.bigBlind}
             </span>
+            {state.blindTimer > 0 && (
+              <BlindTimerCountdown
+                lastBlindIncrease={state.lastBlindIncrease}
+                blindTimer={state.blindTimer}
+                blindLevel={state.blindLevel}
+              />
+            )}
           </div>
         </div>
 
@@ -292,10 +325,10 @@ export function PokerTablePro({
           {/* Debug overlay */}
           {isDebug && <DebugOverlay ellipse={ellipse} seatPositions={positions} />}
 
-          {/* Pot display */}
+          {/* Pot display — under dealer */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: '28%', zIndex: Z.CARDS }}
+            style={{ top: '14%', zIndex: Z.CARDS }}
           >
             <PotDisplay pot={state.pot} />
           </div>
@@ -303,7 +336,7 @@ export function PokerTablePro({
           {/* Community cards */}
           <div
             className="absolute left-1/2 flex gap-1.5 items-center"
-            style={{ top: '44%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
+            style={{ top: '42%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => {
               const isFlop = i < 3;

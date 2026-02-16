@@ -73,15 +73,16 @@ const SEATS_PORTRAIT: Record<SeatKey, { xPct: number; yPct: number }> = {
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)
 // Clockwise order from hero (Y at bottom): E(bot-right) → F(right) → G(upper-right) → H(top-right) → D(top-left) → C(upper-left) → B(left) → A(bot-left)
+// Clockwise order from hero: Y → A(bot-left) → B(left) → C → D(top-left) → H(top-right) → G → F(right) → E(bot-right)
 const SEAT_PICKS: Record<number, SeatKey[]> = {
   2: ['Y', 'D'],
-  3: ['Y', 'F', 'B'],
-  4: ['Y', 'F', 'D', 'B'],
-  5: ['Y', 'E', 'G', 'C', 'A'],
-  6: ['Y', 'E', 'F', 'D', 'B', 'A'],
-  7: ['Y', 'E', 'F', 'H', 'D', 'B', 'A'],
-  8: ['Y', 'E', 'G', 'H', 'D', 'C', 'B', 'A'],
-  9: ['Y', 'E', 'F', 'G', 'H', 'D', 'C', 'B', 'A'],
+  3: ['Y', 'B', 'F'],
+  4: ['Y', 'B', 'D', 'F'],
+  5: ['Y', 'A', 'C', 'G', 'E'],
+  6: ['Y', 'A', 'B', 'D', 'F', 'E'],
+  7: ['Y', 'A', 'B', 'D', 'H', 'F', 'E'],
+  8: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'E'],
+  9: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'F', 'E'],
 };
 
 /**

@@ -111,11 +111,28 @@ export interface GameState {
   bestHandName: string;
   startTime: number;
   startingChips: number;
+  blindLevel: number;
+  blindTimer: number; // minutes, 0 = off
+  lastBlindIncrease: number; // timestamp
 }
+
+export const BLIND_LEVELS = [
+  { small: 25, big: 50 },
+  { small: 50, big: 100 },
+  { small: 75, big: 150 },
+  { small: 100, big: 200 },
+  { small: 150, big: 300 },
+  { small: 200, big: 400 },
+  { small: 300, big: 600 },
+  { small: 500, big: 1000 },
+  { small: 1000, big: 2000 },
+  { small: 2000, big: 4000 },
+];
 
 export interface LobbySettings {
   botCount: number;
   startingChips: number;
   smallBlind: number;
   bigBlind: number;
+  blindTimer: number; // minutes: 0 = off, 5/10/15/30
 }

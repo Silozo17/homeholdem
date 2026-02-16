@@ -25,10 +25,11 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
   const [botCount, setBotCount] = useState(3);
   const [startingChips, setStartingChips] = useState(10000);
   const [bigBlind, setBigBlind] = useState(100);
+  const [blindTimer, setBlindTimer] = useState(0);
   const navigate = useNavigate();
 
   const handleStart = () => {
-    onStart({ botCount, startingChips, smallBlind: bigBlind / 2, bigBlind });
+    onStart({ botCount, startingChips, smallBlind: bigBlind / 2, bigBlind, blindTimer });
   };
 
   return (
@@ -120,6 +121,30 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
               <span className="text-primary font-bold">{bigBlind / 2} / {bigBlind}</span>
             </div>
             <Slider value={[bigBlind]} min={20} max={500} step={20} onValueChange={([v]) => setBigBlind(v)} />
+          </div>
+
+          {/* Blind Timer */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-foreground font-medium">Blind Timer</span>
+              <span className="text-primary font-bold">{blindTimer === 0 ? 'Off' : `${blindTimer} min`}</span>
+            </div>
+            <div className="flex gap-2">
+              {[0, 5, 10, 15, 30].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setBlindTimer(t)}
+                  className={cn(
+                    'flex-1 rounded-xl py-1.5 text-center transition-all border text-xs font-bold',
+                    blindTimer === t
+                      ? 'bg-primary/15 border-primary/40 text-primary'
+                      : 'bg-card/30 border-border/30 text-muted-foreground hover:border-border/60'
+                  )}
+                >
+                  {t === 0 ? 'Off' : `${t}m`}
+                </button>
+              ))}
+            </div>
           </div>
 
         </div>
