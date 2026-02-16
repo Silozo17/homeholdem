@@ -63,8 +63,13 @@ export function TurnTimer({
     <svg
       width={size}
       height={size}
-      className="absolute inset-0 -rotate-90 pointer-events-none"
-      style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%) rotate(-90deg)' }}
+      className="absolute pointer-events-none"
+      style={{
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%) rotate(-90deg)',
+        zIndex: 10,
+      }}
     >
       {/* Background ring */}
       <circle

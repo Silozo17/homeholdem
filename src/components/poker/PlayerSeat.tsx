@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -38,6 +38,29 @@ export const PlayerSeat = memo(function PlayerSeat({
   const cardSize = compact ? 'md' : 'lg';
   const humanCardSize = compact ? 'md' : '2xl';
 
+  // Sequential card reveal: cards stay face-down until their deal delay elapses
+  const [revealedIndices, setRevealedIndices] = useState<Set<number>>(new Set());
+  const cardKey = player.holeCards.map(c => `${c.suit}-${c.rank}`).join(',');
+
+  useEffect(() => {
+    if (!isHuman || player.holeCards.length === 0) {
+      setRevealedIndices(new Set());
+      return;
+    }
+    // Reset on new cards
+    setRevealedIndices(new Set());
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    player.holeCards.forEach((_, i) => {
+      const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
+      // Reveal after deal animation completes (delay + flight duration ~0.7s)
+      const revealMs = (dealDelay + 0.7) * 1000;
+      timers.push(setTimeout(() => {
+        setRevealedIndices(prev => new Set(prev).add(i));
+      }, revealMs));
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [cardKey, isHuman, totalActivePlayers, seatDealOrder]);
+
   // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
@@ -59,15 +82,17 @@ export const PlayerSeat = memo(function PlayerSeat({
     </div>
   ) : null;
 
-  // Human player cards (fanned behind avatar)
+  // Human player cards (fanned behind avatar) — sequential reveal
   const humanCards = isHuman && player.holeCards.length > 0 ? (
    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 9px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
         const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
+        const isRevealed = revealedIndices.has(i);
         return (
           <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-12px' : '0' }}>
             <CardDisplay
-              card={card}
+              card={isRevealed ? card : undefined}
+              faceDown={!isRevealed}
               size={humanCardSize}
               dealDelay={dealDelay}
               className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
@@ -147,8 +172,6 @@ export const PlayerSeat = memo(function PlayerSeat({
           {player.chips.toLocaleString()}
         </p>
       </div>
-
-      {/* Action badge (floating near nameplate) */}
 
       {/* Action badge (floating near nameplate) — hero gets it to the right */}
       {player.lastAction && (

@@ -252,7 +252,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Clear showdown timer if one exists
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
 
-        // After 5s pause, clear hand and auto-start next
+        // After 3.5s pause, clear hand and auto-start next
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
             if (!prev) return prev;
@@ -263,7 +263,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setHandWinners([]);
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
-        }, 7000);
+        }, 3500);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
         // Skip if this is our own message (already added locally in sendChat)
@@ -421,6 +421,17 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       setHandHasEverStarted(true);
     }
   }, [hasActiveHand]);
+
+  // Fix #6: Reset autoStartAttempted when hand clears (prevents freeze)
+  useEffect(() => {
+    if (!hasActiveHand && autoStartAttempted && handHasEverStarted) {
+      // If hand is gone but autoStart is stuck, reset after a short delay
+      const fallback = setTimeout(() => {
+        setAutoStartAttempted(false);
+      }, 1500);
+      return () => clearTimeout(fallback);
+    }
+  }, [hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;

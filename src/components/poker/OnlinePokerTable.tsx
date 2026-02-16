@@ -487,6 +487,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             width: isLandscape ? 'min(88vw, 1100px)' : 'min(96vw, 1100px)',
             maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
+            containerType: 'size',
           }}
         >
           {/* Table image — visual only */}
@@ -623,7 +624,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           )}
 
           {/* Chip animations: pot flies to winner */}
-          {chipAnimations.map(chip => (
+          {chipAnimations.map((chip, i) => (
             <ChipAnimation
               key={chip.id}
               fromX={50}
@@ -631,6 +632,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               toX={chip.toX}
               toY={chip.toY}
               duration={900}
+              delay={i * 80}
             />
           ))}
 
@@ -768,10 +770,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       </div>
 
-      {/* YOUR TURN badge — same positioning as PokerTablePro */}
+      {/* YOUR TURN badge — positioned above hero cards */}
       {showActions && (
         <div className="absolute pointer-events-none" style={{
-          bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'calc(env(safe-area-inset-bottom, 0px) + 140px)',
+          bottom: isLandscape ? 'calc(50% + 60px)' : 'calc(50% + 80px)',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS,

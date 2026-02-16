@@ -9,6 +9,8 @@ interface ChipAnimationProps {
   toY: number;
   /** Duration in ms */
   duration?: number;
+  /** Stagger delay in ms */
+  delay?: number;
   /** Callback when animation completes */
   onComplete?: () => void;
   /** Chip color */
@@ -17,7 +19,8 @@ interface ChipAnimationProps {
 
 export function ChipAnimation({
   fromX, fromY, toX, toY,
-  duration = 500,
+  duration = 900,
+  delay = 0,
   onComplete,
   color = 'hsl(43 74% 49%)',
 }: ChipAnimationProps) {
@@ -27,11 +30,15 @@ export function ChipAnimation({
     const t = setTimeout(() => {
       setVisible(false);
       onComplete?.();
-    }, duration);
+    }, duration + delay);
     return () => clearTimeout(t);
-  }, [duration, onComplete]);
+  }, [duration, delay, onComplete]);
 
   if (!visible) return null;
+
+  // Use pixel-based calc() for reliable movement
+  const dx = toX - fromX;
+  const dy = toY - fromY;
 
   return (
     <div
@@ -39,18 +46,23 @@ export function ChipAnimation({
       style={{
         left: `${fromX}%`,
         top: `${fromY}%`,
-        animation: `chip-fly-custom ${duration}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
-        '--chip-dx': `${toX - fromX}%`,
-        '--chip-dy': `${toY - fromY}%`,
+        animationName: 'chip-sweep',
+        animationDuration: `${duration}ms`,
+        animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        animationFillMode: 'forwards',
+        animationDelay: `${delay}ms`,
+        '--chip-end-x': `${dx}cqw`,
+        '--chip-end-y': `${dy}cqh`,
+        opacity: 0,
       } as React.CSSProperties}
     >
-      {/* Mini chip */}
+      {/* Chip with trail */}
       <div
-        className="w-4 h-4 rounded-full"
+        className="w-5 h-5 rounded-full"
         style={{
           background: `radial-gradient(circle at 35% 35%, ${color}, color-mix(in srgb, ${color} 60%, black))`,
-          boxShadow: `0 1px 6px rgba(200,160,40,0.6), 0 0 10px rgba(200,160,40,0.3), inset 0 1px 2px rgba(255,255,255,0.4)`,
-          border: `1.5px solid color-mix(in srgb, ${color} 70%, white)`,
+          boxShadow: `0 2px 8px rgba(200,160,40,0.8), 0 0 16px rgba(200,160,40,0.5), inset 0 1px 2px rgba(255,255,255,0.4)`,
+          border: `2px solid color-mix(in srgb, ${color} 70%, white)`,
         }}
       />
     </div>
