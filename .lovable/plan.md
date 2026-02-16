@@ -1,50 +1,57 @@
 
 
-# Fix: Showdown Cards Not Revealed + Game Stuck After Hand
+# Auto-Deal: Make Multiplayer Flow Like Bot Games
 
-## Root Causes
+## Overview
 
-### 1. Event name mismatch -- client never receives hand completion
-The server broadcasts event `"hand_result"` (poker-action/index.ts line 619), but the client subscribes to `"hand_complete"` (useOnlinePokerTable.ts line 132). Since these don't match, the client never receives the hand result, so:
-- `current_hand` is never set to `null`
-- The "Deal Hand" button never reappears (it checks `!hand`)
-- The game appears frozen
+Remove the manual "Deal Hand" button entirely. The multiplayer game will auto-start hands continuously, matching the bot game's seamless experience.
 
-### 2. Opponent cards never populated at showdown
-The server sends `revealed_cards` (array of `{ player_id, cards }`) in the `hand_result` payload, but the client ignores this data entirely. Meanwhile, `toPokerPlayer()` always gives opponents empty `holeCards: []`, so even when `isShowdown` is true, `PlayerSeat` has no cards to display.
+## How the Bot Game Works (Reference)
 
-### 3. No showdown pause before clearing the hand
-Even after fixing the event name, the current `hand_complete` handler immediately sets `current_hand: null` and clears cards. This means there's zero time to see the showdown -- it jumps straight to the "waiting" state. We need a brief delay (e.g. 5 seconds) so players can see revealed cards and the winner.
+The bot game uses a series of auto-transitions driven by `useEffect`:
+- `dealing` phase: auto-deals cards after 1.8s
+- Bot turns: auto-plays after 1.5-3s
+- All-in runouts: auto-advances phases with dramatic pauses
+- `showdown`: auto-evaluates after 2.5s  
+- `hand_complete`: auto-starts next hand after 4.5s
 
-## Plan
+No manual buttons needed -- hands flow continuously.
+
+## How Multiplayer Currently Works
+
+- After showdown, the 5-second pause ends and `current_hand` is cleared
+- A "Deal Hand" button appears, requiring someone to tap it
+- Only the table creator or a seated player can press it
+
+## Changes
 
 ### File 1: `src/hooks/useOnlinePokerTable.ts`
 
-**A. Fix event name**: Change `'hand_complete'` to `'hand_result'` in the channel subscription.
+**A. Auto-deal after showdown**: Inside the `hand_result` handler, after the 5-second showdown pause clears the hand state, automatically call `startHand()`. The server already rejects duplicate start requests (it checks for active hands), so even if multiple clients fire simultaneously, only the first succeeds and the rest silently fail.
 
-**B. Add `revealedCards` state**: New state `revealedCards` that stores the `{ player_id, cards }[]` from the `hand_result` payload. This is what the UI reads to show opponent hole cards at showdown.
+**B. Auto-deal on initial table fill**: Add a `useEffect` that watches for "2+ seated players, no active hand" and auto-calls `startHand()` after a short 2-second delay. This handles the first hand when players join, eliminating the need for any manual button.
 
-**C. Add showdown pause**: When `hand_result` arrives:
-1. First, update `current_hand.phase` to `'complete'` and merge `revealed_cards` into state
-2. After a 5-second delay, clear `current_hand` to null and reset `revealedCards`
-
-**D. Expose `revealedCards`** in the return object so the table component can use them.
+**C. Guard against loops**: Use a ref (`autoStartAttemptedRef`) to prevent repeated start attempts. Reset it when a new hand begins or when conditions change.
 
 ### File 2: `src/components/poker/OnlinePokerTable.tsx`
 
-**A. Pass revealed cards to opponents**: In the seat rendering loop, when building the `PokerPlayer` via `toPokerPlayer()`, if `revealedCards` contains cards for an opponent's `player_id`, pass those as `heroCards` so `PlayerSeat` renders them.
+**A. Remove the "Deal Hand" button** (lines 484-499): Delete the entire block that renders the deal button.
 
-**B. Add "Next Hand" button**: During the showdown pause (phase is `'complete'`), show a "Next Hand" button (like the Deal button) so the table creator can start the next hand once showdown is done. The deal button already appears when `!hand`, but we can also let it appear earlier.
+**B. Update waiting text**: Change "Ready to deal" to "Starting soon..." so players know the game is about to auto-start.
 
-### File 3: `src/components/poker/OnlinePokerTable.tsx` (toPokerPlayer)
+**C. Remove `canStartHand` logic**: The variable that computes deal-button visibility is no longer needed.
 
-Update the `toPokerPlayer` adapter to accept optional `revealedCards` so opponents get their hole cards populated for showdown rendering.
+## Edge Cases Handled
+
+- **Only one hand starts**: Server rejects duplicates via the `activeHand` check in `poker-start-hand`
+- **Player leaves mid-showdown**: If players drop below 2, `startHand` returns an error ("Need at least 2 players") which is silently caught
+- **First hand**: The new `useEffect` auto-triggers when enough players sit down
+- **Reconnection**: On refresh, `refreshState()` loads the current hand -- if none exists and 2+ players are seated, the auto-deal effect fires
 
 ## Summary
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| Game stuck after showdown | Client listens for `hand_complete`, server sends `hand_result` | Rename event to `hand_result` |
-| Opponent cards not visible | `revealed_cards` payload ignored, opponents always get `holeCards: []` | Store revealed cards in state, pass to `toPokerPlayer` |
-| No time to see results | Hand clears immediately on completion | Add 5-second showdown pause before clearing |
+| Change | File |
+|--------|------|
+| Auto-call `startHand()` after showdown pause + on initial table fill | `useOnlinePokerTable.ts` |
+| Remove "Deal Hand" button, update waiting text | `OnlinePokerTable.tsx` |
 
