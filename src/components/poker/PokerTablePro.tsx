@@ -190,15 +190,25 @@ export function PokerTablePro({
 
   const winners = useMemo(() => {
     if (state.phase !== 'hand_complete' && state.phase !== 'game_over') return [];
-    return state.players
-      .filter(p => p.lastAction?.includes('!') || (isGameOver && p.chips > 0))
-      .map(p => {
-        const hand = p.holeCards.length >= 2 && state.communityCards.length >= 3
-          ? evaluateHand([...p.holeCards, ...state.communityCards])
-          : { rank: 0, name: 'N/A', score: 0, bestCards: [] };
-        return { name: p.name, hand, chips: p.chips };
-      });
-  }, [state.phase, state.players, state.communityCards, isGameOver]);
+    if (state.lastHandWinners && state.lastHandWinners.length > 0) {
+      return state.lastHandWinners.map(w => ({
+        name: w.name,
+        hand: { rank: 0, name: w.handName, score: 0, bestCards: [] as any[] },
+        chips: state.players.find(p => p.id === w.playerId)?.chips || 0,
+      }));
+    }
+    // Fallback for game_over when lastHandWinners may be empty
+    if (isGameOver) {
+      return state.players
+        .filter(p => p.chips > 0)
+        .map(p => ({
+          name: p.name,
+          hand: { rank: 0, name: 'N/A', score: 0, bestCards: [] as any[] },
+          chips: p.chips,
+        }));
+    }
+    return [];
+  }, [state.phase, state.lastHandWinners, state.players, isGameOver]);
 
   const gameStats = useMemo(() => ({
     handsPlayed: state.handsPlayed,

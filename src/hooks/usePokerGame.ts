@@ -47,6 +47,7 @@ function createInitialState(): GameState {
     blindLevel: 0,
     blindTimer: 0,
     lastBlindIncrease: Date.now(),
+    lastHandWinners: [],
   };
 }
 
@@ -333,11 +334,19 @@ function reducer(state: GameState, action: Action): GameState {
       let bestHandRank = state.bestHandRank;
       let bestHandName = state.bestHandName;
 
+      const lastHandWinners: GameState['lastHandWinners'] = [];
+
       if (remaining.length === 1) {
         // Everyone else folded
         remaining[0].chips += pot;
         remaining[0].lastAction = 'Winner!';
         if (remaining[0].id === 'human') handsWon++;
+        lastHandWinners.push({
+          playerId: remaining[0].id,
+          name: remaining[0].name,
+          handName: 'N/A',
+          chipsWon: pot,
+        });
       } else {
         // Build contributors for side pot calculation
         const contributors: PotContributor[] = players.map(p => ({
@@ -368,6 +377,12 @@ function reducer(state: GameState, action: Action): GameState {
             p.chips += won;
             const hand = results.find(r => r.playerId === p.id)?.hand;
             p.lastAction = hand ? `${hand.name}!` : 'Winner!';
+            lastHandWinners.push({
+              playerId: p.id,
+              name: p.name,
+              handName: hand?.name || 'N/A',
+              chipsWon: won,
+            });
             if (p.id === 'human') {
               handsWon++;
               if (hand && hand.rank > bestHandRank) {
@@ -396,6 +411,7 @@ function reducer(state: GameState, action: Action): GameState {
         biggestPot,
         bestHandRank,
         bestHandName,
+        lastHandWinners,
       };
     }
 
