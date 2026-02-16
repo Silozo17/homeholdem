@@ -213,7 +213,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
     const isRunning = t.status === 'running';
 
     return (
-      <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom overflow-x-hidden">
+      <div className="fixed inset-0 flex flex-col poker-felt-bg card-suit-pattern safe-area-bottom z-10 overflow-y-auto overflow-x-hidden">
         <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
           <div className="container relative flex items-center justify-center h-14 px-4">
             <Button variant="ghost" size="icon" onClick={() => { setSelectedId(null); setDetail(null); }} className="absolute left-4 text-muted-foreground">
@@ -365,7 +365,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
   // List view
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom overflow-x-hidden">
+    <div className="fixed inset-0 flex flex-col poker-felt-bg card-suit-pattern safe-area-bottom z-10 overflow-y-auto overflow-x-hidden">
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-14 px-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(clubId ? `/club/${clubId}` : '/poker')} className="absolute left-4 text-muted-foreground">
