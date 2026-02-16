@@ -209,10 +209,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     sendAction(actionType, action.amount);
   };
 
-  // Build seat array for all positions
-  const allSeats: (OnlineSeatInfo | null)[] = Array.from({ length: table.max_seats }, (_, i) => {
-    return seats.find(s => s.seat === i) || null;
-  });
+  // Build rotated seat array so hero is always at position 0 (bottom center)
+  const maxSeats = table.max_seats;
+  const heroSeat = mySeatNumber ?? 0;
+  const rotatedSeats: (OnlineSeatInfo | null)[] = Array.from(
+    { length: maxSeats },
+    (_, i) => {
+      const actualSeat = (heroSeat + i) % maxSeats;
+      return seats.find(s => s.seat === actualSeat) || null;
+    }
+  );
 
   const positions = SEAT_POSITIONS[Math.min(Math.max(table.max_seats, 2), 9)] || SEAT_POSITIONS[9];
 
@@ -369,11 +375,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           )}
 
           {/* Player seats around the table */}
-          {allSeats.map((seatData, seatIndex) => {
-            const pos = positions[seatIndex] || { x: 50, y: 50 };
+          {rotatedSeats.map((seatData, screenPos) => {
+            const actualSeatNumber = (heroSeat + screenPos) % maxSeats;
+            const pos = positions[screenPos] || { x: 50, y: 50 };
             const isMe = seatData?.player_id === user?.id;
-            const isCurrentActor = hand?.current_actor_seat === seatIndex;
-            const isDealer = hand?.dealer_seat === seatIndex;
+            const isCurrentActor = hand?.current_actor_seat === actualSeatNumber;
+            const isDealer = hand?.dealer_seat === actualSeatNumber;
             const isFolded = seatData?.status === 'folded';
             const isEmpty = !seatData?.player_id;
             const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete';
@@ -383,7 +390,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
             return (
               <div
-                key={seatIndex}
+                key={actualSeatNumber}
                 className={cn(
                   'absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300',
                   !isEmpty && !isCurrentActor && hand && !isShowdown ? 'seat-dimmed' : 'seat-active',
@@ -392,14 +399,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               >
                 {isEmpty ? (
                   <EmptySeatDisplay
-                    seatNumber={seatIndex}
+                    seatNumber={actualSeatNumber}
                     canJoin={!isSeated}
-                    onJoin={() => handleJoinSeat(seatIndex)}
+                    onJoin={() => handleJoinSeat(actualSeatNumber)}
                   />
                 ) : (
                   <OnlineSeatDisplay
                     seatData={seatData!}
-                    seatNumber={seatIndex}
+                    seatNumber={actualSeatNumber}
                     isCurrentActor={isCurrentActor && !isFolded}
                     isDealer={!!isDealer}
                     isFolded={!!isFolded}
