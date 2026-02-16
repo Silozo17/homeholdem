@@ -10,7 +10,7 @@ export default function PokerHub() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden safe-area-bottom">
+    <div className="fixed inset-0 flex flex-col overflow-hidden safe-area-bottom z-10 bg-background">
       {/* Standard fixed header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
         <div className="container relative flex items-center justify-center h-14 px-4">
