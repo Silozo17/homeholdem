@@ -123,13 +123,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!currentPhase) setPrevPhase(null);
   }, [currentPhase, prevPhase, play]);
 
-  useEffect(() => {
-    if (!tableState || !user) return;
-    const checkKicked = () => {
-      if (mySeatNumber !== null) return;
-    };
-    checkKicked();
-  }, [tableState, user, mySeatNumber]);
 
   // Your turn: sound + haptic
   useEffect(() => {
