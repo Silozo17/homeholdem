@@ -1,9 +1,22 @@
 /**
- * Seat positions anchored to an ellipse matching the table rail.
+ * Fixed seat positions for the poker table.
  * All coordinates are % of the TABLE WRAPPER, not the viewport.
+ * 
+ * 9 canonical seats (from the reference layout):
+ *   Y (You)     = bottom center
+ *   A (Alex)    = bottom-left
+ *   B (Blake)   = left middle
+ *   C (Casey)   = upper-left
+ *   D (Drew)    = top-left
+ *   E (Ellis)   = bottom-right
+ *   F (Frankie) = right middle
+ *   G (Gray)    = upper-right
+ *   H (Harper)  = top-right
+ *
+ * Fewer players pick a balanced subset of these same positions.
  */
 
-import { type Ellipse, pointOnEllipsePct, offsetFromCenterPct, clampPct } from './ellipse';
+import { type Ellipse } from './ellipse';
 
 export interface SeatPos {
   xPct: number;
@@ -14,65 +27,63 @@ export interface SeatPos {
 export const PORTRAIT_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 38, ry: 34 };
 export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 
-/**
- * Angle maps per player count.
- * CSS coords: 90° = bottom, 270° = top, 0° = right, 180° = left.
- * Seat 0 (human) is always at bottom (90°).
- *
- * Top-center (270°) is reserved for the dealer character — no player seat goes there.
- */
-const portraitAngles: Record<number, number[]> = {
-  2: [90, 315],
-  3: [90, 200, 340],
-  4: [90, 180, 340, 20],
-  5: [90, 155, 210, 330, 25],
-  6: [90, 145, 200, 240, 310, 35],
-  7: [90, 140, 185, 225, 250, 315, 30],
-  8: [90, 135, 175, 215, 255, 295, 335, 30],
-  9: [90, 130, 160, 200, 235, 250, 305, 340, 20],
+// ── 9 fixed seat positions (landscape) ──────────────────────────────
+// Mapped from the reference screenshot yellow markers
+const SEATS_LANDSCAPE = {
+  Y: { xPct: 50, yPct: 100 },   // bottom center (You)
+  A: { xPct: 18, yPct: 85 },    // bottom-left
+  B: { xPct: 5,  yPct: 52 },    // left middle
+  C: { xPct: 10, yPct: 20 },    // upper-left
+  D: { xPct: 30, yPct: 2 },     // top-left
+  E: { xPct: 82, yPct: 85 },    // bottom-right
+  F: { xPct: 95, yPct: 52 },    // right middle
+  G: { xPct: 90, yPct: 20 },    // upper-right
+  H: { xPct: 70, yPct: 2 },     // top-right
 };
 
-const landscapeAngles: Record<number, number[]> = {
-  2: [90, 270],
-  3: [90, 210, 330],
-  4: [90, 200, 340, 20],
-  5: [90, 160, 210, 330, 20],
-  6: [90, 150, 200, 340, 10, 50],
-  7: [90, 145, 195, 225, 315, 345, 35],
-  8: [90, 140, 180, 215, 325, 0, 35, 55],
-  //        You  Alex  Blake Casey Drew  Ellis Gray  Frankie Harper
-  //  idx:   0    1     2     3     4     5     6     7       8
-  //  Mirror pairs: 1↔5(Alex/Ellis), 2↔8(Blake/Harper), 3↔7(Casey/Frankie), 4↔6(Drew/Gray)
-  9: [90, 140, 180, 215, 240, 40, 0, 325, 300],
+// Portrait uses tighter positions
+const SEATS_PORTRAIT = {
+  Y: { xPct: 50, yPct: 100 },
+  A: { xPct: 12, yPct: 82 },
+  B: { xPct: 3,  yPct: 55 },
+  C: { xPct: 8,  yPct: 28 },
+  D: { xPct: 30, yPct: 5 },
+  E: { xPct: 88, yPct: 82 },
+  F: { xPct: 97, yPct: 55 },
+  G: { xPct: 92, yPct: 28 },
+  H: { xPct: 70, yPct: 5 },
 };
 
-// Very small push — seats should sit ON the rail, not far outside
-const PUSH_DISTANCE = 5;
+// For each player count, which of the 9 seats to use (always seat 0 = You)
+// Picks are chosen for visual balance / symmetry
+const SEAT_PICKS: Record<number, (keyof typeof SEATS_LANDSCAPE)[]> = {
+  2: ['Y', 'D'],
+  3: ['Y', 'C', 'G'],
+  4: ['Y', 'B', 'D', 'F'],
+  5: ['Y', 'A', 'C', 'G', 'E'],
+  6: ['Y', 'A', 'B', 'D', 'F', 'E'],
+  7: ['Y', 'A', 'B', 'D', 'H', 'F', 'E'],
+  8: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'E'],
+  9: ['Y', 'A', 'B', 'C', 'D', 'H', 'G', 'F', 'E'],
+};
 
 /**
- * Compute seat positions anchored to the table rail ellipse.
+ * Get fixed seat positions for the given player count.
  */
 export function getSeatPositions(
   playerCount: number,
   isLandscape: boolean,
-  ellipseOverride?: Ellipse,
+  _ellipseOverride?: Ellipse,
 ): SeatPos[] {
-  const ellipse = ellipseOverride ?? (isLandscape ? LANDSCAPE_ELLIPSE : PORTRAIT_ELLIPSE);
   const count = Math.min(Math.max(playerCount, 2), 9);
-  const angles = (isLandscape ? landscapeAngles : portraitAngles)[count] ?? portraitAngles[9];
+  const picks = SEAT_PICKS[count] ?? SEAT_PICKS[9];
+  const seats = isLandscape ? SEATS_LANDSCAPE : SEATS_PORTRAIT;
 
-  return angles.map((theta) => {
-    const p = pointOnEllipsePct(ellipse, theta);
-    const pushed = offsetFromCenterPct(ellipse, p.xPct, p.yPct, PUSH_DISTANCE);
-    return {
-      xPct: clampPct(pushed.xPct, 3, 97),
-      yPct: clampPct(pushed.yPct, 3, 97),
-    };
-  });
+  return picks.map((key) => seats[key]);
 }
 
 /**
- * Get the default ellipse for the current orientation.
+ * Get the default ellipse for the current orientation (kept for debug overlay).
  */
 export function getDefaultEllipse(isLandscape: boolean): Ellipse {
   return isLandscape ? LANDSCAPE_ELLIPSE : PORTRAIT_ELLIPSE;
