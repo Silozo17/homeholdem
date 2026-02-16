@@ -7,6 +7,8 @@ import { PlayerAvatar } from './PlayerAvatar';
 import { ArrowLeft, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/layout/Logo';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface PlayPokerLobbyProps {
   onStart: (settings: LobbySettings) => void;
@@ -30,18 +32,23 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
-      {/* Header */}
-      <div className="flex items-center px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/poker')} className="text-foreground/70">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      </div>
+    <div className="flex flex-col min-h-[100dvh] poker-felt-bg card-suit-pattern safe-area-bottom">
+      {/* Standard fixed header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
+        <div className="container relative flex items-center justify-center h-14 px-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/poker')} className="absolute left-4 text-muted-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Logo size="sm" />
+          <NotificationBell className="absolute right-4" />
+        </div>
+      </header>
+      <div className="h-14 safe-area-top shrink-0" />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-5">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-4">
         {/* Hero */}
-        <CardFan />
-        <div className="text-center space-y-1">
+        <CardFan compact />
+        <div className="text-center space-y-1 relative z-10">
           <h1 className="text-3xl font-black text-shimmer">Play Poker</h1>
           <p className="text-sm text-muted-foreground">
             Texas Hold'em vs AI &mdash; no real money

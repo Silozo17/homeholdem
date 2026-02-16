@@ -15,7 +15,7 @@ const hiddenNavRoutes = ['/', '/auth'];
 const gameplayRoutes = ['/event/'];
 const conditionalNavRoutes = ['/game'];
 // Routes where bottom nav is hidden for fullscreen gameplay
-const fullscreenRoutes = ['/play-poker', '/online-poker'];
+const fullscreenRoutes: string[] = [];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();

@@ -3,22 +3,29 @@ import { Bot, Users, ArrowLeft, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
+import { Logo } from '@/components/layout/Logo';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export default function PokerHub() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden poker-felt-bg card-suit-pattern safe-area-top safe-area-bottom">
-      {/* Header */}
-      <div className="flex items-center px-3 py-1.5 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="text-foreground/70">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      </div>
+    <div className="flex flex-col h-[100dvh] overflow-hidden safe-area-bottom">
+      {/* Standard fixed header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50 safe-area-top">
+        <div className="container relative flex items-center justify-center h-14 px-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="absolute left-4 text-muted-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Logo size="sm" />
+          <NotificationBell className="absolute right-4" />
+        </div>
+      </header>
+      <div className="h-14 safe-area-top shrink-0" />
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 space-y-3 overflow-hidden">
         {/* Hero */}
-        <CardFan className="h-20" />
+        <CardFan compact className="h-14" />
         <div className="text-center space-y-0.5">
           <h1 className="text-2xl font-black text-shimmer">Poker</h1>
           <p className="text-xs text-muted-foreground">Choose your game mode</p>
