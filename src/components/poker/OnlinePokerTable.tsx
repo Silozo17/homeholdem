@@ -46,14 +46,14 @@ interface OnlinePokerTableProps {
 
 // Seat positions matching PokerTablePro layout
 const SEAT_POSITIONS: Record<number, { x: number; y: number }[]> = {
-  2: [{ x: 50, y: 86 }, { x: 50, y: 8 }],
-  3: [{ x: 50, y: 86 }, { x: 15, y: 30 }, { x: 85, y: 30 }],
-  4: [{ x: 50, y: 86 }, { x: 85, y: 50 }, { x: 50, y: 8 }, { x: 15, y: 50 }],
-  5: [{ x: 50, y: 86 }, { x: 88, y: 55 }, { x: 75, y: 8 }, { x: 25, y: 8 }, { x: 12, y: 55 }],
-  6: [{ x: 50, y: 86 }, { x: 88, y: 60 }, { x: 80, y: 8 }, { x: 50, y: 3 }, { x: 20, y: 8 }, { x: 12, y: 60 }],
-  7: [{ x: 50, y: 86 }, { x: 88, y: 65 }, { x: 85, y: 25 }, { x: 62, y: 3 }, { x: 38, y: 3 }, { x: 15, y: 25 }, { x: 12, y: 65 }],
-  8: [{ x: 50, y: 86 }, { x: 88, y: 65 }, { x: 88, y: 25 }, { x: 65, y: 3 }, { x: 35, y: 3 }, { x: 12, y: 25 }, { x: 12, y: 65 }, { x: 75, y: 86 }],
-  9: [{ x: 50, y: 86 }, { x: 88, y: 70 }, { x: 90, y: 35 }, { x: 72, y: 3 }, { x: 50, y: 0 }, { x: 28, y: 3 }, { x: 10, y: 35 }, { x: 12, y: 70 }, { x: 25, y: 86 }],
+  2: [{ x: 50, y: 88 }, { x: 50, y: 6 }],
+  3: [{ x: 50, y: 88 }, { x: 14, y: 28 }, { x: 86, y: 28 }],
+  4: [{ x: 50, y: 88 }, { x: 86, y: 48 }, { x: 50, y: 6 }, { x: 14, y: 48 }],
+  5: [{ x: 50, y: 88 }, { x: 90, y: 52 }, { x: 76, y: 6 }, { x: 24, y: 6 }, { x: 10, y: 52 }],
+  6: [{ x: 50, y: 88 }, { x: 90, y: 58 }, { x: 82, y: 6 }, { x: 50, y: 2 }, { x: 18, y: 6 }, { x: 10, y: 58 }],
+  7: [{ x: 50, y: 88 }, { x: 90, y: 62 }, { x: 86, y: 22 }, { x: 64, y: 2 }, { x: 36, y: 2 }, { x: 14, y: 22 }, { x: 10, y: 62 }],
+  8: [{ x: 50, y: 88 }, { x: 90, y: 62 }, { x: 90, y: 22 }, { x: 66, y: 2 }, { x: 34, y: 2 }, { x: 10, y: 22 }, { x: 10, y: 62 }, { x: 76, y: 88 }],
+  9: [{ x: 50, y: 88 }, { x: 90, y: 68 }, { x: 92, y: 32 }, { x: 74, y: 2 }, { x: 50, y: 0 }, { x: 26, y: 2 }, { x: 8, y: 32 }, { x: 10, y: 68 }, { x: 24, y: 88 }],
 };
 
 export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
@@ -303,8 +303,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       {/* Main table area */}
       <div className="flex-1 relative z-10">
         <TableFelt className="absolute inset-0">
-          {/* Dealer character */}
-          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '12%' }}>
+          {/* Dealer character — top center */}
+          <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: '2%' }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
@@ -431,7 +431,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   index={0}
                   status={mySeat.status === 'folded' ? 'folded' : 'active'}
                   isCurrentPlayer={isMyTurn}
-                  size="sm"
+                  size="xl"
                 />
                 {hand?.dealer_seat === mySeatNumber && <DealerButton className="scale-75" />}
                 {isMyTurn && <TurnTimer active={true} size={40} strokeWidth={2.5} />}
@@ -649,7 +649,7 @@ function OnlineSeatDisplay({
           index={seatNumber}
           status={isFolded ? 'folded' : isAllIn ? 'all-in' : 'active'}
           isCurrentPlayer={isCurrentActor}
-          size="sm"
+          size="xl"
         />
         {isDealer && <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />}
         {isCurrentActor && <TurnTimer active={true} size={40} strokeWidth={2.5} />}

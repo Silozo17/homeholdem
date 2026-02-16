@@ -15,7 +15,7 @@ export default function PlayPoker() {
     maxBet,
   } = usePokerGame();
 
-  if (state.phase === 'idle' || state.phase === 'game_over') {
+  if (state.phase === 'idle') {
     return <PlayPokerLobby onStart={startGame} />;
   }
 

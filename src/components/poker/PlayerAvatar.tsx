@@ -6,7 +6,7 @@ interface PlayerAvatarProps {
   status: 'active' | 'folded' | 'all-in' | 'eliminated';
   isCurrentPlayer: boolean;
   avatarUrl?: string | null;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
 const AVATAR_COLORS = [
@@ -26,6 +26,8 @@ const sizeMap = {
   sm: 'w-9 h-9 text-xs',
   md: 'w-11 h-11 text-sm',
   lg: 'w-14 h-14 text-base',
+  xl: 'w-20 h-20 text-lg',
+  '2xl': 'w-24 h-24 text-xl',
 };
 
 export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md' }: PlayerAvatarProps) {
@@ -81,7 +83,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
       <span className={cn(
         'absolute -bottom-0.5 -right-0.5 rounded-full border-2 z-[2]',
         'border-background',
-        size === 'lg' ? 'w-3.5 h-3.5' : 'w-3 h-3',
+        (size === 'lg' || size === 'xl' || size === '2xl') ? 'w-3.5 h-3.5' : 'w-3 h-3',
         status === 'active' && 'bg-green-500',
         status === 'folded' && 'bg-muted-foreground',
         status === 'all-in' && 'bg-destructive animate-pulse',
