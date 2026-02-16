@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Sparkles } from 'lucide-react';
-import dealerGirl from '@/assets/dealer/dealer-girl.png';
+import dealerImg from '@/assets/dealer/poker-dealer.webp';
 
 interface DealerCharacterProps {
   className?: string;
@@ -21,21 +21,21 @@ export function DealerCharacter({ className, expression = 'neutral' }: DealerCha
         }}
       />
 
-      {/* Dealer image */}
+      {/* Dealer image — scales with viewport */}
       <div
         className={cn(
           'relative flex items-center justify-center dealer-breathe',
           expression === 'surprise' && 'scale-110',
         )}
         style={{
-          width: 'clamp(80px, 18vw, 120px)',
+          width: 'min(18vw, 140px)',
           transition: 'transform 0.5s ease',
           filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))',
         }}
       >
         {!imgFailed ? (
           <img
-            src={dealerGirl}
+            src={dealerImg}
             alt="Dealer"
             className="w-full h-auto object-contain"
             draggable={false}
