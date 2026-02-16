@@ -137,7 +137,8 @@ export function PokerTablePro({
   }, [state.phase]);
 
   const handleAction = useCallback((action: any) => {
-    if (action.type === 'check') play('check');
+    if (action.type === 'fold') play('fold');
+    else if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
     else if (action.type === 'raise') play('chipStack');
     else if (action.type === 'all-in') play('allIn');
@@ -265,8 +266,8 @@ export function PokerTablePro({
           className="relative"
           style={{
             aspectRatio: '16 / 9',
-            width: isLandscape ? 'min(78vw, 900px)' : 'min(96vw, 900px)',
-            maxHeight: isLandscape ? '70vh' : '75vh',
+            width: isLandscape ? 'min(88vw, 1100px)' : 'min(96vw, 1100px)',
+            maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
           }}
         >
@@ -279,15 +280,15 @@ export function PokerTablePro({
           {/* Pot display */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: '30%', zIndex: Z.CARDS }}
+            style={{ top: '28%', zIndex: Z.CARDS }}
           >
             <PotDisplay pot={state.pot} />
           </div>
 
           {/* Community cards */}
           <div
-            className="absolute left-1/2 -translate-x-1/2 flex gap-1 items-center"
-            style={{ top: '44%', zIndex: Z.CARDS }}
+            className="absolute left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
+            style={{ top: '46%', zIndex: Z.CARDS }}
           >
             {state.communityCards.map((card, i) => {
               const isFlop = i < 3;
@@ -296,7 +297,7 @@ export function PokerTablePro({
                 <CardDisplay
                   key={`${card.suit}-${card.rank}-${i}`}
                   card={card}
-                  size="lg"
+                  size="xl"
                   dealDelay={dealDelay}
                   isWinner={false}
                 />

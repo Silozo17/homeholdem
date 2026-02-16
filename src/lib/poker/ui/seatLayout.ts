@@ -47,28 +47,28 @@ export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 // ── 9 fixed seat positions (landscape) ──────────────────────────────
 // Coordinates place avatar circles ON the brown rail edge
 const SEATS_LANDSCAPE: Record<SeatKey, { xPct: number; yPct: number }> = {
-  Y: { xPct: 50, yPct: 92 },   // bottom center (hero)
-  A: { xPct: 24, yPct: 78 },   // bottom-left
-  B: { xPct: 12, yPct: 50 },   // left middle
-  C: { xPct: 22, yPct: 22 },   // upper-left
-  D: { xPct: 36, yPct: 10 },   // top-left
-  E: { xPct: 76, yPct: 78 },   // bottom-right (mirror of A)
-  F: { xPct: 88, yPct: 50 },   // right middle (mirror of B)
-  G: { xPct: 78, yPct: 22 },   // upper-right (mirror of C)
-  H: { xPct: 64, yPct: 10 },   // top-right (mirror of D)
+  Y: { xPct: 50, yPct: 94 },   // bottom center (hero)
+  A: { xPct: 22, yPct: 80 },   // bottom-left
+  B: { xPct: 8,  yPct: 50 },   // left middle
+  C: { xPct: 18, yPct: 20 },   // upper-left
+  D: { xPct: 34, yPct: 6 },    // top-left
+  E: { xPct: 78, yPct: 80 },   // bottom-right (mirror of A)
+  F: { xPct: 92, yPct: 50 },   // right middle (mirror of B)
+  G: { xPct: 82, yPct: 20 },   // upper-right (mirror of C)
+  H: { xPct: 66, yPct: 6 },    // top-right (mirror of D)
 };
 
 // Portrait uses tighter positions
 const SEATS_PORTRAIT: Record<SeatKey, { xPct: number; yPct: number }> = {
-  Y: { xPct: 50, yPct: 88 },
-  A: { xPct: 20, yPct: 72 },
-  B: { xPct: 10, yPct: 50 },
-  C: { xPct: 14, yPct: 28 },
-  D: { xPct: 32, yPct: 10 },
-  E: { xPct: 80, yPct: 72 },
-  F: { xPct: 90, yPct: 50 },
-  G: { xPct: 86, yPct: 28 },
-  H: { xPct: 68, yPct: 10 },
+  Y: { xPct: 50, yPct: 90 },
+  A: { xPct: 18, yPct: 74 },
+  B: { xPct: 6,  yPct: 50 },
+  C: { xPct: 12, yPct: 26 },
+  D: { xPct: 30, yPct: 8 },
+  E: { xPct: 82, yPct: 74 },
+  F: { xPct: 94, yPct: 50 },
+  G: { xPct: 88, yPct: 26 },
+  H: { xPct: 70, yPct: 8 },
 };
 
 // For each player count, which of the 9 seats to use (always seat 0 = You)

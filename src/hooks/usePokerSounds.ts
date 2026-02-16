@@ -17,41 +17,44 @@ function playTone(
   volume: number,
   type: OscillatorType = 'sine',
   rampDown = true,
+  startTime = 0,
 ) {
+  const t = ctx.currentTime + startTime;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  if (rampDown) gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.frequency.setValueAtTime(freq, t);
+  gain.gain.setValueAtTime(volume, t);
+  if (rampDown) gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
   osc.connect(gain).connect(ctx.destination);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + duration);
+  osc.start(t);
+  osc.stop(t + duration);
 }
 
-function playNoise(ctx: AudioContext, duration: number, volume: number, filterFreq?: number) {
-  const bufferSize = ctx.sampleRate * duration;
+function playNoise(ctx: AudioContext, duration: number, volume: number, filterFreq?: number, startTime = 0) {
+  const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) {
     data[i] = Math.random() * 2 - 1;
   }
+  const t = ctx.currentTime + startTime;
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
 
   if (filterFreq) {
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(filterFreq, ctx.currentTime);
-    filter.Q.setValueAtTime(1, ctx.currentTime);
+    filter.frequency.setValueAtTime(filterFreq, t);
+    filter.Q.setValueAtTime(1.5, t);
     source.connect(filter).connect(gain).connect(ctx.destination);
   } else {
     source.connect(gain).connect(ctx.destination);
   }
-  source.start(ctx.currentTime);
+  source.start(t);
 }
 
 export type PokerSoundEvent =
@@ -65,7 +68,8 @@ export type PokerSoundEvent =
   | 'allIn'
   | 'win'
   | 'yourTurn'
-  | 'timerWarning';
+  | 'timerWarning'
+  | 'fold';
 
 export function usePokerSounds() {
   const ctxRef = useRef<AudioContext | null>(null);
@@ -103,69 +107,130 @@ export function usePokerSounds() {
 
     switch (event) {
       case 'shuffle':
-        playNoise(ctx, 0.4, 0.3 * v, 2000);
+        // Layered riffle: 3 rapid noise bursts
+        playNoise(ctx, 0.12, 0.35 * v, 3000, 0);
+        playNoise(ctx, 0.12, 0.30 * v, 3500, 0.08);
+        playNoise(ctx, 0.15, 0.25 * v, 2500, 0.16);
+        // Subtle low thud
+        playTone(ctx, 80, 0.3, 0.15 * v, 'sine', true, 0);
         break;
 
       case 'deal':
-        playTone(ctx, 1200, 0.12, 0.4 * v, 'sine');
+        // Quick snap: noise burst + high click
+        playNoise(ctx, 0.06, 0.4 * v, 5000);
+        playTone(ctx, 2000, 0.08, 0.25 * v, 'sine', true, 0.02);
         break;
 
       case 'flip':
-        playNoise(ctx, 0.15, 0.35 * v, 4000);
+        // Whoosh + reveal click
+        playNoise(ctx, 0.2, 0.3 * v, 1500);
+        playTone(ctx, 1800, 0.1, 0.2 * v, 'sine', true, 0.08);
+        playTone(ctx, 2400, 0.08, 0.15 * v, 'sine', true, 0.12);
         break;
 
       case 'chipClink':
-        playTone(ctx, 3000, 0.15, 0.35 * v, 'sine');
-        setTimeout(() => {
-          if (ctx.state !== 'closed') playTone(ctx, 4500, 0.1, 0.25 * v, 'sine');
-        }, 50);
+        // Metallic harmonics with randomization
+        const baseFreq = 2800 + Math.random() * 400;
+        playTone(ctx, baseFreq, 0.12, 0.3 * v, 'sine');
+        playTone(ctx, baseFreq * 1.5, 0.1, 0.2 * v, 'sine', true, 0.03);
+        playTone(ctx, baseFreq * 2, 0.08, 0.15 * v, 'sine', true, 0.06);
+        playTone(ctx, baseFreq * 0.7, 0.15, 0.1 * v, 'triangle', true, 0.02);
         break;
 
       case 'chipStack':
-        for (let i = 0; i < 3; i++) {
-          setTimeout(() => {
-            if (ctx.state !== 'closed') playTone(ctx, 3000 + i * 500, 0.12, (0.35 - i * 0.05) * v, 'sine');
-          }, i * 80);
+        // Cascading ceramic clicks
+        for (let i = 0; i < 4; i++) {
+          const freq = 2500 + i * 400 + Math.random() * 200;
+          playTone(ctx, freq, 0.1, (0.3 - i * 0.04) * v, 'sine', true, i * 0.06);
+          playNoise(ctx, 0.05, (0.15 - i * 0.02) * v, 4000 + i * 500, i * 0.06);
         }
         break;
 
       case 'check':
-        playTone(ctx, 200, 0.12, 0.3 * v, 'sine');
+        // Double-tap knock
+        playNoise(ctx, 0.06, 0.3 * v, 800);
+        playTone(ctx, 180, 0.08, 0.25 * v, 'sine');
+        playNoise(ctx, 0.06, 0.25 * v, 900, 0.1);
+        playTone(ctx, 200, 0.08, 0.2 * v, 'sine', true, 0.1);
         break;
 
       case 'raise':
-        playTone(ctx, 400, 0.15, 0.3 * v, 'sine');
-        setTimeout(() => {
-          if (ctx.state !== 'closed') playTone(ctx, 600, 0.15, 0.25 * v, 'sine');
-        }, 80);
-        setTimeout(() => {
-          if (ctx.state !== 'closed') playTone(ctx, 800, 0.15, 0.2 * v, 'sine');
-        }, 160);
+        // Confident ascending chord + chip slide
+        playTone(ctx, 350, 0.2, 0.25 * v, 'sine');
+        playTone(ctx, 520, 0.2, 0.22 * v, 'sine', true, 0.06);
+        playTone(ctx, 700, 0.25, 0.2 * v, 'sine', true, 0.12);
+        // Chip slide noise
+        playNoise(ctx, 0.15, 0.12 * v, 3000, 0.15);
         break;
 
-      case 'allIn':
-        // Low rumble
-        playTone(ctx, 70, 1.2, 0.25 * v, 'sawtooth');
-        playTone(ctx, 60, 1.5, 0.2 * v, 'sine');
+      case 'allIn': {
+        // Sub-bass drop
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(100, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.5);
+        gain.gain.setValueAtTime(0.35 * v, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.5);
+        // Rising tension sweep
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(200, ctx.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.8);
+        gain2.gain.setValueAtTime(0.12 * v, ctx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+        osc2.connect(gain2).connect(ctx.destination);
+        osc2.start(ctx.currentTime);
+        osc2.stop(ctx.currentTime + 0.8);
+        // Impact noise
+        playNoise(ctx, 0.3, 0.25 * v, 200, 0);
         break;
+      }
 
       case 'win': {
-        // C-E-G major chord stinger
-        const freqs = [523, 659, 784];
-        freqs.forEach((f, i) => {
-          setTimeout(() => {
-            if (ctx.state !== 'closed') playTone(ctx, f, 0.5, 0.3 * v, 'sine');
-          }, i * 80);
+        // Full victory fanfare: arpeggio + shimmer
+        const notes = [523, 659, 784, 1047]; // C5-E5-G5-C6
+        notes.forEach((f, i) => {
+          playTone(ctx, f, 0.6, 0.25 * v, 'sine', true, i * 0.1);
+          // Harmonic shimmer
+          playTone(ctx, f * 2, 0.4, 0.08 * v, 'sine', true, i * 0.1 + 0.05);
         });
+        // Sustained chord
+        playTone(ctx, 523, 1.2, 0.15 * v, 'sine', true, 0.4);
+        playTone(ctx, 659, 1.2, 0.12 * v, 'sine', true, 0.4);
+        playTone(ctx, 784, 1.2, 0.1 * v, 'sine', true, 0.4);
+        // Shimmer sweep noise
+        playNoise(ctx, 0.8, 0.1 * v, 6000, 0.3);
         break;
       }
 
       case 'yourTurn':
-        playTone(ctx, 880, 0.25, 0.3 * v, 'sine');
+        // Gentle ding-dong
+        playTone(ctx, 880, 0.2, 0.25 * v, 'sine');
+        playTone(ctx, 660, 0.3, 0.2 * v, 'sine', true, 0.15);
         break;
 
       case 'timerWarning':
         playTone(ctx, 600, 0.08, 0.3 * v, 'square');
+        break;
+
+      case 'fold':
+        // Soft swoosh - filtered descending noise
+        playNoise(ctx, 0.2, 0.2 * v, 2000);
+        const osc3 = ctx.createOscillator();
+        const gain3 = ctx.createGain();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(400, ctx.currentTime);
+        osc3.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+        gain3.gain.setValueAtTime(0.1 * v, ctx.currentTime);
+        gain3.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc3.connect(gain3).connect(ctx.destination);
+        osc3.start(ctx.currentTime);
+        osc3.stop(ctx.currentTime + 0.2);
         break;
     }
   }, [enabled, ensureContext]);
