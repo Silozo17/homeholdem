@@ -1,22 +1,17 @@
 
-# Make Human Player Cards 2x Bigger and Tighter Fan
+# Adjust Pot and Community Card Vertical Positions
 
-## Changes
+Two small positioning tweaks in `src/components/poker/PokerTablePro.tsx`:
 
-### `src/components/poker/CardDisplay.tsx`
-Add a new `2xl` size class that is double the current `lg` size:
-- Current `lg`: `w-12 h-[68px]` (48x68px)
-- New `2xl`: `w-[96px] h-[136px]` (96x136px — exactly 2x)
-- Also add corresponding text sizes for the `2xl` tier in the `textSizes` map
+1. **Pot display**: Move from `top: 14%` down to `top: 20%` so the dealer character no longer overlaps it.
+2. **Community cards**: Move from `top: 42%` down to `top: 48%` to better center them vertically on the felt.
+3. **Phase indicator** and **hand name** will also shift down proportionally (from `60%`/`62%` to `66%`/`68%`) to maintain spacing below the cards.
 
-### `src/components/poker/PlayerSeat.tsx`
-- Change `humanCardSize` from `lg` to `2xl`
-- Tighten the fan: reduce rotation from +/-15deg to +/-8deg and reduce horizontal offset from +/-8px to +/-4px, so the two cards overlap more while still showing both ranks/suits
-- Adjust vertical position (`bottom`) so the tops still protrude well above the avatar
+### File: `src/components/poker/PokerTablePro.tsx`
 
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/poker/CardDisplay.tsx` | Add `2xl` size class and text sizes |
-| `src/components/poker/PlayerSeat.tsx` | Use `2xl` cards, tighten fan rotation and offset |
+| Element | Current | New |
+|---------|---------|-----|
+| Pot display | `top: 14%` | `top: 20%` |
+| Community cards | `top: 42%` | `top: 48%` |
+| Hand name reveal | `top: 60%` | `top: 66%` |
+| Phase indicator | `top: 62%` | `top: 68%` |
