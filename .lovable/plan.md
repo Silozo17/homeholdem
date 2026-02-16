@@ -1,116 +1,88 @@
 
 
-## Fix: Game Freezing After a Few Hands
+## Two Changes
 
-### Root Cause Analysis
+### 1. Move "5 SEC LEFT" pill under the pot total
 
-Three interrelated bugs cause the freeze:
+Currently, both the "YOUR TURN" and "5 SEC LEFT" pills are positioned above the hero's cards at the bottom of the screen. The user wants only "5 SEC LEFT" moved to sit directly below the pot display (which is at `top: 20%`), while "YOUR TURN" stays exactly where it is.
 
-**Bug 1: Missing `hand_result` fallback (PRIMARY FREEZE CAUSE)**
+**File**: `src/components/poker/OnlinePokerTable.tsx`
 
-When a hand completes, the server sends TWO broadcasts in sequence:
-1. `game_state` with `phase: "complete"` 
-2. `hand_result` with winners, revealed cards, etc.
+Change the "5 SEC LEFT" pill positioning from `bottom`-based to `top`-based, placing it just below the pot pill (approximately `top: 28%`):
+```
+// FROM:
+bottom: isLandscape ? 'calc(22% + 65px)' : 'calc(26% + 65px)',
 
-If `hand_result` is dropped by Realtime (network hiccup, timing issue), the client gets stuck:
-- `current_hand` has `phase: "complete"` but is never set to `null`
-- `hasActiveHand` stays `true` forever
-- Auto-deal never fires because it requires `!hasActiveHand`
-- The game appears permanently frozen -- no new hand, no winner display, nothing
+// TO:
+top: '28%',
+```
 
-There is NO fallback for this scenario anywhere in the code.
+### 2. Make card animations feel real
 
-**Bug 2: Auto-deal retry storm (visible in logs)**
+Two issues:
 
-When `startHand` fails (e.g., "Hand already in progress" from both clients racing, or "Need at least 2 players with chips" after a bust-out):
-1. The catch block sets `autoStartAttempted = false`
-2. This immediately re-triggers the auto-deal effect
-3. After 2s + jitter, it calls `startHand` again
-4. It fails again, resets, retries...
-5. The 6-second "safety net" resets `autoStartAttempted` to `false`, which *continues* the loop instead of stopping it
+**A) Player hole cards appear instantly as face-down cards, then flip.**
+Currently the face-down `CardDisplay` renders immediately with a generic `card-deal-from-deck` animation (slides down from above). This doesn't sync with the flying card sprites from the dealer -- the cards are already visible at the seat before the flying sprite even arrives.
 
-The logs show ~30 boots in 50 seconds, confirming this infinite retry loop. This hammers the server and wastes resources.
+**Fix**: Add a visibility delay to PlayerSeat's card rendering. Cards should be `opacity: 0` until their deal sprite has arrived (dealDelay + flight duration), then appear with a subtle pop. This is done by wrapping each card in a container that delays its appearance:
+- For human cards: already has `revealedIndices` timing, but the face-down card appears immediately. Add an initial opacity delay matching `dealDelay + 0.7s` (flight duration).
+- For opponent cards during play (not showdown): they don't render cards at all, which is correct. No change needed.
 
-**Bug 3: Dead `checkKicked` effect (minor)**
+In `CardDisplay.tsx`, for face-down cards, change the animation to include a delayed appearance that matches when the flying sprite arrives:
+```css
+/* Change animate-card-deal-deck to include initial hidden state */
+@keyframes card-deal-from-deck {
+  0% { opacity: 0; transform: scale(0.3); }
+  85% { opacity: 0; transform: scale(0.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+```
+No -- this would break all timing. Better approach: use the existing `dealDelay` prop. The face-down card already has `animationDelay: dealDelay`. The issue is that `card-deal-from-deck` starts with `opacity: 0` but transitions to visible at 40% of the 0.5s duration (0.2s) -- far before the fly sprite arrives at `dealDelay + 0.7s`. Fix: make the face-down card use a simpler "pop in" animation with `animation-fill-mode: both` and delay it properly so it appears exactly when the fly sprite arrives.
 
-Lines 126-132 contain a no-op effect that runs every render for no reason (already identified in the previous plan but not yet removed).
+Update `CardDisplay` face-down card: replace `animate-card-deal-deck` with a new class `animate-card-arrive` that's a quick scale-pop, and set `animationDelay` to `dealDelay + 0.7` (matching fly duration):
 
----
+```css
+@keyframes card-arrive {
+  0% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-card-arrive { animation: card-arrive 0.2s ease-out both; }
+```
 
-### Fixes
+In `CardDisplay.tsx` face-down branch, change class from `animate-card-deal-deck` to `animate-card-arrive`, and set `animationDelay` to `${dealDelay + 0.7}s` so the card pops in exactly when the flying sprite reaches the seat.
 
-**Fix 1: Add `complete` phase fallback timer**
+**B) Community cards have no dealing animation from the dealer.**
+Currently community cards just pop in place with `card-reveal`. There's no flying card from the dealer like hole cards have.
 
-In the `game_state` broadcast handler, when `phase === 'complete'` is received, start a 5-second fallback timer. If `hand_result` never arrives within that window, force the same cleanup (clear hand, clear winners, reset auto-start). This guarantees the game always recovers even if a broadcast is dropped.
+**Fix**: Add dealing sprites for community cards, similar to hole cards. In `OnlinePokerTable.tsx`, when community cards are rendered, also render fly sprites from the dealer position (top: 2%, left: 50%) to the community card area (top: 48%, left: centered). These sprites fly when a new phase starts (flop/turn/river).
 
-**File**: `src/hooks/useOnlinePokerTable.ts`
+Add a community card dealing animation section that detects phase changes and shows card-back sprites flying from dealer to center:
+- Track `prevPhaseRef` to detect flop/turn/river transitions
+- On flop: 3 sprites fly to center with staggered delays
+- On turn: 1 sprite flies to center
+- On river: 1 sprite flies to center
+- Each sprite uses a new `deal-card-fly-center` keyframe that flies to center-table coordinates
 
-In the `game_state` handler (around line 144), after updating state, add:
-```typescript
-if (payload.phase === 'complete') {
-  // Fallback: if hand_result never arrives, force cleanup
-  if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
-  showdownTimerRef.current = setTimeout(() => {
-    setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
-    setMyCards(null);
-    setRevealedCards([]);
-    setHandWinners([]);
-    showdownTimerRef.current = null;
-    setAutoStartAttempted(false);
-  }, 6000); // 6s fallback -- hand_result handler will cancel and replace with 3.5s timer
+```css
+@keyframes deal-card-fly-center {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0.8; }
+  40% { opacity: 1; }
+  100% { transform: translate(0, var(--deal-center-dy)) scale(1); opacity: 0.9; }
 }
 ```
 
-The `hand_result` handler already clears `showdownTimerRef` and starts a 3.5s timer, so this 6s fallback only fires if `hand_result` was missed.
-
-**Fix 2: Cap auto-deal retries**
-
-Add a retry counter ref. If `startHand` fails 3 times in a row, stop retrying and require manual start. Reset the counter when a hand successfully starts.
-
-**File**: `src/hooks/useOnlinePokerTable.ts`
-
-Add: `const autoStartRetriesRef = useRef(0);`
-
-In the auto-deal effect catch:
-```typescript
-startHandRef.current().catch(() => {
-  autoStartTimerRef.current = null;
-  autoStartRetriesRef.current += 1;
-  if (autoStartRetriesRef.current < 3) {
-    setAutoStartAttempted(false); // allow retry
-  }
-  // else: stay attempted=true, stop retrying
-});
-```
-
-Reset on successful hand start:
-```typescript
-useEffect(() => {
-  if (hasActiveHand) {
-    setAutoStartAttempted(true);
-    setHandHasEverStarted(true);
-    autoStartRetriesRef.current = 0; // reset retries on success
-  }
-}, [hasActiveHand]);
-```
-
-**Fix 3: Remove dead `checkKicked` effect**
-
-Remove lines 126-132 in `OnlinePokerTable.tsx` (the no-op `checkKicked` effect).
-
 ---
 
-### Files Modified
+### Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useOnlinePokerTable.ts` | Add `complete` phase fallback timer in `game_state` handler; cap auto-deal retries to 3; add retry counter ref |
-| `src/components/poker/OnlinePokerTable.tsx` | Remove dead `checkKicked` effect (lines 126-132) |
+| File | Change |
+|------|--------|
+| `src/components/poker/OnlinePokerTable.tsx` | Move "5 SEC LEFT" to `top: 28%`; add community card deal sprites on phase change |
+| `src/components/poker/CardDisplay.tsx` | Replace `animate-card-deal-deck` with `animate-card-arrive` and sync delay to `dealDelay + 0.7` |
+| `src/index.css` | Add `card-arrive` keyframe; add `deal-card-fly-center` keyframe |
 
 ### What Does NOT Change
-- No visual/UI changes
-- No animation changes
-- No edge function changes
-- No database changes
-- No seat positioning changes
-
+- "YOUR TURN" pill position (stays exactly where it is)
+- Seat positions, layout, logic
+- Showdown animations, chip animations, winner overlay
+- No backend/edge function changes
