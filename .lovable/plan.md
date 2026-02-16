@@ -1,60 +1,67 @@
 
 
-# Fix Poker Table: Cards/Names Outside Table + 15% Smaller on Mobile
+# 1. Invite Club Members to Poker Game + 2. Fix /poker Hub Viewport
 
-## Problems (from screenshot)
+## What This Delivers
 
-1. **Cards render ON the table felt** -- they should be positioned OUTSIDE the table rail, extending outward from each seat
-2. **Names and chip counts overlap the table** -- these should also be outside the rail
-3. **Everything is too large for mobile landscape** -- avatars (44px), cards (40x56px), and text need to be ~15% smaller
-4. **Seat positions need adjustment** -- some seats (especially B, C, F, G) are too far inside the table
+**Feature 1 — Invite Friends to Poker**
+A new "Invite Players" button on the Online Poker Lobby (and after creating a table). Tapping it opens a modal listing your club members. Each member has an "Invite" button that sends a push notification instantly, inviting them to join your table.
 
-## Solution
+**Feature 2 — /poker Hub Fits in Viewport**
+The Poker Hub page (`/poker`) currently scrolls because of spacing and the CardFan hero taking too much vertical space. The fix makes everything fit within `100dvh` on both mobile and desktop with no scroll.
 
-### 1. Add smaller size variants for mobile
+---
 
-**`src/components/poker/CardDisplay.tsx`**:
-- Add an `xs` size: `w-7 h-10` (28x40px) -- roughly 30% smaller than `md`
+## Technical Plan
 
-**`src/components/poker/PlayerAvatar.tsx`**:
-- Add an `xs` size: `w-8 h-8 text-xs` -- smaller than current `md` (44px)
+### Fix 1: /poker Hub — No Scroll (PokerHub.tsx)
 
-### 2. Scale down PlayerSeat for mobile landscape
+- Remove `pb-24` padding and reduce `space-y-6` to `space-y-3`
+- Shrink the CardFan hero section (reduce from `h-32` to `h-20`, or hide it entirely on small screens)
+- Change the outer container from `min-h-[100dvh]` to `h-[100dvh] overflow-hidden`
+- Make the game mode cards area `flex-1 overflow-hidden` and use `justify-center` so they're centered vertically
+- Reduce GameModeCard padding from `p-5` to `p-4` and shrink spacing
 
-**`src/components/poker/PlayerSeat.tsx`**:
-- Accept new `compact` prop (true on mobile landscape)
-- When `compact=true`: use `xs` avatar size, `sm` card size, shrink text from `text-[11px]` to `text-[9px]`, chips from `text-[10px]` to `text-[8px]`
-- The info stack positioning logic stays the same (side/above/below based on `sidePosition`) but everything is proportionally smaller
+### Fix 2: Invite Club Members Modal
 
-### 3. Ensure info stacks are OUTSIDE the table
+**New component: `src/components/poker/InvitePlayersDialog.tsx`**
 
-The current `sidePosition` logic already positions info stacks outside the avatar. The real issue is that the **seat coordinates themselves** place avatars too far inside the table. The fix is to push seats outward so avatars sit ON the rail edge, which naturally pushes the info stacks (cards, name, chips) outside the table.
+A dialog that:
+- Accepts `clubId` (optional) and `tableId` props
+- If `clubId` is provided, fetches club members via `get_club_member_profiles` RPC
+- If no `clubId`, fetches the user's clubs, then their members
+- Displays each member with their avatar, name, and an "Invite" button
+- On "Invite" tap: calls `sendPushNotification` with a poker game invite notification type
+- Shows a checkmark after sending (per-member loading state)
+- Filters out the current user from the list
 
-**`src/lib/poker/ui/seatLayout.ts`** -- Updated landscape coordinates:
+**Push notification helper: `src/lib/push-notifications.ts`**
 
-| Seat | Current | New | Change |
-|------|---------|-----|--------|
-| Y | (50, 92) | (50, 95) | Push further down so cards extend below table |
-| A | (22, 78) | (18, 82) | Push further toward bottom-left corner |
-| B | (10, 50) | (6, 50) | Push further left -- info extends right, outside table |
-| C | (14, 24) | (10, 20) | Push further toward upper-left corner |
-| D | (32, 6) | (30, 2) | Push up so info extends above table |
-| E | (78, 78) | (82, 82) | Mirror of A |
-| F | (90, 50) | (94, 50) | Mirror of B |
-| G | (86, 24) | (90, 20) | Mirror of C |
-| H | (68, 6) | (70, 2) | Mirror of D |
+Add a new convenience function:
 
-### 4. Pass compact flag from PokerTablePro
+```
+notifyPokerInvite(userId, inviterName, tableName, tableId)
+```
 
-**`src/components/poker/PokerTablePro.tsx`**:
-- Detect mobile landscape (screen width < 900px and landscape) and pass `compact={true}` to each `PlayerSeat`
-- This ensures desktop users still get the full-size UI
+This sends a push notification with:
+- Title: "Poker Invite"
+- Body: "{inviterName} invited you to play at {tableName}"
+- URL: `/online-poker?table={tableId}`
+- Tag: `poker-invite-{tableId}`
 
-## Files to Modify
+**Integration points:**
 
-1. **`src/components/poker/PlayerAvatar.tsx`** -- Add `xs` size variant
-2. **`src/components/poker/CardDisplay.tsx`** -- Add `xs` size variant  
-3. **`src/components/poker/PlayerSeat.tsx`** -- Accept `compact` prop, use smaller sizes when true
-4. **`src/lib/poker/ui/seatLayout.ts`** -- Push all landscape seat positions outward
-5. **`src/components/poker/PokerTablePro.tsx`** -- Detect mobile, pass `compact` prop
+1. `OnlinePokerLobby.tsx` — After creating a table, show the invite dialog (if user has clubs). Also add an "Invite Friends" button in the action row.
+2. `OnlinePokerTable.tsx` — Add an "Invite" button in the table header/menu that opens the same dialog.
+
+### Files to Create
+- `src/components/poker/InvitePlayersDialog.tsx`
+
+### Files to Modify
+- `src/pages/PokerHub.tsx` — Remove scroll, fit in viewport
+- `src/components/poker/CardFan.tsx` — Add optional `compact` prop to reduce height
+- `src/components/poker/GameModeCard.tsx` — Add optional `compact` prop for tighter padding
+- `src/lib/push-notifications.ts` — Add `notifyPokerInvite` function
+- `src/components/poker/OnlinePokerLobby.tsx` — Add "Invite Friends" button + dialog integration
+- `src/components/poker/OnlinePokerTable.tsx` — Add invite button in header menu
 
