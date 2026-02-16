@@ -295,20 +295,24 @@ function reducer(state: GameState, action: Action): GameState {
         return { ...state, phase: 'showdown', players, pot, deck: state.deck, minRaise, lastRaiserIndex };
       }
 
-      // Round complete check:
-      // 1. If there's a raiser and we've come back to them
-      // 2. If no raiser (all checks) and we've gone full circle back to first actor
+      // Round complete check
+      const raiserIsAllIn = lastRaiserIndex !== null 
+        && players[lastRaiserIndex]?.status === 'all-in';
+      const allActiveActed = getActionablePlayers(players)
+        .every(p => p.lastAction !== undefined);
+
       const roundComplete = allEqualBets && (
-        (lastRaiserIndex !== null && nextIdx === lastRaiserIndex) ||
-        (lastRaiserIndex === null && actionable.length <= 1) ||
-        (lastRaiserIndex === null && nextIdx !== -1 && (() => {
-          // Check if all actionable players have acted this round (lastAction is set)
-          const allActed = getActionablePlayers(players).every(p => p.lastAction !== undefined);
-          return allActed;
-        })())
+        // Standard: we've come back to the raiser
+        (lastRaiserIndex !== null 
+          && players[lastRaiserIndex]?.status === 'active' 
+          && nextIdx === lastRaiserIndex) ||
+        // Raiser went all-in: round done when all remaining active players have acted and matched
+        (raiserIsAllIn && allActiveActed) ||
+        // No raiser (check-around): everyone acted
+        (lastRaiserIndex === null && allActiveActed)
       );
 
-      if (actionable.length <= 1 || roundComplete) {
+      if (actionable.length === 0 || roundComplete) {
         // Advance to next phase
         return advancePhase({ ...state, players, pot, minRaise, lastRaiserIndex });
       }
