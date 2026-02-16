@@ -328,6 +328,7 @@
 
 @keyframes float-up {
   0% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(-8px); }
   100% { opacity: 0; transform: translateY(-20px); }
 }
 
@@ -354,7 +355,8 @@
 .animate-phase-flash { animation: phase-flash 0.6s ease-out; }
 .animate-turn-pulse { animation: turn-pulse 1.5s ease-in-out infinite; }
 .animate-winner-glow { animation: winner-glow 1.5s ease-in-out infinite; }
-.animate-float-up { animation: float-up 1.5s ease-out both; }
+.animate-float-up { animation: float-up 6s ease-out both; }
+.animate-confetti { animation: confetti-burst 1s ease-out both; }
 .animate-confetti { animation: confetti-burst 1s ease-out both; }
 
 /* Poker table felt */
