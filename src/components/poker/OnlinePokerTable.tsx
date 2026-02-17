@@ -31,6 +31,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { usePlayerLevels } from '@/hooks/usePlayerLevel';
 import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
@@ -443,6 +444,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     rotatedSeats.forEach((sd, sp) => { if (sd?.player_id) pos.push(sp); });
     return pos;
   }, [rotatedSeats]);
+
+  const playerUserIds = useMemo(() => seats.filter(s => s.player_id).map(s => s.player_id!), [seats]);
+  const playerLevels = usePlayerLevels(playerUserIds);
 
   const positions = useMemo(() => getSeatPositions(maxSeats, isLandscape), [maxSeats, isLandscape]);
   const totalPot = useMemo(() => hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0, [hand?.pots]);
@@ -866,6 +870,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   isHuman={!!isMe} isShowdown={!!isShowdown} cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
                   seatDealOrder={activeScreenPositions.indexOf(screenPos)} totalActivePlayers={activeSeats.length}
+                  level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   

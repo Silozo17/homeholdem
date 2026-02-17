@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { LevelBadge } from '@/components/common/LevelBadge';
 
 interface PlayerAvatarProps {
   name: string;
@@ -7,6 +8,7 @@ interface PlayerAvatarProps {
   isCurrentPlayer: boolean;
   avatarUrl?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  level?: number;
 }
 
 const AVATAR_COLORS = [
@@ -30,7 +32,7 @@ const sizeMap = {
   '2xl': 'w-24 h-24 text-xl',
 };
 
-export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md' }: PlayerAvatarProps) {
+export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md', level }: PlayerAvatarProps) {
   const initial = name.charAt(0).toUpperCase();
   const color = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const isOut = status === 'folded' || status === 'eliminated';
@@ -79,7 +81,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
           initial
         )}
       </div>
-      {/* Status dot */}
+      {/* Status dot (bottom-right) */}
       <span className={cn(
         'absolute -bottom-0.5 -right-0.5 rounded-full border-2 z-[2]',
         'border-background',
@@ -89,6 +91,10 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
         status === 'all-in' && 'bg-destructive animate-pulse',
         status === 'eliminated' && 'bg-muted',
       )} />
+      {/* Level badge (bottom-left) */}
+      {level != null && level > 0 && (
+        <LevelBadge level={level} size={size} />
+      )}
     </div>
   );
 }

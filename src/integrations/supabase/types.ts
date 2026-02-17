@@ -1088,6 +1088,38 @@ export type Database = {
           },
         ]
       }
+      player_xp: {
+        Row: {
+          id: string
+          level: number
+          total_xp: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          level?: number
+          total_xp?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          level?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_xp_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poker_actions: {
         Row: {
           action_type: Database["public"]["Enums"]["poker_action_type"]
@@ -1917,6 +1949,33 @@ export type Database = {
           show_stats_publicly?: boolean | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      xp_events: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string
+          reference_id: string | null
+          user_id: string
+          xp_amount: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason: string
+          reference_id?: string | null
+          user_id: string
+          xp_amount: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string
+          reference_id?: string | null
+          user_id?: string
+          xp_amount?: number
         }
         Relationships: []
       }
