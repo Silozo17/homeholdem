@@ -5,8 +5,8 @@ import cardBackPremium from '@/assets/poker/card-back-premium.png';
 import { cn } from '@/lib/utils';
 
 const PEEK_HINT_KEY = 'poker-peek-hint-shown';
-const DRAG_THRESHOLD = 80; // pixels for full reveal
-const SNAP_THRESHOLD = 0.65; // progress to auto-snap to revealed
+const DRAG_THRESHOLD = 80;
+const SNAP_THRESHOLD = 0.65;
 
 interface PeekableCardProps {
   card: Card;
@@ -29,11 +29,12 @@ const sizeClasses: Record<string, string> = {
 export const PeekableCard = memo(function PeekableCard({
   card, size = '2xl', dealDelay = 0, isPeeked, onPeek, className,
 }: PeekableCardProps) {
-  const [progress, setProgress] = useState(0); // 0 = face down, 1 = fully revealed
+  const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const startYRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
 
   // Show hint once
   useEffect(() => {
@@ -50,7 +51,23 @@ export const PeekableCard = memo(function PeekableCard({
     } catch {}
   }, [isPeeked]);
 
-  // If already peeked, render normal face-up card
+  // Non-passive touchmove listener to prevent scroll interference
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || isPeeked) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      e.preventDefault();
+      const dy = startYRef.current - e.touches[0].clientY;
+      const p = Math.max(0, Math.min(1, dy / DRAG_THRESHOLD));
+      setProgress(p);
+    };
+
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', handleTouchMove);
+  }, [isPeeked]);
+
   if (isPeeked) {
     return (
       <CardDisplay
@@ -66,23 +83,17 @@ export const PeekableCard = memo(function PeekableCard({
   const handleTouchStart = (e: React.TouchEvent) => {
     startYRef.current = e.touches[0].clientY;
     setIsDragging(true);
+    isDraggingRef.current = true;
     setShowHint(false);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    const dy = startYRef.current - e.touches[0].clientY; // positive = drag up
-    const p = Math.max(0, Math.min(1, dy / DRAG_THRESHOLD));
-    setProgress(p);
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
+    isDraggingRef.current = false;
     if (progress >= SNAP_THRESHOLD) {
       setProgress(1);
       onPeek();
     } else {
-      // Spring back
       setProgress(0);
     }
   };
@@ -91,6 +102,7 @@ export const PeekableCard = memo(function PeekableCard({
   const handleMouseDown = (e: React.MouseEvent) => {
     startYRef.current = e.clientY;
     setIsDragging(true);
+    isDraggingRef.current = true;
     setShowHint(false);
 
     const handleMove = (ev: MouseEvent) => {
@@ -100,6 +112,7 @@ export const PeekableCard = memo(function PeekableCard({
     };
     const handleUp = () => {
       setIsDragging(false);
+      isDraggingRef.current = false;
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
       setProgress(prev => {
@@ -123,10 +136,9 @@ export const PeekableCard = memo(function PeekableCard({
       ref={containerRef}
       className={cn('relative cursor-grab select-none', isDragging && 'cursor-grabbing')}
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
-      style={{ perspective: '400px' }}
+      style={{ perspective: '400px', touchAction: 'none' }}
     >
       {/* Card container with tilt */}
       <div
@@ -138,15 +150,12 @@ export const PeekableCard = memo(function PeekableCard({
           boxShadow: `0 ${4 + progress * 12}px ${8 + progress * 16}px rgba(0,0,0,${shadowIntensity})`,
         }}
       >
-        {/* Card back (always visible as base layer) */}
         <img
           src={cardBackPremium}
           alt=""
           className="absolute inset-0 w-full h-full object-cover rounded-lg"
           draggable={false}
         />
-
-        {/* Card face revealed from bottom via clip-path */}
         <div
           className="absolute inset-0 rounded-lg"
           style={{
@@ -161,8 +170,6 @@ export const PeekableCard = memo(function PeekableCard({
             className="!shadow-none !animate-none"
           />
         </div>
-
-        {/* Shine effect during drag */}
         {progress > 0 && (
           <div
             className="absolute inset-0 pointer-events-none rounded-lg"
@@ -173,7 +180,6 @@ export const PeekableCard = memo(function PeekableCard({
         )}
       </div>
 
-      {/* Hint text */}
       {showHint && (
         <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap animate-fade-in">
           <span className="text-[7px] font-bold text-primary/60 uppercase tracking-wider"

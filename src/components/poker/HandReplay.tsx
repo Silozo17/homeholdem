@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HandRecord } from '@/hooks/useHandHistory';
 import { CardDisplay } from './CardDisplay';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, List, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, List, Trophy, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HandReplayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hand: HandRecord | null;
+  onExportCSV?: () => string;
 }
 
 const PHASE_COLORS: Record<string, string> = {
@@ -19,17 +20,23 @@ const PHASE_COLORS: Record<string, string> = {
   river: 'bg-red-500/20 text-red-300',
 };
 
-export function HandReplay({ open, onOpenChange, hand }: HandReplayProps) {
+export function HandReplay({ open, onOpenChange, hand, onExportCSV }: HandReplayProps) {
   const [step, setStep] = useState(0);
   const [showAll, setShowAll] = useState(false);
+
+  // Reset on open
+  useEffect(() => {
+    if (open) {
+      setStep(0);
+      setShowAll(false);
+    }
+  }, [open]);
 
   if (!hand) return null;
 
   const actions = hand.actions;
   const totalSteps = actions.length;
-  const currentAction = actions[step] ?? null;
 
-  // Find phase transitions for community card display
   const phasesUpToStep = showAll
     ? actions.map(a => a.phase)
     : actions.slice(0, step + 1).map(a => a.phase);
@@ -44,12 +51,29 @@ export function HandReplay({ open, onOpenChange, hand }: HandReplayProps) {
 
   const displayActions = showAll ? actions : actions.slice(0, step + 1);
 
+  const handleExportCSV = () => {
+    if (!onExportCSV) return;
+    const csv = onExportCSV();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hand-history.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[70vh] rounded-t-2xl pb-safe">
         <SheetHeader className="pb-2">
           <SheetTitle className="text-sm flex items-center gap-2">
             Hand #{hand.handNumber} Replay
+            {onExportCSV && (
+              <Button variant="ghost" size="sm" onClick={handleExportCSV} className="ml-auto h-7 text-[10px]">
+                <Download className="h-3 w-3 mr-1" /> CSV
+              </Button>
+            )}
           </SheetTitle>
         </SheetHeader>
 
