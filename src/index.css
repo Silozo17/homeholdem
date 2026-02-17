@@ -565,7 +565,7 @@
   70% { opacity: 1; transform: translateY(2px) scale(1.03); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-card-arrive { animation: card-arrive 0.35s ease-out both; }
+.animate-card-arrive { animation: card-arrive 0.25s ease-out both; }
 
 /* Community card deal fly from dealer to center */
 @keyframes deal-card-fly-center {
@@ -580,7 +580,7 @@
   60% { opacity: 1; transform: translateY(2px) scale(1.08); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-card-reveal { animation: card-reveal 0.4s ease-out both; }
+.animate-card-reveal { animation: card-reveal 0.3s ease-out both; }
 
 /* ===== AAA Premium Poker Animations ===== */
 

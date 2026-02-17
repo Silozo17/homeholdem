@@ -34,7 +34,7 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
           'border border-primary/20',
           className,
         )}
-        style={{ animationDelay: `${dealDelay + 0.7}s` }}
+        style={{ animationDelay: `${dealDelay + 0.45}s` }}
       >
         <img src={cardBackPremium} alt="" className="w-full h-full object-cover" draggable={false} />
       </div>
