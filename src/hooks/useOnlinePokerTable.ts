@@ -158,7 +158,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
       if (handActive) {
         // Mid-hand: only update table metadata; seats/hand come from broadcasts only
-        setTableState(prev => prev ? { ...prev, table: data.table } : data);
+        setTableState(prev => {
+          if (prev) return { ...prev, table: data.table };
+          // prev null mid-hand shouldn't happen; keep Option A invariant — never use full snapshot
+          return { table: data.table, seats: [], current_hand: null, my_cards: null };
+        });
       } else {
         // No active hand OR phase === 'complete': full replacement is safe
         setTableState(data);
