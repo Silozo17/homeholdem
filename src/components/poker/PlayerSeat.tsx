@@ -44,7 +44,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const humanCardSize = compact ? 'lg' : 'xl';
 
   // --- Turn timer logic (nameplate-integrated) ---
-  const TIMER_DURATION = 30;
+  const TIMER_DURATION = 20;
   const [timerElapsed, setTimerElapsed] = useState(0);
   const lowTimeFired = useRef(false);
   const isTimerActive = isCurrentPlayer && !isOut;

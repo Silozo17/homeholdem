@@ -315,7 +315,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         // Use longer delay when all community cards arrived at once (all-in runout)
         const communityCount = (payload.community_cards || []).length;
-        const showdownDelay = communityCount >= 5 ? 8500 : 5000;
+        const showdownDelay = communityCount >= 5 ? 6000 : 3500;
 
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
@@ -475,7 +475,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     actionPendingFallbackRef.current = setTimeout(() => {
       setActionPending(false);
       actionPendingFallbackRef.current = null;
-    }, 3000);
+    }, 1500);
     try {
       await callEdge('poker-action', {
         table_id: tableId,
@@ -531,7 +531,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           }
           // else: stay attempted=true, stop retrying
         });
-      }, 2000 + jitter);
+      }, 1200 + jitter);
       return () => {
         if (autoStartTimerRef.current) {
           clearTimeout(autoStartTimerRef.current);
