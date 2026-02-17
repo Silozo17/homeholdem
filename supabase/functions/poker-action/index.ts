@@ -539,21 +539,49 @@ async function processAction(
   const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 20_000).toISOString() : null;
 
   // 9. Commit state
-  const seatUpdates = seatStates.map(s => ({
-    seat_id: s.seat_id,
-    stack: s.stack,
-    status: s.status === "folded" ? "active" : s.status, // Keep DB status as active even if folded (folded is hand-level)
-    consecutive_timeouts: s.consecutive_timeouts,
-  }));
+  const seatUpdates = seatStates.map(s => {
+    const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
+    const wasNonParticipant = originalSeat?.status === "sitting_out" || originalSeat?.status === "disconnected";
+    
+    let dbStatus: string;
+    if (wasNonParticipant) {
+      dbStatus = originalSeat.status;
+    } else if (s.status === "folded") {
+      dbStatus = "active";
+    } else {
+      dbStatus = s.status;
+    }
+    
+    return {
+      seat_id: s.seat_id,
+      stack: s.stack,
+      status: dbStatus,
+      consecutive_timeouts: s.consecutive_timeouts,
+    };
+  });
 
   // For folded/all-in, we track in the actions log, not seat status
   // Seats keep their original status unless all-in
-  const dbSeatUpdates = seatStates.map(s => ({
-    seat_id: s.seat_id,
-    stack: s.stack,
-    status: s.status === "all-in" ? "active" : s.status === "folded" ? "active" : s.status,
-    consecutive_timeouts: s.consecutive_timeouts,
-  }));
+  const dbSeatUpdates = seatStates.map(s => {
+    const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
+    const wasNonParticipant = originalSeat?.status === "sitting_out" || originalSeat?.status === "disconnected";
+    
+    let dbStatus: string;
+    if (wasNonParticipant) {
+      dbStatus = originalSeat.status;
+    } else if (s.status === "all-in" || s.status === "folded") {
+      dbStatus = "active";
+    } else {
+      dbStatus = s.status;
+    }
+    
+    return {
+      seat_id: s.seat_id,
+      stack: s.stack,
+      status: dbStatus,
+      consecutive_timeouts: s.consecutive_timeouts,
+    };
+  });
 
   const actionRecord = {
     player_id: actorSeat.player_id,

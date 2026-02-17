@@ -134,12 +134,26 @@ Deno.serve(async (req) => {
             const totalPot = (hand.pots as any[]).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
             winner.stack += totalPot;
 
-            const dbSeatUpdates = seatStates.map((s) => ({
-              seat_id: s.seat_id,
-              stack: s.stack,
-              status: s.status === "all-in" || s.status === "folded" ? "active" : s.status,
-              consecutive_timeouts: s.consecutive_timeouts,
-            }));
+            const dbSeatUpdates = seatStates.map((s) => {
+              const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
+              const wasNonParticipant = originalSeat?.status === "sitting_out" || originalSeat?.status === "disconnected";
+              
+              let dbStatus: string;
+              if (wasNonParticipant) {
+                dbStatus = originalSeat.status;
+              } else if (s.status === "all-in" || s.status === "folded") {
+                dbStatus = "active";
+              } else {
+                dbStatus = s.status;
+              }
+              
+              return {
+                seat_id: s.seat_id,
+                stack: s.stack,
+                status: dbStatus,
+                consecutive_timeouts: s.consecutive_timeouts,
+              };
+            });
 
             const { data: commitResult } = await admin.rpc("commit_poker_state", {
               _hand_id: hand.id,
@@ -265,12 +279,26 @@ Deno.serve(async (req) => {
 
         const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 20_000).toISOString() : null;
 
-        const dbSeatUpdates = seatStates.map((s) => ({
-          seat_id: s.seat_id,
-          stack: s.stack,
-          status: s.status === "all-in" || s.status === "folded" ? "active" : s.status,
-          consecutive_timeouts: s.consecutive_timeouts,
-        }));
+        const dbSeatUpdates = seatStates.map((s) => {
+          const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
+          const wasNonParticipant = originalSeat?.status === "sitting_out" || originalSeat?.status === "disconnected";
+          
+          let dbStatus: string;
+          if (wasNonParticipant) {
+            dbStatus = originalSeat.status;
+          } else if (s.status === "all-in" || s.status === "folded") {
+            dbStatus = "active";
+          } else {
+            dbStatus = s.status;
+          }
+          
+          return {
+            seat_id: s.seat_id,
+            stack: s.stack,
+            status: dbStatus,
+            consecutive_timeouts: s.consecutive_timeouts,
+          };
+        });
 
         const actionRecord = {
           player_id: actorSeat.player_id,
