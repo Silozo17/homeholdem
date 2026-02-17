@@ -1,53 +1,72 @@
 
-# Fix: Wait for Card Deal Animation Before Bot Actions
 
-## Problem
+# Fix: 4 Online Poker Issues
 
-In bot games, when a new hand starts, the card dealing animation takes several seconds to complete (cards fly out one by one to each player). But the bot action timer starts immediately when the phase changes to `preflop`, so bots act before the human player has even received their cards visually. This breaks immersion -- in a real poker game, no one acts until all cards are dealt.
+## Issue 1: Table Shifts Right When Action Buttons Appear
 
-## Root Cause
+**Root cause**: In mobile landscape, the layout switches from `flex` (centered) to `grid` with `1fr ${panelW}px` columns when `showActions` becomes true (line 930). This re-allocates space, pushing the table left and creating the visual shift.
 
-The flow is:
-1. `dealing` phase -- 1.8s pause (shuffle sound)
-2. `DEAL_HAND` dispatch -- deals cards, sets phase to `preflop`, sets `currentPlayerIndex` to first-to-act
-3. Bot auto-action effect fires after 1.5-3.0s
-4. But the card reveal animation takes up to ~4.5s for the last card (depends on player count)
+**Fix**: Stop using `useGrid` to toggle between flex and grid. Instead, always use absolute positioning for the betting panel (overlay it on the right side), keeping the table centered at all times. The betting controls already render as an absolute overlay in non-mobile-landscape modes -- apply the same pattern for mobile landscape.
 
-The bot action delay (1.5-3.0s) is shorter than the deal animation duration (~4.5s with 6 players).
+**Files**: `src/components/poker/OnlinePokerTable.tsx`
+- Remove `useGrid` variable and the grid layout logic (lines 929-939)
+- Always use `flex` + centered table
+- Render the landscape betting panel as an `absolute` positioned sidebar overlaying the table area on the right
 
-## Solution
+---
 
-Add a "deal grace period" in the bot action `useEffect` inside `usePokerGame.ts`. When a new hand starts (phase transitions from `dealing` to `preflop`), calculate the total deal animation duration and delay bot actions until after all cards have been revealed.
+## Issue 2: Raise Menu Too Narrow in Landscape
 
-### Changes
+**Root cause**: The landscape betting panel width is hardcoded to 130-160px (line 929/72). Quick bet buttons and the slider are crammed into this narrow space.
 
-**File: `src/hooks/usePokerGame.ts`**
+**Fix**: Widen the landscape panel to 180px minimum (up to 200px on wider screens). Also increase the quick bet button text size and slider thumb area for better touch targets.
 
-1. Add a `dealAnimEndRef = useRef(0)` to track when the deal animation finishes
-2. In the `dealing` -> `DEAL_HAND` timeout (line 547), after dispatching, calculate the total deal animation time and store it:
-   - Formula: `totalDealTime = ((1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8) * 1000` (matches PlayerSeat's reveal formula)
-   - Set `dealAnimEndRef.current = Date.now() + totalDealTime`
-3. In the bot action block (line 582-604), before scheduling the bot timeout, check if we're still within the deal animation grace period:
-   - `const dealWait = Math.max(0, dealAnimEndRef.current - Date.now())`
-   - Add `dealWait` to the existing bot delay: `dealWait + 1500 + Math.random() * 1500`
+**Files**: `src/components/poker/BettingControls.tsx`
+- Increase default landscape `panelWidth` from 160px to 180px
+- Quick bet buttons: increase from `text-[10px]` to `text-[11px]`, add more padding
+- Slider: ensure minimum thumb size of 28px for touch
 
-This way:
-- First bot action after a deal waits for the full card animation to finish
-- Subsequent bot actions in the same betting round use normal timing (dealWait will be 0)
-- Human turn is unaffected (the betting controls appear immediately, but the player naturally waits to see their cards anyway)
-- No changes to the animation system, game state, or reducer
+`src/components/poker/OnlinePokerTable.tsx`
+- Update panelW calculation from `130/160` to `160/200`
 
-### Also applies to human turn indicator
+---
 
-The "YOUR TURN" badge and betting controls appear immediately too. Since the human also needs to see their cards first, add the same grace period to the `isHumanTurn` computation:
+## Issue 3: Chat Messages Disappeared
 
-**File: `src/components/poker/PokerTablePro.tsx`**
+**Root cause**: In the `isMobileLandscape` branch (lines 817-853), the `QuickChat` component is NOT rendered -- it only exists in the non-mobile-landscape branch (line 870). So on mobile landscape (which is the primary play mode), users cannot send chat messages at all.
 
-Add a `dealAnimDoneState` that starts as `false` when `handNumber` changes, then flips to `true` after the deal animation duration. Gate `showActions` behind it so the human's betting controls don't appear until cards are dealt.
+**Fix**: Add `QuickChat` to the mobile landscape dropdown menu as a nested component, OR render it separately as an always-visible button in the header bar for mobile landscape too.
 
-## File Summary
+Better approach: render the `QuickChat` button in the header alongside the sound toggle (before the three-dot menu) for both mobile landscape and desktop. This ensures chat is always one tap away.
+
+**Files**: `src/components/poker/OnlinePokerTable.tsx`
+- Move `<QuickChat onSend={trackedSendChat} />` to render BEFORE the `isMobileLandscape` conditional branch, so it appears in the header bar regardless of orientation
+
+---
+
+## Issue 4: Wrong Hand Winning
+
+**Root cause investigation**: The server-side hand evaluator in `poker-action/index.ts` is a direct port of the client-side evaluator and appears logically correct. The showdown logic correctly fetches all hole cards, filters out folded players, evaluates 7-card hands, and distributes pots by score. Without the specific hand ID from the Kris vs Amir game, the exact bug cannot be reproduced from data alone.
+
+However, there is one potential issue: the `has_acted_this_round` reset logic for the **current betting round** may cause an edge case where a player's status is incorrectly computed when transitioning phases. Specifically, the `currentRoundBet` calculation at line 256 only sums actions matching `hand.phase`, but by the time showdown is reached, `hand.phase` has been updated to `showdown` -- meaning all phase-specific bet tracking resets to zero.
+
+**Defensive fix**: Add server-side logging of hand evaluation details (each player's hole cards, the community cards, their evaluated hand name and score) to the `results` object stored in `poker_hands`. This way:
+1. Any disputed hand can be audited from the database
+2. If the evaluator has a subtle bug, the logged data will expose it
+
+Additionally, add a safety check: log a warning when two players have identical scores but different hand names (indicating a potential scoring collision).
+
+**Files**: `supabase/functions/poker-action/index.ts`
+- In the showdown block (lines 447-462), log each player's evaluated hand to console
+- Store `hand_details` (player_id, hole cards, hand name, score) in the results object for auditability
+
+---
+
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePokerGame.ts` | Add `dealAnimEndRef`, calculate deal duration after `DEAL_HAND`, delay bot actions by remaining deal time |
-| `src/components/poker/PokerTablePro.tsx` | Gate `showActions` behind a `dealAnimDone` state that activates after deal animation completes |
+| `src/components/poker/OnlinePokerTable.tsx` | Remove grid layout toggle; use absolute overlay for betting panel; move QuickChat to always-visible header position |
+| `src/components/poker/BettingControls.tsx` | Widen landscape panel (180-200px); improve quick bet button sizing |
+| `supabase/functions/poker-action/index.ts` | Add hand evaluation audit logging to results object for showdown hands |
+
