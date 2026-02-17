@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
 import { WinnerOverlay } from './WinnerOverlay';
+import { XPLevelUpOverlay } from './XPLevelUpOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
@@ -153,6 +154,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const biggestPotRef = useRef(0);
   const gameStartTimeRef = useRef(Date.now());
   const xpSavedRef = useRef(false);
+  const startXpRef = useRef<number | null>(null);
+  const [xpOverlay, setXpOverlay] = useState<{ startXp: number; endXp: number; xpGained: number } | null>(null);
   const chatCountRef = useRef(0);
   const startingStackRef = useRef(0);
   const isLandscape = useIsLandscape();
@@ -163,6 +166,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     requestWakeLock();
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
+
+  // Capture starting XP on mount for level-up animation
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
+  }, [user]);
 
   // Fix 3: Inactivity kick — 2 min no touch → warning → auto-leave
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -532,20 +542,21 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [tableState, user, handWinners]);
 
-  // Save XP and stats on game over
-  useEffect(() => {
-    if (!gameOver || !user || xpSavedRef.current) return;
+  // Shared XP + stats save helper (called on game over AND on leave)
+  const saveXpAndStats = useCallback(async (isWinnerOverride?: boolean) => {
+    if (xpSavedRef.current || !user) return;
     xpSavedRef.current = true;
 
     const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
     const finalChips = mySeatInfo?.stack ?? 0;
-    const isWinner = finalChips > 0;
-    const playerCount = tableState?.seats.filter(s => s.player_id).length ?? 0;
+    const isWinner = isWinnerOverride ?? (finalChips > 0 &&
+      (tableState?.seats.filter(s => s.player_id && s.stack > 0).length ?? 0) === 1);
+    const isTournament = !!(tableState?.table as any)?.tournament_id;
 
     // Save play result
-    supabase.from('poker_play_results').insert({
+    await supabase.from('poker_play_results').insert({
       user_id: user.id,
-      game_mode: 'multiplayer',
+      game_mode: isTournament ? 'tournament' : 'multiplayer',
       hands_played: handsPlayedRef.current,
       hands_won: handsWonRef.current,
       best_hand_name: bestHandNameRef.current || null,
@@ -555,17 +566,45 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       final_chips: finalChips,
       bot_count: 0,
       duration_seconds: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
-    }).then(() => {});
+    });
 
     // Award XP
     const xpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
-    xpEvents.push({ user_id: user.id, xp_amount: 25, reason: 'game_complete' });
-    if (isWinner) xpEvents.push({ user_id: user.id, xp_amount: 100, reason: 'game_win' });
-    xpEvents.push({ user_id: user.id, xp_amount: handsPlayedRef.current, reason: 'hands_played' });
-    xpEvents.push({ user_id: user.id, xp_amount: handsWonRef.current * 10, reason: 'hands_won' });
+    const boost = isTournament ? 1.15 : 1;
+    xpEvents.push({ user_id: user.id, xp_amount: Math.round(25 * boost), reason: 'game_complete' });
+    if (isWinner) xpEvents.push({ user_id: user.id, xp_amount: Math.round(100 * boost), reason: 'game_win' });
+    if (handsPlayedRef.current > 0)
+      xpEvents.push({ user_id: user.id, xp_amount: Math.round(handsPlayedRef.current * boost), reason: 'hands_played' });
+    if (handsWonRef.current > 0)
+      xpEvents.push({ user_id: user.id, xp_amount: Math.round(handsWonRef.current * 10 * boost), reason: 'hands_won' });
 
-    supabase.from('xp_events').insert(xpEvents).then(() => {});
-  }, [gameOver, user, tableState]);
+    await supabase.from('xp_events').insert(xpEvents);
+
+    // Fetch updated XP for level-up animation
+    // Small delay to let the DB trigger process
+    await new Promise(r => setTimeout(r, 500));
+    const { data: newXp } = await supabase.from('player_xp')
+      .select('total_xp').eq('user_id', user.id).maybeSingle();
+
+    const endXp = newXp?.total_xp ?? 0;
+    const sXp = startXpRef.current ?? 0;
+    const totalGained = xpEvents.reduce((s, e) => s + e.xp_amount, 0);
+
+    const calcLevel = (xp: number) => Math.floor(Math.sqrt(xp / 100)) + 1;
+    if (calcLevel(endXp) > calcLevel(sXp)) {
+      setXpOverlay({ startXp: sXp, endXp, xpGained: totalGained });
+      return 'show_overlay';
+    }
+    return 'no_overlay';
+  }, [user, tableState]);
+
+  // Save XP on game over
+  useEffect(() => {
+    if (!gameOver || !user || xpSavedRef.current) return;
+    const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
+    const isWinner = (mySeatInfo?.stack ?? 0) > 0;
+    saveXpAndStats(isWinner);
+  }, [gameOver, user, tableState, saveXpAndStats]);
 
   // Staged community card reveal for all-in runouts
   useEffect(() => {
@@ -764,8 +803,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleLeave = async () => {
-    try { await leaveTable(); onLeave(); }
-    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    try {
+      // Save XP before leaving
+      const result = await saveXpAndStats(false);
+      if (result === 'show_overlay') {
+        // Overlay will call leaveTable + onLeave via its Continue button
+        return;
+      }
+      await leaveTable();
+      onLeave();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
   };
 
   const copyInviteCode = () => {
@@ -1078,6 +1127,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
               }}
               onNextHand={() => { leaveTable().then(onLeave).catch(onLeave); }} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
+            />
+          )}
+
+          {/* XP Level-Up Overlay */}
+          {xpOverlay && (
+            <XPLevelUpOverlay
+              startXp={xpOverlay.startXp}
+              endXp={xpOverlay.endXp}
+              xpGained={xpOverlay.xpGained}
+              onContinue={() => {
+                setXpOverlay(null);
+                leaveTable().then(onLeave).catch(onLeave);
+              }}
             />
           )}
 

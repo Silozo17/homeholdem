@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { usePlayerLevel } from '@/hooks/usePlayerLevel';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,8 @@ interface TournamentLobbyProps {
 export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const levelData = usePlayerLevel(user?.id);
+  const canPlayTournaments = (levelData?.level ?? 0) >= 5;
   const [tournaments, setTournaments] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -334,10 +337,13 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
           {/* Actions */}
           <div className="space-y-2">
-            {t.status === 'registering' && !isRegistered && (
+            {t.status === 'registering' && !isRegistered && canPlayTournaments && (
               <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={() => handleRegister(t.id)}>
                 Register
               </Button>
+            )}
+            {t.status === 'registering' && !isRegistered && !canPlayTournaments && (
+              <p className="text-xs text-center text-muted-foreground py-2">Reach Level 5 to register (currently Level {levelData?.level ?? 1})</p>
             )}
             {t.status === 'registering' && isCreator && detail.total_players >= 2 && (
               <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => handleStart(t.id)}>
@@ -387,8 +393,35 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
           <p className="text-sm text-muted-foreground">Compete in structured poker tournaments</p>
         </div>
 
+        {/* Level Gate */}
+        {!canPlayTournaments && (
+          <div className="glass-card rounded-2xl p-4 text-center space-y-3 animate-slide-up-fade stagger-1">
+            <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center" style={{ background: 'hsl(0 0% 15%)', border: '2px solid hsl(43 74% 49% / 0.4)' }}>
+              <Trophy className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-bold text-foreground text-sm">Tournaments Locked</p>
+              <p className="text-xs text-muted-foreground mt-1">Reach Level 5 to unlock tournaments</p>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Level {levelData?.level ?? 1}</span>
+                <span>Level 5</span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
+                <div className="h-full rounded-full" style={{
+                  width: `${Math.min(100, ((levelData?.level ?? 1) / 5) * 100)}%`,
+                  background: 'linear-gradient(90deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+                  transition: 'width 0.5s ease-out',
+                }} />
+              </div>
+              <p className="text-[10px] text-muted-foreground">Play practice or cash games to earn XP</p>
+            </div>
+          </div>
+        )}
+
         {/* Action row */}
-        <div className="flex gap-2 animate-slide-up-fade stagger-1">
+        {canPlayTournaments && <div className="flex gap-2 animate-slide-up-fade stagger-1">
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <button className="flex-1 glass-card rounded-2xl p-3 flex items-center gap-2 text-left group active:scale-[0.98] transition-all animate-glow-pulse min-w-0">
@@ -454,7 +487,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
+        </div>}
 
         {/* Tournament list */}
         <div className="space-y-3 animate-slide-up-fade stagger-2">
