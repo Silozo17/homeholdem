@@ -90,7 +90,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     setRevealedIndices(new Set());
     const timers: ReturnType<typeof setTimeout>[] = [];
     player.holeCards.forEach((_, i) => {
-      const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
+      const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.35 + 0.1;
       const revealMs = (dealDelay + 0.7) * 1000;
       timers.push(setTimeout(() => {
         setRevealedIndices(prev => new Set(prev).add(i));
