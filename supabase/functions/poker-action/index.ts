@@ -623,6 +623,7 @@ async function processAction(
         winners: results.winners,
         revealed_cards: revealedCards,
         pots: results.pots,
+        community_cards: communityCards,
         state_version: commitResult.state_version,
       },
     });
