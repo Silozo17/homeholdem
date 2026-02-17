@@ -1,99 +1,84 @@
 
 
-# Fix: Mid-Hand Join Disruption + Green Screen (Final Resolution)
+# Fix: Mid-Hand Join — Admin Gets a Turn Despite Not Having Cards
 
-## The Two Root Causes (with proof)
+## Root Cause (exact proof)
 
-### Problem 1: Why Admin gets included mid-hand and cards refresh
+The bug is in `supabase/functions/poker-action/index.ts`, lines 249 and 551-556.
 
-There are **two paths** that cause the disruption, and we've only fixed one:
+**Step-by-step chain:**
 
-**Path A (FIXED):** The `seat_change` broadcast handler. This was fixed to do local-only updates during active hands.
+1. Admin joins seat 1 as `sitting_out` in the `poker_seats` DB table
+2. Julia checks -- `poker-action` runs, reads all seats including Admin
+3. Line 249: Admin's `sitting_out` status is mapped to `"folded"` in the in-memory `seatStates` array
+4. Line 554: When building `dbSeatUpdates`, `"folded"` is mapped back to `"active"` for the DB write (this is by design for actual folded players -- fold is hand-level, not stored on seat)
+5. `commit_poker_state` writes Admin's DB seat status as `active` (was `sitting_out`, now `active`)
+6. On Amir's next action, `poker-action` reads Admin from DB as `active` (no longer `sitting_out`)
+7. Line 249: Since Admin is now `active` in DB (not `sitting_out`), they stay `active` in seatStates
+8. Admin has no fold action in `poker_actions` table, so nothing flips them to `folded`
+9. Line 533: `nextActiveSeat()` skips `folded`, `all-in`, `sitting_out`, `disconnected` -- but Admin is `active`, so Admin becomes the next actor
+10. Admin gets a turn despite having no cards
 
-**Path B (STILL BROKEN):** The `game_state` broadcast from `poker-action` replaces the ENTIRE seat array on every action.
+**The core bug**: `dbSeatUpdates` at line 551-556 treats ALL folded seats the same -- it doesn't distinguish between "actually folded during the hand" and "sitting_out mapped to folded". Both get written back to DB as `active`, which corrupts `sitting_out` players into `active` participants.
 
-Here is what happens step by step:
-1. Julia and Amir are mid-hand (3 community cards on table)
-2. Admin clicks a seat -- `poker-join-table` inserts Admin as `sitting_out` in `poker_seats` table
-3. Julia or Amir takes an action, `poker-action` runs
-4. `poker-action/index.ts` line 594 builds `seatStates` from ALL `poker_seats` rows for the table -- **this now includes Admin's sitting_out row**
-5. Line 616-628 builds the broadcast `seats` array from ALL seatStates
-6. Line 627: `has_cards: holeCardPlayerIds.has(s.player_id) && s.status !== "folded"` -- Admin has no hole cards, so `has_cards` is correctly `false`. **This part was fixed.**
-7. **BUT:** The client at `useOnlinePokerTable.ts` line 243 does: `seats: seats.length > 0 ? seats : prev.seats` -- this **replaces the entire local seat array** with the broadcast seats. The new array has a different length (Admin is now included), which changes `seatsKey` at `OnlinePokerTable.tsx` line 709, which forces ALL `PlayerSeat` components to unmount and remount -- **causing the card refresh visual glitch**.
+## Fix (minimal, 1 file)
 
-The fix for `has_cards` was correct but insufficient. The visual disruption comes from the **seat array changing length**, not from incorrect card flags.
+**File:** `supabase/functions/poker-action/index.ts`
 
-### Problem 2: Why the screen goes green
-
-There is no Error Boundary component in the project (confirmed: search for `PokerErrorBoundary` returns 0 results, search for `ErrorBoundary` returns 0 results). When React encounters any render error -- such as accessing `.map()` on undefined `pots` during a state transition -- the entire component tree crashes. The only visible elements are the background image and the green `TableFelt` which are rendered at lower z-indices.
-
-## Solution: 3 Changes
-
-### Change 1: Stop `game_state` broadcasts from changing seat array membership mid-hand
-
-**File:** `src/hooks/useOnlinePokerTable.ts`, line 243
-
-Instead of replacing the entire seat array from the broadcast, **merge only known seats' changing data** (stack, current_bet, status, last_action, has_cards) while preserving the seat array structure. Never add or remove seats from a `game_state` broadcast -- only `seat_change` can do that.
-
-This is the only fix that will permanently solve the mid-hand join card refresh, because it stops the seat array length from changing on every action broadcast.
+**Change:** When building `dbSeatUpdates`, preserve the ORIGINAL DB status for players who were `sitting_out` or `disconnected`. Only reset `folded`/`all-in` for players who actually participated in the hand (i.e., have hole cards).
 
 ```typescript
-// Line 243 — BEFORE:
-return { ...prev, current_hand: broadcastHand, seats: seats.length > 0 ? seats : prev.seats };
+// Lines 551-556 — BEFORE:
+const dbSeatUpdates = seatStates.map(s => ({
+  seat_id: s.seat_id,
+  stack: s.stack,
+  status: s.status === "all-in" ? "active" : s.status === "folded" ? "active" : s.status,
+  consecutive_timeouts: s.consecutive_timeouts,
+}));
 
-// AFTER:
-// Merge seat DATA without changing seat array membership
-const mergedSeats = prev.seats.map(existingSeat => {
-  const updated = seats.find(s => s.seat === existingSeat.seat);
-  if (updated) {
-    return { ...existingSeat, ...updated };
+// AFTER — preserve sitting_out/disconnected original status:
+const dbSeatUpdates = seatStates.map(s => {
+  // Players who were sitting_out/disconnected must keep that status
+  // They were mapped to "folded" in seatStates (line 249) but their DB status must not change
+  const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
+  const wasNonParticipant = originalSeat?.status === "sitting_out" || originalSeat?.status === "disconnected";
+  
+  let dbStatus: string;
+  if (wasNonParticipant) {
+    dbStatus = originalSeat.status; // Keep sitting_out or disconnected
+  } else if (s.status === "all-in" || s.status === "folded") {
+    dbStatus = "active"; // Reset hand-level status for actual participants
+  } else {
+    dbStatus = s.status;
   }
-  return existingSeat;
+  
+  return {
+    seat_id: s.seat_id,
+    stack: s.stack,
+    status: dbStatus,
+    consecutive_timeouts: s.consecutive_timeouts,
+  };
 });
-return { ...prev, current_hand: broadcastHand, seats: mergedSeats };
 ```
 
-This means:
-- If Admin joins mid-hand and appears in the broadcast, they are IGNORED because they are not in the local seat array yet (they were added via `seat_change` as `sitting_out` with `has_cards: false`)
-- Existing seats get their stack/bet/status updated normally
-- The seat array length never changes from a `game_state` broadcast
-- Only `seat_change` events and `refreshState()` can add/remove seats
-
-### Change 2: Create Error Boundary to prevent green screen
-
-**New file:** `src/components/poker/PokerErrorBoundary.tsx`
-
-A React class component that catches render errors and shows a recovery UI ("Something went wrong -- Tap to reconnect") instead of crashing to the green felt.
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`
-
-Wrap the entire return JSX in the error boundary.
-
-### Change 3: Add null guards for crash-prone render paths
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`
-
-Add defensive `|| []` guards to `hand?.pots` and `hand?.community_cards` where they are iterated in JSX, preventing the crashes that trigger the green screen.
+The same fix must be applied to `supabase/functions/poker-check-timeouts/index.ts` which has the identical pattern for building seat updates.
 
 ## What Does NOT Change
 
-- No layout, style, navigation, spacing, or BottomNav changes
+- No client-side changes
+- No layout, style, navigation, or BottomNav changes
 - No database schema changes
-- No edge function changes (the server-side fixes from the previous round are correct and stay)
 - No changes to game logic, pot calculations, or deal animations
 - No file renames or refactoring
 
-## Technical Summary
+## Why This Fixes It
 
-| File | Change | Risk |
-|------|--------|------|
-| `src/hooks/useOnlinePokerTable.ts` line 243 | Merge seat data instead of replacing array | Low -- only affects how broadcast seats are applied |
-| `src/components/poker/PokerErrorBoundary.tsx` (new) | Error boundary with recovery UI | Low -- additive wrapper |
-| `src/components/poker/OnlinePokerTable.tsx` | Wrap in error boundary + null guards on `pots`/`community_cards` | Low -- defensive only |
+After the fix, when Julia checks:
+- Admin (sitting_out in DB) is still mapped to "folded" in seatStates for action processing (correct -- skipped for next actor)
+- But `dbSeatUpdates` preserves `sitting_out` for Admin's DB row
+- On Amir's next action, Admin is still read as `sitting_out` from DB
+- Line 249 maps Admin to "folded" again
+- `nextActiveSeat` skips Admin (status is "folded" which is in the exclude list)
+- Admin never gets a turn
 
-## Why This Actually Fixes It
-
-Previous fixes targeted `has_cards` flags and the `seat_change` handler. Those were correct but missed the core issue: **every `game_state` broadcast replaces the seat array**. When a new player joins, the next action broadcast includes them, the array length changes, React unmounts/remounts all seats, and cards visually refresh.
-
-By merging seat data instead of replacing the array, the seat membership stays stable throughout a hand. New players only appear via the `seat_change` handler (which correctly marks them as `sitting_out`). The next `refreshState()` (after hand completes) will pick up the full correct state.
-
+Admin will only become `active` when `poker-start-hand` explicitly activates them for the next hand.
