@@ -151,19 +151,31 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
       const currentState = tableStateRef.current;
-      const handActive = !!currentState?.current_hand && !currentState.current_hand.phase?.includes('complete');
+      const currentPhase = currentState?.current_hand?.phase;
+      const handActive = !!currentState?.current_hand
+        && currentPhase !== 'complete'
+        && currentPhase !== 'showdown';
 
       if (handActive && data.current_hand) {
-        // Mid-hand: only update table metadata + my_cards; preserve seats/hand from broadcasts
-        setTableState(prev => prev ? { ...prev, table: data.table } : data);
+        const snapshotVersion = data.current_hand.state_version ?? 0;
+        const localVersion = lastAppliedVersionRef.current;
+
+        if (snapshotVersion > localVersion) {
+          // Snapshot is strictly newer: safe-merge everything
+          setTableState(prev => prev ? { ...prev, table: data.table, seats: data.seats, current_hand: data.current_hand } : data);
+          lastAppliedVersionRef.current = snapshotVersion;
+        } else {
+          // Snapshot is same or older: only merge table metadata
+          setTableState(prev => prev ? { ...prev, table: data.table } : data);
+        }
       } else {
-        // No active hand or hand just completed: full replacement is safe
+        // No active hand or hand completed: full replacement is safe
         setTableState(data);
+        lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
       }
       setMyCards(data.my_cards || null);
       setError(null);
       setConnectionStatus('connected');
-      lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
     } catch (err: any) {
       setError(err.message);
       setConnectionStatus('disconnected');
@@ -627,8 +639,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
-        // Only trigger timeout check; broadcasts will deliver state updates
+        // Trigger timeout check + safe-merge refresh (version-gated inside refreshState)
         callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
+        refreshState();
       }
     }, 5000);
     return () => clearInterval(interval);
