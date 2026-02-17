@@ -1,69 +1,100 @@
 
 
-# Fix: Prevent Mid-Game Player Inclusion (Critical Bug)
+# Fix: Handle Player Dropouts Without Freezing the Game
 
-## Root Cause
+## Problem
 
-In `poker-join-table/index.ts` (line 142-151), when a player joins and no hand is currently active, they get `status: "active"` immediately. Then when `poker-start-hand` fires (auto-triggered ~1.2s later by the leader client), it queries all seats with `status: "active"` and deals cards to ALL of them -- including players who literally just sat down a fraction of a second ago.
+When a player minimizes their phone and can't return, the game freezes for everyone. The current timeout system has several gaps:
 
-The 3-second guard (lines 228-237 in `poker-start-hand`) was designed to prevent this, but it ONLY transitions `sitting_out` players to `active`. Players who were inserted as `active` from the start bypass this guard entirely.
+1. **The 20s turn timer** only exists visually on clients -- the server relies on other clients to report it
+2. **The timeout ping** only fires from non-actor clients 2s after deadline, but if the disconnected player IS the leader (lowest seat), no one polls the server
+3. **The server check** (`poker-check-timeouts`) requires a client to call it AND waits 10s past deadline before acting -- total worst-case: 30+ seconds of apparent freeze
+4. **No redundancy** -- if the leader disconnects, the backup (stale hand recovery at 12s) only calls `refreshState`, not `poker-check-timeouts`
 
-This is the exact scenario the user reported: Matt R and Kadokyourdad joined between hands, got `active` status instantly, and were dealt into the next hand.
+## Solution: Multi-Layer Dropout Protection
 
-## Fix (2 changes, both server-side)
+### Layer 1: ALL seated players poll for timeouts (not just leader)
 
-### Change 1: Always insert as `sitting_out` in `poker-join-table`
+**File:** `src/hooks/useOnlinePokerTable.ts` (lines 607-628)
 
-**File:** `supabase/functions/poker-join-table/index.ts`, lines 142-151
+Currently only the "auto-start leader" (lowest-seated player) runs the 8s timeout poll. Change this so ALL seated players poll, but stagger them:
+- Leader polls every 8s (unchanged)
+- Non-leader seated players poll every 12s with a random offset
 
-Remove the active hand check entirely. Always insert new players as `sitting_out`, regardless of whether a hand is in progress. The `poker-start-hand` function is responsible for activating players at the right time.
+This ensures if the leader is the one who disconnected, other players still trigger the server-side timeout check.
+
+### Layer 2: Reduce server timeout tolerance from 10s to 5s
+
+**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 47)
+
+Change the cutoff from 10 seconds to 5 seconds past deadline. Combined with the 20s turn timer, the total wait becomes 25s instead of 30s. This is still safe against clock skew while being more responsive.
 
 ```
-// BEFORE (line 151):
-const initialStatus = activeHand ? "sitting_out" : "active";
+// BEFORE:
+const cutoff = new Date(Date.now() - 10_000).toISOString();
 
 // AFTER:
-const initialStatus = "sitting_out";
+const cutoff = new Date(Date.now() - 5_000).toISOString();
 ```
 
-This also means we can delete the `activeHand` query (lines 142-149) since it's no longer needed.
+### Layer 3: Stale hand recovery should trigger timeout check, not just refresh
 
-### Change 2: Always respect the 3-second cooldown in `poker-start-hand`
+**File:** `src/hooks/useOnlinePokerTable.ts` (lines 581-592)
 
-**File:** `supabase/functions/poker-start-hand/index.ts`, lines 240-246
+Currently when 12s passes with no broadcast, `refreshState()` is called. But if the hand is stuck because of a timed-out player, refreshing state just shows the same stuck state. Add a `poker-check-timeouts` call before the refresh:
 
-Add a `joined_at` filter to the active seats query so that even if a player somehow has `active` status, they won't be included if they joined less than 3 seconds ago. This is a defence-in-depth measure.
-
-```sql
--- Current query (line 240-246):
-SELECT * FROM poker_seats
-WHERE table_id = ? AND status = 'active' AND player_id IS NOT NULL
-ORDER BY seat_number
-
--- Updated query adds:
-AND joined_at < (now - 3 seconds)
+```typescript
+if (elapsed > 12000) {
+  lastBroadcastRef.current = Date.now();
+  callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
+  refreshState();
+}
 ```
 
-The sitting_out activation query (lines 228-237) already has this guard -- we just need to add it to the active seats fetch too.
+### Layer 4: Auto-kick disconnected players after 1 timeout (down from 2)
 
-## Impact on First Game Start
+**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 375)
 
-When 2 players first sit down at an empty table, both will be `sitting_out`. The `poker-start-hand` activation logic (line 228-237) will transition them to `active` after 3 seconds. The auto-start timer fires at ~1.2s, which is before the 3s cutoff -- so the first auto-start attempt will find fewer than 2 active players and return "Need at least 2 players". The retry logic (up to 3 retries with fallbacks at 3.5s and 6s) will catch this on the second attempt. The manual "Start Game" button will also work after 3 seconds.
+Change the consecutive timeout threshold from 2 to 1. If a player times out once (their 20s turn expires + 5s server grace), they are immediately kicked from the table. This prevents the scenario where a disconnected player causes TWO hands to freeze before being removed.
 
-This is a minor UX trade-off (3-second wait for the very first hand) but eliminates the critical bug entirely.
+```
+// BEFORE:
+.gte("consecutive_timeouts", 2)
 
-## Summary
+// AFTER:
+.gte("consecutive_timeouts", 1)
+```
+
+This is aggressive but appropriate -- a player who missed their entire 20s turn is very likely disconnected. Real players who briefly lag will act within the 20s window.
+
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `supabase/functions/poker-join-table/index.ts` | Always insert as `sitting_out`; remove activeHand query |
-| `supabase/functions/poker-start-hand/index.ts` | Add `joined_at < 3s ago` filter to active seats query |
+| `src/hooks/useOnlinePokerTable.ts` (line 609) | All seated players poll for timeouts (not just leader) |
+| `src/hooks/useOnlinePokerTable.ts` (line 586) | Stale hand recovery triggers `poker-check-timeouts` too |
+| `supabase/functions/poker-check-timeouts/index.ts` (line 47) | Reduce tolerance from 10s to 5s |
+| `supabase/functions/poker-check-timeouts/index.ts` (line 375) | Auto-kick after 1 timeout instead of 2 |
+
+## Worst-Case Timeline (After Fix)
+
+```text
+0s     - Player's turn starts (20s timer)
+20s    - Turn timer expires, action_deadline passes
+22s    - Non-actor client fires poker-timeout-ping (auto-fold)
+25s    - If ping failed: server check triggers (5s tolerance)
+25s    - Disconnected player auto-kicked (1 timeout = kick)
+27s    - Next hand auto-starts
+```
+
+Compare to current worst case: 30-40s freeze, player stays for a SECOND hand freeze, then kicked.
 
 ## What Does NOT Change
 
-- No client code changes
-- No layout, navigation, or UI changes
+- No UI/layout/navigation changes
 - No database schema changes
-- No other edge functions modified
-- Game logic, pot calculations, deal animations all unchanged
+- No changes to the 20s turn timer duration
+- No changes to game logic, pot calculations, or deal animations
+- No BottomNav changes
+- `poker-action`, `poker-start-hand`, `poker-leave-table` unchanged
 
