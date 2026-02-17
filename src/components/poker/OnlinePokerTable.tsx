@@ -1161,8 +1161,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
         {/* Betting panel — absolute overlay in mobile landscape */}
         {isMobileLandscape && showActions && mySeat && (
-          <div className="absolute right-0 top-1/2 -translate-y-1/2"
-            style={{ width: `${panelW}px`, paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)', zIndex: Z.ACTIONS }}
+          <div className="absolute right-0"
+            style={{ width: `${panelW}px`, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)', zIndex: Z.ACTIONS }}
           >
             <BettingControls landscape panelWidth={panelW} canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
           </div>
@@ -1207,7 +1207,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* Pre-action buttons — top-right, stacked vertically */}
       {!showActions && isSeated && hand && mySeat && mySeat.status !== 'folded' && (
-        <div className="absolute" style={{ zIndex: Z.ACTIONS, top: 'calc(env(safe-area-inset-top, 0px) + 48px)', right: 'calc(env(safe-area-inset-right, 0px) + 10px)' }}>
+        <div className="absolute" style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', right: 'calc(env(safe-area-inset-right, 0px) + 10px)' }}>
           <PreActionButtons canPreCheck={canCheck} amountToCall={amountToCall} onQueue={setPreAction} queued={preAction} />
         </div>
       )}
