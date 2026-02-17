@@ -1,60 +1,175 @@
 
-# Fix 4 Poker Game Issues
+# Comprehensive Fix: 4 Critical Poker Game Issues
 
-## Issue 1: Winner doesn't see winning animation, stays at table, no stats/XP
+## Issue 1: Emoji and Achievement Jitter (Jump to Left)
 
-**Root Cause**: When the last hand completes and only 1 player has chips, `NEXT_HAND` transitions to `game_over`. But the winner overlay for `hand_complete` auto-advances to `NEXT_HAND` after 4.5s (line 547-551 in usePokerGame.ts), so the winner briefly sees the hand-complete banner, then immediately goes to `game_over`. The problem is the `game_over` overlay checks `winners` from `lastHandWinners`, but the `NEXT_HAND` reducer doesn't preserve `lastHandWinners` -- it just sets `phase: 'game_over'` with no winner data update.
+**Root Cause**: CSS `transform` property conflict. When an element uses `translateX(-50%)` for centering AND has an animation that sets `transform` (like `translateY`, `scale`), the animation **overwrites** the entire `transform` property, removing the horizontal centering. This causes a visible snap/jump to the left.
 
-Additionally, practice game results are never saved to `poker_play_results` and no XP is awarded.
+**Affected locations**:
+- `AchievementToast.tsx` (line 60): outer div uses `left-1/2 -translate-x-1/2`, inner div uses `animation: 'fade-in 0.3s'` which has `translateY(10px)` -- overwrites the `-translate-x-1/2`
+- `OnlinePokerTable.tsx` (line 828-829): chat bubbles use inline `transform: 'translateX(-50%)'` with `animate-emote-pop` (scale transform) and `animate-float-up` (translateY transform)
+- `tailwind.config.ts` lines 103-111: `fade-in` keyframes include `translateY` which conflicts
 
-**Fix**:
-- In `usePokerGame.ts` `NEXT_HAND` case: when transitioning to `game_over`, populate `lastHandWinners` with the surviving player's data so the game-over overlay shows the correct winner.
-- Add a `useEffect` in `PokerTablePro.tsx` (or `PlayPoker.tsx`) that saves results to `poker_play_results` and awards XP when `game_over` is reached, using the authenticated user's ID.
+**Fix** (3 files):
 
-## Issue 2: Emojis/achievements jitter (auto-align to center)
+1. **`tailwind.config.ts`** -- Remove `translateY` from `fade-in` keyframes, use opacity-only:
+```
+"fade-in": {
+  from: { opacity: "0" },
+  to: { opacity: "1" },
+}
+```
 
-**Root Cause**: `AchievementToast` uses `left-1/2 -translate-x-1/2` for centering, combined with `animate-fade-in` which includes `translateY(10px) -> translateY(0)`. The CSS `animate-fade-in` transform **overwrites** the `-translate-x-1/2` class because both use the `transform` property. On first render, `-translate-x-1/2` applies, then the animation kicks in and replaces the entire transform, causing the horizontal jump.
+2. **`src/index.css`** -- Update `float-up` keyframes to include `translateX(-50%)` so it preserves centering:
+```css
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75%  { opacity: 1; transform: translateX(-50%) translateY(-8px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+```
 
-**Fix**: Use a wrapper div for the centering transform and apply the animation to an inner div, OR change `animate-fade-in` to use only `opacity` (no translateY) for the toast, OR wrap in a container that uses `left-1/2 -translate-x-1/2` as a stable parent and animate the child with opacity only.
-
-## Issue 3: "Play Again" button does nothing at game over
-
-**Root Cause**: `PlayPoker.tsx` passes `onNextHand={nextHand}` to `PokerTablePro`, and the game-over `WinnerOverlay` calls `onNextHand`. But `nextHand` dispatches `NEXT_HAND`, which checks `alivePlayers.length <= 1` and just returns `game_over` again -- an infinite no-op loop.
-
-**Fix**: "Play Again" should dispatch `RESET` followed by showing the lobby, OR better: add a new action `RESTART` that resets the game state and immediately starts a new game with the same settings. The simplest fix is to make the game-over overlay's "Play Again" call `onQuit` (which is `resetGame` -> lobby) and rename the button to "New Game", OR add a `restartGame` callback that resets and auto-starts.
-
-Recommended approach: Make "Play Again" call `resetGame` (returns to lobby where user can start fresh). This is already wired as `onQuit` in PokerTablePro.
-
-## Issue 4: Card dealing animations not sliding to correct positions
-
-**Root Cause**: The `animate-card-arrive` and `animate-card-reveal` animations are pure scale/opacity transitions (scale 0.5 -> 1). They don't actually "fly" cards from a dealer position to the seat. The cards just pop into place at each seat. Community cards similarly just appear in center without a slide. There's a `@keyframes community-card-fly` defined but it uses `translateY` from top which doesn't account for the actual dealer position.
-
-**Fix**: For a proper dealing feel:
-- Change `card-arrive` to include a translateY from negative (cards drop from above/dealer area) so they appear to fly down to the player.
-- Stagger the deal delays properly so cards arrive sequentially per player.
-- For community cards, ensure `community-card-fly` is actually used (currently `CardDisplay` for community cards uses `animate-card-reveal`, not the fly animation).
+3. **`src/components/poker/OnlinePokerTable.tsx`** (lines 828-831) -- For emote-pop, wrap in a positioning div and apply animation to inner element:
+```tsx
+// Outer div: positioning only (no animation)
+<div style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: 'translateX(-50%)', zIndex: Z.EFFECTS + 5 }}>
+  {/* Inner div: animation only (no positioning transform) */}
+  <div className={cn('pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
+       style={isSingleEmoji ? {} : { transform: undefined }}>
+    ...
+  </div>
+</div>
+```
+For `animate-float-up`, since the keyframes now include `translateX(-50%)`, the outer div's inline `transform` will be overridden correctly. For `animate-emote-pop`, the scale animation goes on the inner div so it doesn't touch the outer positioning.
 
 ---
 
-## Technical Changes
+## Issue 2: Users Cannot Change Usernames
 
-### `src/hooks/usePokerGame.ts`
-1. In `NEXT_HAND` case (line 425-443): When `alivePlayers.length <= 1`, populate `lastHandWinners` from the surviving player before returning `game_over`.
-2. Store the original `LobbySettings` in state so "Play Again" can restart with the same config.
+**Current state**: `Profile.tsx` displays `display_name` as read-only text (line 244). No edit UI exists.
 
-### `src/pages/PlayPoker.tsx`
-1. Wire "Play Again" (game over) to `resetGame` instead of `nextHand`.
-2. Add a `useEffect` that saves results to `poker_play_results` and awards XP via edge function or direct insert when `state.phase === 'game_over'`.
+**Fix** (`src/pages/Profile.tsx`):
+- Add an edit icon button next to the display name
+- On tap, replace the name with an input field pre-filled with current name
+- Add Save/Cancel buttons
+- On save, call `supabase.from('profiles').update({ display_name }).eq('id', user.id)`
+- Show a success toast on save
 
-### `src/components/poker/PokerTablePro.tsx`
-1. Pass different callbacks for hand-complete vs game-over overlays: hand-complete uses `onNextHand`, game-over uses a new `onPlayAgain` (= reset to lobby).
+State additions: `editingName` (boolean), `newName` (string), `savingName` (boolean)
 
-### `src/components/poker/AchievementToast.tsx`
-1. Wrap the centering in a stable container div and apply the fade animation to the inner content without conflicting transforms.
+---
 
-### `src/index.css`
-1. Update `card-arrive` keyframes to include a `translateY(-30px)` start so cards visually drop from above into position.
-2. Apply `community-card-fly` animation to community cards properly.
+## Issue 3: XP System Completely Broken
 
-### `src/components/poker/CardDisplay.tsx`
-1. Use the flying animation class for community cards (pass a prop or detect context).
+**Root Cause**: Two problems found:
+1. The `xp_events` table has **zero INSERT policies** -- users cannot insert rows. The `update_player_xp()` trigger function exists but is never triggered because nothing can write to `xp_events`.
+2. `PlayPoker.tsx` saves to `poker_play_results` but **never inserts into `xp_events`**. No code in the entire codebase writes to `xp_events`.
+
+**Fix** (2 changes):
+
+1. **Database migration** -- Add INSERT RLS policy:
+```sql
+CREATE POLICY "Users can insert own xp_events"
+  ON public.xp_events FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+```
+
+2. **`src/pages/PlayPoker.tsx`** -- After inserting into `poker_play_results`, also insert XP events:
+```typescript
+// Calculate XP
+const xpEvents = [];
+const isWinner = humanPlayer && humanPlayer.chips > 0 &&
+  state.players.filter(p => p.chips > 0).length === 1;
+
+// +25 for game completion
+xpEvents.push({ user_id: user.id, reason: 'game_complete', xp_amount: 25 });
+// +100 for winning
+if (isWinner) xpEvents.push({ user_id: user.id, reason: 'game_win', xp_amount: 100 });
+// +10 per hand won
+if (state.handsWon > 0) xpEvents.push({ user_id: user.id, reason: 'hands_won', xp_amount: state.handsWon * 10 });
+
+await supabase.from('xp_events').insert(xpEvents);
+```
+
+---
+
+## Issue 4: Winner Has No End Game Screen (Stuck at Table)
+
+**Root Cause**: Two separate paths are broken:
+
+### Practice mode (`usePokerGame.ts`):
+- Line 452: `case 'QUIT': return { ...state, phase: 'game_over' }` -- does NOT populate `lastHandWinners`, so the game-over overlay has no winner data.
+- The auto-advance at line 554-558 fires `NEXT_HAND` after 4.5s on `hand_complete`. When `alivePlayers <= 1`, lines 427-435 correctly transition to `game_over` with winners populated. This path **should work** for the winner.
+- However, if the winner clicks the exit button instead of waiting for auto-advance, the `QUIT` path loses all winner data.
+
+### Multiplayer mode (`OnlinePokerTable.tsx`):
+- Lines 336-346: Game over detection ONLY fires when `mySeatInfo.stack <= 0` (the **loser**). **Winners are never shown the game over screen.** The winner stays at the table indefinitely with no overlay, no stats, and no way to see they won.
+
+**Fix**:
+
+1. **`src/hooks/usePokerGame.ts`** (line 452) -- `QUIT` case must populate `lastHandWinners`:
+```typescript
+case 'QUIT': {
+  const alivePlayers = state.players.filter(p => p.chips > 0);
+  const gameOverWinners = alivePlayers.length > 0
+    ? alivePlayers.map(p => ({
+        playerId: p.id,
+        name: p.name,
+        handName: state.lastHandWinners?.[0]?.handName || 'N/A',
+        chipsWon: p.chips,
+      }))
+    : state.lastHandWinners || [];
+  return { ...state, phase: 'game_over', lastHandWinners: gameOverWinners };
+}
+```
+
+2. **`src/components/poker/OnlinePokerTable.tsx`** (lines 336-346) -- Fix game over detection to also trigger for **winners** (last player standing):
+```typescript
+useEffect(() => {
+  if (!tableState || !user) return;
+  const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+
+  // LOSER: my stack is 0 after a hand result
+  if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners(handWinners);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+
+  // WINNER: I'm the last player with chips
+  if (mySeatInfo && mySeatInfo.stack > 0 && activePlayers.length === 1
+      && activePlayers[0].player_id === user.id && handWinners.length > 0) {
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners(handWinners);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+}, [tableState, user, handWinners]);
+```
+
+---
+
+## Additional Issue Found: "Play Again" Button in Game Over
+
+**In practice mode**: `PokerTablePro.tsx` line 521 passes `onNextHand={onQuit}` for game over. `onQuit` is `resetGame` which dispatches `RESET` returning to idle/lobby. This should work correctly now.
+
+**In multiplayer mode**: `OnlinePokerTable.tsx` line 772 passes `onNextHand={() => {}}` (no-op) for game over. The "Play Again" button does nothing. Fix: make it call `leaveTable().then(onLeave)` same as the quit button, so the user returns to the lobby.
+
+---
+
+## Summary of All File Changes
+
+| File | Change |
+|------|--------|
+| `tailwind.config.ts` | Remove `translateY` from `fade-in` keyframes |
+| `src/index.css` | Update `float-up` keyframes to preserve `translateX(-50%)` |
+| `src/components/poker/OnlinePokerTable.tsx` | Fix game over for winners, fix emoji jitter wrapping, fix "Play Again" button |
+| `src/components/poker/AchievementToast.tsx` | No further changes needed (fade-in fix in tailwind handles it) |
+| `src/hooks/usePokerGame.ts` | Fix QUIT action to populate `lastHandWinners` |
+| `src/pages/PlayPoker.tsx` | Add XP event insertion after game results save |
+| `src/pages/Profile.tsx` | Add inline username editing with save to database |
+| **Database migration** | Add INSERT RLS policy on `xp_events` for `auth.uid()` |
