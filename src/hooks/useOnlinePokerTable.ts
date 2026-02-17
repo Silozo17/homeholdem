@@ -57,6 +57,7 @@ interface UseOnlinePokerTableReturn {
   sendChat: (text: string) => void;
   autoStartAttempted: boolean;
   handHasEverStarted: boolean;
+  onBlindsUp: (callback: (payload: any) => void) => void;
 }
 
 export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn {
@@ -87,6 +88,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [handHasEverStarted, setHandHasEverStarted] = useState(false);
   const startHandRef = useRef<() => Promise<void>>(null as any);
   const autoStartRetriesRef = useRef(0);
+  const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -294,6 +296,24 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const bubble: ChatBubble = { player_id: payload.player_id, text: payload.text, id };
         setChatBubbles(prev => [...prev, bubble]);
         scheduleBubbleRemoval(id);
+      })
+      .on('broadcast', { event: 'blinds_up' }, ({ payload }) => {
+        // Blinds increased — update table state locally and notify
+        setTableState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            table: {
+              ...prev.table,
+              small_blind: payload.new_small,
+              big_blind: payload.new_big,
+              blind_level: payload.blind_level,
+              last_blind_increase_at: new Date().toISOString(),
+            },
+          };
+        });
+        // Expose via a callback or we'll let the component handle the toast
+        blindsUpCallbackRef.current?.(payload);
       })
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
@@ -567,5 +587,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     sendChat,
     autoStartAttempted,
     handHasEverStarted,
+    onBlindsUp: useCallback((cb: (payload: any) => void) => {
+      blindsUpCallbackRef.current = cb;
+    }, []),
   };
 }

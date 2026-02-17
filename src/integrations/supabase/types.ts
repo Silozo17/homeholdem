@@ -1394,16 +1394,20 @@ export type Database = {
         Row: {
           ante: number
           big_blind: number
+          blind_level: number
           blind_timer_minutes: number
           club_id: string | null
           created_at: string
           created_by: string
           id: string
           invite_code: string | null
+          last_blind_increase_at: string
           max_buy_in: number
           max_seats: number
           min_buy_in: number
           name: string
+          original_big_blind: number | null
+          original_small_blind: number | null
           small_blind: number
           status: Database["public"]["Enums"]["poker_table_status"]
           table_type: Database["public"]["Enums"]["poker_table_type"]
@@ -1413,16 +1417,20 @@ export type Database = {
         Insert: {
           ante?: number
           big_blind?: number
+          blind_level?: number
           blind_timer_minutes?: number
           club_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
           invite_code?: string | null
+          last_blind_increase_at?: string
           max_buy_in?: number
           max_seats?: number
           min_buy_in?: number
           name: string
+          original_big_blind?: number | null
+          original_small_blind?: number | null
           small_blind?: number
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]
@@ -1432,16 +1440,20 @@ export type Database = {
         Update: {
           ante?: number
           big_blind?: number
+          blind_level?: number
           blind_timer_minutes?: number
           club_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
           invite_code?: string | null
+          last_blind_increase_at?: string
           max_buy_in?: number
           max_seats?: number
           min_buy_in?: number
           name?: string
+          original_big_blind?: number | null
+          original_small_blind?: number | null
           small_blind?: number
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]

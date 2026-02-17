@@ -107,6 +107,10 @@ Deno.serve(async (req) => {
         club_id: table_type === "club" ? club_id : null,
         invite_code,
         blind_timer_minutes: [0, 5, 10, 15, 30].includes(blind_timer_minutes) ? blind_timer_minutes : 0,
+        original_small_blind: small_blind,
+        original_big_blind: big_blind,
+        blind_level: 0,
+        last_blind_increase_at: new Date().toISOString(),
       })
       .select()
       .single();

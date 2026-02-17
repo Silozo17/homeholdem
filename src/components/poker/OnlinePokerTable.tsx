@@ -39,6 +39,37 @@ import { Card } from '@/lib/poker/types';
 import { AchievementContext } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
 
+/** Blind timer countdown for multiplayer */
+function OnlineBlindTimer({ lastIncreaseAt, timerMinutes, currentSmall, currentBig }: {
+  lastIncreaseAt: string; timerMinutes: number; currentSmall: number; currentBig: number;
+}) {
+  const [remaining, setRemaining] = useState('');
+  const [isLow, setIsLow] = useState(false);
+  useEffect(() => {
+    const update = () => {
+      const elapsed = Date.now() - new Date(lastIncreaseAt).getTime();
+      const total = timerMinutes * 60000;
+      const left = Math.max(0, total - elapsed);
+      const mins = Math.floor(left / 60000);
+      const secs = Math.floor((left % 60000) / 1000);
+      setRemaining(`${mins}:${secs.toString().padStart(2, '0')}`);
+      setIsLow(left > 0 && left < 60000);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [lastIncreaseAt, timerMinutes]);
+
+  return (
+    <span className={cn(
+      'text-xs font-bold',
+      isLow ? 'text-amber-400 animate-pulse' : 'text-amber-500/80'
+    )}>
+      ⏱ {remaining} → {currentSmall * 2}/{currentBig * 2}
+    </span>
+  );
+}
+
 interface OnlinePokerTableProps {
   tableId: string;
   onLeave: () => void;
@@ -75,7 +106,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
-    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState,
+    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -119,6 +150,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     requestWakeLock();
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
+
+  // Listen for blinds_up broadcast and show toast
+  useEffect(() => {
+    onBlindsUp((payload: any) => {
+      toast({
+        title: '🔺 Blinds Up!',
+        description: `Now ${payload.new_small}/${payload.new_big}`,
+      });
+    });
+  }, [onBlindsUp]);
 
   // Track starting stack when first seated
   useEffect(() => {
@@ -617,6 +658,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </button>
           <span className="text-[10px] font-bold text-foreground/80 truncate max-w-[120px]">{table.name}</span>
           <span className="text-[10px] text-foreground/60 font-medium">{table.small_blind}/{table.big_blind}</span>
+          {table.blind_timer_minutes > 0 && table.last_blind_increase_at && (
+            <OnlineBlindTimer
+              lastIncreaseAt={table.last_blind_increase_at}
+              timerMinutes={table.blind_timer_minutes}
+              currentSmall={table.small_blind}
+              currentBig={table.big_blind}
+            />
+          )}
           {hand && (
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
               style={{

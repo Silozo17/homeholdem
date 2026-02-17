@@ -184,6 +184,11 @@ Deno.serve(async (req) => {
         invite_code: table.invite_code,
         club_id: table.club_id,
         created_by: table.created_by,
+        blind_timer_minutes: table.blind_timer_minutes || 0,
+        blind_level: table.blind_level || 0,
+        original_small_blind: table.original_small_blind || table.small_blind,
+        original_big_blind: table.original_big_blind || table.big_blind,
+        last_blind_increase_at: table.last_blind_increase_at || new Date().toISOString(),
       },
       seats: seatInfo,
       current_hand: currentHand

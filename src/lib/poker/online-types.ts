@@ -17,6 +17,10 @@ export interface OnlineTableInfo {
   club_id: string | null;
   created_by: string;
   blind_timer_minutes: number;
+  blind_level: number;
+  original_small_blind: number;
+  original_big_blind: number;
+  last_blind_increase_at: string;
 }
 
 export interface OnlineSeatInfo {
