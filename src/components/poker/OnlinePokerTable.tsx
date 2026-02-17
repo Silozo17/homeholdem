@@ -4,6 +4,8 @@ import { WinnerOverlay } from './WinnerOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
+import { PotOddsDisplay } from './PotOddsDisplay';
+import { PreActionButtons, PreActionType } from './PreActionButtons';
 import { BettingControls } from './BettingControls';
 import { PlayerSeat } from './PlayerSeat';
 import { SeatAnchor } from './SeatAnchor';
@@ -88,6 +90,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [dealing, setDealing] = useState(false);
   const [lowTimeWarning, setLowTimeWarning] = useState(false);
   const [visibleCommunityCards, setVisibleCommunityCards] = useState<Card[]>([]);
+  const [preAction, setPreAction] = useState<PreActionType>(null);
+  const prevBetRef = useRef<number>(0);
   const stagedRunoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const prevCommunityCountRef = useRef(0);
   const prevHandIdRef = useRef<string | null>(null);
@@ -147,16 +151,54 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [currentPhase]);
 
-  // Your turn: sound + haptic
+  // Your turn: sound + haptic + pre-action execution
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurnRef.current) {
-      play('yourTurn');
-      haptic('cardReveal'); // distinct from the old generic vibrate
-      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+      // Execute queued pre-action
+      if (preAction) {
+        const executePreAction = async () => {
+          let actionToFire: { type: string; amount?: number } | null = null;
+          if (preAction === 'check_fold') {
+            actionToFire = canCheck ? { type: 'check' } : { type: 'fold' };
+          } else if (preAction === 'call_any') {
+            actionToFire = canCheck ? { type: 'check' } : { type: 'call' };
+          } else if (preAction === 'check') {
+            if (canCheck) actionToFire = { type: 'check' };
+          }
+          setPreAction(null);
+          if (actionToFire) {
+            haptic(actionToFire.type as any);
+            await handleAction(actionToFire);
+            return; // Skip turn notification since we auto-acted
+          }
+        };
+        executePreAction();
+      } else {
+        play('yourTurn');
+        haptic('cardReveal');
+        if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+      }
     }
     prevIsMyTurnRef.current = isMyTurn;
     if (!isMyTurn) setLowTimeWarning(false);
-  }, [isMyTurn, play, haptic]);
+  }, [isMyTurn, play, haptic, preAction, canCheck]);
+
+  // Clear pre-action on new hand
+  useEffect(() => {
+    const currentHandId = tableState?.current_hand?.hand_id ?? null;
+    if (currentHandId) {
+      setPreAction(null);
+    }
+  }, [tableState?.current_hand?.hand_id]);
+
+  // Invalidate pre-action "check" if a bet comes in
+  useEffect(() => {
+    const currentBet = tableState?.current_hand?.current_bet ?? 0;
+    if (preAction === 'check' && currentBet > prevBetRef.current && currentBet > 0) {
+      setPreAction(null);
+    }
+    prevBetRef.current = currentBet;
+  }, [tableState?.current_hand?.current_bet, preAction]);
 
   useEffect(() => {
     if (error && (error.includes('fetch') || error.includes('network') || error.includes('Failed'))) {
@@ -570,8 +612,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
           {/* Pot display */}
           {totalPot > 0 && (
-            <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '20%', zIndex: Z.CARDS }}>
+            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5" style={{ top: '20%', zIndex: Z.CARDS }}>
               <PotDisplay pot={totalPot} />
+              <PotOddsDisplay pot={totalPot} amountToCall={amountToCall} visible={isMyTurn && amountToCall > 0} />
             </div>
           )}
 
@@ -768,10 +811,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const screenIdx = ((seatInfo.seat - heroSeatNum) + maxSeats) % maxSeats;
             const pos = positions[screenIdx];
             if (!pos) return null;
+            // Detect single-emoji messages for animated emote display
+            const isSingleEmoji = /^\p{Emoji}$/u.test(bubble.text);
             return (
               <div
                 key={bubble.id}
-                className="absolute animate-float-up pointer-events-none"
+                className={cn('absolute pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
                 style={{
                   left: `${pos.xPct}%`,
                   top: `${pos.yPct - 12}%`,
@@ -779,16 +824,22 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   zIndex: Z.EFFECTS + 5,
                 }}
               >
-                <span className="text-sm px-2 py-1 rounded-lg font-bold"
-                  style={{
-                    background: 'hsl(0 0% 0% / 0.7)',
-                    color: 'hsl(45 30% 95%)',
-                    border: '1px solid hsl(43 74% 49% / 0.3)',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                  }}
-                >
-                  {bubble.text}
-                </span>
+                {isSingleEmoji ? (
+                  <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
+                    {bubble.text}
+                  </span>
+                ) : (
+                  <span className="text-sm px-2 py-1 rounded-lg font-bold"
+                    style={{
+                      background: 'hsl(0 0% 0% / 0.7)',
+                      color: 'hsl(45 30% 95%)',
+                      border: '1px solid hsl(43 74% 49% / 0.3)',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                    }}
+                  >
+                    {bubble.text}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -947,6 +998,24 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           </div>
         )
+      )}
+
+      {/* Pre-action buttons — shown when NOT the player's turn */}
+      {!showActions && isSeated && hand && mySeat && mySeat.status !== 'folded' && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2"
+          style={{
+            zIndex: Z.ACTIONS,
+            bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'max(env(safe-area-inset-bottom, 0px), 14px)',
+          }}
+        >
+          <PreActionButtons
+            canPreCheck={canCheck}
+            amountToCall={amountToCall}
+            onQueue={setPreAction}
+            queued={preAction}
+          />
+        </div>
       )}
 
       {/* Spectator overlay */}
