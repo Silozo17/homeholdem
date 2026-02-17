@@ -142,6 +142,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const stagedRunoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const prevCommunityCountRef = useRef(0);
   const prevAnimHandIdRef = useRef<string | null>(null);
+  const processedActionsRef = useRef(new Set<string>());
   const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
   const winStreakRef = useRef(0);
@@ -259,6 +260,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!hand || !lastActions) return;
     const seats = tableState?.seats ?? [];
     for (const [playerId, actionStr] of Object.entries(lastActions)) {
+      const actionKey = `${playerId}:${actionStr}:${hand.hand_id}`;
+      if (processedActionsRef.current.has(actionKey)) continue;
+      processedActionsRef.current.add(actionKey);
       const seat = seats.find(s => s.player_id === playerId);
       if (seat) {
         recordAction({
@@ -358,10 +362,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Voice: detect all-in from lastActions
   useEffect(() => {
     if (!lastActions) return;
-    for (const [, actionStr] of Object.entries(lastActions)) {
+    const handId = tableState?.current_hand?.hand_id ?? '';
+    for (const [playerId, actionStr] of Object.entries(lastActions)) {
       if (actionStr === 'all_in' || actionStr === 'all-in') {
-        announceCustom("All in! We have an all in!");
-        break;
+        const key = `voice:${playerId}:${actionStr}:${handId}`;
+        if (!processedActionsRef.current.has(key)) {
+          processedActionsRef.current.add(key);
+          announceCustom("All in! We have an all in!");
+          break;
+        }
       }
     }
   }, [lastActions, announceCustom]);
@@ -549,6 +558,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId && currentHandId !== prevAnimHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
       setDealing(true);
+      processedActionsRef.current.clear();
       const timer = setTimeout(() => setDealing(false), 4500);
       prevAnimHandIdRef.current = currentHandId;
       return () => clearTimeout(timer);
