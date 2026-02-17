@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe } from 'lucide-react';
+import { COUNTRIES, isoToEmoji } from '@/lib/countries';
+import { CountrySelector } from '@/components/profile/CountrySelector';
 import { toast } from '@/hooks/use-toast';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -25,6 +27,7 @@ interface ProfileData {
   email: string | null;
   avatar_url: string | null;
   created_at: string;
+  country_code: string | null;
 }
 
 interface ClubMembership {
@@ -67,6 +70,7 @@ export default function Profile() {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [editingCountry, setEditingCountry] = useState(false);
   const { isAdmin } = useIsAppAdmin();
   const levelData = usePlayerLevel(user?.id);
 
@@ -309,6 +313,44 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {profile?.created_at ? t('profile.member_since', { date: format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) }) : ''}
                 </p>
+                {/* Country row */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  {editingCountry ? (
+                    <CountrySelector
+                      value={profile?.country_code ?? null}
+                      onChange={async (code) => {
+                        if (!user) return;
+                        const { error } = await supabase
+                          .from('profiles')
+                          .update({ country_code: code })
+                          .eq('id', user.id);
+                        if (!error) {
+                          setProfile((prev) => prev ? { ...prev, country_code: code } : prev);
+                        }
+                        setEditingCountry(false);
+                      }}
+                      className="h-7 text-xs"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingCountry(true)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {profile?.country_code ? (
+                        <>
+                          <span className="text-sm leading-none">{isoToEmoji(profile.country_code)}</span>
+                          <span>{COUNTRIES.find((c) => c.code === profile.country_code)?.name ?? profile.country_code}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="h-3.5 w-3.5" />
+                          <span>Set country</span>
+                        </>
+                      )}
+                      <Pencil className="h-3 w-3 opacity-50" />
+                    </button>
+                  )}
+                </div>
                 {levelData && (
                   <div className="mt-2">
                     <div className="flex items-center gap-2">

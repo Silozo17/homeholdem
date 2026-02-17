@@ -10,6 +10,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PushNotificationPrompt } from "@/components/pwa/PushNotificationPrompt";
+import { CountryGate } from "@/components/profile/CountryGate";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ClubDetail from "./pages/ClubDetail";
@@ -50,6 +51,7 @@ const App = () => (
             <BrowserRouter>
               <ScrollToTop />
               <PushNotificationPrompt />
+              <CountryGate />
               <AppLayout>
                 <Routes>
                   <Route path="/" element={<Index />} />
