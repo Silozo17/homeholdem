@@ -159,6 +159,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       if (handActive) {
         // Mid-hand: only update table metadata; seats/hand come from broadcasts only
         // If prev is null mid-hand (shouldn't happen), skip entirely — don't blank UI
+        if (typeof window !== 'undefined' && window.location.search.includes('debug=1')) {
+          console.log(`[DEBUG] refreshState mid-hand SKIPPED seats/hand replacement. phase=${currentPhase}`);
+        }
         setTableState(prev => prev ? { ...prev, table: data.table } : prev);
       } else {
         // No active hand OR phase === 'complete': full replacement is safe
@@ -295,6 +298,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           if (handActive) {
             // Mid-hand join: add seat locally as sitting_out with has_cards=false
             // Do NOT refreshState — it would replace the active hand's seat array
+            if (typeof window !== 'undefined' && window.location.search.includes('debug=1')) {
+              console.log(`[DEBUG] seat_change join mid-hand: seat=${payload.seat} has_cards=false status=sitting_out`);
+            }
             setTableState(prev => {
               if (!prev) return prev;
               return {

@@ -168,6 +168,10 @@ Deno.serve(async (req) => {
             }
 
             // Broadcast
+            // Fetch hole card ownership for has_cards accuracy
+            const { data: hcRows1 } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
+            const hcSet1 = new Set((hcRows1 || []).map((r: any) => r.player_id));
+
             const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", seatStates.filter(s => s.player_id).map(s => s.player_id!));
             const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
@@ -198,7 +202,7 @@ Deno.serve(async (req) => {
                     status: s.status,
                     current_bet: 0,
                     last_action: null,
-                    has_cards: s.status !== "folded",
+                    has_cards: hcSet1.has(s.player_id) && s.status !== "folded",
                   };
                 }),
                 action_deadline: null,
@@ -306,8 +310,12 @@ Deno.serve(async (req) => {
 
         // Broadcast updated game state
         const playerIds = seatStates.filter(s => s.player_id).map(s => s.player_id!);
-        const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds);
+        const [{ data: profiles }, { data: hcRows2 }] = await Promise.all([
+          admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds),
+          admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id),
+        ]);
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const hcSet2 = new Set((hcRows2 || []).map((r: any) => r.player_id));
 
         const publicState = {
           hand_id: hand.id,
@@ -334,7 +342,7 @@ Deno.serve(async (req) => {
               status: s.status,
               current_bet: 0,
               last_action: s.player_id === actorSeat.player_id ? "fold" : null,
-              has_cards: s.status !== "folded",
+              has_cards: hcSet2.has(s.player_id!) && s.status !== "folded",
             };
           }),
           action_deadline: actionDeadline,
@@ -369,16 +377,32 @@ Deno.serve(async (req) => {
     }
 
     // ── 2. Auto-kick players with 2+ consecutive timeouts ──
+    // P0-D: Only kick players with 2+ consecutive timeouts AND no active hand on their table
     const { data: timeoutSeats } = await admin
       .from("poker_seats")
       .select("id, table_id, player_id, seat_number, consecutive_timeouts")
-      .gte("consecutive_timeouts", 1)
+      .gte("consecutive_timeouts", 2)
       .not("player_id", "is", null);
 
     const kickResults: any[] = [];
     for (const seat of timeoutSeats || []) {
       try {
-        console.log(`Auto-kicking player ${seat.player_id} from table ${seat.table_id} (${seat.consecutive_timeouts} timeouts)`);
+        // Check if there's an active hand on this table — if so, defer kick
+        const { data: activeHandForTable } = await admin
+          .from("poker_hands")
+          .select("id")
+          .eq("table_id", seat.table_id)
+          .is("completed_at", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (activeHandForTable) {
+          console.log(`[CHECK-TIMEOUTS] Skipping kick for ${seat.player_id} — hand active on table ${seat.table_id}`);
+          kickResults.push({ player_id: seat.player_id, table_id: seat.table_id, status: "deferred_active_hand" });
+          continue;
+        }
+
+        console.log(`[CHECK-TIMEOUTS] Auto-kicking player ${seat.player_id} from table ${seat.table_id} (${seat.consecutive_timeouts} timeouts)`);
 
         // Clear the seat directly
         await admin
