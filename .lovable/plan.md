@@ -1,70 +1,69 @@
 
 
-# Fix Deal Animation Sync and Button Timing
+# Fix: Prevent Mid-Game Player Inclusion (Critical Bug)
 
-## Problem Summary
+## Root Cause
 
-Three timing issues cause the buttons to appear before cards are visible and the deal animation to feel out of sync:
+In `poker-join-table/index.ts` (line 142-151), when a player joins and no hand is currently active, they get `status: "active"` immediately. Then when `poker-start-hand` fires (auto-triggered ~1.2s later by the leader client), it queries all seats with `status: "active"` and deals cards to ALL of them -- including players who literally just sat down a fraction of a second ago.
 
-1. **Action buttons appear too early** -- they show as soon as deal sprites finish flying, but the card reveal animation (the flip from face-down to face-up) takes an additional 0.45s after that. Players see Fold/Check/Raise before they can even see their cards.
+The 3-second guard (lines 228-237 in `poker-start-hand`) was designed to prevent this, but it ONLY transitions `sitting_out` players to `active`. Players who were inserted as `active` from the start bypass this guard entirely.
 
-2. **Deal sprite order doesn't match card reveal order** -- the flying card-back sprites use clockwise-from-dealer order, but the actual card reveal in each PlayerSeat uses plain screen order. So the sprite lands on a player at one time but their card flips at a completely different time.
+This is the exact scenario the user reported: Matt R and Kadokyourdad joined between hands, got `active` status instantly, and were dealt into the next hand.
 
-3. **Sprites fly too fast** -- at 0.12s stagger, the first card lands at 0.45s. The server data for your cards may not have arrived yet, causing the first card to stay face-down while the second card reveals correctly.
+## Fix (2 changes, both server-side)
 
-## Fixes
+### Change 1: Always insert as `sitting_out` in `poker-join-table`
 
-### Fix 1: Slow down deal sprite stagger (0.12s to 0.15s)
+**File:** `supabase/functions/poker-join-table/index.ts`, lines 142-151
 
-**File:** `src/components/poker/OnlinePokerTable.tsx`, line 1186
+Remove the active hand check entirely. Always insert new players as `sitting_out`, regardless of whether a hand is in progress. The `poker-start-hand` function is responsible for activating players at the right time.
 
-Change the sprite stagger from `0.12` to `0.15`. This:
-- Gives the deal animation a more natural, deliberate pace
-- Ensures myCards data arrives before the first card reveal
-- Makes the visual dealing feel more like a real dealer
-
-Also update lines 652-654 (`dealDurationMs` and `visualMs`) to use `0.15` to match.
-
-### Fix 2: Match PlayerSeat deal order to sprite clockwise order
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`, lines 1253-1259
-
-Currently `seatDealOrder` is computed as `activeScreenPositions.indexOf(screenPos)` (screen order). Change it to use a pre-computed `clockwiseOrder` array (the same one the dealing sprites use). This ensures the card reveal timing in PlayerSeat perfectly matches when the dealing sprite arrives.
-
-Compute `clockwiseOrder` once (memoized) and pass the correct index to each PlayerSeat.
-
-### Fix 3: Update PlayerSeat stagger to match (0.12 to 0.15)
-
-**File:** `src/components/poker/PlayerSeat.tsx`, line ~97
-
-Change `* 0.12` to `* 0.15` in the `dealDelay` calculation so the card reveal timing uses the same stagger as the sprites.
-
-### Fix 4: Gate action buttons on card reveal completion
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`, line 847
-
-Add `!dealing` to the `showActions` condition. Currently it only checks `dealAnimDone`, but `dealAnimDone` fires when sprites finish -- not when card reveals finish. Adding `!dealing` ensures we wait for the full visual sequence (sprites + reveals) to complete before showing buttons.
-
-Updated condition:
 ```
-const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
+// BEFORE (line 151):
+const initialStatus = activeHand ? "sitting_out" : "active";
+
+// AFTER:
+const initialStatus = "sitting_out";
 ```
 
-## Summary of Changes
+This also means we can delete the `activeHand` query (lines 142-149) since it's no longer needed.
+
+### Change 2: Always respect the 3-second cooldown in `poker-start-hand`
+
+**File:** `supabase/functions/poker-start-hand/index.ts`, lines 240-246
+
+Add a `joined_at` filter to the active seats query so that even if a player somehow has `active` status, they won't be included if they joined less than 3 seconds ago. This is a defence-in-depth measure.
+
+```sql
+-- Current query (line 240-246):
+SELECT * FROM poker_seats
+WHERE table_id = ? AND status = 'active' AND player_id IS NOT NULL
+ORDER BY seat_number
+
+-- Updated query adds:
+AND joined_at < (now - 3 seconds)
+```
+
+The sitting_out activation query (lines 228-237) already has this guard -- we just need to add it to the active seats fetch too.
+
+## Impact on First Game Start
+
+When 2 players first sit down at an empty table, both will be `sitting_out`. The `poker-start-hand` activation logic (line 228-237) will transition them to `active` after 3 seconds. The auto-start timer fires at ~1.2s, which is before the 3s cutoff -- so the first auto-start attempt will find fewer than 2 active players and return "Need at least 2 players". The retry logic (up to 3 retries with fallbacks at 3.5s and 6s) will catch this on the second attempt. The manual "Start Game" button will also work after 3 seconds.
+
+This is a minor UX trade-off (3-second wait for the very first hand) but eliminates the critical bug entirely.
+
+## Summary
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` (line 652-654) | Update dealDurationMs/visualMs to use 0.15 stagger |
-| `src/components/poker/OnlinePokerTable.tsx` (line 847) | Add `!dealing` to showActions gate |
-| `src/components/poker/OnlinePokerTable.tsx` (lines 1186) | Change sprite stagger from 0.12 to 0.15 |
-| `src/components/poker/OnlinePokerTable.tsx` (lines 1253-1259) | Use clockwise deal order for seatDealOrder prop |
-| `src/components/poker/PlayerSeat.tsx` (line ~97) | Change card reveal stagger from 0.12 to 0.15 |
+| `supabase/functions/poker-join-table/index.ts` | Always insert as `sitting_out`; remove activeHand query |
+| `supabase/functions/poker-start-hand/index.ts` | Add `joined_at < 3s ago` filter to active seats query |
 
 ## What Does NOT Change
 
-- No layout, navigation, spacing, or style changes
-- No BottomNav changes
-- No database or edge function changes
-- No refactoring or renaming
-- BettingControls component unchanged
-- Game logic, pot calculations unchanged
+- No client code changes
+- No layout, navigation, or UI changes
+- No database schema changes
+- No other edge functions modified
+- Game logic, pot calculations, deal animations all unchanged
+
