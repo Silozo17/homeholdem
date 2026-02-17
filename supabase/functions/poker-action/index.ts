@@ -377,8 +377,7 @@ async function processAction(
   if (nonFolded.length <= 1) {
     handComplete = true;
     newPhase = "complete";
-  } else if (activePlayers.length === 0 || 
-             (activePlayers.length === 1 && allInPlayers.length > 0)) {
+  } else if (activePlayers.length === 0) {
     // All remaining players are all-in — run out community cards
     roundComplete = true;
   } else {
