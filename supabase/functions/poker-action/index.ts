@@ -446,20 +446,33 @@ async function processAction(
 
     // Evaluate hands
     const pots = calculatePots(seatStates);
-    const playerHands: { player_id: string; hand: HandResult }[] = [];
+    const playerHands: { player_id: string; hand: HandResult; holeCards: Card[] }[] = [];
 
     for (const sc of (showdownCards || [])) {
       const playerState = seatStates.find(s => s.player_id === sc.player_id);
       if (!playerState || playerState.status === "folded") continue;
 
       try {
-        const allCards = [...(sc.cards as Card[]), ...communityCards];
+        const holeCards = sc.cards as Card[];
+        const allCards = [...holeCards, ...communityCards];
         const handResult = evaluateHand(allCards);
-        playerHands.push({ player_id: sc.player_id, hand: handResult });
+        playerHands.push({ player_id: sc.player_id, hand: handResult, holeCards });
+        console.log(`[SHOWDOWN] player=${sc.player_id} hole=${JSON.stringify(holeCards)} hand=${handResult.name} score=${handResult.score}`);
       } catch (e) {
         console.error(`Failed to evaluate hand for ${sc.player_id}:`, e);
       }
     }
+
+    // Safety: warn on score collision with different hand names
+    for (let i = 0; i < playerHands.length; i++) {
+      for (let j = i + 1; j < playerHands.length; j++) {
+        if (playerHands[i].hand.score === playerHands[j].hand.score && playerHands[i].hand.name !== playerHands[j].hand.name) {
+          console.warn(`[SHOWDOWN WARNING] Score collision: ${playerHands[i].player_id} (${playerHands[i].hand.name}) vs ${playerHands[j].player_id} (${playerHands[j].hand.name}) both score=${playerHands[i].hand.score}`);
+        }
+      }
+    }
+
+    console.log(`[SHOWDOWN] community=${JSON.stringify(communityCards)}`);
 
     // Distribute pots
     const winners: any[] = [];
@@ -485,7 +498,15 @@ async function processAction(
       }
     }
 
-    results = { winners, pots };
+    // Build audit trail
+    const hand_details = playerHands.map(ph => ({
+      player_id: ph.player_id,
+      hole_cards: ph.holeCards,
+      hand_name: ph.hand.name,
+      score: ph.hand.score,
+    }));
+
+    results = { winners, pots, hand_details, community_cards: communityCards };
     handComplete = true;
     newPhase = "complete";
     deckSeedRevealed = hand.deck_seed_internal;
