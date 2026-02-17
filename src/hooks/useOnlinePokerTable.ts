@@ -605,34 +605,28 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     scheduleBubbleRemoval(id);
   }, [userId, scheduleBubbleRemoval]);
 
-  // All seated players poll for timeouts (leader every 8s, others every 12s with random offset)
+  // Leader-only timeout polling (8s interval)
   useEffect(() => {
-    if (!mySeatNumber || !tableId) return;
-    const pollInterval = isAutoStartLeader ? 8000 : 12000;
-    const initialDelay = isAutoStartLeader ? 0 : Math.floor(Math.random() * 4000);
-    const startPolling = () => {
-      timeoutPollRef.current = setInterval(async () => {
-        const currentState = tableStateRef.current;
-        const currentHand = currentState?.current_hand;
-        if (!currentHand?.action_deadline) return;
-        const deadline = new Date(currentHand.action_deadline).getTime();
-        if (Date.now() > deadline + 3000) {
-          try {
-            await callEdge('poker-check-timeouts', { table_id: tableId });
-            refreshState();
-          } catch {}
-        }
-      }, pollInterval);
-    };
-    const delayTimer = setTimeout(startPolling, initialDelay);
+    if (!isAutoStartLeader || !tableId) return;
+    timeoutPollRef.current = setInterval(async () => {
+      const currentState = tableStateRef.current;
+      const currentHand = currentState?.current_hand;
+      if (!currentHand?.action_deadline) return;
+      const deadline = new Date(currentHand.action_deadline).getTime();
+      if (Date.now() > deadline + 3000) {
+        try {
+          await callEdge('poker-check-timeouts', { table_id: tableId });
+          refreshState();
+        } catch {}
+      }
+    }, 8000);
     return () => {
-      clearTimeout(delayTimer);
       if (timeoutPollRef.current) {
         clearInterval(timeoutPollRef.current);
         timeoutPollRef.current = null;
       }
     };
-  }, [mySeatNumber, isAutoStartLeader, tableId, refreshState]);
+  }, [isAutoStartLeader, tableId, refreshState]);
 
   return {
     tableState,
