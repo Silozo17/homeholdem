@@ -261,7 +261,18 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             hand_name: w.hand_name || '',
           };
         });
-        setHandWinners(winners);
+
+        // Detect all-in runout: community cards jumped to 5 from < 3
+        const prevCommunityCount = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
+        const incomingCommunityCount = (payload.community_cards || []).length;
+        const isRunout = prevCommunityCount < 3 && incomingCommunityCount >= 5;
+        const winnerDelay = isRunout ? 4000 : 0;
+
+        if (winnerDelay > 0) {
+          setTimeout(() => setHandWinners(winners), winnerDelay);
+        } else {
+          setHandWinners(winners);
+        }
 
         setTableState(prev => {
           if (!prev) return prev;
@@ -354,14 +365,16 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   // Fetch my cards when a new hand starts
   useEffect(() => {
     if (!hand?.hand_id || !userId || mySeatNumber === null) return;
-    (async () => {
+    // Delay setting myCards by 800ms so the deal animation sprites start flying first
+    const timer = setTimeout(async () => {
       try {
         const data = await callEdge('poker-my-cards', { hand_id: hand.hand_id }, 'GET');
         setMyCards(data.hole_cards || null);
       } catch {
         // not in hand
       }
-    })();
+    }, 800);
+    return () => clearTimeout(timer);
   }, [hand?.hand_id, userId, mySeatNumber]);
 
   // Timeout auto-ping
