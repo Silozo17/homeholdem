@@ -17,7 +17,7 @@ const sizeClasses = {
   sm: 'w-7 h-10',
   md: 'w-10 h-14',
   lg: 'w-10 h-[58px]',
-  xl: 'w-[50px] h-[72px]',
+  xl: 'w-[44px] h-[62px]',
   '2xl': 'w-[96px] h-[136px]',
 };
 
@@ -48,7 +48,7 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
     sm: { rank: 'text-[9px]', suit: 'text-[8px]', center: 'text-sm' },
     md: { rank: 'text-[11px]', suit: 'text-[10px]', center: 'text-lg' },
     lg: { rank: 'text-base', suit: 'text-sm', center: 'text-3xl' },
-    xl: { rank: 'text-xl', suit: 'text-base', center: 'text-5xl' },
+    xl: { rank: 'text-base', suit: 'text-sm', center: 'text-3xl' },
     '2xl': { rank: 'text-lg', suit: 'text-base', center: 'text-4xl' },
   };
 
