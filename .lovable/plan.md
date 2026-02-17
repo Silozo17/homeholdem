@@ -1,79 +1,86 @@
 
 
-# Redesign: Cards ON TOP of Avatar (Matching Reference)
+# Pixel-Perfect Player Profile Redesign
 
-## Clarification of Layout
+## Detailed Analysis: Reference vs Current
 
-The reference image shows cards **overlaying / in front of** the avatar, not behind it. The avatar peeks out from underneath the cards. This is the opposite of what was previously attempted.
+After examining the reference image closely, here are all the differences that need to be fixed:
 
-### Visual Layout (from reference)
+### 1. Avatar Frame -- WRONG STYLE
+**Reference:** Thick dark charcoal/metallic ring border (dark grey, almost black)
+**Current:** Colorful gradient border with bright colors (`3px solid color-mix(in srgb, ${color} 60%, white)`)
+**Fix:** Replace the colorful border with a thick (4px) dark charcoal border (`hsl(0 0% 15%)`) with a subtle inner shadow for the metallic look.
+
+### 2. Cards -- Z-ORDER PARTIALLY WRONG
+**Reference:** Cards are in front of the avatar BUT behind the nameplate bar. The nameplate overlaps both the avatar and the card bottoms.
+**Current:** Cards are at `zIndex: 3`, nameplate has no z-index (defaults to auto). Both cards and nameplate are siblings.
+**Fix:** Keep cards at `zIndex: 3`. Raise the nameplate to `zIndex: 4` so it paints on top of the card bottoms, matching the reference where the nameplate covers the lower portion.
+
+### 3. Nameplate -- WRONG SHAPE AND POSITION
+**Reference:** Wide, fully rounded pill shape (rounded on all sides, not just bottom). It overlaps/connects with the bottom of the avatar circle -- no gap. Contains "You" (white, centered) and "93,240" (white/light, centered) on two lines.
+**Current:** Only rounded at the bottom (`rounded-b-lg`), has a `mt-0.5` gap, uses `borderTop: none`. Name is gold for hero.
+**Fix:** Make the nameplate a full rounded pill (`rounded-full` or `rounded-xl`), remove the top gap by using negative margin (`-mt-3`) so it tucks under the avatar. Make all text white (not gold). Widen it slightly. Set `zIndex: 4` so it sits in front of cards.
+
+### 4. Level Badge -- MISSING FIRE ANIMATION
+**Reference:** The "19" badge has orange/red flames radiating outward around it -- an animated fire effect.
+**Current:** Plain dark circle with a thin gold border. No animation.
+**Fix:** Add a CSS keyframe animation that creates a pulsing fire/ember glow effect around the badge. Use an orange-red radial gradient or box-shadow animation to simulate flames. The badge itself stays the same (dark circle, white number), but gets a glowing animated ring.
+
+### 5. Country Flag -- MISSING
+**Reference:** Small rectangular Union Jack at the avatar's bottom-right.
+**Current:** Not implemented at all.
+**Fix:** Create a `CountryFlag.tsx` component using emoji flags (converting 2-letter ISO code to regional indicator emoji). Position absolute at bottom-right of the avatar, same size as the level badge. Add `country_code` column to profiles table.
+
+### 6. Status Dot -- SHOULD BE REMOVED
+**Reference:** No green/red status dot visible.
+**Current:** A colored status dot at bottom-right.
+**Fix:** Remove the status dot from `PlayerAvatar.tsx`. The bottom-right position is now taken by the country flag.
+
+## Files to Change
+
+### `src/components/poker/PlayerAvatar.tsx`
+- Replace colorful gradient border with dark charcoal metallic border
+- Remove the status dot (bottom-right)
+- Add `countryCode` prop
+- Render `CountryFlag` at bottom-right (where status dot was)
+- Keep `LevelBadge` at bottom-left
+
+### `src/components/common/LevelBadge.tsx`
+- Add animated fire/ember glow effect using CSS keyframes
+- Keep the badge itself the same (dark circle, gold border, white number)
+- Add pulsing orange/red shadow animation around the badge
+
+### `src/components/poker/PlayerSeat.tsx`
+- **Nameplate:** Change to full rounded pill shape, negative top margin to overlap avatar bottom, set `zIndex: 4` (above cards)
+- **Text colors:** All white (remove gold color for hero name)
+- **Nameplate width:** Wider `min-w-[90px]`
+
+### `src/components/poker/CountryFlag.tsx` (NEW)
+- Takes `countryCode` (2-letter ISO) prop
+- Renders flag emoji in a small container
+- Positioned absolute bottom-right of avatar
+
+### `tailwind.config.ts`
+- Add `fire-glow` keyframe animation for the level badge ember effect
+
+### Database
+- Add `country_code TEXT` column to `profiles` table
+
+## Technical: Z-Index Layering (Fixed)
 
 ```text
-         ┌─────────┐  ┌─────────┐
-         │  Card 1  │  │  Card 2  │    <-- Cards IN FRONT, on top of avatar
-         │ (tilted) │  │ (tilted) │        z-index HIGHER than avatar
-         └───┬──────┘  └──────┬───┘
-             │    ┌──────┐    │
-             └────│Avatar│────┘       <-- Avatar BEHIND cards
-                  │(photo│
-            [19]  │  /   │  [flag]
-                  └──┬───┘
-              ┌──────┴──────┐
-              │    "You"    │          <-- Dark nameplate
-              │   93,240    │
-              └─────────────┘
+Layer 1 (z-[1]): Avatar body (profile pic)
+Layer 2 (z-[2]): Active player gold ring / All-in ring
+Layer 3 (z-[3]): Cards (fanned on top of avatar)
+Layer 4 (z-[4]): Nameplate bar (on top of everything)
+Layer 10 (z-[10]): Level badge + Country flag (on avatar edge)
 ```
 
-### States
-
-- **Hero (current user):** Always sees cards on top of their avatar
-- **Opponents during play:** Only avatar + nameplate visible (no cards)
-- **Opponents at showdown:** Cards appear on top of their avatar (same layout as hero)
-- **Folded/Eliminated:** Greyed out, no cards
-
-## Changes in `PlayerSeat.tsx`
-
-### 1. Reposition cards ON TOP of avatar
-
-Both `humanCards` and `opponentShowdownCards` will be rendered **after** the avatar in the DOM and given a **higher z-index** (`z-[3]`), so they paint on top of the profile picture.
-
-Cards will be:
-- Absolutely positioned, centered on the avatar
-- Offset upward so they overlap the top ~60% of the avatar circle (the bottom of the cards aligns roughly with the avatar center)
-- Fanned with ~10-12 degree tilt (currently only 3 degrees -- increase for the dramatic fan in the reference)
-- Slightly overlapping each other (negative margin)
-
-### 2. Unify card rendering for hero and opponents
-
-Both hero and opponent cards use the same positioning logic (centered on avatar, fanned, on top). The only differences:
-- Hero: sequential deal reveal animation
-- Opponents: only visible at showdown with flip animation
-
-### 3. Specific code changes
-
-**Human cards block (lines 88-106):**
-- Change `zIndex: 1` to `zIndex: 3` (on top of avatar which is z-[2])
-- Change positioning from `bottom: calc(30% + 9px)` to `top: -30%` (cards peek above the avatar)
-- Change `left-1/2 -translate-x-1/2` centering to be relative to the avatar container
-- Increase rotation from 3deg to ~10deg for each card
-
-**Opponent showdown cards block (lines 71-85):**
-- Keep `zIndex: 2` or raise to `3` (already overlays avatar)
-- Adjust positioning to match the same fan layout as hero cards
-- Increase rotation from 3deg to ~10deg
-
-**Avatar wrapper:**
-- Ensure avatar stays at `z-[1]` or default z so cards paint on top
-
-### 4. Card sizing
-
-Use the same card size for both hero and opponents -- the reference shows large, prominent cards for the hero view. Keep `humanCardSize` (`2xl` / `md` compact) for all visible cards.
-
-## No Other Files Changed
-
-This is purely a z-index and positioning fix within `PlayerSeat.tsx`. The avatar, card display, and other components remain unchanged. The country flag and other redesign elements from the broader plan are separate work.
-
-## File Modified
-
-- `src/components/poker/PlayerSeat.tsx` -- reposition cards to overlay on top of avatar with higher z-index, increase fan angle, unify hero/opponent card layout
+## Summary of Visual Changes
+- Dark metallic avatar frame (no more colorful borders)
+- Cards in front of avatar, behind nameplate
+- Wide pill-shaped nameplate overlapping avatar bottom
+- Fire/ember animation on level badge
+- Country flag at bottom-right of avatar
+- Status dot removed
 
