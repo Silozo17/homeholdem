@@ -41,6 +41,7 @@ import { Card } from '@/lib/poker/types';
 import { AchievementContext } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
 import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
+import { GameStateDebugPanel } from './GameStateDebugPanel';
 
 /** Blind timer countdown for multiplayer */
 function OnlineBlindTimer({ lastIncreaseAt, timerMinutes, currentSmall, currentBig }: {
@@ -1390,6 +1391,20 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Debug panel for Testing tables */}
+      {tableState?.table?.name === 'Testing' && (
+        <GameStateDebugPanel
+          tableState={tableState}
+          myCards={myCards}
+          mySeatNumber={mySeatNumber}
+          isMyTurn={isMyTurn}
+          amountToCall={amountToCall}
+          canCheck={canCheck}
+          actionPending={actionPending}
+          connectionStatus={connectionStatus}
+        />
+      )}
     </div>
   );
 }
