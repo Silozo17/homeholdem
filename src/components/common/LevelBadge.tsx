@@ -21,14 +21,14 @@ export function LevelBadge({ level, size = 'md', className }: LevelBadgeProps) {
   return (
     <span
       className={cn(
-        'absolute -bottom-1 -left-1 z-10 flex items-center justify-center rounded-full font-bold leading-none',
+        'absolute -bottom-1 -left-1 z-10 flex items-center justify-center rounded-full font-bold leading-none animate-fire-glow',
         s.wrapper,
         s.font,
         className,
       )}
       style={{
         background: 'hsl(0 0% 10%)',
-        border: '1.5px solid hsl(43 74% 49%)',
+        border: '1.5px solid hsl(25 85% 50%)',
         color: 'white',
         textShadow: '0 1px 2px rgba(0,0,0,0.6)',
       }}

@@ -129,6 +129,14 @@ export default {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(100%)" },
         },
+        "fire-glow": {
+          "0%, 100%": {
+            boxShadow: "0 0 4px 1px hsl(25 90% 50% / 0.6), 0 0 8px 3px hsl(15 85% 45% / 0.3)",
+          },
+          "50%": {
+            boxShadow: "0 0 6px 2px hsl(30 95% 55% / 0.8), 0 0 12px 5px hsl(10 80% 40% / 0.5)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -136,6 +144,7 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "slide-up": "slide-up 0.4s ease-out",
         "emote-pop": "emote-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "fire-glow": "fire-glow 1.5s ease-in-out infinite",
       },
     },
   },
