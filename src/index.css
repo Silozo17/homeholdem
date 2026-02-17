@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force toasts below safe area on notched devices (Safari inline env() bug workaround) */
+[data-sonner-toaster][data-y-position="top"] {
+  top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
+}
+
 /* Hide scrollbars globally */
 * {
   scrollbar-width: none; /* Firefox */
