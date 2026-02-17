@@ -111,8 +111,21 @@ export function BettingControls({
             </span>
           </div>
         )}
+        {showRaiseSlider && canRaise && (
+          <button
+            className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
+            style={btnStyle(
+              'linear-gradient(180deg, hsl(0 0% 30%), hsl(0 0% 22%))',
+              'hsl(0 0% 35%)',
+              '0 2px 6px rgba(0,0,0,0.2)'
+            )}
+            onClick={() => setShowRaiseSlider(false)}
+          >
+            <X size={12} /> Cancel
+          </button>
+        )}
         <button
-          className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
+          className={`h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all ${showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92]'}`}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             'hsl(0 40% 40%)',
@@ -204,9 +217,24 @@ export function BettingControls({
           </div>
         </div>
       )}
+      {showRaiseSlider && canRaise && (
+        <div className="flex gap-2 w-full">
+          <button
+            className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92]"
+            style={btnStyle(
+              'linear-gradient(180deg, hsl(0 0% 30%), hsl(0 0% 22%))',
+              'hsl(0 0% 35%)',
+              '0 2px 6px rgba(0,0,0,0.2)'
+            )}
+            onClick={() => setShowRaiseSlider(false)}
+          >
+            <X size={14} /> Cancel
+          </button>
+        </div>
+      )}
       <div className="flex gap-2 w-full">
         <button
-          className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
+          className={`flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 ${showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92] active:shadow-none'}`}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             'hsl(0 40% 40%)',
