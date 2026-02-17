@@ -10,7 +10,7 @@ const sizeStyles: Record<string, { wrapper: string; font: string }> = {
   xs: { wrapper: 'w-3.5 h-3.5', font: 'text-[8px]' },
   sm: { wrapper: 'w-3.5 h-3.5', font: 'text-[8px]' },
   md: { wrapper: 'w-4 h-4', font: 'text-[9px]' },
-  lg: { wrapper: 'w-[18px] h-[18px]', font: 'text-[10px]' },
+  lg: { wrapper: 'w-[22px] h-[22px]', font: 'text-[11px]' },
   xl: { wrapper: 'w-[26px] h-[26px]', font: 'text-[13px]' },
   '2xl': { wrapper: 'w-[22px] h-[22px]', font: 'text-[12px]' },
 };

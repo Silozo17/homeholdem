@@ -113,7 +113,7 @@ export const PlayerSeat = memo(function PlayerSeat({
         return (
           <div key={i} style={{
             transform: `rotate(${i === 0 ? -10 : 10}deg)`,
-            marginLeft: i > 0 ? '-18px' : '0',
+            marginLeft: i > 0 ? (compact ? '-14px' : '-18px') : '0',
           }}>
             <CardDisplay
               card={displayCard}
@@ -178,8 +178,9 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Nameplate bar — wide rounded rectangle, overlaps avatar bottom */}
       <div className={cn(
-        'relative flex flex-col items-center rounded-2xl -mt-5',
-        compact ? 'min-w-[68px] px-3 py-0.5' : 'min-w-[120px] px-5 py-1.5',
+      'relative flex flex-col items-center rounded-2xl',
+        compact ? '-mt-4' : '-mt-5',
+        compact ? 'min-w-[100px] px-4 py-1' : 'min-w-[120px] px-5 py-1.5',
       )} style={{
         zIndex: 4,
         background: isTimerActive
@@ -197,12 +198,12 @@ export const PlayerSeat = memo(function PlayerSeat({
           background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.95), hsl(0 0% 5% / 0.9))',
         } : {}}>
           <p className={cn(
-            compact ? 'text-[9px] max-w-[56px]' : 'text-[13px] max-w-[100px]',
+            compact ? 'text-[11px] max-w-[80px]' : 'text-[13px] max-w-[100px]',
             'font-bold truncate leading-tight text-white',
           )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
             {player.name}
           </p>
-          <p className={cn(compact ? 'text-[8px]' : 'text-[12px]', 'text-white/80 font-semibold leading-none')}>
+          <p className={cn(compact ? 'text-[10px]' : 'text-[12px]', 'text-white/80 font-semibold leading-none')}>
             {player.chips.toLocaleString()}
           </p>
         </div>
