@@ -1,8 +1,12 @@
+import { useEffect, useRef } from 'react';
 import { usePokerGame } from '@/hooks/usePokerGame';
 import { PlayPokerLobby } from '@/components/poker/PlayPokerLobby';
 import { PokerTablePro } from '@/components/poker/PokerTablePro';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function PlayPoker() {
+  const { user } = useAuth();
   const {
     state,
     startGame,
@@ -15,6 +19,33 @@ export default function PlayPoker() {
     canCheck,
     maxBet,
   } = usePokerGame();
+
+  // Save results & award XP on game over
+  const savedRef = useRef(false);
+  useEffect(() => {
+    if (state.phase !== 'game_over' || !user?.id || savedRef.current) return;
+    savedRef.current = true;
+    const humanPlayer = state.players.find(p => p.id === 'human');
+    const duration = Math.round((Date.now() - state.startTime) / 1000);
+    supabase.from('poker_play_results').insert({
+      user_id: user.id,
+      game_mode: 'practice',
+      bot_count: state.players.filter(p => p.isBot).length,
+      starting_chips: state.startingChips,
+      final_chips: humanPlayer?.chips ?? 0,
+      hands_played: state.handsPlayed,
+      hands_won: state.handsWon,
+      best_hand_name: state.bestHandName || null,
+      best_hand_rank: state.bestHandRank || null,
+      biggest_pot: state.biggestPot || null,
+      duration_seconds: duration,
+    }).then(() => {});
+  }, [state.phase, user?.id]);
+
+  // Reset saved flag when returning to lobby
+  useEffect(() => {
+    if (state.phase === 'idle') savedRef.current = false;
+  }, [state.phase]);
 
   if (state.phase === 'idle') {
     return <PlayPokerLobby onStart={startGame} />;

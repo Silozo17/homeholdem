@@ -57,12 +57,15 @@ export function AchievementToast({ achievement, onDismiss }: AchievementToastPro
 
   return (
     <div
-      className="absolute left-1/2 -translate-x-1/2 animate-fade-in pointer-events-none"
+      className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
       style={{
         top: 'calc(env(safe-area-inset-top, 0px) + 52px)',
         zIndex: 200,
       }}
     >
+      <div
+        style={{ animation: 'fade-in 0.3s ease-out' }}
+      >
       <div
         className="flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[220px] max-w-[300px]"
         style={{
@@ -103,6 +106,7 @@ export function AchievementToast({ achievement, onDismiss }: AchievementToastPro
             />
           </div>
         )}
+      </div>
       </div>
     </div>
   );

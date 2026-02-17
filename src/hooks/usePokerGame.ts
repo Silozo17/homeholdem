@@ -425,7 +425,14 @@ function reducer(state: GameState, action: Action): GameState {
     case 'NEXT_HAND': {
       const alivePlayers = state.players.filter(p => p.chips > 0);
       if (alivePlayers.length <= 1) {
-        return { ...state, phase: 'game_over' };
+        // Populate lastHandWinners so the game-over overlay shows the winner
+        const gameOverWinners = alivePlayers.map(p => ({
+          playerId: p.id,
+          name: p.name,
+          handName: state.lastHandWinners?.[0]?.handName || 'N/A',
+          chipsWon: p.chips,
+        }));
+        return { ...state, phase: 'game_over', lastHandWinners: gameOverWinners };
       }
 
       // Rotate dealer

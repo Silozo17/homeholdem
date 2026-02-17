@@ -551,12 +551,13 @@
 
 .animate-card-deal-deck { animation: card-deal-from-deck 0.5s ease-out both; }
 
-/* Card arrive — synced pop when deal sprite reaches seat */
+/* Card arrive — fly down from dealer area into seat */
 @keyframes card-arrive {
-  0% { opacity: 0; transform: scale(0.5); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: translateY(-30px) scale(0.5); }
+  70% { opacity: 1; transform: translateY(2px) scale(1.03); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-card-arrive { animation: card-arrive 0.2s ease-out both; }
+.animate-card-arrive { animation: card-arrive 0.35s ease-out both; }
 
 /* Community card deal fly from dealer to center */
 @keyframes deal-card-fly-center {
@@ -565,11 +566,11 @@
   100% { transform: translate(var(--deal-center-dx, 0), var(--deal-center-dy, 0)) scale(1); opacity: 0.9; }
 }
 
-/* Card reveal animation (face-up) */
+/* Card reveal animation (face-up) — community cards fly from dealer */
 @keyframes card-reveal {
-  0% { opacity: 0; transform: scale(0.5) translateY(8px); }
-  60% { opacity: 1; transform: scale(1.08) translateY(-2px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  0% { opacity: 0; transform: translateY(-25px) scale(0.5); }
+  60% { opacity: 1; transform: translateY(2px) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-card-reveal { animation: card-reveal 0.4s ease-out both; }
 

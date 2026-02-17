@@ -518,7 +518,7 @@ export function PokerTablePro({
         <WinnerOverlay winners={winners} isGameOver={false} onNextHand={onNextHand} onQuit={onQuit} />
       )}
       {isGameOver && winners.length > 0 && (
-        <WinnerOverlay winners={winners} isGameOver={true} stats={gameStats} onNextHand={onNextHand} onQuit={onQuit} />
+        <WinnerOverlay winners={winners} isGameOver={true} stats={gameStats} onNextHand={onQuit} onQuit={onQuit} />
       )}
 
       {/* Quit Confirmation Dialog */}
