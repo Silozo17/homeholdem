@@ -168,13 +168,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [error, tableState, loading, onLeave]);
 
-  // Game over detection: human stack hits 0
+  // Game over detection: human stack hits 0 — delayed so winner banner plays out first
   useEffect(() => {
     if (!tableState || !user) return;
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
-      setGameOver(true);
-      setGameOverWinners(handWinners);
+      const timer = setTimeout(() => {
+        setGameOver(true);
+        setGameOverWinners(handWinners);
+      }, 4000);
+      return () => clearTimeout(timer);
     }
   }, [tableState, user, handWinners]);
 

@@ -251,7 +251,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         // Use longer delay when all community cards arrived at once (all-in runout)
         const communityCount = (payload.community_cards || []).length;
-        const showdownDelay = communityCount >= 5 ? 7000 : 3500;
+        const showdownDelay = communityCount >= 5 ? 8500 : 5000;
 
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
