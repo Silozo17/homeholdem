@@ -41,6 +41,7 @@ interface UseOnlinePokerTableReturn {
   lastActions: Record<string, string>;
   handWinners: HandWinner[];
   chatBubbles: ChatBubble[];
+  spectatorCount: number;
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -64,6 +65,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [lastActions, setLastActions] = useState<Record<string, string>>({});
   const [handWinners, setHandWinners] = useState<HandWinner[]>([]);
   const [chatBubbles, setChatBubbles] = useState<ChatBubble[]>([]);
+  const [spectatorCount, setSpectatorCount] = useState(0);
   const channelRef = useRef<any>(null);
   const tableStateRef = useRef<OnlineTableState | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -272,7 +274,22 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         setChatBubbles(prev => [...prev, bubble]);
         scheduleBubbleRemoval(id);
       })
-      .subscribe();
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = channel.presenceState();
+        let spectators = 0;
+        for (const key of Object.keys(presenceState)) {
+          for (const p of presenceState[key] as any[]) {
+            if (p.role === 'spectator') spectators++;
+          }
+        }
+        setSpectatorCount(spectators);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && userId) {
+          const isCurrentlySeated = tableStateRef.current?.seats.some(s => s.player_id === userId) ?? false;
+          await channel.track({ user_id: userId, role: isCurrentlySeated ? 'player' : 'spectator' });
+        }
+      });
 
     channelRef.current = channel;
 
@@ -509,6 +526,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     lastActions,
     handWinners,
     chatBubbles,
+    spectatorCount,
     joinTable,
     leaveTable,
     startHand,

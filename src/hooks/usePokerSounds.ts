@@ -69,7 +69,18 @@ export type PokerSoundEvent =
   | 'win'
   | 'yourTurn'
   | 'timerWarning'
-  | 'fold';
+  | 'fold'
+  | 'achievement';
+
+export type HapticEvent =
+  | 'fold'
+  | 'call'
+  | 'check'
+  | 'raise'
+  | 'allIn'
+  | 'win'
+  | 'cardReveal'
+  | 'deal';
 
 export function usePokerSounds() {
   const ctxRef = useRef<AudioContext | null>(null);
@@ -294,8 +305,36 @@ export function usePokerSounds() {
         playTone(ctx, 1800, 0.04, 0.15 * v, 'sine', true, 0.19);
         break;
       }
+
+      case 'achievement': {
+        // Ascending major chord C-E-G-C with sparkle shimmer
+        const achNotes = [523.25, 659.25, 783.99, 1046.5];
+        achNotes.forEach((f, i) => {
+          playTone(ctx, f, 0.6, 0.22 * v, 'sine', true, i * 0.12);
+          playTone(ctx, f * 2, 0.3, 0.08 * v, 'sine', true, i * 0.12 + 0.05);
+        });
+        // Sparkle shimmer
+        playNoise(ctx, 0.5, 0.1 * v, 8000, 0.3, 1.5);
+        playTone(ctx, 1046.5, 0.8, 0.12 * v, 'sine', true, 0.48);
+        break;
+      }
     }
   }, [enabled, ensureContext]);
+
+  const haptic = useCallback((event: HapticEvent) => {
+    if (!enabled || !('vibrate' in navigator)) return;
+    const patterns: Record<HapticEvent, number | number[]> = {
+      fold: 30,
+      call: 40,
+      check: [20, 20],
+      raise: [40, 30, 60],
+      allIn: [100, 50, 100, 50, 200],
+      win: [50, 30, 50, 30, 50, 30, 100],
+      cardReveal: 25,
+      deal: [15, 40, 15],
+    };
+    navigator.vibrate(patterns[event]);
+  }, [enabled]);
 
   const toggle = useCallback(() => setEnabled(prev => !prev), []);
 
@@ -308,5 +347,5 @@ export function usePokerSounds() {
     };
   }, []);
 
-  return { play, enabled, toggle };
+  return { play, enabled, toggle, haptic };
 }

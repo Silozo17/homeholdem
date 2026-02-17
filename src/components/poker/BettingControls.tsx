@@ -41,8 +41,8 @@ export function BettingControls({
 
   const quickBets = [
     { label: '2×BB', amount: Math.max(minRaiseTotal, maxBet + bigBlind * 2) },
-    { label: '3×BB', amount: Math.max(minRaiseTotal, maxBet + bigBlind * 3) },
     { label: '½ Pot', amount: Math.max(minRaiseTotal, Math.round(pot / 2) + maxBet) },
+    { label: '¾ Pot', amount: Math.max(minRaiseTotal, Math.round(pot * 0.75) + maxBet) },
     { label: 'Pot', amount: Math.max(minRaiseTotal, pot + maxBet) },
     { label: 'All-in', amount: maxRaiseTotal },
   ];
