@@ -207,6 +207,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Activate sitting_out players for the new hand
+    await admin
+      .from("poker_seats")
+      .update({ status: "active" })
+      .eq("table_id", table_id)
+      .eq("status", "sitting_out")
+      .gt("stack", 0);
+
     // Get active seats
     const { data: seats } = await admin
       .from("poker_seats")
