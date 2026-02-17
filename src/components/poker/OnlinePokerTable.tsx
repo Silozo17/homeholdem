@@ -94,7 +94,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverWinners, setGameOverWinners] = useState<HandWinner[]>([]);
-  const [cardsPeeked, setCardsPeeked] = useState(false);
+  
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
   const [lowTimeWarning, setLowTimeWarning] = useState(false);
@@ -281,11 +281,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         const executePreAction = async () => {
           let actionToFire: { type: string; amount?: number } | null = null;
           if (preAction === 'check_fold') {
-            actionToFire = canCheck ? { type: 'check' } : { type: 'fold' };
+            actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'fold' };
           } else if (preAction === 'call_any') {
-            actionToFire = canCheck ? { type: 'check' } : { type: 'call' };
+            actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'call' };
           } else if (preAction === 'check') {
-            if (canCheck) actionToFire = { type: 'check' };
+            // ONLY fire if there is genuinely nothing to call
+            if (amountToCall === 0) actionToFire = { type: 'check' };
+            // Otherwise discard silently (do NOT call)
           }
           setPreAction(null);
           if (actionToFire) {
@@ -303,14 +305,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
     prevIsMyTurnRef.current = isMyTurn;
     if (!isMyTurn) setLowTimeWarning(false);
-  }, [isMyTurn, play, haptic, preAction, canCheck]);
+  }, [isMyTurn, play, haptic, preAction, amountToCall]);
 
   // Clear pre-action and card peek on new hand
   useEffect(() => {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId) {
       setPreAction(null);
-      setCardsPeeked(false);
     }
   }, [tableState?.current_hand?.hand_id]);
 
@@ -867,7 +868,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   seatDealOrder={activeScreenPositions.indexOf(screenPos)} totalActivePlayers={activeSeats.length}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
-                  isPeeked={isMe ? cardsPeeked : undefined} onPeek={isMe ? () => setCardsPeeked(true) : undefined}
+                  
                 />
               </SeatAnchor>
             );
@@ -908,9 +909,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         )
       )}
 
-      {/* Pre-action buttons */}
+      {/* Pre-action buttons — top-right, stacked vertically */}
       {!showActions && isSeated && hand && mySeat && mySeat.status !== 'folded' && (
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ zIndex: Z.ACTIONS, bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'max(env(safe-area-inset-bottom, 0px), 14px)' }}>
+        <div className="absolute" style={{ zIndex: Z.ACTIONS, top: 'calc(env(safe-area-inset-top, 0px) + 48px)', right: 'calc(env(safe-area-inset-right, 0px) + 10px)' }}>
           <PreActionButtons canPreCheck={canCheck} amountToCall={amountToCall} onQueue={setPreAction} queued={preAction} />
         </div>
       )}
