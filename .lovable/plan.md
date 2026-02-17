@@ -1,37 +1,35 @@
 
 
-# Fix: Landscape Bottom Padding on Full-Screen Lobby Pages
+# Fix: Action Buttons Appearing and Staying Visible Before Cards
 
 ## Problem
 
-Several poker lobby/menu pages use `fixed inset-0` positioning, which bypasses AppLayout's bottom padding entirely. They rely on the CSS class `safe-area-bottom` which only adds `padding-bottom: env(safe-area-inset-bottom, 0px)`.
-
-In portrait mode on iPhones, `safe-area-inset-bottom` is ~34px, which partially clears the bottom nav. In landscape mode, `safe-area-inset-bottom` is 0px on most devices, so there is zero gap -- the last items are hidden behind the bottom nav with no way to scroll them into view.
+`dealAnimDone` is initialized as `true` (line 595). When a new hand broadcast arrives with `isMyTurn = true`, the React effect that resets `dealAnimDone` to `false` runs AFTER the render. So for that render cycle (and potentially longer if the effect condition doesn't match), `showActions` evaluates to `true` and the buttons appear and persist.
 
 ## Fix
 
-Add an inline `paddingBottom` style to the inner scrollable content div of each affected page, matching the same formula already used in `AppLayout.tsx`: `calc(6rem + env(safe-area-inset-bottom, 0px))`. This ensures 96px + safe-area clearance regardless of orientation.
+**File:** `src/components/poker/OnlinePokerTable.tsx`, line 788
 
-The padding goes on the inner content container (the `flex-1` div), not the outer `fixed inset-0` wrapper, so it only adds scrollable space at the bottom.
+Add `&& myCards !== null` to the `showActions` condition. Since `myCards` is only set after an async fetch (with an 800ms delay), this naturally prevents action buttons from appearing until the player's hole cards are actually available and visible.
 
-## Files Changed
+Current:
+```tsx
+const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded';
+```
 
-| File | Line | Change |
-|------|------|--------|
-| `src/components/poker/OnlinePokerLobby.tsx` | 228 | Add `style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}` to the `flex-1 px-4` content div |
-| `src/components/poker/PlayPokerLobby.tsx` | 52 | Add same inline style to the `flex-1` content div |
-| `src/pages/PokerHub.tsx` | 37 | Add same inline style to the `flex-1` content div |
-| `src/components/poker/TournamentLobby.tsx` | 227 | Add same inline style to the detail view content div |
-| `src/components/poker/TournamentLobby.tsx` | ~381 | Add same inline style to the list view content div (need to check exact line) |
+Updated:
+```tsx
+const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
+```
 
 ## What Does NOT Change
 
-- BottomNav component -- untouched
-- AppLayout -- untouched
-- No styling, layout, or behavior changes beyond adding bottom padding to these 4 components
+- No style, layout, spacing, or navigation changes
+- No changes to BottomNav, PlayerSeat, CardDisplay, or any other component
 - No refactoring or renaming
+- Only one line in `OnlinePokerTable.tsx` is modified
 
 ## Why This Fixes It
 
-These pages create their own full-screen scroll containers that sit on top of AppLayout. In landscape, `safe-area-inset-bottom` is 0, so content has no clearance from the bottom nav. Adding `6rem` (96px) of base padding ensures the last item is always scrollable above the nav bar, on any orientation and any device.
+`myCards` starts as `null` and is only populated after the hole cards are fetched from the server (800ms+ delay). By requiring `myCards !== null`, the action buttons cannot appear until the player's cards are actually loaded and rendered on screen. This is a single-condition addition -- the smallest possible change.
 
