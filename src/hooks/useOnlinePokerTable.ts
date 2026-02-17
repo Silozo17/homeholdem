@@ -578,18 +578,19 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [seatedCount, hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
-  // Stale hand recovery: if hand is active but no broadcast in 12s, poll server
+   // Stale hand recovery: if hand is active but no broadcast in 12s, trigger timeout check + poll server
   useEffect(() => {
-    if (!hasActiveHand) return;
+    if (!hasActiveHand || !tableId) return;
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
+        callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
         refreshState();
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [hasActiveHand, refreshState]);
+  }, [hasActiveHand, tableId, refreshState]);
 
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;
@@ -604,28 +605,34 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     scheduleBubbleRemoval(id);
   }, [userId, scheduleBubbleRemoval]);
 
-  // Fix 1: Periodic server-side timeout polling (leader-only, every 8s)
+  // All seated players poll for timeouts (leader every 8s, others every 12s with random offset)
   useEffect(() => {
-    if (!isAutoStartLeader || !tableId) return;
-    timeoutPollRef.current = setInterval(async () => {
-      const currentState = tableStateRef.current;
-      const currentHand = currentState?.current_hand;
-      if (!currentHand?.action_deadline) return;
-      const deadline = new Date(currentHand.action_deadline).getTime();
-      if (Date.now() > deadline + 3000) {
-        try {
-          await callEdge('poker-check-timeouts', { table_id: tableId });
-          refreshState();
-        } catch {}
-      }
-    }, 8000);
+    if (!mySeatNumber || !tableId) return;
+    const pollInterval = isAutoStartLeader ? 8000 : 12000;
+    const initialDelay = isAutoStartLeader ? 0 : Math.floor(Math.random() * 4000);
+    const startPolling = () => {
+      timeoutPollRef.current = setInterval(async () => {
+        const currentState = tableStateRef.current;
+        const currentHand = currentState?.current_hand;
+        if (!currentHand?.action_deadline) return;
+        const deadline = new Date(currentHand.action_deadline).getTime();
+        if (Date.now() > deadline + 3000) {
+          try {
+            await callEdge('poker-check-timeouts', { table_id: tableId });
+            refreshState();
+          } catch {}
+        }
+      }, pollInterval);
+    };
+    const delayTimer = setTimeout(startPolling, initialDelay);
     return () => {
+      clearTimeout(delayTimer);
       if (timeoutPollRef.current) {
         clearInterval(timeoutPollRef.current);
         timeoutPollRef.current = null;
       }
     };
-  }, [isAutoStartLeader, tableId, refreshState]);
+  }, [mySeatNumber, isAutoStartLeader, tableId, refreshState]);
 
   return {
     tableState,

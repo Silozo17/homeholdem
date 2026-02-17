@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     );
 
     // ── 1. Find stuck hands (deadline passed by 10s+) ──
-    const cutoff = new Date(Date.now() - 10_000).toISOString();
+    const cutoff = new Date(Date.now() - 5_000).toISOString();
 
     const { data: stuckHands, error } = await admin
       .from("poker_hands")
@@ -372,7 +372,7 @@ Deno.serve(async (req) => {
     const { data: timeoutSeats } = await admin
       .from("poker_seats")
       .select("id, table_id, player_id, seat_number, consecutive_timeouts")
-      .gte("consecutive_timeouts", 2)
+      .gte("consecutive_timeouts", 1)
       .not("player_id", "is", null);
 
     const kickResults: any[] = [];
