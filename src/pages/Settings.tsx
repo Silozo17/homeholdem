@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +6,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen, Crown, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen, Crown, Loader2, Globe } from 'lucide-react';
+import { CountrySelector } from '@/components/profile/CountrySelector';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
 import { PrivacySettings } from '@/components/settings/PrivacySettings';
@@ -25,6 +26,16 @@ export default function Settings() {
   const navigate = useNavigate();
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [managingSubscription, setManagingSubscription] = useState(false);
+  const [countryCode, setCountryCode] = useState<string | null>(null);
+  const [countryLoading, setCountryLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('country_code').eq('id', user.id).single().then(({ data }) => {
+      setCountryCode(data?.country_code ?? null);
+      setCountryLoading(false);
+    });
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -186,6 +197,37 @@ export default function Settings() {
         <LanguageSettings />
 
         <CurrencySettings />
+
+        {/* Country / Region */}
+        <Card className="bg-card/50 border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              Country / Region
+            </CardTitle>
+            <CardDescription>Your flag is shown at the poker table</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {countryLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <CountrySelector
+                value={countryCode}
+                onChange={async (code) => {
+                  if (!user) return;
+                  const { error } = await supabase
+                    .from('profiles')
+                    .update({ country_code: code })
+                    .eq('id', user.id);
+                  if (!error) setCountryCode(code);
+                }}
+                className="w-full"
+              />
+            )}
+          </CardContent>
+        </Card>
 
         <NotificationSettings />
 

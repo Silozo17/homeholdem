@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { isoToEmoji } from '@/lib/countries';
 
 interface CountryFlagProps {
   countryCode?: string | null;
@@ -14,10 +15,6 @@ const sizeStyles: Record<string, string> = {
   xl: 'w-[26px] h-[26px] text-[14px]',
   '2xl': 'w-[22px] h-[22px] text-[12px]',
 };
-
-function isoToEmoji(code: string): string {
-  return [...code.toUpperCase()].map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('');
-}
 
 export function CountryFlag({ countryCode, size = 'md', className }: CountryFlagProps) {
   if (!countryCode) return null;
