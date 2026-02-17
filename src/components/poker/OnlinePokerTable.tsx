@@ -649,9 +649,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       processedActionsRef.current.clear();
       const activePlayers = (tableState?.seats ?? []).filter(s => s.player_id && s.status !== 'eliminated').length;
       // Duration: 2 cards per player * 0.12s stagger + 0.45s fly + 0.3s reveal buffer
-      const dealDurationMs = ((activePlayers * 2) * 0.12 + 0.45 + 0.3) * 1000;
+      const dealDurationMs = ((activePlayers * 2) * 0.15 + 0.45 + 0.3) * 1000;
       const dealTimer = setTimeout(() => setDealAnimDone(true), dealDurationMs);
-      const visualMs = ((activePlayers * 2) * 0.12 + 0.45) * 1000 + 200;
+      const visualMs = ((activePlayers * 2) * 0.15 + 0.45) * 1000 + 200;
       const visualTimer = setTimeout(() => setDealing(false), visualMs);
       prevAnimHandIdRef.current = currentHandId;
       return () => { clearTimeout(dealTimer); clearTimeout(visualTimer); };
@@ -721,6 +721,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     rotatedSeats.forEach((sd, sp) => { if (sd?.player_id) pos.push(sp); });
     return pos;
   }, [rotatedSeats]);
+
+  const clockwiseOrder = useMemo(() => {
+    if (!hand) return activeScreenPositions;
+    const dealerScreenPos = ((hand.dealer_seat - heroSeat) + maxSeats) % maxSeats;
+    const dealerIdx = activeScreenPositions.indexOf(dealerScreenPos);
+    return dealerIdx >= 0
+      ? [...activeScreenPositions.slice(dealerIdx + 1), ...activeScreenPositions.slice(0, dealerIdx + 1)]
+      : activeScreenPositions;
+  }, [activeScreenPositions, hand?.dealer_seat, heroSeat, maxSeats]);
 
   const playerUserIds = useMemo(() => seats.filter(s => s.player_id).map(s => s.player_id!), [seats]);
   const playerLevels = usePlayerLevels(playerUserIds);
@@ -844,7 +853,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
+  const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
@@ -1161,20 +1170,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
           {dealing && (() => {
             const posArr = positions;
-            const activeScreenPos: number[] = [];
-            rotatedSeats.forEach((seatData, screenPos) => { if (seatData?.player_id) activeScreenPos.push(screenPos); });
-            const activeSeatCount = activeScreenPos.length;
+            const activeSeatCount = clockwiseOrder.length;
 
-            // Reorder dealing to start from dealer+1 (clockwise from dealer)
-            const dealerScreenPos = hand ? (() => {
-              const dealerActual = hand.dealer_seat;
-              return ((dealerActual - heroSeat) + maxSeats) % maxSeats;
-            })() : 0;
-            // Rotate activeScreenPos so dealing starts from the seat after the dealer
-            const dealerIdx = activeScreenPos.indexOf(dealerScreenPos);
-            const clockwiseOrder = dealerIdx >= 0
-              ? [...activeScreenPos.slice(dealerIdx + 1), ...activeScreenPos.slice(0, dealerIdx + 1)]
-              : activeScreenPos;
 
             return rotatedSeats.map((seatData, screenPos) => {
               if (!seatData?.player_id) return null;
@@ -1183,7 +1180,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               const seatOrder = clockwiseOrder.indexOf(screenPos);
               if (seatOrder < 0) return null;
               return [0, 1].map(cardIdx => {
-                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.12;
+                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.15;
                 return (
                   <div key={`deal-${screenPos}-${cardIdx}`} className="absolute pointer-events-none"
                     style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.45s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}cqw`, ['--deal-dy' as any]: `${pos.yPct - 2}cqh` }}>
@@ -1256,7 +1253,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   player={player} isCurrentPlayer={!!isCurrentActor && !isFolded} showCards={showCards}
                   isHuman={!!isMe} isShowdown={!!isShowdown} cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
-                  seatDealOrder={Math.max(0, activeScreenPositions.indexOf(screenPos))} totalActivePlayers={activeSeats.length}
+                  seatDealOrder={Math.max(0, clockwiseOrder.indexOf(screenPos))} totalActivePlayers={activeSeats.length}
                   disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
