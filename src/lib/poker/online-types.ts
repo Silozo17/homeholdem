@@ -24,6 +24,7 @@ export interface OnlineSeatInfo {
   player_id: string | null;
   display_name: string;
   avatar_url: string | null;
+  country_code: string | null;
   stack: number;
   status: string;
   has_cards: boolean;

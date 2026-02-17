@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       .filter(Boolean);
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, display_name, avatar_url")
+      .select("id, display_name, avatar_url, country_code")
       .in("id", playerIds.length > 0 ? playerIds : ["none"]);
 
     const profileMap = new Map(
@@ -159,6 +159,7 @@ Deno.serve(async (req) => {
         player_id: s.player_id,
         display_name: profile?.display_name || "Player",
         avatar_url: profile?.avatar_url || null,
+        country_code: profile?.country_code || null,
         stack: s.stack,
         status: derivedStatus,
         current_bet: currentBet,

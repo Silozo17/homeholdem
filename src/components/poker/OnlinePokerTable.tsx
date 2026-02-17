@@ -871,6 +871,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
                   seatDealOrder={activeScreenPositions.indexOf(screenPos)} totalActivePlayers={activeSeats.length}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
+                  countryCode={seatData!.country_code}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   
