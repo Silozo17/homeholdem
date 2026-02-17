@@ -10,6 +10,7 @@ interface HandReplayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hand: HandRecord | null;
+  isLandscape?: boolean;
   onExportCSV?: () => string;
 }
 
@@ -20,7 +21,7 @@ const PHASE_COLORS: Record<string, string> = {
   river: 'bg-red-500/20 text-red-300',
 };
 
-export function HandReplay({ open, onOpenChange, hand, onExportCSV }: HandReplayProps) {
+export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onExportCSV }: HandReplayProps) {
   const [step, setStep] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
@@ -65,7 +66,10 @@ export function HandReplay({ open, onOpenChange, hand, onExportCSV }: HandReplay
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[70vh] rounded-t-2xl pb-safe">
+      <SheetContent
+        side={isLandscape ? 'right' : 'bottom'}
+        className={isLandscape ? 'w-[320px] h-full' : 'max-h-[70vh] rounded-t-2xl pb-safe'}
+      >
         <SheetHeader className="pb-2">
           <SheetTitle className="text-sm flex items-center gap-2">
             Hand #{hand.handNumber} Replay

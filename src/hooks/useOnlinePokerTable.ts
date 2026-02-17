@@ -89,6 +89,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const startHandRef = useRef<() => Promise<void>>(null as any);
   const autoStartRetriesRef = useRef(0);
   const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
+  const prevCommunityAtResultRef = useRef(0);
+  const lastAppliedVersionRef = useRef(0);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -127,6 +129,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         setLastActions({});
       }
       prevHandIdRef.current = currentHandId;
+      prevCommunityAtResultRef.current = 0;
     }
   }, [hand?.hand_id]);
 
@@ -148,6 +151,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       setMyCards(data.my_cards || null);
       setError(null);
       setConnectionStatus('connected');
+      lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
     } catch (err: any) {
       setError(err.message);
       setConnectionStatus('disconnected');
@@ -165,12 +169,31 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   useEffect(() => {
     if (!tableId) return;
 
+    // M4: Clean up stale channel before creating new one
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     const channel = supabase.channel(`poker:table:${tableId}`)
       .on('broadcast', { event: 'game_state' }, ({ payload }) => {
         // Track last broadcast for stale hand detection
         lastBroadcastRef.current = Date.now();
         // Mark connected on any successful broadcast
         setConnectionStatus('connected');
+
+        // M2: Ignore out-of-order broadcasts by state_version
+        const incomingVersion = payload.state_version ?? 0;
+        const currentHandId = tableStateRef.current?.current_hand?.hand_id ?? null;
+        const incomingHandId = payload.hand_id ?? null;
+        if (incomingHandId && incomingHandId === currentHandId && incomingVersion <= lastAppliedVersionRef.current) {
+          return; // Skip stale broadcast
+        }
+        if (incomingHandId !== currentHandId) {
+          lastAppliedVersionRef.current = 0;
+        }
+        lastAppliedVersionRef.current = incomingVersion;
+
         // Clear actionPending on any game_state broadcast
         setActionPending(false);
         if (actionPendingFallbackRef.current) {
@@ -190,6 +213,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           }
           return next;
         });
+
+        // Track community card count for runout detection
+        prevCommunityAtResultRef.current = (payload.community_cards || []).length;
 
         // Merge broadcast state into local state
         setTableState(prev => {
@@ -262,12 +288,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Detect all-in runout: payload now includes community_cards reliably
+        // Detect all-in runout: only delay if community cards jumped from <5 to 5
         const incomingCommunityCount = (payload.community_cards || []).length;
-        const hasRevealedCards = (payload.revealed_cards || []).length > 0;
-        // Runout = showdown with 5 community cards dealt at once (all-in scenario)
-        const isRunout = hasRevealedCards && incomingCommunityCount >= 5;
-        const winnerDelay = isRunout ? 4000 : 0;
+        const wasRunout = prevCommunityAtResultRef.current < 5 && incomingCommunityCount === 5;
+        const winnerDelay = wasRunout ? 4000 : 0;
 
         if (winnerDelay > 0) {
           setTimeout(() => setHandWinners(winners), winnerDelay);
