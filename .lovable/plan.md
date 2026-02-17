@@ -1,65 +1,62 @@
 
 
-# Give Bots Fake Personas (Avatars, Levels, Flags)
+# Fix Player Profile to Match Reference
 
-## Overview
+## Problems Identified (Reference IMG_3984 vs Current IMG_3985)
 
-Currently bots have generic names ("Alex", "Blake", etc.) and no avatar images, levels, or country flags. This change creates a rich persona system so each bot feels like a real player at the table.
+### 1. Level Badge and Country Flag Hidden Behind Nameplate
+The badge and flag are children of `PlayerAvatar` (which has `z-[2]`). CSS stacking contexts mean their `z-10` only applies within that parent -- so the nameplate at `z-[4]` paints over them completely.
+**Fix:** Move `LevelBadge` and `CountryFlag` out of `PlayerAvatar` and render them in `PlayerSeat.tsx` as siblings positioned absolutely at `z-[5]`, anchored to the avatar's bottom-left and bottom-right edges.
 
-## What Changes
+### 2. Avatar Too Small Relative to Cards
+Avatar `xl` = 80px. Card `xl` = 56x80px. In the reference, the avatar is clearly the dominant element with cards peeking above it. The avatar needs to be bigger.
+**Fix:** Increase `xl` avatar from `w-20 h-20` (80px) to `w-[88px] h-[88px]` (88px). This makes the avatar clearly larger than the cards.
 
-### 1. New file: `src/lib/poker/bot-personas.ts`
+### 3. Card Markings Too Small
+Reference shows large, bold rank letters (A, K, 7) that nearly fill the card face. Current `xl` uses `text-sm` for rank (14px) and `text-2xl` for center suit.
+**Fix:** Bump `xl` rank to `text-base` (16px), suit to `text-sm` (14px), and center suit to `text-3xl`. Makes the card face bolder and more readable like the reference.
 
-A data file containing an array of 8 bot personas, each with:
-- **name** -- A more colorful poker nickname (e.g., "Viktor", "Luna", "Ace", "Maverick")
-- **avatarUrl** -- A generated avatar URL using DiceBear API (e.g., `https://api.dicebear.com/9.x/adventurer/svg?seed=Viktor`) -- free, no API key needed, deterministic per seed
-- **level** -- Random level between 3 and 45 (feels realistic)
-- **countryCode** -- Random 2-letter ISO code from a curated list (US, GB, BR, JP, DE, FR, AU, CA, PL, KR, etc.)
+### 4. Cards Slightly Too Large
+User confirmed cards are close but slightly oversized.
+**Fix:** Reduce `xl` card from `w-14 h-[80px]` to `w-[50px] h-[72px]` -- a small trim.
 
-Each persona is tied to a specific bot index so it stays consistent across games.
+### 5. Turn Timer Circle Overlapping Cards
+The SVG timer ring wraps the avatar center at `z-10`, painting over the cards and everything else.
+**Fix:** Integrate the timer into the nameplate pill. When it is the player's turn, the nameplate border becomes a gold animated countdown line (using a CSS conic-gradient that sweeps). Keep the timer logic (countdown, onTimeout, onLowTime) but render a thin gold progress border around the nameplate instead of a big circle over the avatar.
 
-### 2. Update: `src/hooks/usePokerGame.ts`
+### 6. Card Fan Angle
+Reference shows a wider spread between the two cards (~14-15 degrees each).
+**Fix:** Increase rotation from 10deg to 14deg.
 
-- Import the bot personas array
-- When creating bot players in the `START_GAME` reducer, assign each bot its persona name (replacing the old `BOT_NAMES` array)
-- Store the persona index on the player object (or just use seatIndex to look up persona later)
+## Files to Change
 
-### 3. Update: `src/components/poker/PlayPokerLobby.tsx`
+### `src/components/poker/PlayerAvatar.tsx`
+- Increase `xl` size to `w-[88px] h-[88px]`
+- Remove `LevelBadge` and `CountryFlag` rendering (move to PlayerSeat)
+- Remove `level` and `countryCode` props
 
-- Import bot personas to show the correct names and avatar URLs in the lobby preview
-- Pass `avatarUrl`, `level`, and `countryCode` from the persona to the `PlayerAvatar` component shown in the lobby
+### `src/components/poker/PlayerSeat.tsx`
+- Render `LevelBadge` at `z-[5]` positioned at avatar's bottom-left edge
+- Render `CountryFlag` at `z-[5]` positioned at avatar's bottom-right edge
+- Remove circular `TurnTimer` from avatar area
+- Add turn timer as a gold conic-gradient border on the nameplate pill (sweeping countdown)
+- Increase card fan angle from 10 to 14 degrees
+- Use the timer's elapsed/duration state to drive the nameplate border animation
 
-### 4. Update: `src/components/poker/PokerTablePro.tsx`
+### `src/components/poker/CardDisplay.tsx`
+- Reduce `xl` dimensions to `w-[50px] h-[72px]`
+- Increase `xl` text sizes: rank `text-base`, corner suit `text-sm`, center suit `text-3xl`
 
-- Import bot personas
-- For bot players, pass `avatarUrl`, `level`, and `countryCode` from their persona to `PlayerSeat` (currently these are `undefined` for bots)
+## Revised Z-Index Layering
 
-### 5. Update: `src/components/poker/PokerTable.tsx` (fallback table)
+```text
+z-[1]: Avatar body (profile picture)
+z-[2]: Active player gold ring / All-in ring
+z-[3]: Cards (fanned over avatar top)
+z-[4]: Nameplate pill (overlaps card bottoms + avatar bottom)
+z-[5]: Level badge + Country flag (on avatar edges, above nameplate)
+```
 
-- Same treatment as PokerTablePro -- pass persona data to `PlayerSeat` for bots
-
-## Bot Persona Data (Example)
-
-| Index | Name     | Flag | Level | Avatar Seed |
-|-------|----------|------|-------|-------------|
-| 0     | Viktor   | RU   | 32    | viktor      |
-| 1     | Luna     | BR   | 18    | luna        |
-| 2     | Ace      | US   | 41    | ace         |
-| 3     | Maverick | AU   | 12    | maverick    |
-| 4     | Sakura   | JP   | 27    | sakura      |
-| 5     | Klaus    | DE   | 35    | klaus       |
-| 6     | Priya    | IN   | 9     | priya       |
-| 7     | Carlos   | MX   | 22    | carlos      |
-
-## Files to Create/Modify
-
-- **Create**: `src/lib/poker/bot-personas.ts`
-- **Modify**: `src/hooks/usePokerGame.ts` -- use persona names
-- **Modify**: `src/components/poker/PlayPokerLobby.tsx` -- show persona avatars/flags in lobby
-- **Modify**: `src/components/poker/PokerTablePro.tsx` -- pass persona props to PlayerSeat for bots
-- **Modify**: `src/components/poker/PokerTable.tsx` -- pass persona props to PlayerSeat for bots
-
-## No database or edge function changes needed
-
-This is purely a frontend/cosmetic change for the practice (vs bots) game mode. Multiplayer already pulls real profile data from the database.
+## Turn Timer Redesign
+Instead of a large SVG circle overlaying the avatar and cards, the timer becomes a conic-gradient border on the nameplate pill that sweeps from full gold to empty as time runs out, transitioning gold to orange to red. This keeps the timer visible without occluding cards or badges.
 
