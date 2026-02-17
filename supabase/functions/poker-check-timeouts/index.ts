@@ -171,6 +171,10 @@ Deno.serve(async (req) => {
             const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", seatStates.filter(s => s.player_id).map(s => s.player_id!));
             const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+            // FIX MH-2: Check actual hole cards to set has_cards accurately
+            const { data: hcRows1 } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
+            const hcSet1 = new Set((hcRows1 || []).map((r: any) => r.player_id));
+
             const channel = admin.channel(`poker:table:${hand.table_id}`);
             await channel.send({
               type: "broadcast",
@@ -198,7 +202,7 @@ Deno.serve(async (req) => {
                     status: s.status,
                     current_bet: 0,
                     last_action: null,
-                    has_cards: s.status !== "folded",
+                    has_cards: hcSet1.has(s.player_id) && s.status !== "folded",
                   };
                 }),
                 action_deadline: null,
@@ -309,6 +313,10 @@ Deno.serve(async (req) => {
         const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds);
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+        // FIX MH-2: Check actual hole cards for accurate has_cards
+        const { data: hcRows2 } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
+        const hcSet2 = new Set((hcRows2 || []).map((r: any) => r.player_id));
+
         const publicState = {
           hand_id: hand.id,
           phase: newPhase,
@@ -334,7 +342,7 @@ Deno.serve(async (req) => {
               status: s.status,
               current_bet: 0,
               last_action: s.player_id === actorSeat.player_id ? "fold" : null,
-              has_cards: s.status !== "folded",
+              has_cards: hcSet2.has(s.player_id) && s.status !== "folded",
             };
           }),
           action_deadline: actionDeadline,
@@ -368,11 +376,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 2. Auto-kick players with 2+ consecutive timeouts ──
+    // ── 2. Auto-kick players with 3+ consecutive timeouts (FIX SV-6: was 1, too aggressive) ──
     const { data: timeoutSeats } = await admin
       .from("poker_seats")
       .select("id, table_id, player_id, seat_number, consecutive_timeouts")
-      .gte("consecutive_timeouts", 1)
+      .gte("consecutive_timeouts", 3)
       .not("player_id", "is", null);
 
     const kickResults: any[] = [];

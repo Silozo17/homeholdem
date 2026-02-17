@@ -83,15 +83,109 @@ Deno.serve(async (req) => {
     const remainingAfterLeave = otherSeats.length;
 
     if (activeHand) {
-      // If only 1 opponent remains, auto-complete the hand so the table isn't stuck
+      // FIX SV-1: When leaving mid-hand, properly resolve the hand
+      // If only 1 opponent remains, award pot and broadcast result
       if (remainingAfterLeave <= 1) {
-        await admin
+        // Get hand details for pot award
+        const { data: handData } = await admin
           .from("poker_hands")
-          .update({ completed_at: new Date().toISOString(), phase: "complete" })
-          .eq("id", activeHand.id);
+          .select("*, table_id")
+          .eq("id", activeHand.id)
+          .single();
+
+        if (handData && otherSeats.length === 1) {
+          const winnerId = otherSeats[0].player_id;
+          const pots = (handData.pots as any[]) || [];
+          const totalPot = pots.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+          // Get winner's current seat for stack update
+          const { data: winnerSeat } = await admin
+            .from("poker_seats")
+            .select("id, stack")
+            .eq("table_id", table_id)
+            .eq("player_id", winnerId)
+            .single();
+
+          if (winnerSeat) {
+            const newStack = winnerSeat.stack + totalPot;
+
+            // Commit via RPC for version safety
+            const { data: commitResult } = await admin.rpc("commit_poker_state", {
+              _hand_id: activeHand.id,
+              _expected_version: handData.state_version,
+              _new_phase: "complete",
+              _community_cards: handData.community_cards,
+              _pots: [{ amount: totalPot, winners: [winnerId] }],
+              _current_actor_seat: null,
+              _current_bet: 0,
+              _min_raise: 0,
+              _action_deadline: null,
+              _completed_at: new Date().toISOString(),
+              _results: {
+                winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
+                pots: [{ amount: totalPot, winners: [winnerId] }],
+              },
+              _deck_seed_revealed: null,
+              _seat_updates: [{ seat_id: winnerSeat.id, stack: newStack, status: "active", consecutive_timeouts: 0 }],
+              _action_record: null,
+            });
+
+            if (!commitResult?.error) {
+              // Get winner profile for broadcast
+              const { data: winnerProfile } = await admin.from("profiles").select("display_name, avatar_url").eq("id", winnerId).single();
+
+              const leaveChannel = admin.channel(`poker:table:${table_id}`);
+              await leaveChannel.send({
+                type: "broadcast",
+                event: "game_state",
+                payload: {
+                  hand_id: activeHand.id,
+                  phase: "complete",
+                  community_cards: handData.community_cards,
+                  pots: [{ amount: totalPot, winners: [winnerId] }],
+                  current_actor_seat: null,
+                  current_actor_id: null,
+                  seats: [{
+                    seat: otherSeats[0].id ? undefined : 0,
+                    player_id: winnerId,
+                    display_name: winnerProfile?.display_name || "Player",
+                    avatar_url: winnerProfile?.avatar_url || null,
+                    stack: newStack,
+                    status: "active",
+                    current_bet: 0,
+                    last_action: null,
+                    has_cards: true,
+                  }],
+                  state_version: commitResult.state_version,
+                },
+              });
+
+              await leaveChannel.send({
+                type: "broadcast",
+                event: "hand_result",
+                payload: {
+                  hand_id: activeHand.id,
+                  winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
+                  revealed_cards: [],
+                  pots: [{ amount: totalPot, winners: [winnerId] }],
+                  community_cards: handData.community_cards,
+                  state_version: commitResult.state_version,
+                },
+              });
+
+              await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
+            }
+          }
+        } else {
+          // Fallback: force-complete without pot award if something unexpected
+          await admin
+            .from("poker_hands")
+            .update({ completed_at: new Date().toISOString(), phase: "complete" })
+            .eq("id", activeHand.id);
+        }
       }
 
-      // Delete seat immediately (don't just mark sitting_out — player is leaving)
+      // Delete seat immediately (player is leaving)
       await admin.from("poker_seats").delete().eq("id", seat.id);
     } else {
       // No active hand — remove seat immediately
