@@ -49,7 +49,7 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
         <div className="h-14" />
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-start pt-4 px-4 space-y-3">
+      <div className="flex-1 flex flex-col items-center justify-start pt-4 px-4 space-y-3" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Hero */}
         <CardFan compact />
         <div className="text-center space-y-1 relative z-10">

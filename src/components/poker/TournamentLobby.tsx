@@ -224,7 +224,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
           <div className="h-14" />
         </div>
 
-        <div className="flex-1 px-4 pt-4 space-y-4">
+        <div className="flex-1 px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="text-center space-y-1">
             <h1 className="text-xl font-black text-shimmer">{t.name}</h1>
             <Badge variant={isRunning ? 'default' : 'secondary'} className="text-[10px]">
@@ -378,7 +378,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         <div className="h-14" />
       </div>
 
-      <div className="flex-1 px-4 pt-4 space-y-5">
+      <div className="flex-1 px-4 pt-4 space-y-5" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
             <Trophy className="inline h-6 w-6 mr-2 text-primary" />
