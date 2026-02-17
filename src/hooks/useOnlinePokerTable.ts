@@ -79,6 +79,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const autoStartRetriesRef = useRef(0);
 
   const userId = user?.id;
+  const lastBroadcastRef = useRef<number>(Date.now());
 
   // Keep ref in sync for use inside broadcast callbacks
   useEffect(() => { tableStateRef.current = tableState; }, [tableState]);
@@ -143,6 +144,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
     const channel = supabase.channel(`poker:table:${tableId}`)
       .on('broadcast', { event: 'game_state' }, ({ payload }) => {
+        // Track last broadcast for stale hand detection
+        lastBroadcastRef.current = Date.now();
         // Clear actionPending on any game_state broadcast
         setActionPending(false);
         if (actionPendingFallbackRef.current) {
@@ -389,8 +392,18 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const seatedCount = tableState?.seats.filter(s => s.player_id && s.status !== 'eliminated').length ?? 0;
   const hasActiveHand = !!tableState?.current_hand;
 
+  // Leader election: only lowest-seated player triggers auto-deal
+  const isAutoStartLeader = (() => {
+    if (!tableState?.seats || mySeatNumber === null) return false;
+    const occupiedSeats = tableState.seats
+      .filter(s => s.player_id && s.status !== 'eliminated')
+      .map(s => s.seat)
+      .sort((a, b) => a - b);
+    return occupiedSeats[0] === mySeatNumber;
+  })();
+
   useEffect(() => {
-    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted) {
+    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted && isAutoStartLeader) {
       if (autoStartTimerRef.current) return;
       const jitter = Math.random() * 1000;
       autoStartTimerRef.current = setTimeout(() => {
@@ -413,31 +426,36 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         }
       };
     }
-  }, [seatedCount, hasActiveHand, mySeatNumber, autoStartAttempted, handHasEverStarted]);
+  }, [seatedCount, hasActiveHand, mySeatNumber, autoStartAttempted, handHasEverStarted, isAutoStartLeader]);
 
   useEffect(() => {
     if (hasActiveHand) {
       setAutoStartAttempted(true);
       setHandHasEverStarted(true);
       autoStartRetriesRef.current = 0;
+      lastBroadcastRef.current = Date.now();
     }
   }, [hasActiveHand]);
 
-  // Fallback reset: wait longer than showdown timer (3.5s) + buffer
+  // Fallback reset: wait longer than showdown timer (3.5s) + buffer, respect retry cap
   useEffect(() => {
     if (!hasActiveHand && autoStartAttempted && handHasEverStarted) {
       const fallback = setTimeout(() => {
-        setAutoStartAttempted(false);
+        if (autoStartRetriesRef.current < 3) {
+          setAutoStartAttempted(false);
+        }
       }, 4500);
       return () => clearTimeout(fallback);
     }
   }, [hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
-  // Safety net: force reset if stuck for more than 6 seconds
+  // Safety net: force reset if stuck for more than 6 seconds, respect retry cap
   useEffect(() => {
     if (seatedCount >= 2 && !hasActiveHand && autoStartAttempted && handHasEverStarted) {
       const safetyNet = setTimeout(() => {
-        setAutoStartAttempted(false);
+        if (autoStartRetriesRef.current < 3) {
+          setAutoStartAttempted(false);
+        }
         if (autoStartTimerRef.current) {
           clearTimeout(autoStartTimerRef.current);
           autoStartTimerRef.current = null;
@@ -446,6 +464,19 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       return () => clearTimeout(safetyNet);
     }
   }, [seatedCount, hasActiveHand, autoStartAttempted, handHasEverStarted]);
+
+  // Stale hand recovery: if hand is active but no broadcast in 12s, poll server
+  useEffect(() => {
+    if (!hasActiveHand) return;
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastBroadcastRef.current;
+      if (elapsed > 12000) {
+        lastBroadcastRef.current = Date.now();
+        refreshState();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [hasActiveHand, refreshState]);
 
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;
