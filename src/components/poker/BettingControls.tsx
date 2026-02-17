@@ -69,7 +69,7 @@ export function BettingControls({
   // ── Landscape: vertical right-thumb panel ──
   if (landscape) {
     return (
-      <div className="flex flex-col gap-2 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '180px' }}>
+      <div className="flex flex-col gap-1.5 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '180px' }}>
         {showRaiseSlider && canRaise && (
           <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl"
             style={{
@@ -112,7 +112,7 @@ export function BettingControls({
           </div>
         )}
         <button
-          className="h-11 rounded-xl font-bold text-sm flex items-center justify-center active:scale-[0.92] transition-all"
+          className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             'hsl(0 40% 40%)',
@@ -120,10 +120,10 @@ export function BettingControls({
           )}
           onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
-          <X size={14} /> Fold
+          <X size={12} /> Fold
         </button>
         <button
-          className="h-11 rounded-xl font-bold text-sm flex items-center justify-center active:scale-[0.92] transition-all"
+          className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
           style={btnStyle(
             canCheck
               ? 'linear-gradient(180deg, hsl(160 45% 30%), hsl(160 50% 22%))'
@@ -138,11 +138,11 @@ export function BettingControls({
             else onAction({ type: 'call' });
           }}
         >
-          {canCheck ? <Check size={14} /> : amountToCall >= playerChips ? <Flame size={14} /> : <PhoneIncoming size={14} />} {callLabel}
+          {canCheck ? <Check size={12} /> : amountToCall >= playerChips ? <Flame size={12} /> : <PhoneIncoming size={12} />} {callLabel}
         </button>
         {canRaise && (
           <button
-            className="h-11 rounded-xl font-bold text-sm flex items-center justify-center active:scale-[0.92] transition-all"
+            className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
                 ? 'linear-gradient(180deg, hsl(0 70% 45%), hsl(0 70% 35%))'
@@ -155,7 +155,7 @@ export function BettingControls({
             }}
             onClick={handleRaiseTap}
           >
-            {showRaiseSlider && raiseAmount >= maxRaiseTotal ? <Flame size={14} /> : <TrendingUp size={14} />} {raiseLabel}
+            {showRaiseSlider && raiseAmount >= maxRaiseTotal ? <Flame size={12} /> : <TrendingUp size={12} />} {raiseLabel}
           </button>
         )}
       </div>
