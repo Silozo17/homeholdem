@@ -150,7 +150,16 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (!tableId) return;
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
-      setTableState(data);
+      const currentState = tableStateRef.current;
+      const handActive = !!currentState?.current_hand && !currentState.current_hand.phase?.includes('complete');
+
+      if (handActive && data.current_hand) {
+        // Mid-hand: only update table metadata + my_cards; preserve seats/hand from broadcasts
+        setTableState(prev => prev ? { ...prev, table: data.table } : data);
+      } else {
+        // No active hand or hand just completed: full replacement is safe
+        setTableState(data);
+      }
       setMyCards(data.my_cards || null);
       setError(null);
       setConnectionStatus('connected');
@@ -618,8 +627,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
+        // Only trigger timeout check; broadcasts will deliver state updates
         callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
-        refreshState();
       }
     }, 5000);
     return () => clearInterval(interval);
@@ -648,8 +657,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const deadline = new Date(currentHand.action_deadline).getTime();
       if (Date.now() > deadline + 3000) {
         try {
+          // Only trigger timeout check; broadcasts will deliver state updates
           await callEdge('poker-check-timeouts', { table_id: tableId });
-          refreshState();
         } catch {}
       }
     }, 8000);
