@@ -1,100 +1,106 @@
 
 
-# Fix: Handle Player Dropouts Without Freezing the Game
+# Fix: Race Condition Causing Duplicate Hands + Animation Chaos
 
-## Problem
+## Root Cause Found
 
-When a player minimizes their phone and can't return, the game freezes for everyone. The current timeout system has several gaps:
-
-1. **The 20s turn timer** only exists visually on clients -- the server relies on other clients to report it
-2. **The timeout ping** only fires from non-actor clients 2s after deadline, but if the disconnected player IS the leader (lowest seat), no one polls the server
-3. **The server check** (`poker-check-timeouts`) requires a client to call it AND waits 10s past deadline before acting -- total worst-case: 30+ seconds of apparent freeze
-4. **No redundancy** -- if the leader disconnects, the backup (stale hand recovery at 12s) only calls `refreshState`, not `poker-check-timeouts`
-
-## Solution: Multi-Layer Dropout Protection
-
-### Layer 1: ALL seated players poll for timeouts (not just leader)
-
-**File:** `src/hooks/useOnlinePokerTable.ts` (lines 607-628)
-
-Currently only the "auto-start leader" (lowest-seated player) runs the 8s timeout poll. Change this so ALL seated players poll, but stagger them:
-- Leader polls every 8s (unchanged)
-- Non-leader seated players poll every 12s with a random offset
-
-This ensures if the leader is the one who disconnected, other players still trigger the server-side timeout check.
-
-### Layer 2: Reduce server timeout tolerance from 10s to 5s
-
-**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 47)
-
-Change the cutoff from 10 seconds to 5 seconds past deadline. Combined with the 20s turn timer, the total wait becomes 25s instead of 30s. This is still safe against clock skew while being more responsive.
+The edge function logs and database confirm the exact problem: **two hands were started simultaneously** for the same table.
 
 ```
-// BEFORE:
-const cutoff = new Date(Date.now() - 10_000).toISOString();
-
-// AFTER:
-const cutoff = new Date(Date.now() - 5_000).toISOString();
+22:12:51.523 - Hand 608bd0dc (hand #1) started - 2 players
+22:12:51.548 - Hand cfb43d37 (hand #1) started - 2 players
 ```
 
-### Layer 3: Stale hand recovery should trigger timeout check, not just refresh
+Both requests passed the "no active hand" check (lines 194-226 in `poker-start-hand`) before either had finished inserting their hand row. This is a classic time-of-check-time-of-use (TOCTOU) race condition.
 
-**File:** `src/hooks/useOnlinePokerTable.ts` (lines 581-592)
+This was made worse by the recent timeout polling change: ALL seated players now poll `poker-check-timeouts`, and the auto-start logic runs on multiple clients. More clients calling `poker-start-hand` simultaneously = higher chance of the race.
 
-Currently when 12s passes with no broadcast, `refreshState()` is called. But if the hand is stuck because of a timed-out player, refreshing state just shows the same stuck state. Add a `poker-check-timeouts` call before the refresh:
+**This single bug explains ALL reported symptoms:**
+- Cards dealt on every flop = second hand's broadcast re-triggers deal animation
+- Animations trigger again and again = conflicting state broadcasts from two concurrent hands
+- Cards move to different players when someone joins = two active hands with different seat snapshots conflict
+
+## Fix (3 changes)
+
+### Change 1: Database -- Add unique partial index to prevent duplicate active hands
+
+Create a partial unique index on `poker_hands` that only allows ONE non-completed hand per table at any time. If a second concurrent `INSERT` hits this constraint, it will fail, which the edge function can catch gracefully.
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_hand_per_table
+ON poker_hands(table_id)
+WHERE completed_at IS NULL;
+```
+
+This is an atomic, database-level guarantee -- no race condition can bypass it.
+
+### Change 2: `poker-start-hand` -- Catch the duplicate insert error
+
+**File:** `supabase/functions/poker-start-hand/index.ts`
+
+After the `poker_hands` insert (line 429-456), if `handErr` contains a unique constraint violation, return a clean error instead of crashing:
 
 ```typescript
-if (elapsed > 12000) {
-  lastBroadcastRef.current = Date.now();
-  callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
-  refreshState();
+if (handErr) {
+  if (handErr.code === '23505') {
+    // Unique constraint: another hand was started simultaneously
+    return new Response(
+      JSON.stringify({ error: "Hand already in progress" }),
+      { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  throw handErr;
 }
 ```
 
-### Layer 4: Auto-kick disconnected players after 1 timeout (down from 2)
+### Change 3: Revert all-players polling to leader-only
 
-**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 375)
+**File:** `src/hooks/useOnlinePokerTable.ts` (lines 608-635)
 
-Change the consecutive timeout threshold from 2 to 1. If a player times out once (their 20s turn expires + 5s server grace), they are immediately kicked from the table. This prevents the scenario where a disconnected player causes TWO hands to freeze before being removed.
+The change that made ALL seated players poll for timeouts dramatically increased the number of concurrent `poker-start-hand` and `poker-check-timeouts` calls, directly causing the race condition. Revert this to leader-only polling (the original 8s interval).
 
+The stale hand recovery (line 581-593) already provides a backup path for non-leader clients -- that is sufficient redundancy.
+
+```typescript
+// Revert to leader-only timeout polling
+useEffect(() => {
+  if (!isAutoStartLeader || !tableId) return;
+  timeoutPollRef.current = setInterval(async () => {
+    const currentState = tableStateRef.current;
+    const currentHand = currentState?.current_hand;
+    if (!currentHand?.action_deadline) return;
+    const deadline = new Date(currentHand.action_deadline).getTime();
+    if (Date.now() > deadline + 3000) {
+      try {
+        await callEdge('poker-check-timeouts', { table_id: tableId });
+        refreshState();
+      } catch {}
+    }
+  }, 8000);
+  return () => {
+    if (timeoutPollRef.current) {
+      clearInterval(timeoutPollRef.current);
+      timeoutPollRef.current = null;
+    }
+  };
+}, [isAutoStartLeader, tableId, refreshState]);
 ```
-// BEFORE:
-.gte("consecutive_timeouts", 2)
 
-// AFTER:
-.gte("consecutive_timeouts", 1)
-```
+Keep the reduced 5s tolerance and 1-timeout auto-kick from `poker-check-timeouts` -- those are fine. The stale hand recovery calling `poker-check-timeouts` (line 588) stays too -- that provides the non-leader backup.
 
-This is aggressive but appropriate -- a player who missed their entire 20s turn is very likely disconnected. Real players who briefly lag will act within the 20s window.
+## Summary
 
-## Summary of Changes
-
-| File | Change |
+| File/Resource | Change |
 |------|--------|
-| `src/hooks/useOnlinePokerTable.ts` (line 609) | All seated players poll for timeouts (not just leader) |
-| `src/hooks/useOnlinePokerTable.ts` (line 586) | Stale hand recovery triggers `poker-check-timeouts` too |
-| `supabase/functions/poker-check-timeouts/index.ts` (line 47) | Reduce tolerance from 10s to 5s |
-| `supabase/functions/poker-check-timeouts/index.ts` (line 375) | Auto-kick after 1 timeout instead of 2 |
-
-## Worst-Case Timeline (After Fix)
-
-```text
-0s     - Player's turn starts (20s timer)
-20s    - Turn timer expires, action_deadline passes
-22s    - Non-actor client fires poker-timeout-ping (auto-fold)
-25s    - If ping failed: server check triggers (5s tolerance)
-25s    - Disconnected player auto-kicked (1 timeout = kick)
-27s    - Next hand auto-starts
-```
-
-Compare to current worst case: 30-40s freeze, player stays for a SECOND hand freeze, then kicked.
+| Database migration | Add `one_active_hand_per_table` unique partial index |
+| `supabase/functions/poker-start-hand/index.ts` | Catch duplicate constraint error (23505) gracefully |
+| `src/hooks/useOnlinePokerTable.ts` | Revert timeout polling to leader-only |
 
 ## What Does NOT Change
 
-- No UI/layout/navigation changes
-- No database schema changes
-- No changes to the 20s turn timer duration
+- No UI/layout/navigation/BottomNav changes
 - No changes to game logic, pot calculations, or deal animations
-- No BottomNav changes
-- `poker-action`, `poker-start-hand`, `poker-leave-table` unchanged
+- No changes to `poker-action`, `poker-join-table`, `poker-check-timeouts`, `poker-leave-table`
+- The 5s server tolerance and 1-timeout auto-kick stay (they're good changes)
+- The stale hand recovery calling `poker-check-timeouts` stays (good redundancy)
 
