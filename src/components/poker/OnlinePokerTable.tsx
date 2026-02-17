@@ -14,15 +14,19 @@ import { TableFelt } from './TableFelt';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { ChipAnimation } from './ChipAnimation';
 import { QuickChat } from './QuickChat';
+import { AchievementToast } from './AchievementToast';
+import { HandReplay } from './HandReplay';
 import { getSeatPositions, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { Z } from './z';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
+import { useAchievements } from '@/hooks/useAchievements';
+import { useHandHistory, HandPlayerSnapshot } from '@/hooks/useHandHistory';
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
 import { callEdge } from '@/lib/poker/callEdge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus } from 'lucide-react';
+import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
@@ -31,6 +35,7 @@ import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
+import { AchievementContext } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
 
 interface OnlinePokerTableProps {
@@ -75,6 +80,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
+  const { newAchievement, clearNew, checkAndAward } = useAchievements();
+  const { lastHand, startNewHand, recordAction, finalizeHand } = useHandHistory(tableId);
+  const [replayOpen, setReplayOpen] = useState(false);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
   const prevPhaseRef = useRef<string | null>(null);
@@ -98,6 +106,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const prevHandIdRef = useRef<string | null>(null);
   const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
+  const winStreakRef = useRef(0);
+  const handsPlayedRef = useRef(0);
+  const chatCountRef = useRef(0);
+  const startingStackRef = useRef(0);
   const isLandscape = useIsLandscape();
   useLockLandscape();
 
@@ -106,6 +118,21 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     requestWakeLock();
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
+
+  // Track starting stack when first seated
+  useEffect(() => {
+    if (mySeatNumber !== null && startingStackRef.current === 0 && tableState) {
+      const mySeat = tableState.seats.find(s => s.player_id === user?.id);
+      if (mySeat) startingStackRef.current = mySeat.stack;
+    }
+  }, [mySeatNumber, tableState, user?.id]);
+
+  // Track chat count
+  const originalSendChat = sendChat;
+  const trackedSendChat = useCallback((text: string) => {
+    chatCountRef.current++;
+    originalSendChat(text);
+  }, [originalSendChat]);
 
   // Intercept browser back button
   useEffect(() => {
@@ -152,6 +179,100 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [currentPhase]);
 
+  // Hand history: snapshot players on new hand
+  useEffect(() => {
+    const hand = tableState?.current_hand;
+    if (!hand) return;
+    const currentHandId = hand.hand_id;
+    if (currentHandId && currentHandId !== prevHandIdRef.current && hand.phase === 'preflop') {
+      handsPlayedRef.current++;
+      const players: HandPlayerSnapshot[] = (tableState?.seats ?? [])
+        .filter(s => s.player_id)
+        .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
+      startNewHand(currentHandId, hand.hand_number, players);
+    }
+  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase, tableState?.seats, startNewHand]);
+
+  // Hand history: record actions from lastActions changes
+  useEffect(() => {
+    const hand = tableState?.current_hand;
+    if (!hand || !lastActions) return;
+    const seats = tableState?.seats ?? [];
+    for (const [playerId, actionStr] of Object.entries(lastActions)) {
+      const seat = seats.find(s => s.player_id === playerId);
+      if (seat) {
+        recordAction({
+          playerName: seat.display_name,
+          action: actionStr,
+          amount: seat.current_bet ?? 0,
+          phase: hand.phase,
+          timestamp: Date.now(),
+        });
+      }
+    }
+  }, [lastActions]);
+
+  // Hand history + achievements: on hand result
+  useEffect(() => {
+    if (handWinners.length === 0 || !tableState || !user) return;
+    const hand = tableState.current_hand;
+    const communityCards = hand?.community_cards ?? [];
+
+    // Finalize hand history
+    finalizeHand({
+      communityCards,
+      winners: handWinners,
+      pots: hand?.pots ?? [],
+      myCards: myCards,
+      revealedCards,
+    });
+
+    // Achievement check
+    const heroWon = handWinners.some(w => w.player_id === user.id);
+    if (heroWon) {
+      winStreakRef.current++;
+    } else {
+      winStreakRef.current = 0;
+    }
+
+    const mySeat = tableState.seats.find(s => s.player_id === user.id);
+    const allStacks = tableState.seats.filter(s => s.player_id).map(s => s.stack);
+    const avgStack = allStacks.length > 0 ? allStacks.reduce((a, b) => a + b, 0) / allStacks.length : 0;
+    const heroStack = mySeat?.stack ?? 0;
+    const isChipLeader = allStacks.length > 0 && heroStack >= Math.max(...allStacks);
+    const playerCount = allStacks.length;
+    const winnerHand = handWinners.find(w => w.player_id === user.id);
+    const potWon = winnerHand?.amount ?? 0;
+    const wasDesperate = heroStack > 0 && (heroStack - potWon) < avgStack * 0.1 && heroWon;
+    const wasAllIn = mySeat?.status === 'all-in';
+    const isBB = hand?.bb_seat === mySeat?.seat;
+
+    const ctx: AchievementContext = {
+      heroWon,
+      winStreak: winStreakRef.current,
+      handName: winnerHand?.hand_name ?? null,
+      potWon,
+      bigBlind: tableState.table.big_blind,
+      heroStack,
+      startingStack: startingStackRef.current || heroStack,
+      averageStack: avgStack,
+      allInWin: heroWon && !!wasAllIn,
+      playerCount,
+      isChipLeader,
+      handsPlayed: handsPlayedRef.current,
+      chatMessagesSent: chatCountRef.current,
+      wonFromBB: heroWon && !!isBB,
+      isHeadsUp: playerCount === 2,
+      lastPlayerStanding: playerCount === 1 && !!mySeat,
+      wasDesperate,
+    };
+
+    const newAchs = checkAndAward(ctx);
+    if (newAchs.length > 0) {
+      play('achievement');
+    }
+  }, [handWinners]);
+
   // Your turn: sound + haptic + pre-action execution
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurnRef.current) {
@@ -170,7 +291,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           if (actionToFire) {
             haptic(actionToFire.type as any);
             await handleAction(actionToFire);
-            return; // Skip turn notification since we auto-acted
+            return;
           }
         };
         executePreAction();
@@ -208,14 +329,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     } else if (tableState) {
       setIsDisconnected(false);
     }
-    // Handle table_closed: tableState set to null by hook
     if (!tableState && !loading && !error) {
       toast({ title: 'Table closed', description: 'This table has been closed.' });
       onLeave();
     }
   }, [error, tableState, loading, onLeave]);
 
-  // Game over detection: human stack hits 0 — delayed so winner banner plays out first
+  // Game over detection
   useEffect(() => {
     if (!tableState || !user) return;
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
@@ -233,39 +353,22 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const communityCards = tableState?.current_hand?.community_cards ?? [];
     const prevCount = prevCommunityCountRef.current;
     const newCount = communityCards.length;
-
-    // Detect big jump (e.g., 0→5 or 0→3→5 in one broadcast)
     if (newCount > prevCount && (newCount - prevCount) > 1) {
-      // Clear any existing staged timers
       stagedRunoutRef.current.forEach(t => clearTimeout(t));
       stagedRunoutRef.current = [];
-
-      // Show flop (first 3) immediately
       setVisibleCommunityCards(communityCards.slice(0, Math.min(3, newCount)));
-
-      // Show turn after 1.5s
       if (newCount > 3) {
-        const t1 = setTimeout(() => {
-          setVisibleCommunityCards(communityCards.slice(0, 4));
-        }, 1500);
+        const t1 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 4)), 1500);
         stagedRunoutRef.current.push(t1);
       }
-
-      // Show river after 3s
       if (newCount > 4) {
-        const t2 = setTimeout(() => {
-          setVisibleCommunityCards(communityCards.slice(0, 5));
-        }, 3000);
+        const t2 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 5)), 3000);
         stagedRunoutRef.current.push(t2);
       }
     } else {
-      // Normal phase-by-phase reveal, show all cards immediately
       setVisibleCommunityCards(communityCards);
     }
-
     prevCommunityCountRef.current = newCount;
-
-    // Reset when hand ends
     if (newCount === 0) {
       stagedRunoutRef.current.forEach(t => clearTimeout(t));
       stagedRunoutRef.current = [];
@@ -273,11 +376,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [tableState?.current_hand?.community_cards]);
 
-  // Cleanup staged runout timers on unmount
   useEffect(() => {
-    return () => {
-      stagedRunoutRef.current.forEach(t => clearTimeout(t));
-    };
+    return () => { stagedRunoutRef.current.forEach(t => clearTimeout(t)); };
   }, []);
 
   // Deal animation on new hand
@@ -300,13 +400,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const maxSeatsCount = tableState.table.max_seats;
     const isLand = window.innerWidth > window.innerHeight;
     const positionsArr = getSeatPositions(maxSeatsCount, isLand);
-    // Find winner's screen position
     const winnerSeat = tableState.seats.find(s => s.player_id === winner.player_id);
     if (!winnerSeat) return;
     const screenIdx = ((winnerSeat.seat - heroSeatNum) + maxSeatsCount) % maxSeatsCount;
     const winnerPos = positionsArr[screenIdx];
     if (!winnerPos) return;
-    // Spawn 4 chip animations from pot (50, 20) to winner seat
     const newChips = Array.from({ length: 6 }, (_, i) => ({
       id: chipAnimIdRef.current++,
       toX: winnerPos.xPct,
@@ -317,7 +415,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => clearTimeout(timer);
   }, [handWinners, tableState, mySeatNumber]);
 
-  // Low time callback for hero
+  // Low time callback
   const handleLowTime = useCallback(() => {
     if (isMyTurn) {
       setLowTimeWarning(true);
@@ -329,7 +427,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   const handleReconnect = useCallback(() => { window.location.reload(); }, []);
 
-  // ── Memoized derived values (must be before early returns) ──
+  // ── Memoized derived values ──
   const table = tableState?.table;
   const seats = tableState?.seats ?? [];
   const hand = tableState?.current_hand ?? null;
@@ -463,7 +561,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
-      {/* Portrait block overlay — same as PokerTablePro */}
+      {/* Portrait block overlay */}
       {!isLandscape && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary animate-pulse">
@@ -477,23 +575,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* ====== BG LAYERS — same as PokerTablePro ====== */}
-      <img
-        src={pokerBg}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        draggable={false}
-        style={{ zIndex: Z.BG }}
-      />
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          zIndex: Z.BG,
-          background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.2), rgba(0,0,0,0.8))',
-        }}
-      />
+      {/* BG LAYERS */}
+      <img src={pokerBg} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} style={{ zIndex: Z.BG }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: Z.BG, background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.2), rgba(0,0,0,0.8))' }} />
 
-      {/* ====== HEADER BAR — safe-area aware, same style as PokerTablePro ====== */}
+      {/* Achievement toast */}
+      {newAchievement && <AchievementToast achievement={newAchievement} onDismiss={clearNew} />}
+
+      {/* HEADER BAR */}
       <div
         className="absolute top-0 left-0 right-0 flex items-center justify-between px-3"
         style={{
@@ -528,6 +617,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Last Hand replay button */}
+          {lastHand && (
+            <button onClick={() => setReplayOpen(true)}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+            >
+              <History className="h-3.5 w-3.5 text-foreground/80" />
+            </button>
+          )}
           {table.invite_code && (
             <button onClick={copyInviteCode}
               className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
@@ -535,7 +632,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
             </button>
           )}
-          <QuickChat onSend={sendChat} />
+          <QuickChat onSend={trackedSendChat} />
           <button onClick={() => setInviteOpen(true)}
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
           >
@@ -589,11 +686,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       </div>
 
-      {/* ====== TABLE SCENE — identical to PokerTablePro ====== */}
-      <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ zIndex: Z.TABLE }}
-      >
+      {/* TABLE SCENE */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: Z.TABLE }}>
         <div
           className="relative"
           style={{
@@ -604,15 +698,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             containerType: 'size',
           }}
         >
-          {/* Table image — visual only */}
           <TableFelt />
 
-          {/* Dealer character — top center */}
           <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
-          {/* Pot display */}
           {totalPot > 0 && (
             <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5" style={{ top: '20%', zIndex: Z.CARDS }}>
               <PotDisplay pot={totalPot} />
@@ -620,17 +711,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          {/* Community cards */}
-          <div
-            className="absolute left-1/2 flex gap-1.5 items-center"
-            style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
-          >
+          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
             {visibleCommunityCards.map((card, i) => {
               const isFlop = i < 3;
               const dealDelay = isFlop ? i * 0.18 : 0.1;
-              return (
-                <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="xl" dealDelay={dealDelay} />
-              );
+              return <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="xl" dealDelay={dealDelay} />;
             })}
             {(!hand || visibleCommunityCards.length === 0) && (
               <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
@@ -639,7 +724,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             )}
           </div>
 
-          {/* Phase indicator */}
           <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '68%', zIndex: Z.CARDS }}>
             {hand ? (
               <span className={cn(
@@ -649,138 +733,75 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 {hand.phase === 'preflop' ? 'Pre-Flop' : hand.phase === 'complete' ? 'Showdown' : hand.phase}
               </span>
             ) : (
-              <span className="text-[9px] text-foreground/20 italic font-medium"
-                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
-              >
+              <span className="text-[9px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                 {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
               </span>
             )}
           </div>
 
-          {/* Manual deal fallback for table creator */}
           {isCreator && !hand && !autoStartAttempted && !handHasEverStarted && activeSeats.length >= 2 && (
             <button
               onClick={() => startHand()}
               className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"
               style={{ zIndex: Z.ACTIONS, bottom: '28%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <Play className="h-3 w-3 inline mr-1" />
-              Deal Hand
+              <Play className="h-3 w-3 inline mr-1" /> Deal Hand
             </button>
           )}
 
-          {/* Showdown particles (stable positions) */}
           {isShowdown && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS }}>
               {particlePositions.map((p, i) => (
-                <div
-                  key={i}
-                  className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
-                  style={{
-                    left: `${p.left}%`,
-                    top: `${p.top}%`,
-                    background: 'radial-gradient(circle, hsl(43 74% 60%), hsl(43 74% 49% / 0))',
-                    animationDelay: `${i * 0.2}s`,
-                    boxShadow: '0 0 4px hsl(43 74% 49% / 0.6)',
-                  }}
+                <div key={i} className="absolute w-1.5 h-1.5 rounded-full animate-particle-float"
+                  style={{ left: `${p.left}%`, top: `${p.top}%`, background: 'radial-gradient(circle, hsl(43 74% 60%), hsl(43 74% 49% / 0))', animationDelay: `${i * 0.2}s`, boxShadow: '0 0 4px hsl(43 74% 49% / 0.6)' }}
                 />
               ))}
             </div>
           )}
 
-          {/* Winner banner during showdown pause */}
           {handWinners.length > 0 && !gameOver && (
             <WinnerOverlay
-              winners={handWinners.map(w => ({
-                name: w.player_id === user?.id ? 'You' : w.display_name,
-                hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] },
-                chips: w.amount,
-              }))}
-              isGameOver={false}
-              onNextHand={() => {}}
-              onQuit={() => {}}
+              winners={handWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
+              isGameOver={false} onNextHand={() => {}} onQuit={() => {}}
             />
           )}
 
-          {/* Game Over overlay — uses snapshotted winners so they persist */}
           {gameOver && (
             <WinnerOverlay
-              winners={gameOverWinners.map(w => ({
-                name: w.player_id === user?.id ? 'You' : w.display_name,
-                hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] },
-                chips: w.amount,
-              }))}
-              isGameOver={true}
-              onNextHand={() => {}}
-              onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
+              winners={gameOverWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
+              isGameOver={true} onNextHand={() => {}} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
             />
           )}
 
-          {/* Confetti when human wins (stable positions) */}
           {handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id) && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
               {confettiPositions.map((c, i) => (
-                <div
-                  key={i}
-                  className="absolute animate-confetti-drift"
-                  style={{
-                    left: `${c.left}%`,
-                    top: `${c.top}%`,
-                    width: `${c.w}px`,
-                    height: `${c.h}px`,
-                    background: ['hsl(43 74% 49%)', 'hsl(0 70% 50%)', 'hsl(210 80% 55%)', 'hsl(142 70% 45%)', 'hsl(280 60% 55%)'][i % 5],
-                    borderRadius: c.round ? '50%' : '2px',
-                    animationDelay: `${i * 0.08}s`,
-                    animationDuration: `${c.dur}s`,
-                  }}
+                <div key={i} className="absolute animate-confetti-drift"
+                  style={{ left: `${c.left}%`, top: `${c.top}%`, width: `${c.w}px`, height: `${c.h}px`, background: ['hsl(43 74% 49%)', 'hsl(0 70% 50%)', 'hsl(210 80% 55%)', 'hsl(142 70% 45%)', 'hsl(280 60% 55%)'][i % 5], borderRadius: c.round ? '50%' : '2px', animationDelay: `${i * 0.08}s`, animationDuration: `${c.dur}s` }}
                 />
               ))}
             </div>
           )}
 
-          {/* Chip animations: pot flies to winner */}
           {chipAnimations.map((chip, i) => (
-            <ChipAnimation
-              key={chip.id}
-              fromX={50}
-              fromY={20}
-              toX={chip.toX}
-              toY={chip.toY}
-              duration={900}
-              delay={i * 80}
-            />
+            <ChipAnimation key={chip.id} fromX={50} fromY={20} toX={chip.toX} toY={chip.toY} duration={900} delay={i * 80} />
           ))}
 
-          {/* Deal animation: cards fly from dealer to seats */}
           {dealing && (() => {
             const posArr = positions;
-            // Build ordered list of active screen positions for round-robin dealing
-            const activeScreenPositions: number[] = [];
-            rotatedSeats.forEach((seatData, screenPos) => {
-              if (seatData?.player_id) activeScreenPositions.push(screenPos);
-            });
-            const activeSeatCount = activeScreenPositions.length;
+            const activeScreenPos: number[] = [];
+            rotatedSeats.forEach((seatData, screenPos) => { if (seatData?.player_id) activeScreenPos.push(screenPos); });
+            const activeSeatCount = activeScreenPos.length;
             return rotatedSeats.map((seatData, screenPos) => {
               if (!seatData?.player_id) return null;
               const pos = posArr[screenPos];
               if (!pos) return null;
-              const seatOrder = activeScreenPositions.indexOf(screenPos);
+              const seatOrder = activeScreenPos.indexOf(screenPos);
               return [0, 1].map(cardIdx => {
-                // Round-robin: first card to each player in order, then second card
                 const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;
                 return (
-                  <div
-                    key={`deal-${screenPos}-${cardIdx}`}
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: '50%',
-                      top: '2%',
-                      zIndex: Z.EFFECTS,
-                      animation: `deal-card-fly 0.7s ease-out ${delay}s both`,
-                      ['--deal-dx' as any]: `${pos.xPct - 50}vw`,
-                      ['--deal-dy' as any]: `${pos.yPct - 2}vh`,
-                    }}
-                  >
+                  <div key={`deal-${screenPos}-${cardIdx}`} className="absolute pointer-events-none"
+                    style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.7s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}vw`, ['--deal-dy' as any]: `${pos.yPct - 2}vh` }}>
                     <div className="w-6 h-9 rounded card-back-premium border border-white/10" />
                   </div>
                 );
@@ -788,24 +809,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             });
           })()}
 
-          {/* Community card deal sprites — fly from dealer to center */}
           {communityDealSprites.map(sprite => (
-            <div
-              key={sprite.id}
-              className="absolute pointer-events-none"
-              style={{
-                left: '50%',
-                top: '2%',
-                zIndex: Z.EFFECTS,
-                animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`,
-                ['--deal-center-dy' as any]: '46cqh',
-              }}
-            >
+            <div key={sprite.id} className="absolute pointer-events-none"
+              style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`, ['--deal-center-dy' as any]: '46cqh' }}>
               <div className="w-8 h-11 rounded card-back-premium border border-white/10" />
             </div>
           ))}
 
-          {/* Chat bubbles near player seats */}
           {chatBubbles.map(bubble => {
             const seatInfo = tableState.seats.find(s => s.player_id === bubble.player_id);
             if (!seatInfo) return null;
@@ -813,44 +823,27 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const screenIdx = ((seatInfo.seat - heroSeatNum) + maxSeats) % maxSeats;
             const pos = positions[screenIdx];
             if (!pos) return null;
-            // Detect single-emoji messages for animated emote display
             const isSingleEmoji = /^\p{Emoji}$/u.test(bubble.text);
             return (
-              <div
-                key={bubble.id}
-                className={cn('absolute pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
-                style={{
-                  left: `${pos.xPct}%`,
-                  top: `${pos.yPct - 12}%`,
-                  transform: 'translateX(-50%)',
-                  zIndex: Z.EFFECTS + 5,
-                }}
-              >
+              <div key={bubble.id} className={cn('absolute pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
+                style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: 'translateX(-50%)', zIndex: Z.EFFECTS + 5 }}>
                 {isSingleEmoji ? (
-                  <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
-                    {bubble.text}
-                  </span>
+                  <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>{bubble.text}</span>
                 ) : (
                   <span className="text-sm px-2 py-1 rounded-lg font-bold"
-                    style={{
-                      background: 'hsl(0 0% 0% / 0.7)',
-                      color: 'hsl(45 30% 95%)',
-                      border: '1px solid hsl(43 74% 49% / 0.3)',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                    }}
-                  >
+                    style={{ background: 'hsl(0 0% 0% / 0.7)', color: 'hsl(45 30% 95%)', border: '1px solid hsl(43 74% 49% / 0.3)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                     {bubble.text}
                   </span>
                 )}
               </div>
             );
           })}
-          {/* ====== SEATS — using SeatAnchor + PlayerSeat, same as PokerTablePro ====== */}
+
+          {/* SEATS */}
           {rotatedSeats.map((seatData, screenPos) => {
             const actualSeatNumber = (heroSeat + screenPos) % maxSeats;
             const pos = positions[screenPos];
             if (!pos) return null;
-
             const isEmpty = !seatData?.player_id;
             const isMe = seatData?.player_id === user?.id;
             const isDealer = hand?.dealer_seat === actualSeatNumber;
@@ -860,54 +853,26 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             if (isEmpty) {
               return (
                 <SeatAnchor key={`empty-${actualSeatNumber}`} xPct={pos.xPct} yPct={pos.yPct} zIndex={Z.SEATS}>
-                  <EmptySeatDisplay
-                    seatNumber={actualSeatNumber}
-                    canJoin={!isSeated}
-                    onJoin={() => handleJoinSeat(actualSeatNumber)}
-                  />
+                  <EmptySeatDisplay seatNumber={actualSeatNumber} canJoin={!isSeated} onJoin={() => handleJoinSeat(actualSeatNumber)} />
                 </SeatAnchor>
               );
             }
 
-            // Build PokerPlayer from OnlineSeatInfo, with revealed cards for opponents at showdown
-            const opponentRevealed = !isMe
-              ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null
-              : null;
+            const opponentRevealed = !isMe ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null : null;
             const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
-            const player = toPokerPlayer(
-              seatData!,
-              !!isDealer,
-              isMe ? myCards : null,
-              isMe,
-              opponentRevealed,
-              playerLastAction,
-            );
-
-
+            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
             return (
-              <SeatAnchor
-                key={seatData!.player_id}
-                xPct={pos.xPct}
-                yPct={pos.yPct}
-                zIndex={isMe ? Z.SEATS + 1 : Z.SEATS}
-              >
+              <SeatAnchor key={seatData!.player_id} xPct={pos.xPct} yPct={pos.yPct} zIndex={isMe ? Z.SEATS + 1 : Z.SEATS}>
                 <PlayerSeat
-                  player={player}
-                  isCurrentPlayer={!!isCurrentActor && !isFolded}
-                  showCards={showCards}
-                  isHuman={!!isMe}
-                  isShowdown={!!isShowdown}
-                  cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
-                  compact={isMobileLandscape}
-                  avatarUrl={seatData!.avatar_url}
-                  seatDealOrder={activeScreenPositions.indexOf(screenPos)}
-                  totalActivePlayers={activeSeats.length}
+                  player={player} isCurrentPlayer={!!isCurrentActor && !isFolded} showCards={showCards}
+                  isHuman={!!isMe} isShowdown={!!isShowdown} cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
+                  compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
+                  seatDealOrder={activeScreenPositions.indexOf(screenPos)} totalActivePlayers={activeSeats.length}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
-                  isPeeked={isMe ? cardsPeeked : undefined}
-                  onPeek={isMe ? () => setCardsPeeked(true) : undefined}
+                  isPeeked={isMe ? cardsPeeked : undefined} onPeek={isMe ? () => setCardsPeeked(true) : undefined}
                 />
               </SeatAnchor>
             );
@@ -915,134 +880,56 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       </div>
 
-      {/* YOUR TURN badge — positioned above hero cards */}
+      {/* YOUR TURN badge */}
       {showActions && (
-        <div className="absolute pointer-events-none" style={{
-          bottom: isLandscape ? 'calc(18% + 65px)' : 'calc(22% + 65px)',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: Z.ACTIONS,
-        }}>
+        <div className="absolute pointer-events-none" style={{ bottom: isLandscape ? 'calc(18% + 65px)' : 'calc(22% + 65px)', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
-            style={{
-              background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))',
-              color: 'hsl(43 74% 60%)',
-              border: '1px solid hsl(43 74% 49% / 0.4)',
-              textShadow: '0 0 8px hsl(43 74% 49% / 0.5)',
-            }}
-          >
+            style={{ background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))', color: 'hsl(43 74% 60%)', border: '1px solid hsl(43 74% 49% / 0.4)', textShadow: '0 0 8px hsl(43 74% 49% / 0.5)' }}>
             YOUR TURN
           </span>
         </div>
       )}
 
-      {/* 5 SEC LEFT warning pill — positioned under pot total */}
+      {/* 5 SEC LEFT warning */}
       {lowTimeWarning && (
-        <div className="absolute pointer-events-none animate-low-time-pill" style={{
-          top: '28%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: Z.ACTIONS + 1,
-        }}>
+        <div className="absolute pointer-events-none animate-low-time-pill" style={{ top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS + 1 }}>
           <span className="text-[11px] px-4 py-1.5 rounded-full font-black"
-            style={{
-              background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.8), hsl(0 70% 40% / 0.6))',
-              color: 'hsl(0 0% 100%)',
-              border: '1px solid hsl(0 70% 50% / 0.6)',
-              textShadow: '0 0 8px hsl(0 70% 50% / 0.8)',
-              animation: 'low-time-pulse 0.5s ease-in-out infinite',
-            }}
-          >
+            style={{ background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.8), hsl(0 70% 40% / 0.6))', color: 'hsl(0 0% 100%)', border: '1px solid hsl(0 70% 50% / 0.6)', textShadow: '0 0 8px hsl(0 70% 50% / 0.8)', animation: 'low-time-pulse 0.5s ease-in-out infinite' }}>
             5 SEC LEFT!
           </span>
         </div>
       )}
 
-      {/* ====== ACTION CONTROLS — same layout as PokerTablePro ====== */}
+      {/* ACTION CONTROLS */}
       {showActions && mySeat && (
         isLandscape ? (
-          <div
-            className="absolute"
-            style={{
-              zIndex: Z.ACTIONS,
-              right: 'calc(env(safe-area-inset-right, 0px) + 10px)',
-              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-            }}
-          >
-            <BettingControls
-              landscape
-              canCheck={canCheck}
-              amountToCall={amountToCall}
-              minRaise={hand?.min_raise ?? table.big_blind}
-              maxBet={hand?.current_bet ?? 0}
-              playerChips={mySeat.stack}
-              bigBlind={table.big_blind}
-              pot={totalPot}
-              onAction={handleAction}
-            />
+          <div className="absolute" style={{ zIndex: Z.ACTIONS, right: 'calc(env(safe-area-inset-right, 0px) + 10px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+            <BettingControls landscape canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
           </div>
         ) : (
-          <div
-            className="absolute bottom-0 left-0 right-0 px-3 pt-1"
-            style={{
-              zIndex: Z.ACTIONS,
-              paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)',
-              background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))',
-            }}
-          >
-            <BettingControls
-              canCheck={canCheck}
-              amountToCall={amountToCall}
-              minRaise={hand?.min_raise ?? table.big_blind}
-              maxBet={hand?.current_bet ?? 0}
-              playerChips={mySeat.stack}
-              bigBlind={table.big_blind}
-              pot={totalPot}
-              onAction={handleAction}
-            />
+          <div className="absolute bottom-0 left-0 right-0 px-3 pt-1" style={{ zIndex: Z.ACTIONS, paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)', background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))' }}>
+            <BettingControls canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
           </div>
         )
       )}
 
-      {/* Pre-action buttons — shown when NOT the player's turn */}
+      {/* Pre-action buttons */}
       {!showActions && isSeated && hand && mySeat && mySeat.status !== 'folded' && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{
-            zIndex: Z.ACTIONS,
-            bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'max(env(safe-area-inset-bottom, 0px), 14px)',
-          }}
-        >
-          <PreActionButtons
-            canPreCheck={canCheck}
-            amountToCall={amountToCall}
-            onQueue={setPreAction}
-            queued={preAction}
-          />
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ zIndex: Z.ACTIONS, bottom: isLandscape ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 'max(env(safe-area-inset-bottom, 0px), 14px)' }}>
+          <PreActionButtons canPreCheck={canCheck} amountToCall={amountToCall} onQueue={setPreAction} queued={preAction} />
         </div>
       )}
 
       {/* Spectator overlay */}
       {isSpectator && (
         <div className="absolute bottom-0 left-0 right-0 px-4 py-3"
-          style={{
-            zIndex: Z.ACTIONS,
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
-            background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))',
-          }}
-        >
+          style={{ zIndex: Z.ACTIONS, paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)', background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))' }}>
           <p className="text-xs text-center font-bold mb-2" style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
             Tap a glowing seat to join
           </p>
-          <button
-            onClick={onLeave}
+          <button onClick={onLeave}
             className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"
-            style={{
-              background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))',
-              color: 'hsl(0 0% 60%)',
-              border: '1px solid hsl(0 0% 20%)',
-            }}
-          >
+            style={{ background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))', color: 'hsl(0 0% 60%)', border: '1px solid hsl(0 0% 20%)' }}>
             <ArrowLeft className="h-3.5 w-3.5" /> Leave
           </button>
         </div>
@@ -1053,15 +940,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
             <AlertDialogTitle>Kick {kickTarget?.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove {kickTarget?.name} from the table. They can rejoin later.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This will remove {kickTarget?.name} from the table. They can rejoin later.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => kickTarget && handleKickPlayer(kickTarget.id)} className="bg-destructive text-destructive-foreground">
-              Kick Player
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => kickTarget && handleKickPlayer(kickTarget.id)} className="bg-destructive text-destructive-foreground">Kick Player</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1071,15 +954,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
             <AlertDialogTitle>Close Table?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove all players and permanently close the table.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This will remove all players and permanently close the table.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCloseTable} className="bg-destructive text-destructive-foreground">
-              Close Table
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleCloseTable} className="bg-destructive text-destructive-foreground">Close Table</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1088,31 +967,21 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <ConnectionOverlay isDisconnected={isDisconnected} onReconnect={handleReconnect} />
 
       {/* Invite players dialog */}
-      <InvitePlayersDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
-        tableId={tableId}
-        tableName={table.name}
-        clubId={table.club_id}
-      />
+      <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
+
+      {/* Hand Replay sheet */}
+      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} />
 
       {/* Quit confirmation dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
             <AlertDialogTitle>Leave Table?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to leave? You will forfeit your seat.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Are you sure you want to leave? You will forfeit your seat.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={isSeated ? handleLeave : onLeave}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Leave Table
-            </AlertDialogAction>
+            <AlertDialogAction onClick={isSeated ? handleLeave : onLeave} className="bg-red-600 hover:bg-red-700">Leave Table</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
