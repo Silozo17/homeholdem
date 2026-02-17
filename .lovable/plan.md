@@ -1,109 +1,176 @@
 
-# Fix Card Dealing Flow and Winner Announcement Timing
 
-## Problems Identified
+# Comprehensive Multiplayer Poker Audit -- Findings & Fixes
 
-### Problem 1: Card dealing is not sequential clockwise
-The current deal animation (lines 917-937 of `OnlinePokerTable.tsx`) fires visual card sprites from the dealer to each seat, but the actual hole cards (`myCards`) arrive from `poker-my-cards` API immediately when the hand_id changes (line 355 of `useOnlinePokerTable.ts`). This means the player's cards appear in `PlayerSeat` before the deal animation finishes flying to their seat, creating a jarring overlap.
+## Summary
 
-The deal delay formula is `(cardIdx * activeSeatCount + seatOrder) * 0.35s`, meaning for 4 players the second card to the last player arrives at `(1 * 4 + 3) * 0.35 = 2.45s`. But the hole cards are fetched and displayed instantly.
-
-**Fix**: Gate the display of hero cards behind a `dealComplete` flag. Only show hole cards after the dealing animation finishes. Card 1 reveals when its deal sprite lands, card 2 reveals when its sprite lands -- matching the clockwise dealing motion.
-
-### Problem 2: Winner announced before community cards finish dealing
-During all-in runouts, the server sends ALL 5 community cards at once plus the `hand_result` broadcast simultaneously. The client's staged runout (lines 460-486) correctly reveals them over 3 seconds (flop immediately, turn at 1.5s, river at 3s), BUT:
-- `handWinners` is set immediately when `hand_result` arrives (line 264)
-- `WinnerOverlay` renders immediately when `handWinners.length > 0` (line 889)
-- Voice announcement fires immediately (line 335)
-
-So the winner is shown while the turn/river cards are still being staged.
-
-**Fix**: Delay setting `handWinners` during all-in runouts until the staged card reveal completes. The river card appears at 3s, so delay winner display by ~3.5s after a runout is detected.
+After auditing every file involved in the multiplayer poker lifecycle (table creation, joining, dealing, betting, showdown, game over, XP, history), I found **13 issues** ranging from critical bugs to polish items. The game is architecturally sound but has specific gaps that affect the user experience.
 
 ---
 
-## Changes
+## CRITICAL BUGS
 
-### File 1: `src/components/poker/OnlinePokerTable.tsx`
+### 1. Hand History Replay -- "Nothing Happens" When Clicking
 
-**A. Gate hero card visibility behind deal animation timing**
+**File**: `src/components/poker/OnlinePokerTable.tsx` (line 1110)
+**File**: `src/hooks/useHandHistory.ts`
 
-Add a `dealPhaseComplete` state that starts `false` when a new hand begins and becomes `true` after the full dealing animation duration. Calculate the total deal time from `activeSeats.length`:
+The HandReplay Sheet is correctly wired (`open={replayOpen}` at line 1110), but the `lastHand` value from `useHandHistory(tableId)` only has data if `finalizeHand()` was called. The problem is that `finalizeHand` (line 275) is inside a `useEffect` that depends on `handWinners.length > 0`. During all-in runouts, `handWinners` is now delayed by 4 seconds (our recent fix). During those 4 seconds, the `hand_result` handler also sets the `current_hand` to `{ phase: 'complete' }`, and the showdown timer starts. But the `prevHandIdRef` in the hand history snapshot effect (line 240) tracks `hand_id` correctly.
 
-```
-totalDealTime = (1 * activeCount + (activeCount - 1)) * 0.35 + 0.7  // last card's deal sprite + card-arrive
-```
+**Actual bug**: The `HandReplay` component reads `hand.actions`, but the `recordAction` function (line 250-266) only captures actions from `lastActions` state changes. The `lastActions` map is reset to `{}` on new `hand_id` (line 127 of useOnlinePokerTable.ts). Since `lastActions` is only populated from broadcast `game_state` events (which only include the *most recent* actor's action), many actions are lost. The history ends up with incomplete action logs, making the replay appear broken or empty.
 
-In the `PlayerSeat` rendering (line 992), pass the cards as `null` while `dealPhaseComplete` is false (for the hero only -- opponents always see face-down backs anyway).
+**Fix**: Instead of relying on `lastActions` (which only contains the latest actor), fetch the full action log from the `poker_actions` table when finalizing the hand. Add a call to `supabase.from('poker_actions').select('*').eq('hand_id', handId).order('sequence')` inside `finalizeHand` and populate the actions from the server data.
 
-**B. Sequential card reveal per card**
+### 2. No XP Awarded for Multiplayer Games
 
-The `PlayerSeat` component already has sequential reveal logic (lines 82-100) using `seatDealOrder` and `totalActivePlayers`. This is correct but the hero's `myCards` data arrives too early. The fix is to delay setting `myCards` into the player's display until each card's deal sprite would have landed.
+**File**: `src/components/poker/OnlinePokerTable.tsx`
 
-Approach: Instead of gating all cards, use the existing `revealedIndices` mechanism in `PlayerSeat.tsx` which already calculates per-card reveal timing. The issue is that `myCards` is set immediately from the API call. Add a short delay before setting myCards to align with the deal animation start.
+The practice game (`PlayPoker.tsx`, lines 27-46) saves results to `poker_play_results` and awards XP via `xp_events` inserts. The multiplayer game does *neither*. There is no code in `OnlinePokerTable.tsx` that inserts into `poker_play_results` or `xp_events` when `gameOver` becomes true.
 
-**C. Delay winner display during all-in runouts**
+**Fix**: Add an effect in `OnlinePokerTable.tsx` that, when `gameOver` becomes true, inserts a record into `poker_play_results` and `xp_events` similar to the practice game logic. This should run once using a `savedRef` pattern.
 
-In the `hand_result` handler (line 250 of `useOnlinePokerTable.ts`), detect if this is a runout scenario (community cards jumped from less than 5 to 5 in one broadcast). If so, delay setting `handWinners` by 3.5 seconds so the staged reveal completes first.
+### 3. No Stats Saved for Multiplayer Games
 
-**D. Delay winner voice announcement and overlay for runouts**
+Same root cause as issue 2 -- no `poker_play_results` insert happens for multiplayer. Player career stats (hands played, wins, best hand) are never persisted for online games.
 
-The `WinnerOverlay` (line 889) and voice announcement (line 335) both trigger off `handWinners`. Since we delay `handWinners` in the runout case, these will automatically be delayed too.
-
-### File 2: `src/hooks/useOnlinePokerTable.ts`
-
-**A. Delay `handWinners` during runouts**
-
-In the `hand_result` handler (line 250), check the current community card count vs the incoming count. If it is a runout (cards jumped to 5), use a setTimeout to delay `setHandWinners`:
-
-```text
-const isRunout = prevCommunityCount < 5 && incomingCommunityCount === 5 && prevCommunityCount < 3;
-const winnerDelay = isRunout ? 4000 : 0;  // Wait for staged card reveal
-setTimeout(() => setHandWinners(winners), winnerDelay);
-```
-
-**B. Delay `myCards` to sync with deal animation**
-
-After fetching hole cards (line 357), add a short delay (~800ms) before calling `setMyCards` to let the deal animation sprites start flying first. This gives the visual impression that cards arrive face-down and then flip when they land.
-
-### File 3: `src/components/poker/PlayerSeat.tsx`
-
-Minor adjustment to the reveal timing formula to better sync with the deal animation sprites:
-
-Currently: `const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1`
-Updated: `const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.35 + 0.1`
-
-This matches the 0.35s interval used by the deal sprites in `OnlinePokerTable.tsx` (line 928), so cards flip face-up precisely when the deal sprite lands at the seat.
+**Fix**: Combined with issue 2.
 
 ---
 
-## Detailed Sequence After Fix
+## GAMEPLAY FLOW ISSUES
 
-```text
-1. Creator hits "Deal Hand"
-2. Server broadcasts game_state with phase=preflop
-3. Client starts deal animation sprites (0.35s stagger, clockwise)
-4. Client fetches myCards but delays display by 800ms
-5. Card 1 sprite flies to Seat A (0s), card 1 sprite to Seat B (0.35s), etc.
-6. Card 2 sprite flies to Seat A (1.4s for 4 players), etc.
-7. As each sprite lands, the card at that seat flips from back to face (hero only sees own)
-8. Full deal complete. Players see their 2 cards. Betting begins.
+### 4. Deal Animation Sprites Fly to Wrong Positions
 
-ALL-IN RUNOUT:
-1. Player calls all-in. Server detects runout, deals all 5 community cards at once.
-2. Client receives game_state with 5 community cards + hand_result broadcast
-3. Staged reveal: Flop (3 cards) appear immediately, Turn at 1.5s, River at 3s
-4. hand_result processing is DELAYED by 4s
-5. After river is visible (3s), winner overlay + voice announcement fire at 4s
-6. Showdown timer starts from winner display (5s standard / 8.5s for runouts)
+**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 917-937)
+
+The deal sprite uses CSS custom properties `--deal-dx` and `--deal-dy` calculated as:
 ```
+--deal-dx: ${pos.xPct - 50}vw
+--deal-dy: ${pos.yPct - 2}vh
+```
+
+The unit is `vw` and `vh` but the seat positions (`pos.xPct`, `pos.yPct`) are percentages of the **table wrapper**, not the viewport. Since the table wrapper is only ~79vw wide and ~82vh tall (not 100vw/100vh), the sprites overshoot their targets. For example, a seat at xPct=84 calculates `--deal-dx: 34vw` but the actual distance within the table is only ~34% of 79vw = ~27vw.
+
+**Fix**: Change the units from `vw/vh` to container-relative units (`cqw/cqh`) since the table wrapper has `containerType: 'size'` set (line 826). This makes the sprite destinations match the percentage-based seat positions exactly:
+```
+--deal-dx: ${pos.xPct - 50}cqw
+--deal-dy: ${pos.yPct - 2}cqh
+```
+
+### 5. Dealing Order Not Truly Clockwise
+
+**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 917-937)
+
+The deal sprite stagger uses `seatOrder = activeScreenPos.indexOf(screenPos)` which is the order of *screen positions* (hero-rotated), not the actual clockwise order from the dealer. In a real poker game, cards are dealt starting from the player to the left of the dealer. The current code deals in screen-order (starting from the hero at the bottom), which visually doesn't match the clockwise-from-dealer expectation.
+
+**Fix**: Reorder `activeScreenPos` so that dealing starts from the seat immediately after the dealer seat (clockwise). Calculate the dealer's screen position and rotate the deal order array so the first seat dealt to is the one after the dealer.
+
+### 6. Community Cards Position Slightly Low
+
+**File**: `src/components/poker/OnlinePokerTable.tsx` (line 841)
+
+Community cards are at `top: '48%'` which places them slightly below center. For a standard poker table layout, `42-44%` would better center them within the felt area (accounting for the dealer character above and the phase label below at 68%).
+
+**Fix**: Adjust to `top: '44%'`.
 
 ---
 
-## File Summary
+## RACE CONDITIONS & TIMING
 
-| File | Change |
-|------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Delay `handWinners` by 4s during runouts; delay `myCards` by 800ms to sync with deal sprites |
-| `src/components/poker/OnlinePokerTable.tsx` | No structural changes needed -- delays propagate from hook |
-| `src/components/poker/PlayerSeat.tsx` | Update card reveal timing from 0.18s to 0.35s interval to match deal sprite stagger |
+### 7. Winner Delay Uses Wrong Reference for Runout Detection
+
+**File**: `src/hooks/useOnlinePokerTable.ts` (lines 265-275)
+
+The runout detection reads `prevCommunityCount` from `tableStateRef.current?.current_hand?.community_cards?.length`. However, this ref is updated by the `game_state` broadcast handler (line 195-214) which may fire *before* the `hand_result` handler. If the `game_state` broadcast with 5 community cards arrives first, `prevCommunityCount` would already be 5, and the runout would NOT be detected.
+
+The `hand_result` payload does NOT include `community_cards` -- checking `payload.community_cards` is always undefined/empty, so `incomingCommunityCount` is 0. This means the runout detection is unreliable.
+
+**Fix**: Instead of comparing community card counts, detect runout by checking if the `hand_result` includes `revealed_cards` (showdown happened) AND the phase transition jumped past normal betting (check if there are all-in players in the seat data). A simpler approach: check if `revealed_cards.length > 0` (showdown) and the `game_state` that just arrived had phase jump from preflop/flop/turn directly to complete.
+
+### 8. Potential Auto-Deal Race When Showdown Timer Finishes
+
+**File**: `src/hooks/useOnlinePokerTable.ts` (lines 487-511)
+
+The auto-deal logic has a leader election (lowest seated player), but after the showdown timer clears the hand (line 292-302), `autoStartAttempted` is reset to `false` (line 301). Multiple players could then race to start the next hand. The leader election mitigates this, but there's a window where the state update hasn't propagated and both players could call `startHand`. The server protects against this with `activeHand` check (line 187-200 of poker-start-hand), so it's safe but causes unnecessary 400 errors.
+
+**Status**: Acceptable -- server-side guard prevents actual issues. No fix needed.
+
+---
+
+## POLISH & UX
+
+### 9. `hand_result` Broadcast Missing `community_cards`
+
+**File**: `supabase/functions/poker-action/index.ts` (lines 618-628)
+
+The `hand_result` broadcast payload does not include `community_cards`. This is needed by the client for:
+1. Runout detection (issue 7)
+2. Hand history finalization (community cards are read from `tableState` which may be stale)
+
+**Fix**: Add `community_cards: communityCards` to the `hand_result` broadcast payload.
+
+### 10. Seat Status Reset After Fold
+
+**File**: `supabase/functions/poker-action/index.ts` (line 524, 530-535)
+
+After a hand completes, seat statuses are reset to `active` even if a player folded:
+```
+status: s.status === "all-in" ? "active" : s.status === "folded" ? "active" : s.status
+```
+This is correct behavior (fold is hand-level, not seat-level), but the broadcast at line 598 sends `status: s.status` which is the *hand-level* status (including "folded"). The client then shows these seats as folded even after the hand ends, until the next `refreshState()`.
+
+**Status**: Minor -- the showdown timer forces a `refreshState` via auto-deal, which corrects this. But it causes a brief visual flicker. Could be improved by having the client reset fold status locally when hand clears.
+
+### 11. Game Over Overlay Missing Stats for Multiplayer
+
+**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 896-900)
+
+The `WinnerOverlay` for game over passes no `stats` prop:
+```tsx
+<WinnerOverlay winners={...} isGameOver={true} onNextHand={...} onQuit={...} />
+```
+
+The practice game passes `stats` with handsPlayed, handsWon, bestHandName, biggestPot, and duration. The multiplayer version doesn't track these, so the game over screen shows no stats. `handsPlayedRef.current` is tracked but never used.
+
+**Fix**: Pass a `stats` object using the refs already tracked: `handsPlayedRef.current`, `winStreakRef.current`, etc. Track `handsWon` and `bestHandName` in refs similarly to the practice game.
+
+### 12. Deal Sprite Animation Uses `vw/vh` Mismatch
+
+Already covered in issue 4 above. The `deal-card-fly` animation in CSS (index.css line 707-711) uses `var(--deal-dx)` and `var(--deal-dy)` which are set with `vw/vh` units but should be `cqw/cqh`.
+
+### 13. `hand_result` `community_cards` in Staged Runout
+
+**File**: `src/components/poker/OnlinePokerTable.tsx` (lines 460-486)
+
+The staged runout effect reads `tableState?.current_hand?.community_cards`. During an all-in runout, the server sends all 5 cards at once in the `game_state` broadcast, then immediately sends `hand_result`. The staged effect correctly reveals them over 3 seconds. However, if the `hand_result` handler sets the phase to `complete` (line 281), the community cards ref might get nulled before the staged reveal finishes when the showdown timer fires.
+
+**Status**: The showdown timer is set to 8.5s for runouts (line 290), which is well after the 3s staged reveal. No fix needed.
+
+---
+
+## FIX PRIORITY & FILE CHANGES
+
+| Priority | Issue | Files to Change |
+|----------|-------|-----------------|
+| P0 | 1. Hand history actions incomplete | `useHandHistory.ts`, `OnlinePokerTable.tsx` |
+| P0 | 2+3. No XP/stats for multiplayer | `OnlinePokerTable.tsx` |
+| P1 | 4+12. Deal sprites overshoot targets | `OnlinePokerTable.tsx` (CSS vars), `index.css` |
+| P1 | 5. Deal order not clockwise from dealer | `OnlinePokerTable.tsx` |
+| P1 | 9. `hand_result` missing community_cards | `poker-action/index.ts` |
+| P1 | 7. Runout detection unreliable | `useOnlinePokerTable.ts` |
+| P2 | 6. Community cards position | `OnlinePokerTable.tsx` |
+| P2 | 11. Game over missing stats | `OnlinePokerTable.tsx` |
+
+### Implementation Summary
+
+1. **`supabase/functions/poker-action/index.ts`**: Add `community_cards` to `hand_result` broadcast payload
+2. **`src/hooks/useOnlinePokerTable.ts`**: Fix runout detection to use the `hand_result` payload's `community_cards` instead of comparing against stale ref
+3. **`src/hooks/useHandHistory.ts`**: Add a `populateActions` method that fetches the full action log from the server
+4. **`src/components/poker/OnlinePokerTable.tsx`**:
+   - Fix deal sprite CSS vars from `vw/vh` to `cqw/cqh`
+   - Reorder deal stagger to start from dealer+1 clockwise
+   - Add XP/stats saving on game over
+   - Pass stats to game over WinnerOverlay
+   - Adjust community card vertical position
+5. **`src/index.css`**: No changes needed (CSS vars come from JS)
+
