@@ -1,138 +1,111 @@
 
-# Fix Blind Timer: Doubling Logic + Multiplayer Implementation + Notifications
+# Voice Announcements for Multiplayer Poker using ElevenLabs
 
-## Current Problems
+## What Already Exists
 
-### Bot Game (Practice Mode)
-The blind timer uses a hardcoded `BLIND_LEVELS` array (25/50, 50/100, 75/150, ...) which does NOT match the user's expectation. The correct behavior is: **blinds double from whatever the starting value is**. If you start at 50/100, after the timer elapses they become 100/200, then 200/400, etc. The current code jumps through an unrelated fixed schedule.
+- **Edge function** `tournament-announce` -- calls ElevenLabs TTS API (Brian voice, `eleven_turbo_v2_5` model), returns base64 MP3
+- **Hook** `useTournamentSounds` -- already has `playAnnouncement()` that calls the edge function, but is only used in the tournament clock (home game mode), NOT in online multiplayer
+- **Hook** `usePokerSounds` -- Web Audio API beeps/tones for multiplayer game actions (fold, call, raise, etc.)
+- **ELEVENLABS_API_KEY** secret is already configured
 
-### Multiplayer Game
-The blind timer is **completely unimplemented**. The `blind_timer_minutes` value is saved to the database but never used:
-- `poker-start-hand` always uses static `table.small_blind` / `table.big_blind`
-- No columns exist to track blind escalation state
-- No client-side countdown is shown in `OnlinePokerTable.tsx`
+## What Needs to Be Built
 
----
+Create a new hook `usePokerVoiceAnnouncements` specifically for the multiplayer poker table that calls the existing `tournament-announce` edge function for these events:
 
-## Solution: Doubling Blinds Logic
+### 1. Blinds Up Announcement
+- **Trigger**: The `blinds_up` broadcast event already exists (line 300 of `useOnlinePokerTable.ts`)
+- **Message**: "Blinds are now {small} / {big}"
+- **Integration**: In `OnlinePokerTable.tsx`, the `onBlindsUp` callback (line 155) already fires a toast. Add voice announcement alongside it.
 
-When the timer elapses during a hand, blinds increase from the **start of the next hand**.
+### 2. Turn Timer -- Last 5 Seconds Countdown
+- **Trigger**: `TurnTimer.tsx` fires `onLowTime` when 5 seconds remain. `OnlinePokerTable.tsx` line 471 handles it via `handleLowTime`.
+- **Message**: "Five... Four... Three... Two... One" (short countdown) OR a single "Time is running out" announcement
+- **Note**: Since ElevenLabs TTS has ~1-2s latency, a full countdown won't be in sync. Better approach: play a single "Time's running out!" voice line when `onLowTime` fires (at 5s remaining), combined with the existing beep/vibration.
 
-```text
-Example: Starting 50/100, timer = 5 minutes
-  Hand 1 (0:00): 50/100
-  Hand 5 (5:01): 100/200   <-- doubled
-  Hand 9 (10:02): 200/400  <-- doubled again
-  Hand 12 (15:03): 400/800 <-- and so on
-```
+### 3. Hand Winner Announcement
+- **Trigger**: `handWinners` state updates in `useOnlinePokerTable.ts` line 264. `OnlinePokerTable.tsx` already detects this at line 259.
+- **Message**: "{player_name} wins {amount} chips with {hand_name}" (e.g. "Player1 wins 500 chips with a Full House")
+- **For hero wins**: "You win {amount} chips with {hand_name}!"
 
----
+### 4. Game Over / Final Winner Announcement
+- **Trigger**: `gameOver` state becomes true (line 377-401 in `OnlinePokerTable.tsx`)
+- **Message**: "Game over! {winner_name} takes it all!" or "Congratulations! You are the champion!"
 
-## Changes
+### 5. Additional Immersive Voice Lines (New Ideas)
 
-### 1. Database Migration -- Add blind tracking columns to `poker_tables`
+| Event | Trigger Point | Example Message |
+|-------|---------------|-----------------|
+| **New hand dealt** | `preflop` phase detected (line 195) | "Shuffling up and dealing" (first hand only) |
+| **All-in called** | When a player goes all-in (detected from `lastActions`) | "All in! We have an all-in!" |
+| **Heads-up reached** | `activePlayers.length === 2` after a bust-out | "We're heads up!" |
+| **Big pot** | When `totalPot` exceeds 10x big blind | "Big pot building!" |
+| **Player eliminated** | When a seat goes from active to `stack <= 0` | "{name} has been eliminated" |
+| **Player joins table** | `seat_change` broadcast with join action | "Welcome to the table" |
 
-```sql
-ALTER TABLE public.poker_tables
-  ADD COLUMN blind_level integer NOT NULL DEFAULT 0,
-  ADD COLUMN original_small_blind integer,
-  ADD COLUMN original_big_blind integer,
-  ADD COLUMN last_blind_increase_at timestamptz NOT NULL DEFAULT now();
+## Technical Architecture
 
--- Backfill originals from current values
-UPDATE public.poker_tables
-SET original_small_blind = small_blind,
-    original_big_blind = big_blind;
-```
-
-- `blind_level`: how many times blinds have doubled (0 = original, 1 = 2x, 2 = 4x, ...)
-- `original_small_blind` / `original_big_blind`: the starting blinds (so we can always calculate: current = original * 2^level)
-- `last_blind_increase_at`: timestamp of last increase (used for countdown)
-
-### 2. Edge Function: `poker-start-hand/index.ts` -- Add blind escalation
-
-Before posting blinds, check if blinds should increase:
+### New Hook: `usePokerVoiceAnnouncements`
 
 ```text
-1. Read table.blind_timer_minutes, table.blind_level, table.last_blind_increase_at
-2. If blind_timer_minutes > 0:
-   a. Calculate elapsed = now - last_blind_increase_at
-   b. While elapsed >= blind_timer_minutes * 60s:
-      - Increment blind_level
-      - Subtract one interval from elapsed
-   c. If blind_level changed:
-      - new_small = original_small_blind * (2 ^ blind_level)
-      - new_big = original_big_blind * (2 ^ blind_level)
-      - Update poker_tables: small_blind, big_blind, blind_level, last_blind_increase_at
-3. Use updated blinds for posting SB/BB
-4. Include blind_timer_minutes, blind_level, last_blind_increase_at in broadcast payload
-5. If blinds increased, broadcast a "blinds_up" event with old and new values
+src/hooks/usePokerVoiceAnnouncements.ts
+
+- Wraps calls to the existing `tournament-announce` edge function
+- Manages a queue so announcements don't overlap (one at a time)
+- Has an enable/disable toggle (respects existing sound toggle)
+- Implements caching: common phrases like "Shuffling up and dealing" are
+  cached in memory after first play to avoid repeat API calls
+- Deduplication: prevents the same announcement within 3 seconds
+- Returns: { announceBlindUp, announceWinner, announceCountdown,
+             announceGameOver, announceCustom, voiceEnabled, toggleVoice }
 ```
 
-### 3. Bot Game: `src/hooks/usePokerGame.ts` -- Replace BLIND_LEVELS with doubling
+### Audio Queue System
 
-In the `DEAL_HAND` case (lines 140-155), replace the `BLIND_LEVELS` lookup with simple doubling:
+Since TTS has network latency (~1-2s), the hook will:
+1. Queue announcements if one is already playing
+2. Skip queued items older than 5 seconds (stale)
+3. Play sound effects immediately (existing system) while voice loads async
 
-```typescript
-// Replace current blind escalation logic with:
-if (state.blindTimer > 0 && Date.now() - state.lastBlindIncrease >= state.blindTimer * 60000) {
-  blindLevel = state.blindLevel + 1;
-  currentSmallBlind = state.smallBlind * 2;  // Double current blinds
-  currentBigBlind = state.bigBlind * 2;
-  lastBlindIncrease = Date.now();
-}
-```
+### Caching Strategy
 
-Also update the `BlindTimerCountdown` in `PokerTablePro.tsx` to show the doubled values instead of looking up `BLIND_LEVELS`:
+- Cache generated audio in a `Map<string, string>` (message -> base64 data URI)
+- Common phrases reuse cached audio
+- Dynamic messages (player names, chip amounts) are not cached
+- Cache limited to 20 entries with LRU eviction
 
-```typescript
-// Instead of: const next = BLIND_LEVELS[blindLevel + 1];
-// Use: const next = { small: currentSmall * 2, big: currentBig * 2 };
-```
+### Integration Points in `OnlinePokerTable.tsx`
 
-Pass `currentSmall` and `currentBig` as props instead of `blindLevel`.
+1. Import and initialize `usePokerVoiceAnnouncements` alongside `usePokerSounds`
+2. Wire the voice toggle to the existing sound button (or add a separate mic icon)
+3. Add voice calls at these existing trigger points:
+   - **Line 155** (`onBlindsUp` callback): call `announceBlindUp(small, big)`
+   - **Line 259** (`handWinners` effect): call `announceWinner(winnerName, amount, handName)`
+   - **Line 377** (game over effect): call `announceGameOver(winnerName)`
+   - **Line 471** (`handleLowTime`): call `announceCountdown()`
+   - **Line 195** (phase change to preflop): call `announceCustom("Shuffling up and dealing")` on first hand
+   - New effect watching `lastActions` for all-in: call `announceCustom("All in!")`
+   - New effect watching active player count for heads-up detection
 
-### 4. Client: `src/components/poker/OnlinePokerTable.tsx` -- Add blind timer countdown
+### Sound Toggle UX
 
-Add a countdown display in the header bar (next to the blinds display at line 619):
-- Show time remaining until next blind increase
-- Show upcoming doubled blind values
-- Only visible when `blind_timer_minutes > 0`
+Add a dedicated voice toggle button next to the existing sound toggle in the header bar (line 704). Two separate controls:
+- Speaker icon: existing SFX on/off
+- Microphone/voice icon: voice announcements on/off
 
-### 5. Client: `src/lib/poker/online-types.ts` -- Update types
+Both default to ON.
 
-Add new fields to `OnlineTableInfo`:
-```typescript
-blind_level: number;
-original_small_blind: number;
-original_big_blind: number;
-last_blind_increase_at: string;
-```
-
-### 6. Notifications -- Blinds increased alert
-
-**Bot game**: Show a toast notification when blinds increase at the start of a new hand. In `usePokerGame.ts`, return a flag `blindsIncreased` from `DEAL_HAND`, and in `PokerTablePro.tsx` display a toast.
-
-**Multiplayer**: Broadcast a `blinds_up` event from `poker-start-hand` when blinds escalate. In `OnlinePokerTable.tsx`, listen for this event and show a toast with the new blind values.
-
-Toast format: "Blinds Up! Now 200/400"
-
-### 7. Bot Game Display Enhancement
-
-Make the `BlindTimerCountdown` more visible:
-- Increase font from 9px to 12px
-- Add a pulsing glow effect when under 60 seconds remaining
-- Use gold/amber color to stand out
-
----
-
-## File Summary
+## File Changes Summary
 
 | File | Change |
 |------|--------|
-| **Database migration** | Add `blind_level`, `original_small_blind`, `original_big_blind`, `last_blind_increase_at` to `poker_tables` |
-| `supabase/functions/poker-start-hand/index.ts` | Check timer, double blinds, update table, broadcast `blinds_up` event |
-| `src/hooks/usePokerGame.ts` | Replace `BLIND_LEVELS` lookup with doubling logic in `DEAL_HAND` |
-| `src/components/poker/PokerTablePro.tsx` | Update `BlindTimerCountdown` to show doubled values, bigger display, show toast on blind increase |
-| `src/components/poker/OnlinePokerTable.tsx` | Add blind timer countdown, listen for `blinds_up` broadcast, show toast |
-| `src/lib/poker/online-types.ts` | Add blind tracking fields to `OnlineTableInfo` |
+| `src/hooks/usePokerVoiceAnnouncements.ts` | **New file** -- voice announcement hook with queue, cache, and dedup |
+| `src/components/poker/OnlinePokerTable.tsx` | Import hook, wire to game events, add voice toggle button |
+| `supabase/functions/tournament-announce/index.ts` | No changes needed -- already works perfectly |
+
+## Cost and Performance Considerations
+
+- ElevenLabs `eleven_turbo_v2_5` model is fast (~1s latency) and cost-efficient
+- Caching common phrases minimizes API calls per session
+- Average game might make 10-20 TTS calls (blinds up + winners + special events)
+- Voice announcements are client-side only -- each player's device calls independently
+- No database changes required
