@@ -68,22 +68,22 @@ export function BettingControls({
   // ── Landscape: vertical right-thumb panel ──
   if (landscape) {
     return (
-      <div className="flex flex-col gap-2 w-[130px] animate-fade-in">
+      <div className="flex flex-col gap-2 w-[160px] animate-fade-in">
         {showRaiseSlider && canRaise && (
-          <div className="flex flex-col gap-1.5 px-2 py-2 rounded-xl"
+          <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl"
             style={{
               background: 'linear-gradient(180deg, hsl(160 25% 12% / 0.95), hsl(160 30% 8% / 0.98))',
               backdropFilter: 'blur(12px)',
               border: '1px solid hsl(43 74% 49% / 0.2)',
             }}
           >
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {quickBets.map((qb) => {
                 const capped = Math.min(Math.max(qb.amount, minRaiseTotal), maxRaiseTotal);
                 const isActive = raiseAmount === capped;
                 return (
                   <button key={qb.label}
-                    className="text-[8px] py-0.5 px-1.5 rounded-full font-bold active:scale-90 transition-all"
+                    className="text-[10px] py-1 px-2 rounded-full font-bold active:scale-90 transition-all"
                     style={{
                       background: isActive
                         ? 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))'
@@ -105,7 +105,7 @@ export function BettingControls({
               step={bigBlind}
               onValueChange={([v]) => setRaiseAmount(v)}
             />
-            <span className="text-[9px] text-primary text-center font-bold tabular-nums">
+            <span className="text-[11px] text-primary text-center font-bold tabular-nums">
               {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
             </span>
           </div>
@@ -165,20 +165,20 @@ export function BettingControls({
   return (
     <div className="flex flex-col gap-1.5 w-full animate-fade-in">
       {showRaiseSlider && canRaise && (
-        <div className="flex flex-col gap-1.5 px-2 py-2 rounded-xl animate-fade-in"
+        <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl animate-fade-in"
           style={{
             background: 'linear-gradient(180deg, hsl(160 25% 12% / 0.9), hsl(160 30% 8% / 0.95))',
             backdropFilter: 'blur(12px)',
             border: '1px solid hsl(43 74% 49% / 0.2)',
           }}
         >
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             {quickBets.map((qb) => {
               const capped = Math.min(Math.max(qb.amount, minRaiseTotal), maxRaiseTotal);
               const isActive = raiseAmount === capped;
               return (
                 <button key={qb.label}
-                  className={cn('flex-1 text-[9px] py-1 px-1 rounded-full font-bold active:scale-90 transition-all duration-150')}
+                  className={cn('flex-1 text-[11px] py-1.5 px-2 rounded-full font-bold active:scale-90 transition-all duration-150')}
                   style={{
                     background: isActive
                       ? 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))'
@@ -195,9 +195,9 @@ export function BettingControls({
               );
             })}
           </div>
-          <div className="flex items-center gap-2">
-            <Slider value={[raiseAmount]} min={minRaiseTotal} max={maxRaiseTotal} step={bigBlind} onValueChange={([v]) => setRaiseAmount(v)} className="flex-1" />
-            <span className="text-[10px] text-primary w-14 text-right font-bold tabular-nums" style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}>
+          <div className="flex items-center gap-3">
+            <Slider value={[raiseAmount]} min={minRaiseTotal} max={maxRaiseTotal} step={bigBlind} onValueChange={([v]) => setRaiseAmount(v)} className="flex-1 h-6" />
+            <span className="text-xs text-primary w-16 text-right font-bold tabular-nums" style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}>
               {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
             </span>
           </div>
