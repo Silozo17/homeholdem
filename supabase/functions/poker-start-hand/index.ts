@@ -464,7 +464,10 @@ Deno.serve(async (req) => {
       throw handErr;
     }
 
-    console.log(`[START-HAND] hand=${hand.id} #${handNumber} table=${table_id} players=${activePlayers.length} dealer=seat${dealerSeat} SB=seat${sbSeat} BB=seat${bbSeat} blinds=${table.small_blind}/${table.big_blind} ante=${table.ante} firstActor=seat${firstActor}`);
+    // P0-B debug: log which players are active vs still sitting_out
+    const { data: allSeatsForLog } = await admin.from("poker_seats").select("seat_number, player_id, status").eq("table_id", table_id).not("player_id", "is", null);
+    const sittingOut = (allSeatsForLog || []).filter((s: any) => s.status === "sitting_out");
+    console.log(`[START-HAND] hand=${hand.id} #${handNumber} table=${table_id} players=${activePlayers.length} dealer=seat${dealerSeat} SB=seat${sbSeat} BB=seat${bbSeat} blinds=${table.small_blind}/${table.big_blind} ante=${table.ante} firstActor=seat${firstActor} sitting_out=${sittingOut.length}`);
 
     // Insert hole cards
     for (const hc of holeCardInserts) {
