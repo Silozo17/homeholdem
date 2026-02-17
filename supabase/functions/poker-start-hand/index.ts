@@ -191,29 +191,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check no active hand
+    // Check no active hand — with stuck-hand recovery
     const { data: activeHand } = await admin
       .from("poker_hands")
-      .select("id")
+      .select("id, action_deadline")
       .eq("table_id", table_id)
       .is("completed_at", null)
       .limit(1)
       .maybeSingle();
 
     if (activeHand) {
-      return new Response(
-        JSON.stringify({ error: "Hand already in progress" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // If stuck for 60s+, force-complete it
+      const stuckCutoff = Date.now() - 60_000;
+      if (activeHand.action_deadline && new Date(activeHand.action_deadline).getTime() < stuckCutoff) {
+        console.log(`Force-completing stuck hand ${activeHand.id} (deadline was ${activeHand.action_deadline})`);
+        await admin
+          .from("poker_hands")
+          .update({ completed_at: new Date().toISOString(), phase: "complete" })
+          .eq("id", activeHand.id);
+        await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
+        // Broadcast so clients know the hand ended
+        const channel = admin.channel(`poker:table:${table_id}`);
+        await channel.send({
+          type: "broadcast",
+          event: "game_state",
+          payload: { hand_id: activeHand.id, phase: "complete", force_completed: true },
+        });
+      } else {
+        return new Response(
+          JSON.stringify({ error: "Hand already in progress" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Activate sitting_out players for the new hand
+    // Skip players who joined within the last 3 seconds to prevent mid-hand dealing
+    const joinCutoff = new Date(Date.now() - 3000).toISOString();
     await admin
       .from("poker_seats")
       .update({ status: "active" })
       .eq("table_id", table_id)
       .eq("status", "sitting_out")
-      .gt("stack", 0);
+      .gt("stack", 0)
+      .lt("joined_at", joinCutoff);
 
     // Get active seats
     const { data: seats } = await admin
