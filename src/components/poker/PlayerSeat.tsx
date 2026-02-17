@@ -19,6 +19,7 @@ interface PlayerSeatProps {
   seatDealOrder?: number;
   totalActivePlayers?: number;
   compact?: boolean;
+  level?: number;
   onTimeout?: () => void;
   onLowTime?: () => void;
 }
@@ -30,7 +31,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, onTimeout, onLowTime,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, onTimeout, onLowTime,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -129,6 +130,7 @@ export const PlayerSeat = memo(function PlayerSeat({
           isCurrentPlayer={isCurrentPlayer && !isOut}
           avatarUrl={avatarUrl}
           size={avatarSize}
+          level={level}
         />
 
         {/* Dealer button */}

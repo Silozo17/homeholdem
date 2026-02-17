@@ -12,6 +12,8 @@ import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown,
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
+import { usePlayerLevel } from '@/hooks/usePlayerLevel';
+import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { enUS, pl } from 'date-fns/locale';
 
@@ -61,6 +63,7 @@ export default function Profile() {
   const [loadingData, setLoadingData] = useState(true);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { isAdmin } = useIsAppAdmin();
+  const levelData = usePlayerLevel(user?.id);
 
   const dateLocale = i18n.language === 'pl' ? pl : enUS;
 
@@ -244,6 +247,15 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {profile?.created_at ? t('profile.member_since', { date: format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) }) : ''}
                 </p>
+                {levelData && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-primary">Lvl {levelData.level}</span>
+                      <span className="text-[10px] text-muted-foreground">{levelData.totalXp.toLocaleString()} / {levelData.xpForNextLevel.toLocaleString()} XP</span>
+                    </div>
+                    <Progress value={levelData.progress * 100} className="h-1.5 mt-1" />
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
