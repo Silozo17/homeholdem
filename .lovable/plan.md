@@ -1,50 +1,36 @@
 
 
-# Fix: Toast Notifications Under iPhone Notch (Final Solution)
+# Fix: Red Toast Notifications Under iPhone Notch
 
-## Root Cause (confirmed after 3 failed attempts)
+## Root Cause
 
-Safari/WebKit does NOT evaluate `env(safe-area-inset-top)` inside inline styles (the HTML `style` attribute). Every previous fix -- whether using `style` prop, `offset` prop, or `mobileOffset` prop -- ultimately writes to the element's inline style. Safari sees `env(safe-area-inset-top)` there and treats it as 0, so the toast sits at the very top of the screen.
+The app uses **two completely separate toast systems**:
 
-The `env()` function only works properly in **stylesheet rules** (CSS files, `<style>` tags), not in inline `style` attributes on Safari.
+1. **Sonner** (green success toasts) -- already fixed with the CSS rule in `index.css`
+2. **Radix/shadcn Toaster** (red error/destructive toasts) -- completely untouched by all previous fixes
+
+The red toasts are rendered by `ToastViewport` in `src/components/ui/toast.tsx`, which has `fixed top-0` with no safe-area padding whatsoever. This is why the red notifications still appear under the notch.
 
 ## The Fix
 
-Two changes:
+**File: `src/components/ui/toast.tsx`** (line 17)
 
-### 1. `src/index.css` -- Add a CSS rule targeting Sonner's toaster
+Change the `ToastViewport` className from:
 
-```css
-/* Force toasts below safe area on notched devices (Safari inline env() bug workaround) */
-[data-sonner-toaster][data-y-position="top"] {
-  top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
-}
+```
+fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 ...
 ```
 
-This single rule handles both desktop and mobile widths because it directly overrides the `top` property with `!important`, bypassing whatever inline variables Sonner generates.
+to:
 
-### 2. `src/components/ui/sonner.tsx` -- Remove the broken offset props
-
-Remove the `offset` and `mobileOffset` props from the Sonner component since they have no effect on Safari. The CSS rule above handles positioning.
-
-```tsx
-<Sonner
-  theme={theme as ToasterProps["theme"]}
-  position="top-center"
-  className="toaster group"
-  toastOptions={...}
-  {...props}
-/>
+```
+fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] ...
 ```
 
-## Why this works
+This adds `pt-[calc(env(safe-area-inset-top,0px)+1rem)]` which pushes the toast container below the notch on iPhones. On non-notched devices, `env(safe-area-inset-top)` returns 0 so the padding stays at the normal 1rem.
 
-- `env(safe-area-inset-top)` in a CSS stylesheet rule is fully supported by Safari 11.1+ and all WebKit browsers
-- `!important` ensures it overrides Sonner's inline style `top: var(--offset-top)` and `top: var(--mobile-offset-top)`
-- No JavaScript, no props, no CSS variables -- just a direct CSS rule that Safari will correctly evaluate
+Since this is a Tailwind class in a stylesheet (not an inline style), Safari evaluates `env()` correctly.
 
-## Files changed
+## Files Changed
 
-- `src/index.css` -- Add 1 CSS rule (4 lines)
-- `src/components/ui/sonner.tsx` -- Remove offset/mobileOffset props
-
+- `src/components/ui/toast.tsx` -- 1 line change in `ToastViewport` className
