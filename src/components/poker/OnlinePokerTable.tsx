@@ -86,6 +86,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverWinners, setGameOverWinners] = useState<HandWinner[]>([]);
+  const [cardsPeeked, setCardsPeeked] = useState(false);
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
   const [lowTimeWarning, setLowTimeWarning] = useState(false);
@@ -183,11 +184,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!isMyTurn) setLowTimeWarning(false);
   }, [isMyTurn, play, haptic, preAction, canCheck]);
 
-  // Clear pre-action on new hand
+  // Clear pre-action and card peek on new hand
   useEffect(() => {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId) {
       setPreAction(null);
+      setCardsPeeked(false);
     }
   }, [tableState?.current_hand?.hand_id]);
 
@@ -904,6 +906,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   totalActivePlayers={activeSeats.length}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
+                  isPeeked={isMe ? cardsPeeked : undefined}
+                  onPeek={isMe ? () => setCardsPeeked(true) : undefined}
                 />
               </SeatAnchor>
             );
