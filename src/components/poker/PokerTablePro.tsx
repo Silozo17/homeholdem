@@ -219,7 +219,19 @@ export function PokerTablePro({
     duration: Date.now() - state.startTime,
   }), [state.handsPlayed, state.handsWon, state.bestHandName, state.biggestPot, state.startTime]);
 
-  const showActions = isHumanTurn && humanPlayer && humanPlayer.status === 'active';
+  // Gate betting controls behind deal animation completion
+  const [dealAnimDone, setDealAnimDone] = useState(true);
+  useEffect(() => {
+    if (state.phase !== 'preflop' && state.phase !== 'flop' && state.phase !== 'turn' && state.phase !== 'river') return;
+    // When a new hand starts (handNumber changes), wait for deal animation
+    const activePlayers = state.players.filter(p => p.status !== 'eliminated').length;
+    const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8;
+    setDealAnimDone(false);
+    const t = setTimeout(() => setDealAnimDone(true), lastCardDelay * 1000);
+    return () => clearTimeout(t);
+  }, [state.handNumber]);
+
+  const showActions = isHumanTurn && humanPlayer && humanPlayer.status === 'active' && dealAnimDone;
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
