@@ -24,9 +24,9 @@ import { useHandHistory, HandPlayerSnapshot } from '@/hooks/useHandHistory';
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
 import { callEdge } from '@/lib/poker/callEdge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Play, LogOut, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History } from 'lucide-react';
+import { ArrowLeft, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
@@ -81,7 +81,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
-  const { lastHand, startNewHand, recordAction, finalizeHand } = useHandHistory(tableId);
+  const { lastHand, startNewHand, recordAction, finalizeHand, exportCSV } = useHandHistory(tableId);
   const [replayOpen, setReplayOpen] = useState(false);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [communityDealSprites, setCommunityDealSprites] = useState<Array<{ id: number; delay: number }>>([]);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
-  const [_keepHookOrder] = useState(false); // keep hook order stable after removing isDisconnected
+  
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -535,7 +535,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const handleAction = async (action: any) => {
+  const handleAction = async (action: { type: string; amount?: number }) => {
     // Haptic feedback per action type
     const hapticMap: Record<string, any> = { check: 'check', call: 'call', raise: 'raise', 'all-in': 'allIn', fold: 'fold' };
     if (hapticMap[action.type]) haptic(hapticMap[action.type]);
@@ -971,7 +971,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
 
       {/* Hand Replay sheet */}
-      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} />
+      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} onExportCSV={exportCSV} />
 
       {/* Quit confirmation dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>

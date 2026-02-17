@@ -30,7 +30,10 @@ export const PreActionButtons = memo(function PreActionButtons({
         return (
           <button
             key={action.id}
-            onClick={() => onQueue(isActive ? null : action.id)}
+            onClick={() => {
+              onQueue(isActive ? null : action.id);
+              if ('vibrate' in navigator) navigator.vibrate([30]);
+            }}
             className={cn(
               'px-3 py-1.5 rounded-full text-[10px] font-bold transition-all active:scale-95',
               isActive
