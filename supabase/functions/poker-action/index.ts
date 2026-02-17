@@ -377,7 +377,8 @@ async function processAction(
   if (nonFolded.length <= 1) {
     handComplete = true;
     newPhase = "complete";
-  } else if (activePlayers.length === 0) {
+  } else if (activePlayers.length === 0 || 
+             (activePlayers.length === 1 && allInPlayers.length > 0)) {
     // All remaining players are all-in — run out community cards
     roundComplete = true;
   } else {
@@ -420,7 +421,7 @@ async function processAction(
     }
 
     // If all active players are all-in, run out all remaining cards
-    if (activePlayers.length === 0 && nonFolded.length > 1) {
+    if (activePlayers.length <= 1 && allInPlayers.length > 0 && nonFolded.length > 1) {
       // Run out all community cards at once
       while (communityCards.length < 5) {
         communityCards.push(deck[deckOffset + communityCards.length]);
