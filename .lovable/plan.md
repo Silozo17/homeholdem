@@ -1,105 +1,67 @@
 
 
-# Stage 5 Cleanup, Sanitization & Feature Guide
+# Disable Card Peek + Fix & Reposition Pre-Action Buttons
 
-## Part 1: Code Cleanup
+## 1. Remove Card Peek Feature
 
-### 1.1 Remove dead code in `OnlinePokerTable.tsx`
+Remove the PeekableCard squeeze mechanic entirely. Cards will auto-reveal face-up after the deal animation (existing sequential reveal behaviour).
 
-| Line | Issue | Fix |
-|------|-------|-----|
-| 27 | `Input` imported but never used | Remove import |
-| 29 | `LogOut` imported but never used | Remove from icon import list |
-| 92 | `_keepHookOrder` state — artificial placeholder after `isDisconnected` removal | Remove entirely (hooks after it maintain stable order regardless) |
+**Files affected:**
+- `OnlinePokerTable.tsx` -- Remove `cardsPeeked` state, stop passing `isPeeked`/`onPeek` to PlayerSeat
+- `PlayerSeat.tsx` -- Remove `isPeeked`/`onPeek` props, remove PeekableCard import, always use CardDisplay for human cards
+- `PeekableCard.tsx` -- Delete the file (no longer referenced)
 
-### 1.2 Expose `exportCSV` from hand history to the UI
+## 2. Fix Pre-Action Bug ("Check" auto-called a raise)
 
-`useHandHistory` returns `exportCSV` but `OnlinePokerTable` never destructures it. Two options:
+The issue: when you queue "Check" and an opponent raises before your turn, there is a race condition where `isMyTurn` fires the pre-action before the bet invalidation effect runs. 
 
-- **Option A (chosen):** Add a "Download CSV" button inside `HandReplay.tsx` so users can export the last hand's data from the replay sheet. This requires passing `handHistory` (the full array) or `exportCSV` callback down.
-- Wire it: destructure `exportCSV` from `useHandHistory` in `OnlinePokerTable`, pass it as a prop to `HandReplay`.
+**Fix (in `OnlinePokerTable.tsx`):**
+- In the pre-action execution block, add an explicit `amountToCall === 0` guard for the `check` pre-action, so it never fires when there is money to call
+- Also guard `check_fold`: use the live `amountToCall` value (not just `canCheck`) to decide fold vs check
+- Clear any queued pre-action whenever the table bet level changes (strengthen the existing invalidation)
 
-### 1.3 Minor type safety
+## 3. Move Pre-Action Buttons to Top-Right, Stacked Vertically
 
-- `handleAction` in `OnlinePokerTable` accepts `any` — tighten to `{ type: string; amount?: number }`.
+Reposition the pre-action pills from bottom-center to the top-right corner of the screen, stacked vertically.
 
----
+**Changes:**
+- `PreActionButtons.tsx` -- Change layout from horizontal (`flex-row gap-1.5`) to vertical (`flex-col gap-1`)
+- `OnlinePokerTable.tsx` -- Change the pre-action container from `absolute left-1/2 -translate-x-1/2 bottom-...` to `absolute top-[calc(safe-area + header)] right-[safe-area + 8px]`, positioned just below the header bar icons
 
-## Part 2: Strengthen & Harden
+### Technical Detail
 
-### 2.1 `PeekableCard` — prevent scroll interference
+**OnlinePokerTable.tsx lines 911-916 (pre-action container):**
+```
+// FROM: centered at bottom
+<div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '...' }}>
 
-Touch drag on the card currently doesn't call `preventDefault()` on `touchmove`, which can cause the page to scroll on some browsers. Add `e.preventDefault()` in `handleTouchMove` and set `{ passive: false }` via a `useEffect` event listener instead of React's synthetic handler (React marks touch handlers as passive by default).
+// TO: top-right corner, below header
+<div className="absolute" style={{ 
+  top: 'calc(env(safe-area-inset-top, 0px) + 48px)', 
+  right: 'calc(env(safe-area-inset-right, 0px) + 10px)',
+  zIndex: Z.ACTIONS 
+}}>
+```
 
-### 2.2 `HandReplay` — reset step on open
+**PreActionButtons.tsx layout:**
+```
+// FROM: horizontal row
+<div className="flex items-center justify-center gap-1.5">
 
-When `HandReplay` opens, `step` retains its value from the previous viewing. Add a `useEffect` to reset `step` to `0` and `showAll` to `false` when `open` transitions to `true`.
+// TO: vertical stack
+<div className="flex flex-col items-end gap-1">
+```
 
-### 2.3 `ConnectionOverlay` — cleanup auto-reconnect on status change
-
-The current `useEffect` for auto-reconnect correctly clears timers on unmount but the `attempts` counter can drift if `status` flickers between `reconnecting` and `disconnected`. Add a guard: only increment attempts when the timer actually fires, and reset attempts to 0 immediately when status becomes `connected`.
-
-This is already mostly correct in the current code. No change needed after review.
-
-### 2.4 `PreActionButtons` — add haptic feedback
-
-When a pre-action button is toggled, add a light haptic tap for confirmation. Pass `haptic` from `OnlinePokerTable` or use `navigator.vibrate([30])` inline.
-
----
-
-## Part 3: Summary of Changes
-
-| File | Action |
-|------|--------|
-| `OnlinePokerTable.tsx` | Remove unused `Input` import, `LogOut` icon, `_keepHookOrder` state. Type-tighten `handleAction`. Destructure and pass `exportCSV` to `HandReplay`. |
-| `HandReplay.tsx` | Add CSV export button. Reset `step`/`showAll` on open. Accept `onExportCSV` prop. |
-| `PeekableCard.tsx` | Fix touch scroll interference with non-passive `touchmove` listener. |
-| `PreActionButtons.tsx` | Add light vibration on toggle. |
-
----
-
-## Part 4: Where to Find & Use Each New Feature
-
-Here is a guide to all features added in Stages 1--5:
-
-### Pre-Action Buttons (Stage 2.1)
-- **Where:** During an online multiplayer hand, when it is NOT your turn
-- **How:** Three small pill buttons appear at the bottom of the screen: "Check/Fold", "Call Any", "Check"
-- **Usage:** Tap one to queue an action. It highlights gold. When your turn arrives, the action fires automatically. Tap again to cancel.
-
-### Pot Odds Display (Stage 2.2)
-- **Where:** During your turn in multiplayer, when facing a bet
-- **How:** A small info line appears just below the pot total showing "X to win Y" and "Need Z% equity"
-- **Usage:** Purely informational — helps you decide whether to call
-
-### Enhanced Emote Reactions (Stage 2.3)
-- **Where:** Tap the chat bubble icon in the table header bar
-- **How:** A popover grid of 8 emoji reactions + 6 quick text messages. Recently used emojis appear at the top.
-- **Usage:** Tap any emoji/message to send it. Single emojis float as large animated bubbles; text appears as chat pills.
-
-### Card Peek / Squeeze (Stage 3.1)
-- **Where:** When you are dealt cards in multiplayer, your hole cards start face-down
-- **How:** Drag upward on your cards to "peek" — the card tilts and reveals from the bottom like a real squeeze
-- **Usage:** Drag past 65% to permanently reveal. A one-time "Drag to peek" hint appears on first use.
-
-### Achievement System (Stage 4.1)
-- **Where:** Achievements trigger automatically during multiplayer play
-- **How:** A rarity-styled toast (silver/blue/purple/gold) appears at the top of the table when you unlock one
-- **Examples:** Win your first hand (First Blood), hit a Royal Flush, win 5 in a row (On Fire), double your stack
-- **Persistence:** Stored in localStorage. 20 achievements available across Common, Rare, Epic, and Legendary tiers.
-
-### Hand History & Replay (Stage 4.2)
-- **Where:** After at least one hand completes, a clock/history icon appears in the top-right header bar
-- **How:** Tap it to open a bottom sheet showing a step-by-step replay of the last hand
-- **Usage:** Use Prev/Next to step through actions, or "Show All" for the full timeline. Community cards and winners display contextually. CSV export button (being added in this cleanup).
-
-### Offline Hand Cache (Stage 5.1)
-- **Where:** Automatic — hands are cached in localStorage per table
-- **How:** Up to 20 hands stored per table, up to 5 tables total. Oldest tables are pruned automatically.
-- **Usage:** Hand history persists even if you close the browser and return later.
-
-### Smart Reconnection (Stage 5.2)
-- **Where:** Appears automatically when your connection drops during multiplayer
-- **How:** A full-screen overlay shows connection status, attempt progress (6 attempts with exponential backoff: 2s to 30s), and context about the current hand
-- **Usage:** Wait for auto-reconnect, or tap "Reconnect" manually. On success, a green "Reconnected!" flash confirms recovery.
+**Pre-action execution fix (OnlinePokerTable.tsx ~line 280):**
+```typescript
+if (preAction === 'check_fold') {
+  actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'fold' };
+} else if (preAction === 'call_any') {
+  actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'call' };
+} else if (preAction === 'check') {
+  // ONLY fire if there is genuinely nothing to call
+  if (amountToCall === 0) actionToFire = { type: 'check' };
+  // Otherwise discard silently (do NOT call)
+}
+```
 
