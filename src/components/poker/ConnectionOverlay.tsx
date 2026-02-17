@@ -1,42 +1,101 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { WifiOff, RefreshCw } from 'lucide-react';
+import { WifiOff, RefreshCw, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
 interface ConnectionOverlayProps {
-  isDisconnected: boolean;
+  status: ConnectionStatus;
   onReconnect: () => void;
+  handInProgress?: boolean;
+  lastPhase?: string | null;
+  myStack?: number | null;
 }
 
-export function ConnectionOverlay({ isDisconnected, onReconnect }: ConnectionOverlayProps) {
+const BACKOFF_DELAYS = [2000, 4000, 8000, 16000, 30000, 30000];
+const MAX_ATTEMPTS = BACKOFF_DELAYS.length;
+
+export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPhase, myStack }: ConnectionOverlayProps) {
   const { t } = useTranslation();
   const [reconnecting, setReconnecting] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const prevStatusRef = useRef<ConnectionStatus>(status);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Show "Reconnected!" flash when recovering
   useEffect(() => {
-    if (!isDisconnected) {
+    const wasDisconnected = prevStatusRef.current === 'reconnecting' || prevStatusRef.current === 'disconnected';
+    if (wasDisconnected && status === 'connected') {
+      setShowSuccess(true);
       setReconnecting(false);
       setAttempts(0);
+      const timer = setTimeout(() => setShowSuccess(false), 1500);
+      prevStatusRef.current = status;
+      return () => clearTimeout(timer);
     }
-  }, [isDisconnected]);
+    prevStatusRef.current = status;
+  }, [status]);
 
-  // Auto-reconnect every 5 seconds up to 6 attempts
+  // Reset state when connected
   useEffect(() => {
-    if (!isDisconnected || reconnecting || attempts >= 6) return;
-    const timer = setTimeout(() => {
+    if (status === 'connected') {
+      setReconnecting(false);
+      setAttempts(0);
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    }
+  }, [status]);
+
+  // Auto-reconnect with exponential backoff
+  useEffect(() => {
+    if (status === 'connected' || reconnecting || attempts >= MAX_ATTEMPTS) return;
+    if (status !== 'disconnected' && status !== 'reconnecting') return;
+
+    const delay = BACKOFF_DELAYS[attempts] ?? 30000;
+    timerRef.current = setTimeout(() => {
       setReconnecting(true);
       setAttempts(prev => prev + 1);
       onReconnect();
       setTimeout(() => setReconnecting(false), 2000);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [isDisconnected, reconnecting, attempts, onReconnect]);
+    }, delay);
 
-  if (!isDisconnected) return null;
+    return () => {
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    };
+  }, [status, reconnecting, attempts, onReconnect]);
+
+  // Cleanup on unmount
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  // Success flash
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+        <div
+          className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl animate-fade-in"
+          style={{
+            background: 'linear-gradient(135deg, hsl(142 50% 15% / 0.95), hsl(142 40% 10% / 0.98))',
+            border: '1px solid hsl(142 60% 45% / 0.5)',
+            boxShadow: '0 0 20px hsl(142 60% 45% / 0.3)',
+          }}
+        >
+          <Wifi className="h-5 w-5 text-green-400" />
+          <span className="text-sm font-bold text-green-300">Reconnected!</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'connected') return null;
+
+  const progressPct = (attempts / MAX_ATTEMPTS) * 100;
+  const isExhausted = attempts >= MAX_ATTEMPTS;
 
   const handleManualReconnect = () => {
     setReconnecting(true);
-    setAttempts(prev => prev + 1);
+    setAttempts(prev => Math.min(prev + 1, MAX_ATTEMPTS));
     onReconnect();
     setTimeout(() => setReconnecting(false), 2000);
   };
@@ -44,27 +103,64 @@ export function ConnectionOverlay({ isDisconnected, onReconnect }: ConnectionOve
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        className="flex flex-col items-center gap-4 p-6 rounded-2xl max-w-xs text-center"
+        className="flex flex-col items-center gap-3 p-5 rounded-2xl max-w-xs w-[280px] text-center"
         style={{
           background: 'linear-gradient(180deg, hsl(160 25% 12% / 0.95), hsl(160 30% 8% / 0.98))',
           border: '1px solid hsl(0 60% 45% / 0.4)',
           boxShadow: '0 8px 32px hsl(0 0% 0% / 0.5)',
         }}
       >
-        <div className="w-14 h-14 rounded-full flex items-center justify-center bg-destructive/20">
-          <WifiOff className="h-7 w-7 text-destructive" />
+        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-destructive/20">
+          <WifiOff className="h-6 w-6 text-destructive" />
         </div>
-        <h3 className="text-lg font-bold text-foreground">
+
+        <h3 className="text-base font-bold text-foreground">
           {t('poker_online.connection_lost')}
         </h3>
-        <p className="text-sm text-muted-foreground">
-          {reconnecting
-            ? t('poker_online.reconnecting')
-            : attempts >= 6
-              ? t('poker_online.reconnect_failed')
-              : t('poker_online.reconnecting')
-          }
-        </p>
+
+        {/* Hand context info */}
+        {handInProgress && (
+          <div
+            className="w-full rounded-lg px-3 py-2 text-left space-y-1"
+            style={{
+              background: 'hsl(43 30% 12% / 0.6)',
+              border: '1px solid hsl(43 74% 49% / 0.2)',
+            }}
+          >
+            {lastPhase && (
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-foreground/50">Hand:</span>
+                <span className="text-primary font-bold capitalize">{lastPhase === 'preflop' ? 'Pre-Flop' : lastPhase}</span>
+              </div>
+            )}
+            {myStack != null && (
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-foreground/50">Your stack:</span>
+                <span className="text-foreground font-bold">{myStack.toLocaleString()}</span>
+              </div>
+            )}
+            <p className="text-[10px] text-foreground/40 italic">
+              Reconnecting will restore your position
+            </p>
+          </div>
+        )}
+
+        {/* Progress */}
+        <div className="w-full space-y-1">
+          <Progress
+            value={progressPct}
+            className="h-1.5 bg-secondary/40"
+          />
+          <p className="text-[10px] text-muted-foreground">
+            {reconnecting
+              ? 'Reconnecting...'
+              : isExhausted
+                ? 'Auto-reconnect exhausted'
+                : `Attempt ${attempts}/${MAX_ATTEMPTS}`
+            }
+          </p>
+        </div>
+
         <Button
           onClick={handleManualReconnect}
           disabled={reconnecting}
