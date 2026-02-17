@@ -332,11 +332,25 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [error, tableState, loading, onLeave]);
 
-  // Game over detection
+  // Game over detection — loser (stack=0) OR winner (last player standing)
   useEffect(() => {
     if (!tableState || !user) return;
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-    if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
+    if (!mySeatInfo || handWinners.length === 0) return;
+
+    const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+
+    // LOSER: my stack is 0 after a hand result
+    if (mySeatInfo.stack <= 0) {
+      const timer = setTimeout(() => {
+        setGameOver(true);
+        setGameOverWinners(handWinners);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+
+    // WINNER: I'm the last player with chips
+    if (activePlayers.length === 1 && activePlayers[0].player_id === user.id) {
       const timer = setTimeout(() => {
         setGameOver(true);
         setGameOverWinners(handWinners);
@@ -769,7 +783,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           {gameOver && (
             <WinnerOverlay
               winners={gameOverWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
-              isGameOver={true} onNextHand={() => {}} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
+              isGameOver={true} onNextHand={() => { leaveTable().then(onLeave).catch(onLeave); }} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
             />
           )}
 
@@ -825,16 +839,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             if (!pos) return null;
             const isSingleEmoji = /^\p{Emoji}$/u.test(bubble.text);
             return (
-              <div key={bubble.id} className={cn('absolute pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
+              <div key={bubble.id} className="absolute pointer-events-none"
                 style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: 'translateX(-50%)', zIndex: Z.EFFECTS + 5 }}>
-                {isSingleEmoji ? (
-                  <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>{bubble.text}</span>
-                ) : (
-                  <span className="text-sm px-2 py-1 rounded-lg font-bold"
-                    style={{ background: 'hsl(0 0% 0% / 0.7)', color: 'hsl(45 30% 95%)', border: '1px solid hsl(43 74% 49% / 0.3)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                    {bubble.text}
-                  </span>
-                )}
+                <div className={isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up'}>
+                  {isSingleEmoji ? (
+                    <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>{bubble.text}</span>
+                  ) : (
+                    <span className="text-sm px-2 py-1 rounded-lg font-bold"
+                      style={{ background: 'hsl(0 0% 0% / 0.7)', color: 'hsl(45 30% 95%)', border: '1px solid hsl(43 74% 49% / 0.3)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                      {bubble.text}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

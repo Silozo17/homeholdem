@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
@@ -62,6 +64,9 @@ export default function Profile() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [savingName, setSavingName] = useState(false);
   const { isAdmin } = useIsAppAdmin();
   const levelData = usePlayerLevel(user?.id);
 
@@ -240,9 +245,66 @@ export default function Profile() {
                 onUploadComplete={handleAvatarUpdate}
               />
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gold-gradient">
-                  {profile?.display_name}
-                </h1>
+                {editingName ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="h-8 text-lg font-bold bg-background/50"
+                      maxLength={30}
+                      autoFocus
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-success shrink-0"
+                      disabled={savingName || !newName.trim()}
+                      onClick={async () => {
+                        if (!user || !newName.trim()) return;
+                        setSavingName(true);
+                        const { error } = await supabase
+                          .from('profiles')
+                          .update({ display_name: newName.trim() })
+                          .eq('id', user.id);
+                        setSavingName(false);
+                        if (error) {
+                          toast({ title: 'Error', description: 'Failed to update name', variant: 'destructive' });
+                        } else {
+                          setProfile(prev => prev ? { ...prev, display_name: newName.trim() } : prev);
+                          setEditingName(false);
+                          toast({ title: 'Name updated' });
+                        }
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground shrink-0"
+                      onClick={() => setEditingName(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-gold-gradient">
+                      {profile?.display_name}
+                    </h1>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        setNewName(profile?.display_name || '');
+                        setEditingName(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">{profile?.email}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {profile?.created_at ? t('profile.member_since', { date: format(new Date(profile.created_at), 'MMM yyyy', { locale: dateLocale }) }) : ''}
