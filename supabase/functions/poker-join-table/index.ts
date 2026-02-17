@@ -159,7 +159,14 @@ Deno.serve(async (req) => {
       throw seatErr;
     }
 
-    // Broadcast seat change
+    // Fetch profile for broadcast payload
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("display_name, avatar_url")
+      .eq("id", user.id)
+      .single();
+
+    // Broadcast seat change with full player info
     const channel = admin.channel(`poker:table:${table_id}`);
     await channel.send({
       type: "broadcast",
@@ -167,8 +174,10 @@ Deno.serve(async (req) => {
       payload: {
         seat: seat_number,
         player_id: user.id,
-        display_name: null, // client can fetch profile
+        display_name: profile?.display_name || 'Player',
+        avatar_url: profile?.avatar_url || null,
         action: "join",
+        stack: buy_in_amount,
       },
     });
 

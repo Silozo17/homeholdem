@@ -99,13 +99,21 @@ Deno.serve(async (req) => {
 
     // Get actions for the current hand to derive folded/all-in status
     let handActions: any[] = [];
+    let holeCardPlayerIds: Set<string> = new Set();
     if (currentHand) {
-      const { data: actions } = await admin
-        .from("poker_actions")
-        .select("*")
-        .eq("hand_id", currentHand.id)
-        .order("sequence", { ascending: true });
-      handActions = actions || [];
+      const [actionsResult, holeCardsResult] = await Promise.all([
+        admin
+          .from("poker_actions")
+          .select("*")
+          .eq("hand_id", currentHand.id)
+          .order("sequence", { ascending: true }),
+        admin
+          .from("poker_hole_cards")
+          .select("player_id")
+          .eq("hand_id", currentHand.id),
+      ]);
+      handActions = actionsResult.data || [];
+      holeCardPlayerIds = new Set((holeCardsResult.data || []).map((r: any) => r.player_id));
     }
 
     // Get player's own hole cards if there's an active hand
@@ -165,7 +173,7 @@ Deno.serve(async (req) => {
         current_bet: currentBet,
         last_action: lastAction,
         has_cards:
-          currentHand && derivedStatus !== "folded" && s.player_id ? true : false,
+          currentHand && holeCardPlayerIds.has(s.player_id) && derivedStatus !== "folded" ? true : false,
       };
     });
 
