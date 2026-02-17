@@ -785,7 +785,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded';
+  const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
