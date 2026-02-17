@@ -225,7 +225,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         <div className="h-14" />
       </div>
 
-      <div className="flex-1 px-4 pt-4 space-y-5">
+      <div className="flex-1 px-4 pt-4 space-y-5" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Hero */}
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
