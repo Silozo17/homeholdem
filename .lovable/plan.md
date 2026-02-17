@@ -1,31 +1,41 @@
 
 
-# Fix: Button Positioning Corrections
+# Fix: Content Hidden Behind Bottom Navigation
 
-## Issue 1: Coloured buttons (Fold/Check/Raise) — move 5px to the left
+## Problem
 
-The action buttons in portrait mode are currently at `left: 0, right: 0, px-3`. They appear centered. Moving them 5px to the left means adjusting the padding or adding a slight left offset.
+The bottom navigation bar is `h-16` (64px) + `pb-[5px]` (5px) + `safe-area-bottom` (up to ~34px on iPhones with home indicator) = up to ~103px total height.
 
-For the landscape/desktop version at line 1236, the buttons use `right: calc(env(safe-area-inset-right, 0px) + 10px)`. Moving 5px left means increasing the right offset to `15px`.
+However, the main content wrapper in `AppLayout.tsx` only applies `pb-20` (80px) of bottom padding. This means on devices with a safe-area inset, the last ~23px of content is hidden behind the nav bar and users cannot scroll to see it.
 
-For the mobile landscape version at line 1202-1203, same adjustment: increase `paddingRight` by 5px.
+## Fix
 
-**File: `src/components/poker/OnlinePokerTable.tsx`**
-- Line 1203: Change `paddingRight` from `max(env(safe-area-inset-right, 0px), 8px)` to `max(env(safe-area-inset-right, 0px), 13px)`
-- Line 1236: Change right from `10px` to `15px`
+**File: `src/components/layout/AppLayout.tsx`** (line 55)
 
-## Issue 2: Grey pre-action buttons (Check/Fold, Call Any, Check) — move back to top-right
+Change the bottom padding from a fixed `pb-20` to a value that accounts for the safe-area inset:
 
-The user originally asked to move these closer to the right edge with 10px padding, NOT to the bottom. They should stay in the **top-right corner** as they were before, just with exactly 10px right padding.
+```
+// Before
+showBottomNav ? 'pb-20' : ''
 
-**File: `src/components/poker/OnlinePokerTable.tsx`**
-- Line 1248: Change positioning from `bottom: calc(env(safe-area-inset-bottom, 0px) + 12px)` back to `top: calc(env(safe-area-inset-top, 0px) + 48px)`, keep `right: calc(env(safe-area-inset-right, 0px) + 10px)`
+// After  
+showBottomNav ? 'pb-24' : ''
+```
+
+Additionally, add an inline style to include the device safe-area inset on top of the Tailwind padding, ensuring the content clears the nav on all devices:
+
+```tsx
+style={showBottomNav ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+```
+
+This ensures:
+- Base padding of `6rem` (96px) covers the nav height (64px + 5px + margin)
+- `env(safe-area-inset-bottom)` adds the device-specific home indicator area
+- No changes to BottomNav or any other component
 
 ## Summary
 
 | File | Line | Change |
 |------|------|--------|
-| `OnlinePokerTable.tsx` | 1203 | Increase paddingRight by 5px (8px to 13px) for mobile landscape action buttons |
-| `OnlinePokerTable.tsx` | 1236 | Increase right offset by 5px (10px to 15px) for desktop landscape action buttons |
-| `OnlinePokerTable.tsx` | 1248 | Change pre-action buttons from `bottom` back to `top: calc(env(safe-area-inset-top, 0px) + 48px)` |
+| `AppLayout.tsx` | 55 | Replace `pb-20` class with inline `paddingBottom: calc(6rem + env(safe-area-inset-bottom, 0px))` |
 
