@@ -1,46 +1,70 @@
 
 
-# Fix XP Abuse + Level-Based Badge Animations
+# Fix Deal Animation Sync and Button Timing
 
-## Issue 1: Free XP on Join-and-Leave
+## Problem Summary
 
-**Root Cause:** `saveXpAndStats` in `OnlinePokerTable.tsx` (line 574) always inserts a `game_complete` XP event worth 25 XP, even when `handsPlayedRef.current === 0`. A player can sit down and immediately leave to farm 25 XP per attempt.
+Three timing issues cause the buttons to appear before cards are visible and the deal animation to feel out of sync:
 
-Same issue in `PlayPoker.tsx` (line 49) -- quitting a practice game instantly awards 25 XP.
+1. **Action buttons appear too early** -- they show as soon as deal sprites finish flying, but the card reveal animation (the flip from face-down to face-up) takes an additional 0.45s after that. Players see Fold/Check/Raise before they can even see their cards.
 
-**Fix:**
-- `src/components/poker/OnlinePokerTable.tsx` (line 546-581): Skip ALL XP and result saving if `handsPlayedRef.current === 0`. Add an early return: `if (handsPlayedRef.current === 0) return;` right after the `xpSavedRef` guard. This means you must play at least 1 hand to receive any XP.
-- `src/pages/PlayPoker.tsx` (line 25-52): Same guard -- skip saving if `state.handsPlayed === 0`.
+2. **Deal sprite order doesn't match card reveal order** -- the flying card-back sprites use clockwise-from-dealer order, but the actual card reveal in each PlayerSeat uses plain screen order. So the sprite lands on a player at one time but their card flips at a completely different time.
 
-## Issue 2: Level Badge Animation Scales with Level
+3. **Sprites fly too fast** -- at 0.12s stagger, the first card lands at 0.45s. The server data for your cards may not have arrived yet, causing the first card to stay face-down while the second card reveals correctly.
 
-**Current:** Every level gets the same `animate-fire-glow` animation with identical orange glow.
+## Fixes
 
-**Fix in `src/components/common/LevelBadge.tsx`:**
-- Compute an "intensity tier" from the level (0-4 scale):
-  - Level 1-4: tier 0 -- no animation, plain dark badge with subtle border
-  - Level 5-14: tier 1 -- slow gentle pulse (3s cycle), faint warm glow
-  - Level 15-29: tier 2 -- medium pulse (2s cycle), orange glow
-  - Level 30-59: tier 3 -- faster pulse (1.5s cycle), bright orange-red glow, larger shadow radius
-  - Level 60+: tier 4 -- fast intense pulse (1s cycle), red-hot glow with large shadow, border color shifts to bright red/gold
+### Fix 1: Slow down deal sprite stagger (0.12s to 0.15s)
 
-- Apply the glow via inline `style` with `animation` and `boxShadow` instead of the single `animate-fire-glow` Tailwind class. This avoids needing 5 new Tailwind keyframes and keeps it self-contained.
+**File:** `src/components/poker/OnlinePokerTable.tsx`, line 1186
 
-**Fix in `tailwind.config.ts`:** No changes needed -- inline styles handle the tiers.
+Change the sprite stagger from `0.12` to `0.15`. This:
+- Gives the deal animation a more natural, deliberate pace
+- Ensures myCards data arrives before the first card reveal
+- Makes the visual dealing feel more like a real dealer
 
-## Files Changed
+Also update lines 652-654 (`dealDurationMs` and `visualMs`) to use `0.15` to match.
+
+### Fix 2: Match PlayerSeat deal order to sprite clockwise order
+
+**File:** `src/components/poker/OnlinePokerTable.tsx`, lines 1253-1259
+
+Currently `seatDealOrder` is computed as `activeScreenPositions.indexOf(screenPos)` (screen order). Change it to use a pre-computed `clockwiseOrder` array (the same one the dealing sprites use). This ensures the card reveal timing in PlayerSeat perfectly matches when the dealing sprite arrives.
+
+Compute `clockwiseOrder` once (memoized) and pass the correct index to each PlayerSeat.
+
+### Fix 3: Update PlayerSeat stagger to match (0.12 to 0.15)
+
+**File:** `src/components/poker/PlayerSeat.tsx`, line ~97
+
+Change `* 0.12` to `* 0.15` in the `dealDelay` calculation so the card reveal timing uses the same stagger as the sprites.
+
+### Fix 4: Gate action buttons on card reveal completion
+
+**File:** `src/components/poker/OnlinePokerTable.tsx`, line 847
+
+Add `!dealing` to the `showActions` condition. Currently it only checks `dealAnimDone`, but `dealAnimDone` fires when sprites finish -- not when card reveals finish. Adding `!dealing` ensures we wait for the full visual sequence (sprites + reveals) to complete before showing buttons.
+
+Updated condition:
+```
+const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
+```
+
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Skip XP/result save when handsPlayed is 0 |
-| `src/pages/PlayPoker.tsx` | Skip XP/result save when handsPlayed is 0 |
-| `src/components/common/LevelBadge.tsx` | Level-scaled animation intensity (5 tiers from static to fiery) |
+| `src/components/poker/OnlinePokerTable.tsx` (line 652-654) | Update dealDurationMs/visualMs to use 0.15 stagger |
+| `src/components/poker/OnlinePokerTable.tsx` (line 847) | Add `!dealing` to showActions gate |
+| `src/components/poker/OnlinePokerTable.tsx` (lines 1186) | Change sprite stagger from 0.12 to 0.15 |
+| `src/components/poker/OnlinePokerTable.tsx` (lines 1253-1259) | Use clockwise deal order for seatDealOrder prop |
+| `src/components/poker/PlayerSeat.tsx` (line ~97) | Change card reveal stagger from 0.12 to 0.15 |
 
 ## What Does NOT Change
 
-- No layout, navigation, spacing, or style changes outside LevelBadge
+- No layout, navigation, spacing, or style changes
 - No BottomNav changes
-- No database schema changes
-- No edge function changes
+- No database or edge function changes
 - No refactoring or renaming
-
+- BettingControls component unchanged
+- Game logic, pot calculations unchanged
