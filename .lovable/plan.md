@@ -1,80 +1,37 @@
 
-# Add Paywall Gate to Multiplayer & Tournament Poker Modes
 
-## Overview
+# Fix: Landscape Bottom Padding on Full-Screen Lobby Pages
 
-Gate the Online Multiplayer and Tournament poker modes behind the existing subscription paywall, while keeping Play with Bots free. Follow the same pattern used for club creation/joining on the Dashboard.
+## Problem
 
-## Changes
+Several poker lobby/menu pages use `fixed inset-0` positioning, which bypasses AppLayout's bottom padding entirely. They rely on the CSS class `safe-area-bottom` which only adds `padding-bottom: env(safe-area-inset-bottom, 0px)`.
 
-### 1. PokerHub page (`src/pages/PokerHub.tsx`)
+In portrait mode on iPhones, `safe-area-inset-bottom` is ~34px, which partially clears the bottom nav. In landscape mode, `safe-area-inset-bottom` is 0px on most devices, so there is zero gap -- the last items are hidden behind the bottom nav with no way to scroll them into view.
 
-- Import `useSubscription`, `PaywallDrawer`, and `Crown` (lock icon for badges)
-- Add `paywallOpen` state
-- For the Multiplayer and Tournament `GameModeCard` buttons, check `isActive` before navigating. If not active, open the paywall instead.
-- The Bots card remains unchanged (free).
-- Add a small `Crown` / lock badge on the Multiplayer and Tournament cards to visually indicate they are premium.
-- Render `<PaywallDrawer>` at the bottom.
+## Fix
 
-### 2. OnlinePoker page (`src/pages/OnlinePoker.tsx`)
+Add an inline `paddingBottom` style to the inner scrollable content div of each affected page, matching the same formula already used in `AppLayout.tsx`: `calc(6rem + env(safe-area-inset-bottom, 0px))`. This ensures 96px + safe-area clearance regardless of orientation.
 
-- Import `useSubscription` and `PaywallDrawer`
-- After auth check, if `!isActive`, show the paywall drawer (auto-open) instead of the lobby. This prevents direct URL access bypassing the hub.
+The padding goes on the inner content container (the `flex-1` div), not the outer `fixed inset-0` wrapper, so it only adds scrollable space at the bottom.
 
-### 3. PokerTournament page (`src/pages/PokerTournament.tsx`)
+## Files Changed
 
-- Same treatment as OnlinePoker: gate with `useSubscription`, auto-open paywall if not subscribed.
+| File | Line | Change |
+|------|------|--------|
+| `src/components/poker/OnlinePokerLobby.tsx` | 228 | Add `style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}` to the `flex-1 px-4` content div |
+| `src/components/poker/PlayPokerLobby.tsx` | 52 | Add same inline style to the `flex-1` content div |
+| `src/pages/PokerHub.tsx` | 37 | Add same inline style to the `flex-1` content div |
+| `src/components/poker/TournamentLobby.tsx` | 227 | Add same inline style to the detail view content div |
+| `src/components/poker/TournamentLobby.tsx` | ~381 | Add same inline style to the list view content div (need to check exact line) |
 
-### 4. GameModesGrid on Dashboard (`src/components/home/GameModesGrid.tsx`)
+## What Does NOT Change
 
-- Import `useSubscription` and `PaywallDrawer`
-- For the Multiplayer card, check `isActive` before navigating; open paywall if not.
-- Add a small lock/crown indicator on the Multiplayer card.
+- BottomNav component -- untouched
+- AppLayout -- untouched
+- No styling, layout, or behavior changes beyond adding bottom padding to these 4 components
+- No refactoring or renaming
 
-### 5. PaywallDrawer features list (`src/components/subscription/PaywallDrawer.tsx`)
+## Why This Fixes It
 
-- Add a 5th feature mentioning online poker: `{ icon: Gamepad2, text: "Online multiplayer & tournaments" }` (using a suitable icon like `Gamepad2` or `Spade`).
+These pages create their own full-screen scroll containers that sit on top of AppLayout. In landscape, `safe-area-inset-bottom` is 0, so content has no clearance from the bottom nav. Adding `6rem` (96px) of base padding ensures the last item is always scrollable above the nav bar, on any orientation and any device.
 
-### 6. Translation files (`src/i18n/locales/en.json` and `pl.json`)
-
-- Add `subscription.feature_5` key:
-  - EN: `"Online multiplayer & tournament poker"`
-  - PL: `"Poker wieloosobowy online i turnieje"`
-
-## Technical Details
-
-**Pattern (same as Dashboard club gating):**
-```tsx
-const { isActive } = useSubscription();
-const [paywallOpen, setPaywallOpen] = useState(false);
-
-const handleMultiplayer = () => {
-  if (!isActive) { setPaywallOpen(true); return; }
-  navigate('/online-poker');
-};
-```
-
-**Direct URL protection (OnlinePoker / PokerTournament pages):**
-```tsx
-const { isActive, loading: subLoading } = useSubscription();
-const [paywallOpen, setPaywallOpen] = useState(false);
-
-useEffect(() => {
-  if (!subLoading && !isActive) setPaywallOpen(true);
-}, [subLoading, isActive]);
-
-// If paywall is open and user dismisses it, navigate back
-// Render PaywallDrawer alongside the lobby
-```
-
-**Files changed:**
-
-| File | Change |
-|------|--------|
-| `src/pages/PokerHub.tsx` | Add subscription check + paywall for Multiplayer & Tournament cards |
-| `src/pages/OnlinePoker.tsx` | Add subscription gate with auto-open paywall |
-| `src/pages/PokerTournament.tsx` | Add subscription gate with auto-open paywall |
-| `src/components/home/GameModesGrid.tsx` | Add subscription check + paywall for Multiplayer card |
-| `src/components/subscription/PaywallDrawer.tsx` | Add 5th feature about online poker modes |
-| `src/i18n/locales/en.json` | Add `subscription.feature_5` |
-| `src/i18n/locales/pl.json` | Add `subscription.feature_5` |
