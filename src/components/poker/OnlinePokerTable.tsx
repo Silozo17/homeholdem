@@ -545,6 +545,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Shared XP + stats save helper (called on game over AND on leave)
   const saveXpAndStats = useCallback(async (isWinnerOverride?: boolean) => {
     if (xpSavedRef.current || !user) return;
+    if (handsPlayedRef.current === 0) return; // No XP for join-and-leave
     xpSavedRef.current = true;
 
     const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
