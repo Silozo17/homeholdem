@@ -20,6 +20,7 @@ interface PlayerSeatProps {
   totalActivePlayers?: number;
   compact?: boolean;
   level?: number;
+  countryCode?: string | null;
   onTimeout?: () => void;
   onLowTime?: () => void;
 }
@@ -31,7 +32,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, onTimeout, onLowTime,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, onTimeout, onLowTime,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -128,6 +129,7 @@ export const PlayerSeat = memo(function PlayerSeat({
           avatarUrl={avatarUrl}
           size={avatarSize}
           level={level}
+          countryCode={countryCode}
         />
 
         {/* Dealer button */}
@@ -147,28 +149,23 @@ export const PlayerSeat = memo(function PlayerSeat({
         {humanCards}
       </div>
 
-      {/* Nameplate bar */}
+      {/* Nameplate pill — overlaps avatar bottom, sits above cards */}
       <div className={cn(
-        'flex flex-col items-center rounded-b-lg px-2 py-0.5 mt-0.5',
-        compact ? 'min-w-[60px]' : 'min-w-[76px]',
+        'relative flex flex-col items-center rounded-full px-3 py-0.5 -mt-3',
+        compact ? 'min-w-[68px]' : 'min-w-[90px]',
       )} style={{
-        background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.75), hsl(0 0% 0% / 0.6))',
+        zIndex: 4,
+        background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.9), hsl(0 0% 5% / 0.85))',
         backdropFilter: 'blur(8px)',
-        borderBottomLeftRadius: '8px',
-        borderBottomRightRadius: '8px',
-        border: '1px solid hsl(0 0% 100% / 0.08)',
-        borderTop: 'none',
+        border: '1px solid hsl(0 0% 100% / 0.1)',
       }}>
         <p className={cn(
-          compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[72px]',
-          'font-bold truncate leading-tight',
-          isHuman ? 'text-primary' : 'text-foreground/90',
+          compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[80px]',
+          'font-bold truncate leading-tight text-white',
         )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
           {player.name}
         </p>
-        <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-primary/80 font-semibold leading-none')}
-          style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}
-        >
+        <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-white/80 font-semibold leading-none')}>
           {player.chips.toLocaleString()}
         </p>
       </div>

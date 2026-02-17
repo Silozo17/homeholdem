@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { LevelBadge } from '@/components/common/LevelBadge';
+import { CountryFlag } from '@/components/poker/CountryFlag';
 
 interface PlayerAvatarProps {
   name: string;
@@ -9,7 +10,17 @@ interface PlayerAvatarProps {
   avatarUrl?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   level?: number;
+  countryCode?: string | null;
 }
+
+const sizeMap = {
+  xs: 'w-7 h-7 text-[10px]',
+  sm: 'w-9 h-9 text-xs',
+  md: 'w-11 h-11 text-sm',
+  lg: 'w-14 h-14 text-base',
+  xl: 'w-20 h-20 text-lg',
+  '2xl': 'w-24 h-24 text-xl',
+};
 
 const AVATAR_COLORS = [
   'hsl(43 74% 49%)',
@@ -23,16 +34,7 @@ const AVATAR_COLORS = [
   'hsl(220 70% 55%)',
 ];
 
-const sizeMap = {
-  xs: 'w-7 h-7 text-[10px]',
-  sm: 'w-9 h-9 text-xs',
-  md: 'w-11 h-11 text-sm',
-  lg: 'w-14 h-14 text-base',
-  xl: 'w-20 h-20 text-lg',
-  '2xl': 'w-24 h-24 text-xl',
-};
-
-export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md', level }: PlayerAvatarProps) {
+export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md', level, countryCode }: PlayerAvatarProps) {
   const initial = name.charAt(0).toUpperCase();
   const color = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const isOut = status === 'folded' || status === 'eliminated';
@@ -58,7 +60,7 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
           style={{ background: 'hsl(0 70% 50%)', opacity: 0.5 }}
         />
       )}
-      {/* Avatar body */}
+      {/* Avatar body — dark charcoal metallic border */}
       <div
         className={cn(
           'relative rounded-full flex items-center justify-center w-full h-full z-[1] overflow-hidden',
@@ -66,13 +68,17 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
         style={{
           background: isOut
             ? 'linear-gradient(135deg, hsl(160 10% 25%), hsl(160 10% 18%))'
-            : `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 70%, black))`,
+            : avatarUrl
+              ? 'hsl(0 0% 12%)'
+              : `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 70%, black))`,
           boxShadow: isOut
             ? 'inset 0 2px 4px rgba(0,0,0,0.3)'
-            : `inset 0 2px 6px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4), 0 3px 12px rgba(0,0,0,0.5)`,
+            : 'inset 0 2px 6px rgba(255,255,255,0.15), inset 0 -3px 6px rgba(0,0,0,0.4), 0 3px 12px rgba(0,0,0,0.5)',
           color: 'white',
           textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-          border: isOut ? '2px solid hsl(160 10% 30%)' : `3px solid color-mix(in srgb, ${color} 60%, white)`,
+          border: isOut
+            ? '3px solid hsl(0 0% 20%)'
+            : '4px solid hsl(0 0% 15%)',
         }}
       >
         {avatarUrl ? (
@@ -81,20 +87,12 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
           initial
         )}
       </div>
-      {/* Status dot (bottom-right) */}
-      <span className={cn(
-        'absolute -bottom-0.5 -right-0.5 rounded-full border-2 z-[2]',
-        'border-background',
-        (size === 'lg' || size === 'xl' || size === '2xl') ? 'w-3.5 h-3.5' : 'w-3 h-3',
-        status === 'active' && 'bg-green-500',
-        status === 'folded' && 'bg-muted-foreground',
-        status === 'all-in' && 'bg-destructive animate-pulse',
-        status === 'eliminated' && 'bg-muted',
-      )} />
       {/* Level badge (bottom-left) */}
       {level != null && level > 0 && (
         <LevelBadge level={level} size={size} />
       )}
+      {/* Country flag (bottom-right) */}
+      <CountryFlag countryCode={countryCode} size={size} />
     </div>
   );
 }
