@@ -1,13 +1,24 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Users, ArrowLeft, Trophy } from 'lucide-react';
+import { Bot, Users, ArrowLeft, Trophy, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useSubscription } from '@/hooks/useSubscription';
+import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { Badge } from '@/components/ui/badge';
 
 export default function PokerHub() {
   const navigate = useNavigate();
+  const { isActive } = useSubscription();
+  const [paywallOpen, setPaywallOpen] = useState(false);
+
+  const handlePremiumMode = (path: string) => {
+    if (!isActive) { setPaywallOpen(true); return; }
+    navigate(path);
+  };
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden safe-area-bottom z-10 bg-background">
@@ -43,28 +54,44 @@ export default function PokerHub() {
             onClick={() => navigate('/play-poker')}
             compact
           />
-          <GameModeCard
-            icon={Users}
-            title="Online Multiplayer"
-            description="Create or join a table with real players"
-            hint="Real-time • Invite friends"
-            accentClass="bg-emerald-500/15"
-            ctaLabel="Find Table"
-            onClick={() => navigate('/online-poker')}
-            compact
-          />
-          <GameModeCard
-            icon={Trophy}
-            title="Tournaments"
-            description="Structured competitions with blind schedules"
-            hint="Multi-table • Payouts"
-            accentClass="bg-purple-500/15"
-            ctaLabel="Browse Tournaments"
-            onClick={() => navigate('/poker-tournament')}
-            compact
-          />
+          <div className="relative">
+            {!isActive && (
+              <Badge className="absolute -top-1 -right-1 z-10 bg-primary/90 text-primary-foreground text-[9px] px-1.5 py-0 gap-0.5">
+                <Crown className="h-2.5 w-2.5" /> PRO
+              </Badge>
+            )}
+            <GameModeCard
+              icon={Users}
+              title="Online Multiplayer"
+              description="Create or join a table with real players"
+              hint="Real-time • Invite friends"
+              accentClass="bg-emerald-500/15"
+              ctaLabel="Find Table"
+              onClick={() => handlePremiumMode('/online-poker')}
+              compact
+            />
+          </div>
+          <div className="relative">
+            {!isActive && (
+              <Badge className="absolute -top-1 -right-1 z-10 bg-primary/90 text-primary-foreground text-[9px] px-1.5 py-0 gap-0.5">
+                <Crown className="h-2.5 w-2.5" /> PRO
+              </Badge>
+            )}
+            <GameModeCard
+              icon={Trophy}
+              title="Tournaments"
+              description="Structured competitions with blind schedules"
+              hint="Multi-table • Payouts"
+              accentClass="bg-purple-500/15"
+              ctaLabel="Browse Tournaments"
+              onClick={() => handlePremiumMode('/poker-tournament')}
+              compact
+            />
+          </div>
         </div>
       </div>
+
+      <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
     </div>
   );
 }
