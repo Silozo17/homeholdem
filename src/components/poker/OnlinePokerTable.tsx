@@ -82,9 +82,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [gameOverWinners, setGameOverWinners] = useState<HandWinner[]>([]);
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
   const [lowTimeWarning, setLowTimeWarning] = useState(false);
+  const [visibleCommunityCards, setVisibleCommunityCards] = useState<Card[]>([]);
+  const stagedRunoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const prevCommunityCountRef = useRef(0);
   const prevHandIdRef = useRef<string | null>(null);
   const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
@@ -170,8 +174,61 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
       setGameOver(true);
+      setGameOverWinners(handWinners);
     }
   }, [tableState, user, handWinners]);
+
+  // Staged community card reveal for all-in runouts
+  useEffect(() => {
+    const communityCards = tableState?.current_hand?.community_cards ?? [];
+    const prevCount = prevCommunityCountRef.current;
+    const newCount = communityCards.length;
+
+    // Detect big jump (e.g., 0→5 or 0→3→5 in one broadcast)
+    if (newCount > prevCount && (newCount - prevCount) > 1) {
+      // Clear any existing staged timers
+      stagedRunoutRef.current.forEach(t => clearTimeout(t));
+      stagedRunoutRef.current = [];
+
+      // Show flop (first 3) immediately
+      setVisibleCommunityCards(communityCards.slice(0, Math.min(3, newCount)));
+
+      // Show turn after 1.5s
+      if (newCount > 3) {
+        const t1 = setTimeout(() => {
+          setVisibleCommunityCards(communityCards.slice(0, 4));
+        }, 1500);
+        stagedRunoutRef.current.push(t1);
+      }
+
+      // Show river after 3s
+      if (newCount > 4) {
+        const t2 = setTimeout(() => {
+          setVisibleCommunityCards(communityCards.slice(0, 5));
+        }, 3000);
+        stagedRunoutRef.current.push(t2);
+      }
+    } else {
+      // Normal phase-by-phase reveal, show all cards immediately
+      setVisibleCommunityCards(communityCards);
+    }
+
+    prevCommunityCountRef.current = newCount;
+
+    // Reset when hand ends
+    if (newCount === 0) {
+      stagedRunoutRef.current.forEach(t => clearTimeout(t));
+      stagedRunoutRef.current = [];
+      prevCommunityCountRef.current = 0;
+    }
+  }, [tableState?.current_hand?.community_cards]);
+
+  // Cleanup staged runout timers on unmount
+  useEffect(() => {
+    return () => {
+      stagedRunoutRef.current.forEach(t => clearTimeout(t));
+    };
+  }, []);
 
   // Deal animation on new hand
   useEffect(() => {
@@ -510,14 +567,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             className="absolute left-1/2 flex gap-1.5 items-center"
             style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
-            {(hand?.community_cards || []).map((card, i) => {
+            {visibleCommunityCards.map((card, i) => {
               const isFlop = i < 3;
               const dealDelay = isFlop ? i * 0.18 : 0.1;
               return (
                 <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="xl" dealDelay={dealDelay} />
               );
             })}
-            {(!hand || (hand.community_cards || []).length === 0) && (
+            {(!hand || visibleCommunityCards.length === 0) && (
               <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                 {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
               </div>
@@ -587,10 +644,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           )}
 
-          {/* Game Over overlay */}
+          {/* Game Over overlay — uses snapshotted winners so they persist */}
           {gameOver && (
             <WinnerOverlay
-              winners={handWinners.map(w => ({
+              winners={gameOverWinners.map(w => ({
                 name: w.player_id === user?.id ? 'You' : w.display_name,
                 hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] },
                 chips: w.amount,
@@ -683,7 +740,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 top: '2%',
                 zIndex: Z.EFFECTS,
                 animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`,
-                ['--deal-center-dy' as any]: '46vh',
+                ['--deal-center-dy' as any]: '46cqh',
               }}
             >
               <div className="w-8 h-11 rounded card-back-premium border border-white/10" />
