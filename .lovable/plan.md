@@ -1,100 +1,64 @@
 
 
-# Add Country Selector to Profile + Forced Picker for Existing Users
+# Fix: Blind Timer Starts on First Hand Deal, Not Table Creation
 
-## Overview
+## Problem
 
-The `profiles.country_code` column already exists and is already piped through to the multiplayer game (`poker-table-state` fetches it, `OnlineSeatInfo` carries it, `PlayerSeat` renders the `CountryFlag`). The only missing pieces are a way to SET it, and a gate for users who haven't set it yet.
+Currently, `last_blind_increase_at` is set to `new Date().toISOString()` when the table is created (`poker-create-table/index.ts` line 113). This means if a player creates a table and waits 10 minutes for friends to join before starting, the blinds may have already escalated by the time the first hand is dealt.
 
----
+## Solution
 
-## What Gets Built
+Three small, targeted changes:
 
-### 1. Country Selector Component
+### 1. `poker-create-table/index.ts` -- Set `last_blind_increase_at` to null
 
-**New file**: `src/components/profile/CountrySelector.tsx`
+Instead of `new Date().toISOString()`, set it to `null` at creation time. The timer hasn't started yet because no hand has been dealt.
 
-A searchable dropdown/command palette of ~250 ISO 3166-1 alpha-2 country codes with flag emoji + country name. Uses the existing `Command` (cmdk) component for search. Shows the current selection as a flag emoji + name.
+**Change**: Line 113, replace `last_blind_increase_at: new Date().toISOString()` with `last_blind_increase_at: null`.
 
-### 2. Country Selector in Profile Page
+### 2. `poker-start-hand/index.ts` -- Initialize timer on first hand
 
-**File**: `src/pages/Profile.tsx`
+In the blind escalation block (lines 138-169), if `last_blind_increase_at` is null (meaning this is the first hand), set it to now and skip escalation. This anchors the blind timer to the moment the first hand is dealt.
 
-Add a "Country" row in the Profile Header Card, below the member-since line. Shows the current flag + country name with a tap-to-change button. On change, updates `profiles.country_code` via Supabase.
-
-### 3. Country Selector in Settings Page
-
-**File**: `src/pages/Settings.tsx`
-
-Add a "Country / Region" section (similar to Language and Currency settings) so users can also change it from Settings.
-
-### 4. Forced Country Selector Modal for Existing Users
-
-**New file**: `src/components/profile/CountryGate.tsx`
-
-A non-dismissable dialog that appears when:
-- User is logged in (`user` exists)
-- User's `profiles.country_code` is null
-
-This component:
-- Fetches the user's profile on mount
-- If `country_code` is null, shows a full-screen Dialog (no close button, no backdrop dismiss)
-- User must select a country and tap "Confirm" to proceed
-- On confirm, updates `profiles.country_code` and closes the dialog
-- Only runs once -- after setting the country, the dialog never appears again
-
-**File**: `src/App.tsx`
-
-Render `<CountryGate />` inside the `AuthProvider` + `BrowserRouter` tree, so it has access to auth state and appears on any route.
-
----
-
-## Technical Details
-
-### Country Data
-
-A static array of ~250 countries with `{ code: string, name: string }` stored in a new file `src/lib/countries.ts`. No external API needed. Flag emojis are generated using the existing `isoToEmoji` function from `CountryFlag.tsx` (will be extracted to a shared util or imported).
-
-### CountryGate Logic
-
+**Change** at line 142:
 ```
-1. useAuth() -> get user
-2. If no user -> render nothing
-3. Fetch profiles.country_code for user.id
-4. If country_code is not null -> render nothing
-5. If country_code is null -> show forced Dialog
-6. On submit -> UPDATE profiles SET country_code = X WHERE id = user.id
-7. Close dialog, set local state so it doesn't re-show
+if (table.blind_timer_minutes > 0) {
+  if (!table.last_blind_increase_at) {
+    // First hand -- start the blind timer NOW
+    const now = new Date().toISOString();
+    await admin.from("poker_tables")
+      .update({ last_blind_increase_at: now })
+      .eq("id", table_id);
+    table.last_blind_increase_at = now;
+  } else {
+    // Existing escalation logic (unchanged)
+    const lastIncrease = new Date(table.last_blind_increase_at).getTime();
+    ...
+  }
+}
 ```
 
-The dialog uses Radix Dialog with `onPointerDownOutside` and `onEscapeKeyDown` both prevented, and no close button. The only way out is to select a country.
-
-### Profile Page Changes
-
-Below the "Member since" line (line 310), add:
-
+Also update the fallback at line 503 to not inject a fake timestamp:
 ```
-Country: [Flag] [Country Name] [Edit pencil]
+last_blind_increase_at: table.last_blind_increase_at || null,
 ```
 
-Tapping edit opens the CountrySelector inline or as a popover.
+Similarly in `poker-table-state/index.ts` line 191, stop falling back to `new Date().toISOString()`:
+```
+last_blind_increase_at: table.last_blind_increase_at || null,
+```
 
-### Files Changed / Created
+### 3. UI -- Hide blind timer until first hand is dealt
 
-| File | Action |
+The `OnlineBlindTimer` component at `OnlinePokerTable.tsx` line 787 already has a guard: `table.blind_timer_minutes > 0 && table.last_blind_increase_at`. Since `last_blind_increase_at` will now be null until the first hand, the timer countdown simply won't render in the header until then. No UI code change needed.
+
+## Files Changed
+
+| File | Change |
 |------|--------|
-| `src/lib/countries.ts` | **New** -- static country list |
-| `src/components/profile/CountrySelector.tsx` | **New** -- searchable country picker component |
-| `src/components/profile/CountryGate.tsx` | **New** -- forced one-time country selection dialog |
-| `src/pages/Profile.tsx` | **Edit** -- add country display + edit inline |
-| `src/pages/Settings.tsx` | **Edit** -- add Country/Region settings section |
-| `src/App.tsx` | **Edit** -- add `<CountryGate />` component |
+| `supabase/functions/poker-create-table/index.ts` | Set `last_blind_increase_at: null` instead of `new Date().toISOString()` |
+| `supabase/functions/poker-start-hand/index.ts` | Initialize `last_blind_increase_at` to now on first hand; remove fallback at line 503 |
+| `supabase/functions/poker-table-state/index.ts` | Remove fallback `new Date().toISOString()` for `last_blind_increase_at` |
 
-### No Database Changes Needed
-
-`profiles.country_code` (text, nullable) already exists. No migration required.
-
-### No Edge Function Changes Needed
-
-`poker-table-state` already reads `country_code` from profiles and includes it in the seat response. The flag will automatically appear for all players once they set their country.
+No database migration needed -- the column is already nullable (`last_blind_increase_at: string`).
 
