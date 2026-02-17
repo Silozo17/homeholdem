@@ -453,7 +453,16 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    if (handErr) throw handErr;
+    if (handErr) {
+      if (handErr.code === '23505') {
+        // Unique constraint: another hand was started simultaneously
+        return new Response(
+          JSON.stringify({ error: "Hand already in progress" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw handErr;
+    }
 
     console.log(`[START-HAND] hand=${hand.id} #${handNumber} table=${table_id} players=${activePlayers.length} dealer=seat${dealerSeat} SB=seat${sbSeat} BB=seat${bbSeat} blinds=${table.small_blind}/${table.big_blind} ante=${table.ante} firstActor=seat${firstActor}`);
 
