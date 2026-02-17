@@ -1,80 +1,67 @@
 
 
-# Fix: New Players Joining Mid-Hand Should Spectate Until Next Hand
+# Fix: Intermittent Missing Action Buttons + Chip Leak Explanation
 
-## Problem
+## Issue 1: Buttons Sometimes Not Appearing (BUG FIX)
 
-When a player joins an ongoing hand (e.g. during the flop), they are inserted into `poker_seats` with `status: 'active'`. This causes two issues:
+### Root Cause
 
-1. They appear as an active player mid-hand, even though they were not dealt cards
-2. They cannot see any cards because no hole cards were dealt for them -- they were not part of the hand
+The `dealAnimDone` timer is killed by seat broadcasts. Here is what happens:
 
-## Root Cause
+1. A new hand starts. The effect at line 596 sets `dealAnimDone = false` and starts a timer (e.g. 4.3 seconds) to set it back to `true`.
+2. During those 4.3 seconds, a broadcast arrives (another player acts, or any seat update occurs).
+3. Because `tableState?.seats` is in the effect's dependency array (line 614), React re-runs the effect.
+4. React calls the **previous cleanup function** first, which runs `clearTimeout(dealTimer)` -- killing the timer.
+5. The new effect run sees `currentHandId === prevAnimHandIdRef.current` (same hand), so it skips the `if` block and does NOT set a new timer.
+6. `dealAnimDone` stays `false` forever for that hand.
+7. `showActions` (line 788) requires `dealAnimDone`, so the action buttons never appear.
 
-`poker-join-table` always inserts seats with `status: 'active'` regardless of whether a hand is in progress. Meanwhile, `poker-start-hand` only deals cards to seats that are `active` at the time the hand starts.
+This is a classic React useEffect cleanup race condition. It happens "sometimes" because it depends on whether a broadcast arrives before the deal animation timer fires.
 
-## Fix (2 files, server-side only)
+### Fix
 
-### 1. `supabase/functions/poker-join-table/index.ts`
+**File:** `src/components/poker/OnlinePokerTable.tsx`, line 614
 
-Before inserting the seat, check if a hand is currently in progress at the table. If so, insert with `status: 'sitting_out'` instead of `'active'`.
+Remove `tableState?.seats` from the effect dependency array. The seats data is only used to calculate `activePlayers` count for the timer duration, which only matters on the initial run (when `hand_id` changes). Subsequent seat changes should not re-trigger this effect.
 
-```typescript
-// After the existing seat/table validation, before inserting:
-
-// Check if a hand is in progress
-const { data: activeHand } = await admin
-  .from("poker_hands")
-  .select("id")
-  .eq("table_id", table_id)
-  .is("completed_at", null)
-  .limit(1)
-  .maybeSingle();
-
-const initialStatus = activeHand ? "sitting_out" : "active";
-
-// Insert seat (change "active" to initialStatus)
-const { data: seat, error: seatErr } = await admin
-  .from("poker_seats")
-  .insert({
-    table_id,
-    seat_number,
-    player_id: user.id,
-    stack: buy_in_amount,
-    status: initialStatus,
-  })
-  .select()
-  .single();
+**Before:**
+```tsx
+}, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase, tableState?.seats]);
 ```
 
-### 2. `supabase/functions/poker-start-hand/index.ts`
-
-Before querying active seats for dealing, promote all `sitting_out` seats (with chips) to `active`. This ensures players who joined during the previous hand participate in the next one.
-
-```typescript
-// Before the existing "Get active seats" query (around line 210):
-
-// Activate sitting_out players for the new hand
-await admin
-  .from("poker_seats")
-  .update({ status: "active" })
-  .eq("table_id", table_id)
-  .eq("status", "sitting_out")
-  .gt("stack", 0);
+**After:**
+```tsx
+}, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
 ```
+
+This is a single dependency removal. No other code changes.
+
+---
+
+## Issue 2: Chip Leak (ALREADY FIXED)
+
+### Explanation
+
+The chip imbalance you saw on the previous table was caused by the bug we fixed in the last session: players joining mid-hand as `active` instead of `sitting_out`. When a player joined mid-flop with `active` status, they got included in the action rotation without having hole cards. They could bet chips into the pot, but at showdown their side pot was skipped (no cards to evaluate). This corrupted the chip accounting.
+
+The fix we deployed (poker-join-table setting `sitting_out` for mid-hand joins + poker-start-hand promoting them for next hand) prevents this from happening on any new tables.
+
+Your current table "Wieczorny Pokerek" shows correct chip totals (total chips = starting chips minus current hand's blinds). No chip leak present.
+
+---
+
+## Summary
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Buttons missing | `dealAnimDone` timer killed by seat broadcast re-render | Remove `tableState?.seats` from effect deps (1 line) |
+| Chip leak | Mid-hand join as active (old bug) | Already fixed in previous session |
 
 ## What Does NOT Change
 
-- No client-side code changes
-- No style, layout, navigation, or UI changes
+- No style, layout, navigation, or spacing changes
 - No changes to BottomNav or any other component
 - No refactoring or renaming
-- The `poker-action`, `poker-table-state`, and all other edge functions remain untouched
-
-## Why This Fixes It
-
-- Players joining mid-hand get `sitting_out` status, so they are not treated as active participants (no cards expected, no turn expected)
-- When the next hand starts, all `sitting_out` players are promoted to `active` and dealt cards normally
-- The client already handles `sitting_out` seats correctly in the display logic
-- The "can't see cards" issue is resolved because players will only be `active` when a hand starts and cards are dealt to them
+- Only one dependency array in `OnlinePokerTable.tsx` is modified
+- No server-side changes
 
