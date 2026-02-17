@@ -27,6 +27,9 @@ export default function PlayPoker() {
     savedRef.current = true;
     const humanPlayer = state.players.find(p => p.id === 'human');
     const duration = Math.round((Date.now() - state.startTime) / 1000);
+    const isWinner = humanPlayer && humanPlayer.chips > 0 &&
+      state.players.filter(p => p.chips > 0).length <= 1;
+
     supabase.from('poker_play_results').insert({
       user_id: user.id,
       game_mode: 'practice',
@@ -40,6 +43,13 @@ export default function PlayPoker() {
       biggest_pot: state.biggestPot || null,
       duration_seconds: duration,
     }).then(() => {});
+
+    // Award XP
+    const xpEvents: Array<{ user_id: string; reason: string; xp_amount: number }> = [];
+    xpEvents.push({ user_id: user.id, reason: 'game_complete', xp_amount: 25 });
+    if (isWinner) xpEvents.push({ user_id: user.id, reason: 'game_win', xp_amount: 100 });
+    if (state.handsWon > 0) xpEvents.push({ user_id: user.id, reason: 'hands_won', xp_amount: state.handsWon * 10 });
+    supabase.from('xp_events').insert(xpEvents).then(() => {});
   }, [state.phase, user?.id]);
 
   // Reset saved flag when returning to lobby

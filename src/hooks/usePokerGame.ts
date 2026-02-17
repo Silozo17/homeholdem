@@ -449,8 +449,18 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...state, phase: 'dealing', players, dealerIndex: newDealerIndex };
     }
 
-    case 'QUIT':
-      return { ...state, phase: 'game_over' };
+    case 'QUIT': {
+      const alivePlayers = state.players.filter(p => p.chips > 0);
+      const gameOverWinners = alivePlayers.length > 0
+        ? alivePlayers.map(p => ({
+            playerId: p.id,
+            name: p.name,
+            handName: state.lastHandWinners?.[0]?.handName || 'N/A',
+            chipsWon: p.chips,
+          }))
+        : state.lastHandWinners || [];
+      return { ...state, phase: 'game_over', lastHandWinners: gameOverWinners };
+    }
 
     case 'RESET':
       return createInitialState();
