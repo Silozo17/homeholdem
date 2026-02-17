@@ -647,10 +647,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       setDealAnimDone(false);
       processedActionsRef.current.clear();
       const activePlayers = (tableState?.seats ?? []).filter(s => s.player_id && s.status !== 'eliminated').length;
-      // Duration: 2 cards per player * 0.35s stagger + 0.8s buffer
-      const dealDurationMs = ((activePlayers * 2) * 0.18 + 0.8) * 1000;
+      // Duration: 2 cards per player * 0.12s stagger + 0.45s fly + 0.3s reveal buffer
+      const dealDurationMs = ((activePlayers * 2) * 0.12 + 0.45 + 0.3) * 1000;
       const dealTimer = setTimeout(() => setDealAnimDone(true), dealDurationMs);
-      const visualTimer = setTimeout(() => setDealing(false), 4500);
+      const visualMs = ((activePlayers * 2) * 0.12 + 0.45) * 1000 + 200;
+      const visualTimer = setTimeout(() => setDealing(false), visualMs);
       prevAnimHandIdRef.current = currentHandId;
       return () => { clearTimeout(dealTimer); clearTimeout(visualTimer); };
     }

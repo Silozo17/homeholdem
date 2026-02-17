@@ -454,6 +454,8 @@ Deno.serve(async (req) => {
 
     if (handErr) throw handErr;
 
+    console.log(`[START-HAND] hand=${hand.id} #${handNumber} table=${table_id} players=${activePlayers.length} dealer=seat${dealerSeat} SB=seat${sbSeat} BB=seat${bbSeat} blinds=${table.small_blind}/${table.big_blind} ante=${table.ante} firstActor=seat${firstActor}`);
+
     // Insert hole cards
     for (const hc of holeCardInserts) {
       await admin.from("poker_hole_cards").insert({
