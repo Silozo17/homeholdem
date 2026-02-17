@@ -1,7 +1,7 @@
 import { useReducer, useCallback, useRef, useEffect } from 'react';
 import {
   Card, PokerPlayer, GameState, GamePhase, GameAction, LobbySettings,
-  HAND_RANK_NAMES, BotPersonality, BLIND_LEVELS,
+  HAND_RANK_NAMES, BotPersonality,
 } from '@/lib/poker/types';
 import { createDeck, shuffle, deal } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
@@ -112,9 +112,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       players[0].isDealer = true;
 
-      // Find starting blind level
-      const startLevel = BLIND_LEVELS.findIndex(l => l.big >= bigBlind);
-      const blindLevel = startLevel >= 0 ? startLevel : 0;
+      const blindLevel = 0;
 
       return {
         ...state,
@@ -138,20 +136,19 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'DEAL_HAND': {
-      // Check blind level progression
+      // Check blind level progression — doubling logic
       let currentSmallBlind = state.smallBlind;
       let currentBigBlind = state.bigBlind;
       let blindLevel = state.blindLevel;
       let lastBlindIncrease = state.lastBlindIncrease;
+      let blindsIncreased = false;
 
       if (state.blindTimer > 0 && Date.now() - state.lastBlindIncrease >= state.blindTimer * 60000) {
-        const nextLevel = Math.min(blindLevel + 1, BLIND_LEVELS.length - 1);
-        if (nextLevel !== blindLevel) {
-          blindLevel = nextLevel;
-          currentSmallBlind = BLIND_LEVELS[nextLevel].small;
-          currentBigBlind = BLIND_LEVELS[nextLevel].big;
-          lastBlindIncrease = Date.now();
-        }
+        blindLevel = state.blindLevel + 1;
+        currentSmallBlind = state.smallBlind * 2;
+        currentBigBlind = state.bigBlind * 2;
+        lastBlindIncrease = Date.now();
+        blindsIncreased = true;
       }
 
       // Reset for new hand
@@ -215,6 +212,7 @@ function reducer(state: GameState, action: Action): GameState {
         bigBlind: currentBigBlind,
         blindLevel,
         lastBlindIncrease,
+        blindsIncreased,
       };
     }
 

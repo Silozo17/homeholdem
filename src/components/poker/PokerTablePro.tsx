@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, BLIND_LEVELS } from '@/lib/poker/types';
+import { GameState } from '@/lib/poker/types';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
@@ -36,8 +37,9 @@ interface PokerTableProProps {
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
-function BlindTimerCountdown({ lastBlindIncrease, blindTimer, blindLevel }: { lastBlindIncrease: number; blindTimer: number; blindLevel: number }) {
+function BlindTimerCountdown({ lastBlindIncrease, blindTimer, currentSmall, currentBig }: { lastBlindIncrease: number; blindTimer: number; currentSmall: number; currentBig: number }) {
   const [remaining, setRemaining] = useState('');
+  const [isLow, setIsLow] = useState(false);
   useEffect(() => {
     const update = () => {
       const elapsed = Date.now() - lastBlindIncrease;
@@ -46,18 +48,22 @@ function BlindTimerCountdown({ lastBlindIncrease, blindTimer, blindLevel }: { la
       const mins = Math.floor(left / 60000);
       const secs = Math.floor((left % 60000) / 1000);
       setRemaining(`${mins}:${secs.toString().padStart(2, '0')}`);
+      setIsLow(left > 0 && left < 60000);
     };
     update();
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, [lastBlindIncrease, blindTimer]);
 
-  if (blindLevel >= BLIND_LEVELS.length - 1) return null;
-  const next = BLIND_LEVELS[blindLevel + 1];
+  const nextSmall = currentSmall * 2;
+  const nextBig = currentBig * 2;
 
   return (
-    <span className="text-[9px] text-primary/70 font-medium">
-      ⏱ {remaining} → {next.small}/{next.big}
+    <span className={cn(
+      'text-xs font-bold',
+      isLow ? 'text-amber-400 animate-pulse' : 'text-amber-500/80'
+    )}>
+      ⏱ {remaining} → {nextSmall}/{nextBig}
     </span>
   );
 }
@@ -106,6 +112,16 @@ export function PokerTablePro({
   const [prevHandNumber, setPrevHandNumber] = useState(state.handNumber);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [showHandName, setShowHandName] = useState<string | null>(null);
+
+  // Blinds-up toast notification
+  useEffect(() => {
+    if (state.blindsIncreased) {
+      toast({
+        title: '🔺 Blinds Up!',
+        description: `Now ${state.smallBlind}/${state.bigBlind}`,
+      });
+    }
+  }, [state.blindsIncreased, state.handNumber]);
 
   // Sound triggers
   useEffect(() => {
@@ -281,7 +297,8 @@ export function PokerTablePro({
             <BlindTimerCountdown
               lastBlindIncrease={state.lastBlindIncrease}
               blindTimer={state.blindTimer}
-              blindLevel={state.blindLevel}
+              currentSmall={state.smallBlind}
+              currentBig={state.bigBlind}
             />
           )}
         </div>

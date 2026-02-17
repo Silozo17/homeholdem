@@ -135,6 +135,39 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Blind escalation (doubling logic) ──
+    let blindsIncreased = false;
+    let oldSmall = table.small_blind;
+    let oldBig = table.big_blind;
+    if (table.blind_timer_minutes > 0 && table.last_blind_increase_at) {
+      const lastIncrease = new Date(table.last_blind_increase_at).getTime();
+      const intervalMs = table.blind_timer_minutes * 60 * 1000;
+      const elapsed = Date.now() - lastIncrease;
+      let levelsToAdd = Math.floor(elapsed / intervalMs);
+      if (levelsToAdd > 0) {
+        const newLevel = (table.blind_level || 0) + levelsToAdd;
+        const origSmall = table.original_small_blind || table.small_blind;
+        const origBig = table.original_big_blind || table.big_blind;
+        const newSmall = origSmall * Math.pow(2, newLevel);
+        const newBig = origBig * Math.pow(2, newLevel);
+        // Update table in DB
+        await admin
+          .from("poker_tables")
+          .update({
+            small_blind: newSmall,
+            big_blind: newBig,
+            blind_level: newLevel,
+            last_blind_increase_at: new Date().toISOString(),
+          })
+          .eq("id", table_id);
+        table.small_blind = newSmall;
+        table.big_blind = newBig;
+        table.blind_level = newLevel;
+        table.last_blind_increase_at = new Date().toISOString();
+        blindsIncreased = true;
+      }
+    }
+
     // Verify user is creator or seated
     const { data: userSeat } = await admin
       .from("poker_seats")
@@ -464,6 +497,11 @@ Deno.serve(async (req) => {
         big: table.big_blind,
         ante: table.ante,
       },
+      blind_timer: {
+        blind_timer_minutes: table.blind_timer_minutes,
+        blind_level: table.blind_level || 0,
+        last_blind_increase_at: table.last_blind_increase_at || new Date().toISOString(),
+      },
       state_version: 0,
     };
 
@@ -474,6 +512,21 @@ Deno.serve(async (req) => {
       event: "game_state",
       payload: publicState,
     });
+
+    // Broadcast blinds_up event if blinds increased
+    if (blindsIncreased) {
+      await channel.send({
+        type: "broadcast",
+        event: "blinds_up",
+        payload: {
+          old_small: oldSmall,
+          old_big: oldBig,
+          new_small: table.small_blind,
+          new_big: table.big_blind,
+          blind_level: table.blind_level,
+        },
+      });
+    }
 
     return new Response(
       JSON.stringify({ hand_id: hand.id, state: publicState }),

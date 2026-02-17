@@ -114,6 +114,7 @@ export interface GameState {
   blindLevel: number;
   blindTimer: number; // minutes, 0 = off
   lastBlindIncrease: number; // timestamp
+  blindsIncreased?: boolean; // flag set when blinds doubled at hand start
   lastHandWinners: Array<{
     playerId: string;
     name: string;
