@@ -273,7 +273,39 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
               ),
             };
           });
+          // Don't refreshState for leaves — local update is sufficient
+          return;
         }
+        if (payload?.action === 'join') {
+          const currentState = tableStateRef.current;
+          const handActive = !!currentState?.current_hand;
+          if (handActive) {
+            // Mid-hand join: add seat locally as sitting_out with has_cards=false
+            // Do NOT refreshState — it would replace the active hand's seat array
+            setTableState(prev => {
+              if (!prev) return prev;
+              const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
+              if (alreadyExists) return prev;
+              return {
+                ...prev,
+                seats: [...prev.seats, {
+                  seat: payload.seat,
+                  player_id: payload.player_id,
+                  display_name: payload.display_name || 'Player',
+                  avatar_url: payload.avatar_url || null,
+                  country_code: null,
+                  stack: payload.stack || 0,
+                  status: 'sitting_out',
+                  has_cards: false,
+                  current_bet: 0,
+                  last_action: null,
+                }],
+              };
+            });
+            return; // Skip refreshState during active hand
+          }
+        }
+        // No active hand: safe to do a full refresh
         refreshState();
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
