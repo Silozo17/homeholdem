@@ -1,70 +1,109 @@
 
-# Fix: Auto-Runout When All Opponents Are All-In
+# Fix Card Dealing Flow and Winner Announcement Timing
 
-## The Bug
+## Problems Identified
 
-In the multiplayer `poker-action` edge function, when one player calls an all-in and is the only player with chips remaining, the server still asks that player to act on each subsequent street (check on flop, check on turn, check on river) instead of automatically dealing out all remaining community cards.
+### Problem 1: Card dealing is not sequential clockwise
+The current deal animation (lines 917-937 of `OnlinePokerTable.tsx`) fires visual card sprites from the dealer to each seat, but the actual hole cards (`myCards`) arrive from `poker-my-cards` API immediately when the hand_id changes (line 355 of `useOnlinePokerTable.ts`). This means the player's cards appear in `PlayerSeat` before the deal animation finishes flying to their seat, creating a jarring overlap.
 
-**Root cause** is in `poker-action/index.ts` lines 380-388:
+The deal delay formula is `(cardIdx * activeSeatCount + seatOrder) * 0.35s`, meaning for 4 players the second card to the last player arrives at `(1 * 4 + 3) * 0.35 = 2.45s`. But the hole cards are fetched and displayed instantly.
+
+**Fix**: Gate the display of hero cards behind a `dealComplete` flag. Only show hole cards after the dealing animation finishes. Card 1 reveals when its deal sprite lands, card 2 reveals when its sprite lands -- matching the clockwise dealing motion.
+
+### Problem 2: Winner announced before community cards finish dealing
+During all-in runouts, the server sends ALL 5 community cards at once plus the `hand_result` broadcast simultaneously. The client's staged runout (lines 460-486) correctly reveals them over 3 seconds (flop immediately, turn at 1.5s, river at 3s), BUT:
+- `handWinners` is set immediately when `hand_result` arrives (line 264)
+- `WinnerOverlay` renders immediately when `handWinners.length > 0` (line 889)
+- Voice announcement fires immediately (line 335)
+
+So the winner is shown while the turn/river cards are still being staged.
+
+**Fix**: Delay setting `handWinners` during all-in runouts until the staged card reveal completes. The river card appears at 3s, so delay winner display by ~3.5s after a runout is detected.
+
+---
+
+## Changes
+
+### File 1: `src/components/poker/OnlinePokerTable.tsx`
+
+**A. Gate hero card visibility behind deal animation timing**
+
+Add a `dealPhaseComplete` state that starts `false` when a new hand begins and becomes `true` after the full dealing animation duration. Calculate the total deal time from `activeSeats.length`:
+
+```
+totalDealTime = (1 * activeCount + (activeCount - 1)) * 0.35 + 0.7  // last card's deal sprite + card-arrive
+```
+
+In the `PlayerSeat` rendering (line 992), pass the cards as `null` while `dealPhaseComplete` is false (for the hero only -- opponents always see face-down backs anyway).
+
+**B. Sequential card reveal per card**
+
+The `PlayerSeat` component already has sequential reveal logic (lines 82-100) using `seatDealOrder` and `totalActivePlayers`. This is correct but the hero's `myCards` data arrives too early. The fix is to delay setting `myCards` into the player's display until each card's deal sprite would have landed.
+
+Approach: Instead of gating all cards, use the existing `revealedIndices` mechanism in `PlayerSeat.tsx` which already calculates per-card reveal timing. The issue is that `myCards` is set immediately from the API call. Add a short delay before setting myCards to align with the deal animation start.
+
+**C. Delay winner display during all-in runouts**
+
+In the `hand_result` handler (line 250 of `useOnlinePokerTable.ts`), detect if this is a runout scenario (community cards jumped from less than 5 to 5 in one broadcast). If so, delay setting `handWinners` by 3.5 seconds so the staged reveal completes first.
+
+**D. Delay winner voice announcement and overlay for runouts**
+
+The `WinnerOverlay` (line 889) and voice announcement (line 335) both trigger off `handWinners`. Since we delay `handWinners` in the runout case, these will automatically be delayed too.
+
+### File 2: `src/hooks/useOnlinePokerTable.ts`
+
+**A. Delay `handWinners` during runouts**
+
+In the `hand_result` handler (line 250), check the current community card count vs the incoming count. If it is a runout (cards jumped to 5), use a setTimeout to delay `setHandWinners`:
 
 ```text
-} else if (activePlayers.length === 0) {
-    // All remaining players are all-in -- run out community cards
-    roundComplete = true;
-} else {
-    // Check if all active players have acted and bets are equal
-    ...
-}
+const isRunout = prevCommunityCount < 5 && incomingCommunityCount === 5 && prevCommunityCount < 3;
+const winnerDelay = isRunout ? 4000 : 0;  // Wait for staged card reveal
+setTimeout(() => setHandWinners(winners), winnerDelay);
 ```
 
-When Player A (10,000 chips) calls Player B's all-in (400 chips):
-- Player B is `all-in` (status)
-- Player A is still `active` (has chips left)
-- `activePlayers.length === 1` (not 0)
-- So it falls into the `else` branch and treats it as a normal round
-- Each new phase asks Player A to act again
+**B. Delay `myCards` to sync with deal animation**
 
-The condition at line 423 that runs out all cards also only checks `activePlayers.length === 0`, missing the case where 1 active player has no opponents to bet against.
+After fetching hole cards (line 357), add a short delay (~800ms) before calling `setMyCards` to let the deal animation sprites start flying first. This gives the visual impression that cards arrive face-down and then flip when they land.
 
-## The Fix
+### File 3: `src/components/poker/PlayerSeat.tsx`
 
-**One line change in the condition logic.** When only 1 active player remains and everyone else is either folded or all-in, there is no further betting possible. The hand should auto-run out all remaining community cards to showdown.
+Minor adjustment to the reveal timing formula to better sync with the deal animation sprites:
 
-### Change 1: Round completion check (line 380)
+Currently: `const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1`
+Updated: `const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.35 + 0.1`
 
-```
-// BEFORE:
-} else if (activePlayers.length === 0) {
+This matches the 0.35s interval used by the deal sprites in `OnlinePokerTable.tsx` (line 928), so cards flip face-up precisely when the deal sprite lands at the seat.
 
-// AFTER:
-} else if (activePlayers.length === 0 || 
-           (activePlayers.length === 1 && allInPlayers.length > 0)) {
-```
+---
 
-This catches both scenarios:
-- All players are all-in (existing)
-- Only 1 player has chips, rest are all-in (the reported bug)
+## Detailed Sequence After Fix
 
-### Change 2: Runout check (line 423)
+```text
+1. Creator hits "Deal Hand"
+2. Server broadcasts game_state with phase=preflop
+3. Client starts deal animation sprites (0.35s stagger, clockwise)
+4. Client fetches myCards but delays display by 800ms
+5. Card 1 sprite flies to Seat A (0s), card 1 sprite to Seat B (0.35s), etc.
+6. Card 2 sprite flies to Seat A (1.4s for 4 players), etc.
+7. As each sprite lands, the card at that seat flips from back to face (hero only sees own)
+8. Full deal complete. Players see their 2 cards. Betting begins.
 
-```
-// BEFORE:
-if (activePlayers.length === 0 && nonFolded.length > 1) {
-
-// AFTER:
-if (activePlayers.length <= 1 && allInPlayers.length > 0 && nonFolded.length > 1) {
+ALL-IN RUNOUT:
+1. Player calls all-in. Server detects runout, deals all 5 community cards at once.
+2. Client receives game_state with 5 community cards + hand_result broadcast
+3. Staged reveal: Flop (3 cards) appear immediately, Turn at 1.5s, River at 3s
+4. hand_result processing is DELAYED by 4s
+5. After river is visible (3s), winner overlay + voice announcement fire at 4s
+6. Showdown timer starts from winner display (5s standard / 8.5s for runouts)
 ```
 
-This ensures all remaining community cards are dealt at once and the phase jumps straight to showdown, rather than advancing one street at a time.
-
-### Why the bot game already works
-
-The practice mode (`usePokerGame.ts` line 572) already handles this correctly with `getActionablePlayers(state.players).length <= 1` -- it auto-advances through phases with a dramatic delay. No changes needed there.
+---
 
 ## File Summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/poker-action/index.ts` | Fix two conditions (lines 380 and 423) to detect "1 active + all-in opponents" as a runout scenario |
-
-This is a 2-line fix in a single file.
+| `src/hooks/useOnlinePokerTable.ts` | Delay `handWinners` by 4s during runouts; delay `myCards` by 800ms to sync with deal sprites |
+| `src/components/poker/OnlinePokerTable.tsx` | No structural changes needed -- delays propagate from hook |
+| `src/components/poker/PlayerSeat.tsx` | Update card reveal timing from 0.18s to 0.35s interval to match deal sprite stagger |
