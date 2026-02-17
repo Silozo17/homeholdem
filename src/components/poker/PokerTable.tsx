@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { GameState } from '@/lib/poker/types';
+import { getBotPersona } from '@/lib/poker/bot-personas';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { PlayerSeat } from './PlayerSeat';
 import { CardDisplay } from './CardDisplay';
@@ -65,17 +66,23 @@ export function PokerTable({
 
       {/* Bot players - top area */}
       <div className="flex flex-wrap justify-center gap-1 px-2 py-2">
-        {bots.map(bot => (
-          <PlayerSeat
-            key={bot.id}
-            player={bot}
-            isCurrentPlayer={state.currentPlayerIndex === bot.seatIndex}
-            showCards={isShowdown && (bot.status === 'active' || bot.status === 'all-in')}
-            isHuman={false}
-            isShowdown={isShowdown}
-            cardsPlacement="above"
-          />
-        ))}
+        {bots.map(bot => {
+          const persona = bot.isBot ? getBotPersona(bot.seatIndex - 1) : undefined;
+          return (
+            <PlayerSeat
+              key={bot.id}
+              player={bot}
+              isCurrentPlayer={state.currentPlayerIndex === bot.seatIndex}
+              showCards={isShowdown && (bot.status === 'active' || bot.status === 'all-in')}
+              isHuman={false}
+              isShowdown={isShowdown}
+              cardsPlacement="above"
+              avatarUrl={persona?.avatarUrl}
+              level={persona?.level}
+              countryCode={persona?.countryCode}
+            />
+          );
+        })}
       </div>
 
       {/* Table felt - center */}
