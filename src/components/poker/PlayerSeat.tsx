@@ -37,8 +37,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isFolded = player.status === 'folded';
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
-  const cardSize = compact ? 'md' : 'lg';
-  const humanCardSize = compact ? 'md' : '2xl';
+  const humanCardSize = compact ? 'lg' : 'xl';
 
   // Sequential card reveal: cards stay face-down until their deal delay elapses
   const [revealedIndices, setRevealedIndices] = useState<Set<number>>(new Set());
@@ -67,35 +66,23 @@ export const PlayerSeat = memo(function PlayerSeat({
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
-  // Opponent showdown cards (overlay the avatar)
-  const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0 ? (
-    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex animate-showdown-reveal" style={{ zIndex: 2 }}>
-      {player.holeCards.map((card, i) => (
-        <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-10px' : '0' }}>
-          <CardDisplay
-            card={shouldShowCards ? card : undefined}
-            faceDown={!shouldShowCards}
-            size={cardSize}
-            dealDelay={i * 0.15}
-            className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
-          />
-        </div>
-      ))}
-    </div>
-  ) : null;
-
-  // Human player cards (fanned behind avatar) — sequential reveal
-  const humanCards = isHuman && player.holeCards.length > 0 ? (
-   <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 9px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
-      {player.holeCards.map((card, i) => {
-        const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
-        const isRevealed = revealedIndices.has(i);
+  // Shared card fan layout — cards ON TOP of avatar, fanned with ~10deg tilt
+  const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
+    <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
+      style={{ zIndex: 3, top: '-30%' }}>
+      {cards.map((card, i) => {
+        const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1 : i * 0.15;
+        const isRevealed = useReveal ? revealedIndices.has(i) : true;
+        const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
         return (
-          <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-12px' : '0' }}>
+          <div key={i} style={{
+            transform: `rotate(${i === 0 ? -10 : 10}deg)`,
+            marginLeft: i > 0 ? '-14px' : '0',
+          }}>
             <CardDisplay
-              card={isRevealed ? card : undefined}
+              card={displayCard}
               faceDown={!isRevealed}
-              size={humanCardSize}
+              size={size as any}
               dealDelay={dealDelay}
               className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
             />
@@ -103,7 +90,17 @@ export const PlayerSeat = memo(function PlayerSeat({
         );
       })}
     </div>
-  ) : null;
+  );
+
+  // Opponent showdown cards (on top of avatar)
+  const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0
+    ? cardFan(player.holeCards, humanCardSize, false)
+    : null;
+
+  // Human player cards (on top of avatar) — sequential reveal
+  const humanCards = isHuman && player.holeCards.length > 0
+    ? cardFan(player.holeCards, humanCardSize, true)
+    : null;
 
   return (
     <div className={cn(
