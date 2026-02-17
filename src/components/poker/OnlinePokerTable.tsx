@@ -196,6 +196,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         toast({ title: '⚠️ Inactivity Warning', description: 'You will be removed in 10 seconds. Tap anywhere to stay.' });
 
         inactivityWarningRef.current = setTimeout(() => {
+          // FIX CL-9: Don't auto-kick during active hand — extend instead
+          const currentHand = tableState?.current_hand;
+          if (currentHand && currentHand.phase !== 'complete') {
+            setInactivityWarning(false);
+            resetInactivity();
+            return;
+          }
           leaveTable().then(onLeave).catch(onLeave);
         }, WARNING_MS);
       }, IDLE_MS);
@@ -555,8 +562,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       (tableState?.seats.filter(s => s.player_id && s.stack > 0).length ?? 0) === 1);
     const isTournament = !!(tableState?.table as any)?.tournament_id;
 
-    // Save play result
-    await supabase.from('poker_play_results').insert({
+    // Save play result (FIX XP-1: add error handling)
+    const { error: resultErr } = await supabase.from('poker_play_results').insert({
       user_id: user.id,
       game_mode: isTournament ? 'tournament' : 'multiplayer',
       hands_played: handsPlayedRef.current,
@@ -569,6 +576,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       bot_count: 0,
       duration_seconds: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
     });
+    if (resultErr) console.error('[XP] poker_play_results insert failed:', resultErr);
 
     // Award XP
     const xpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
@@ -580,7 +588,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (handsWonRef.current > 0)
       xpEvents.push({ user_id: user.id, xp_amount: Math.round(handsWonRef.current * 10 * boost), reason: 'hands_won' });
 
-    await supabase.from('xp_events').insert(xpEvents);
+    const { error: xpErr } = await supabase.from('xp_events').insert(xpEvents);
+    if (xpErr) console.error('[XP] xp_events insert failed:', xpErr);
 
     // Fetch updated XP for level-up animation
     // Small delay to let the DB trigger process

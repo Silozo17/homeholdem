@@ -498,15 +498,25 @@ Deno.serve(async (req) => {
       .update({ status: "playing" })
       .eq("id", table_id);
 
-    // Get profiles for broadcast
-    const playerIds = activePlayers.map((p: any) => p.player_id);
+    // Get profiles for broadcast — include ALL seated players, not just active
+    const { data: allSeatsForBroadcast } = await admin
+      .from("poker_seats")
+      .select("seat_number, player_id, stack, status")
+      .eq("table_id", table_id)
+      .not("player_id", "is", null)
+      .order("seat_number");
+
+    const allPlayerIds = (allSeatsForBroadcast || []).map((p: any) => p.player_id);
     const { data: profiles } = await admin
       .from("profiles")
       .select("id, display_name, avatar_url")
-      .in("id", playerIds);
+      .in("id", allPlayerIds);
     const profileMap = new Map(
       (profiles || []).map((p: any) => [p.id, p])
     );
+
+    // FIX SV-2: Build seats from ALL seated players, mark sitting_out with has_cards=false
+    const activePlayerIds = new Set(activePlayers.map((p: any) => p.player_id));
 
     // Build public state (NO hole cards)
     const publicState = {
@@ -522,21 +532,22 @@ Deno.serve(async (req) => {
       bb_seat: bbSeat,
       min_raise: table.big_blind,
       current_bet: bbActual,
-      seats: activePlayers.map((p: any) => {
+      seats: (allSeatsForBroadcast || []).map((p: any) => {
         const su = seatUpdates.find(
           (u: any) => u.player_id === p.player_id
         );
         const profile = profileMap.get(p.player_id);
+        const isActive = activePlayerIds.has(p.player_id);
         return {
           seat: p.seat_number,
           player_id: p.player_id,
           display_name: profile?.display_name || "Player",
           avatar_url: profile?.avatar_url || null,
           stack: su ? su.stack : p.stack,
-          status: "active",
+          status: isActive ? "active" : p.status,
           current_bet: su ? su.current_round_bet : 0,
           last_action: null,
-          has_cards: true,
+          has_cards: isActive,
         };
       }),
       action_deadline: actionDeadline,

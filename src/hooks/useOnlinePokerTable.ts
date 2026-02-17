@@ -309,6 +309,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         refreshState();
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
+        // FIX RT-1: Deduplicate hand_result by hand_id to prevent double winner display
+        const resultHandId = payload.hand_id;
+        if (resultHandId && resultHandId === prevHandIdRef.current && handWinners.length > 0) {
+          console.log('[hand_result] Skipping duplicate for hand', resultHandId);
+          return;
+        }
+
         const revealed: RevealedCard[] = payload.revealed_cards || [];
         setRevealedCards(revealed);
 
@@ -617,8 +624,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
-        callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
-        refreshState();
+        // FIX CL-4: Await check-timeouts before refreshState to avoid race
+        callEdge('poker-check-timeouts', { table_id: tableId })
+          .catch(() => {})
+          .finally(() => refreshState());
       }
     }, 5000);
     return () => clearInterval(interval);

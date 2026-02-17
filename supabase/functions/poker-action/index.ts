@@ -595,6 +595,11 @@ async function processAction(
   const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds);
   const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+  // FIX MH-1: Only include players who actually have hole cards for this hand
+  // This prevents mid-hand joiners (sitting_out) from appearing with has_cards:true
+  const { data: holeCardRows } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
+  const holeCardPlayerIds = new Set((holeCardRows || []).map((r: any) => r.player_id));
+
   // 11. Broadcast public state
   const publicState = {
     hand_id: hand.id,
@@ -619,7 +624,7 @@ async function processAction(
         status: s.status,
         current_bet: s.current_round_bet,
         last_action: s.player_id === actorSeat.player_id ? action : null,
-        has_cards: s.status !== "folded",
+        has_cards: holeCardPlayerIds.has(s.player_id) && s.status !== "folded",
       };
     }),
     action_deadline: actionDeadline,
