@@ -27,6 +27,8 @@ export interface ChatBubble {
   id: string;
 }
 
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
+
 interface UseOnlinePokerTableReturn {
   tableState: OnlineTableState | null;
   myCards: Card[] | null;
@@ -42,6 +44,9 @@ interface UseOnlinePokerTableReturn {
   handWinners: HandWinner[];
   chatBubbles: ChatBubble[];
   spectatorCount: number;
+  connectionStatus: ConnectionStatus;
+  lastKnownPhase: string | null;
+  lastKnownStack: number | null;
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -66,6 +71,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [handWinners, setHandWinners] = useState<HandWinner[]>([]);
   const [chatBubbles, setChatBubbles] = useState<ChatBubble[]>([]);
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
+  const [lastKnownPhase, setLastKnownPhase] = useState<string | null>(null);
+  const [lastKnownStack, setLastKnownStack] = useState<number | null>(null);
   const channelRef = useRef<any>(null);
   const tableStateRef = useRef<OnlineTableState | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,8 +91,17 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
 
-  // Keep ref in sync for use inside broadcast callbacks
-  useEffect(() => { tableStateRef.current = tableState; }, [tableState]);
+  // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
+  useEffect(() => {
+    tableStateRef.current = tableState;
+    if (tableState?.current_hand) {
+      setLastKnownPhase(tableState.current_hand.phase);
+    }
+    if (userId) {
+      const mySeatInfo = tableState?.seats.find(s => s.player_id === userId);
+      if (mySeatInfo) setLastKnownStack(mySeatInfo.stack);
+    }
+  }, [tableState, userId]);
 
   // Derive computed state
   const mySeatNumber = tableState?.seats.find(s => s.player_id === userId)?.seat ?? null;
@@ -128,8 +145,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       setTableState(data);
       setMyCards(data.my_cards || null);
       setError(null);
+      setConnectionStatus('connected');
     } catch (err: any) {
       setError(err.message);
+      setConnectionStatus('disconnected');
     } finally {
       setLoading(false);
     }
@@ -148,6 +167,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       .on('broadcast', { event: 'game_state' }, ({ payload }) => {
         // Track last broadcast for stale hand detection
         lastBroadcastRef.current = Date.now();
+        // Mark connected on any successful broadcast
+        setConnectionStatus('connected');
         // Clear actionPending on any game_state broadcast
         setActionPending(false);
         if (actionPendingFallbackRef.current) {
@@ -285,9 +306,16 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         setSpectatorCount(spectators);
       })
       .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED' && userId) {
-          const isCurrentlySeated = tableStateRef.current?.seats.some(s => s.player_id === userId) ?? false;
-          await channel.track({ user_id: userId, role: isCurrentlySeated ? 'player' : 'spectator' });
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
+          if (userId) {
+            const isCurrentlySeated = tableStateRef.current?.seats.some(s => s.player_id === userId) ?? false;
+            await channel.track({ user_id: userId, role: isCurrentlySeated ? 'player' : 'spectator' });
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setConnectionStatus('disconnected');
+        } else if (status === 'CLOSED') {
+          setConnectionStatus('disconnected');
         }
       });
 
@@ -527,6 +555,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     handWinners,
     chatBubbles,
     spectatorCount,
+    connectionStatus,
+    lastKnownPhase,
+    lastKnownStack,
     joinTable,
     leaveTable,
     startHand,

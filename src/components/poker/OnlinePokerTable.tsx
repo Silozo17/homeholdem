@@ -74,7 +74,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
-    spectatorCount,
+    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -89,7 +89,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [communityDealSprites, setCommunityDealSprites] = useState<Array<{ id: number; delay: number }>>([]);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
-  const [isDisconnected, setIsDisconnected] = useState(false);
+  const [_keepHookOrder] = useState(false); // keep hook order stable after removing isDisconnected
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -324,11 +324,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   }, [tableState?.current_hand?.current_bet, preAction]);
 
   useEffect(() => {
-    if (error && (error.includes('fetch') || error.includes('network') || error.includes('Failed'))) {
-      setIsDisconnected(true);
-    } else if (tableState) {
-      setIsDisconnected(false);
-    }
     if (!tableState && !loading && !error) {
       toast({ title: 'Table closed', description: 'This table has been closed.' });
       onLeave();
@@ -425,7 +420,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [isMyTurn, play]);
 
-  const handleReconnect = useCallback(() => { window.location.reload(); }, []);
+  const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
 
   // ── Memoized derived values ──
   const table = tableState?.table;
@@ -964,7 +959,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       </AlertDialog>
 
       {/* Connection lost overlay */}
-      <ConnectionOverlay isDisconnected={isDisconnected} onReconnect={handleReconnect} />
+      <ConnectionOverlay
+        status={connectionStatus}
+        onReconnect={handleReconnect}
+        handInProgress={!!hand}
+        lastPhase={lastKnownPhase}
+        myStack={lastKnownStack}
+      />
 
       {/* Invite players dialog */}
       <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
