@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/layout/Logo';
-import { Check, Crown, Users, Trophy, BarChart3, Loader2 } from 'lucide-react';
+import { Check, Crown, Users, Trophy, BarChart3, Loader2, Gamepad2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaywallDrawerProps {
@@ -35,6 +35,7 @@ export function PaywallDrawer({ open, onOpenChange }: PaywallDrawerProps) {
     { icon: Crown, text: t('subscription.feature_2', 'Join private clubs with invite codes') },
     { icon: Trophy, text: t('subscription.feature_3', 'Full tournament management') },
     { icon: BarChart3, text: t('subscription.feature_4', 'Track stats and leaderboards') },
+    { icon: Gamepad2, text: t('subscription.feature_5', 'Online multiplayer & tournament poker') },
   ];
 
   const handleSubscribe = async () => {
