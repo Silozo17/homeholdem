@@ -131,19 +131,29 @@ Deno.serve(async (req) => {
     }
 
     if (action === "close") {
-      // Check no active hand
+      // Check for active hand -- force-complete if stuck (deadline 60s+ overdue)
       const { data: activeHand } = await admin
         .from("poker_hands")
-        .select("id")
+        .select("id, action_deadline")
         .eq("table_id", table_id)
         .is("completed_at", null)
         .single();
 
       if (activeHand) {
-        return new Response(
-          JSON.stringify({ error: "Cannot close during an active hand" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const deadline = activeHand.action_deadline ? new Date(activeHand.action_deadline).getTime() : 0;
+        const staleMs = Date.now() - deadline;
+        if (deadline === 0 || staleMs < 60000) {
+          return new Response(
+            JSON.stringify({ error: "Cannot close during an active hand" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // Force-complete the stuck hand so we can close
+        console.log(`[MODERATE] Force-completing stuck hand ${activeHand.id} (stale ${Math.round(staleMs/1000)}s)`);
+        await admin.from("poker_hands").update({
+          completed_at: new Date().toISOString(),
+          phase: "complete",
+        }).eq("id", activeHand.id);
       }
 
       // Broadcast close before deleting
