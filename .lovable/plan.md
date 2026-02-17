@@ -1,40 +1,50 @@
 
 
-# Fix: Toast Notifications Hidden Under iPhone Notch (Root Cause Found)
+# Fix: Toast Notifications Under iPhone Notch (Final Solution)
 
-## Why Previous Fixes Failed
+## Root Cause (confirmed after 3 failed attempts)
 
-After reading Sonner's actual source code, the reason is clear. Sonner's internal rendering does this:
+Safari/WebKit does NOT evaluate `env(safe-area-inset-top)` inside inline styles (the HTML `style` attribute). Every previous fix -- whether using `style` prop, `offset` prop, or `mobileOffset` prop -- ultimately writes to the element's inline style. Safari sees `env(safe-area-inset-top)` there and treats it as 0, so the toast sits at the very top of the screen.
 
-```
-style: { ...yourStyleProp, ...generatedOffsets }
-```
-
-The library generates `--offset-top` and `--mobile-offset-top` from its own `offset`/`mobileOffset` props and spreads them **after** the `style` prop. This means our CSS variables get **overwritten** every single time -- no matter what we put in the `style` prop.
+The `env()` function only works properly in **stylesheet rules** (CSS files, `<style>` tags), not in inline `style` attributes on Safari.
 
 ## The Fix
 
-Use Sonner's dedicated `offset` and `mobileOffset` props, which accept objects with a `top` property that can be a string (including CSS `calc()` expressions). Remove the `style` prop entirely.
+Two changes:
 
-**File: `src/components/ui/sonner.tsx`**
+### 1. `src/index.css` -- Add a CSS rule targeting Sonner's toaster
 
-Replace the current `style` prop with:
+```css
+/* Force toasts below safe area on notched devices (Safari inline env() bug workaround) */
+[data-sonner-toaster][data-y-position="top"] {
+  top: calc(env(safe-area-inset-top, 0px) + 20px) !important;
+}
+```
+
+This single rule handles both desktop and mobile widths because it directly overrides the `top` property with `!important`, bypassing whatever inline variables Sonner generates.
+
+### 2. `src/components/ui/sonner.tsx` -- Remove the broken offset props
+
+Remove the `offset` and `mobileOffset` props from the Sonner component since they have no effect on Safari. The CSS rule above handles positioning.
 
 ```tsx
 <Sonner
-  ...
-  offset={{ top: 'calc(env(safe-area-inset-top, 0px) + 20px)' }}
-  mobileOffset={{ top: 'calc(env(safe-area-inset-top, 0px) + 20px)' }}
-  // remove the style prop with --offset-top / --mobile-offset-top
-  ...
+  theme={theme as ToasterProps["theme"]}
+  position="top-center"
+  className="toaster group"
+  toastOptions={...}
+  {...props}
 />
 ```
 
-This feeds the safe-area value directly into Sonner's internal offset generator, so the CSS variables are set correctly from the start rather than being overwritten.
+## Why this works
 
-## Technical Details
+- `env(safe-area-inset-top)` in a CSS stylesheet rule is fully supported by Safari 11.1+ and all WebKit browsers
+- `!important` ensures it overrides Sonner's inline style `top: var(--offset-top)` and `top: var(--mobile-offset-top)`
+- No JavaScript, no props, no CSS variables -- just a direct CSS rule that Safari will correctly evaluate
 
-- Single file change: `src/components/ui/sonner.tsx`
-- The `Offset` type in Sonner explicitly supports `{ top?: string | number }`, so this is fully type-safe
-- `env(safe-area-inset-top)` returns ~47px on notched iPhones in PWA mode, plus our 20px buffer = ~67px from top
+## Files changed
+
+- `src/index.css` -- Add 1 CSS rule (4 lines)
+- `src/components/ui/sonner.tsx` -- Remove offset/mobileOffset props
 
