@@ -71,33 +71,29 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
       }}
     >
       {/* Top-left corner */}
-      <div className={cn('absolute top-0.5 left-1 flex flex-col items-center leading-none')}>
+      <div className={cn('absolute top-1 left-1.5 flex flex-col items-center leading-none')}>
         <span className={cn(
           textSizes[size].rank, 'font-black',
-          isRed ? 'text-red-600' : 'text-gray-900',
+          isRed ? 'text-[#C53030]' : 'text-[#1A1A1A]',
         )}>
           {rankStr}
         </span>
         <span className={cn(
-          textSizes[size].suit,
-          isRed ? 'text-red-500' : 'text-gray-800',
+          textSizes[size].suit, '-mt-0.5',
+          isRed ? 'text-[#C53030]' : 'text-[#1A1A1A]',
         )}>
           {suitStr}
         </span>
       </div>
-      {/* Center suit */}
-      <div className="flex-1 flex items-center justify-center">
+      {/* Center suit watermark */}
+      <div className="flex-1 flex items-end justify-center pb-[15%]">
         <span className={cn(
           textSizes[size].center, 'font-bold',
-          isRed ? 'text-red-500/80' : 'text-gray-700/80',
+          isRed ? 'text-[#C53030]/30' : 'text-[#1A1A1A]/30',
         )}>
           {suitStr}
         </span>
       </div>
-      {/* Linen texture overlay */}
-      <div className="absolute inset-0 rounded-lg pointer-events-none opacity-[0.03]"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='%23000' fill-opacity='1'/%3E%3C/svg%3E")` }}
-      />
     </div>
   );
 });
