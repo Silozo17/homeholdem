@@ -1,86 +1,65 @@
 
 
-# Pixel-Perfect Player Profile Redesign
+# Give Bots Fake Personas (Avatars, Levels, Flags)
 
-## Detailed Analysis: Reference vs Current
+## Overview
 
-After examining the reference image closely, here are all the differences that need to be fixed:
+Currently bots have generic names ("Alex", "Blake", etc.) and no avatar images, levels, or country flags. This change creates a rich persona system so each bot feels like a real player at the table.
 
-### 1. Avatar Frame -- WRONG STYLE
-**Reference:** Thick dark charcoal/metallic ring border (dark grey, almost black)
-**Current:** Colorful gradient border with bright colors (`3px solid color-mix(in srgb, ${color} 60%, white)`)
-**Fix:** Replace the colorful border with a thick (4px) dark charcoal border (`hsl(0 0% 15%)`) with a subtle inner shadow for the metallic look.
+## What Changes
 
-### 2. Cards -- Z-ORDER PARTIALLY WRONG
-**Reference:** Cards are in front of the avatar BUT behind the nameplate bar. The nameplate overlaps both the avatar and the card bottoms.
-**Current:** Cards are at `zIndex: 3`, nameplate has no z-index (defaults to auto). Both cards and nameplate are siblings.
-**Fix:** Keep cards at `zIndex: 3`. Raise the nameplate to `zIndex: 4` so it paints on top of the card bottoms, matching the reference where the nameplate covers the lower portion.
+### 1. New file: `src/lib/poker/bot-personas.ts`
 
-### 3. Nameplate -- WRONG SHAPE AND POSITION
-**Reference:** Wide, fully rounded pill shape (rounded on all sides, not just bottom). It overlaps/connects with the bottom of the avatar circle -- no gap. Contains "You" (white, centered) and "93,240" (white/light, centered) on two lines.
-**Current:** Only rounded at the bottom (`rounded-b-lg`), has a `mt-0.5` gap, uses `borderTop: none`. Name is gold for hero.
-**Fix:** Make the nameplate a full rounded pill (`rounded-full` or `rounded-xl`), remove the top gap by using negative margin (`-mt-3`) so it tucks under the avatar. Make all text white (not gold). Widen it slightly. Set `zIndex: 4` so it sits in front of cards.
+A data file containing an array of 8 bot personas, each with:
+- **name** -- A more colorful poker nickname (e.g., "Viktor", "Luna", "Ace", "Maverick")
+- **avatarUrl** -- A generated avatar URL using DiceBear API (e.g., `https://api.dicebear.com/9.x/adventurer/svg?seed=Viktor`) -- free, no API key needed, deterministic per seed
+- **level** -- Random level between 3 and 45 (feels realistic)
+- **countryCode** -- Random 2-letter ISO code from a curated list (US, GB, BR, JP, DE, FR, AU, CA, PL, KR, etc.)
 
-### 4. Level Badge -- MISSING FIRE ANIMATION
-**Reference:** The "19" badge has orange/red flames radiating outward around it -- an animated fire effect.
-**Current:** Plain dark circle with a thin gold border. No animation.
-**Fix:** Add a CSS keyframe animation that creates a pulsing fire/ember glow effect around the badge. Use an orange-red radial gradient or box-shadow animation to simulate flames. The badge itself stays the same (dark circle, white number), but gets a glowing animated ring.
+Each persona is tied to a specific bot index so it stays consistent across games.
 
-### 5. Country Flag -- MISSING
-**Reference:** Small rectangular Union Jack at the avatar's bottom-right.
-**Current:** Not implemented at all.
-**Fix:** Create a `CountryFlag.tsx` component using emoji flags (converting 2-letter ISO code to regional indicator emoji). Position absolute at bottom-right of the avatar, same size as the level badge. Add `country_code` column to profiles table.
+### 2. Update: `src/hooks/usePokerGame.ts`
 
-### 6. Status Dot -- SHOULD BE REMOVED
-**Reference:** No green/red status dot visible.
-**Current:** A colored status dot at bottom-right.
-**Fix:** Remove the status dot from `PlayerAvatar.tsx`. The bottom-right position is now taken by the country flag.
+- Import the bot personas array
+- When creating bot players in the `START_GAME` reducer, assign each bot its persona name (replacing the old `BOT_NAMES` array)
+- Store the persona index on the player object (or just use seatIndex to look up persona later)
 
-## Files to Change
+### 3. Update: `src/components/poker/PlayPokerLobby.tsx`
 
-### `src/components/poker/PlayerAvatar.tsx`
-- Replace colorful gradient border with dark charcoal metallic border
-- Remove the status dot (bottom-right)
-- Add `countryCode` prop
-- Render `CountryFlag` at bottom-right (where status dot was)
-- Keep `LevelBadge` at bottom-left
+- Import bot personas to show the correct names and avatar URLs in the lobby preview
+- Pass `avatarUrl`, `level`, and `countryCode` from the persona to the `PlayerAvatar` component shown in the lobby
 
-### `src/components/common/LevelBadge.tsx`
-- Add animated fire/ember glow effect using CSS keyframes
-- Keep the badge itself the same (dark circle, gold border, white number)
-- Add pulsing orange/red shadow animation around the badge
+### 4. Update: `src/components/poker/PokerTablePro.tsx`
 
-### `src/components/poker/PlayerSeat.tsx`
-- **Nameplate:** Change to full rounded pill shape, negative top margin to overlap avatar bottom, set `zIndex: 4` (above cards)
-- **Text colors:** All white (remove gold color for hero name)
-- **Nameplate width:** Wider `min-w-[90px]`
+- Import bot personas
+- For bot players, pass `avatarUrl`, `level`, and `countryCode` from their persona to `PlayerSeat` (currently these are `undefined` for bots)
 
-### `src/components/poker/CountryFlag.tsx` (NEW)
-- Takes `countryCode` (2-letter ISO) prop
-- Renders flag emoji in a small container
-- Positioned absolute bottom-right of avatar
+### 5. Update: `src/components/poker/PokerTable.tsx` (fallback table)
 
-### `tailwind.config.ts`
-- Add `fire-glow` keyframe animation for the level badge ember effect
+- Same treatment as PokerTablePro -- pass persona data to `PlayerSeat` for bots
 
-### Database
-- Add `country_code TEXT` column to `profiles` table
+## Bot Persona Data (Example)
 
-## Technical: Z-Index Layering (Fixed)
+| Index | Name     | Flag | Level | Avatar Seed |
+|-------|----------|------|-------|-------------|
+| 0     | Viktor   | RU   | 32    | viktor      |
+| 1     | Luna     | BR   | 18    | luna        |
+| 2     | Ace      | US   | 41    | ace         |
+| 3     | Maverick | AU   | 12    | maverick    |
+| 4     | Sakura   | JP   | 27    | sakura      |
+| 5     | Klaus    | DE   | 35    | klaus       |
+| 6     | Priya    | IN   | 9     | priya       |
+| 7     | Carlos   | MX   | 22    | carlos      |
 
-```text
-Layer 1 (z-[1]): Avatar body (profile pic)
-Layer 2 (z-[2]): Active player gold ring / All-in ring
-Layer 3 (z-[3]): Cards (fanned on top of avatar)
-Layer 4 (z-[4]): Nameplate bar (on top of everything)
-Layer 10 (z-[10]): Level badge + Country flag (on avatar edge)
-```
+## Files to Create/Modify
 
-## Summary of Visual Changes
-- Dark metallic avatar frame (no more colorful borders)
-- Cards in front of avatar, behind nameplate
-- Wide pill-shaped nameplate overlapping avatar bottom
-- Fire/ember animation on level badge
-- Country flag at bottom-right of avatar
-- Status dot removed
+- **Create**: `src/lib/poker/bot-personas.ts`
+- **Modify**: `src/hooks/usePokerGame.ts` -- use persona names
+- **Modify**: `src/components/poker/PlayPokerLobby.tsx` -- show persona avatars/flags in lobby
+- **Modify**: `src/components/poker/PokerTablePro.tsx` -- pass persona props to PlayerSeat for bots
+- **Modify**: `src/components/poker/PokerTable.tsx` -- pass persona props to PlayerSeat for bots
+
+## No database or edge function changes needed
+
+This is purely a frontend/cosmetic change for the practice (vs bots) game mode. Multiplayer already pulls real profile data from the database.
 
