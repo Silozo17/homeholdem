@@ -1,70 +1,74 @@
 
 
-## Three Fixes
+## Slow Down the Final Hand Sequence
 
-### 1. All-in runout: Cards must be revealed sequentially
+### Current Problem
 
-**Problem**: When all players go all-in, the server deals all 5 community cards in a single action and jumps straight from preflop to showdown/complete. The client receives all cards at once, so there's no dramatic flop-turn-river reveal.
+When the last hand finishes (whether all-in or not), everything happens too fast:
+- The showdown timer (3.5s or 7s) clears `handWinners`, which removes the winner banner
+- The `gameOver` overlay appears but the winner celebration is rushed
+- There's no distinct "stages" -- cards reveal, winner banner, confetti, and game over all blur together
 
-**Fix (client-side)**: Add a "staged reveal" system in `OnlinePokerTable.tsx`. When community cards jump from 0 to 5 (or 3 to 5) in a single broadcast, don't render them all immediately. Instead:
-- Store incoming community cards in a ref
-- Use a local `visibleCommunityCards` state that reveals them in stages with delays:
-  - Cards 0-2 (flop): shown immediately
-  - Card 3 (turn): shown after 1.5s
-  - Card 4 (river): shown after 3s
-- Only trigger staged reveal when a "big jump" is detected (e.g., going from 0 cards to 5)
-- The showdown timer (3.5s) must also be extended when a staged runout is active, to allow all cards to be revealed before cleanup
+### Desired Sequence (applies to ALL final hands)
 
-**File**: `src/components/poker/OnlinePokerTable.tsx`
-- Add `visibleCommunityCards` state and `stagedRunoutRef`
-- Detect big jumps in community card count via a `useEffect`
-- Replace `hand?.community_cards` with `visibleCommunityCards` in the render
-- Extend showdown timer from 3.5s to 7s when staged runout is detected
+1. **Cards reveal** -- community cards shown (staged if all-in, normal otherwise)
+2. **Opponent hands shown** -- revealed cards visible on the table
+3. **Winner banner appears** -- gold banner with hand name + confetti for ~4 seconds
+4. **Winner banner fades** -- pot chips fly to winner
+5. **Game Over overlay slides in** -- with stats, "Close Game" and "Play Again" buttons
+6. **Stays until user dismisses** -- already fixed in previous commit
 
-**File**: `src/hooks/useOnlinePokerTable.ts`
-- Export a flag or let the component control showdown duration
-- When `hand_result` arrives, check if a staged runout is happening and delay the cleanup accordingly
+### Implementation
 
-### 2. Community card deal sprites land too far down
+**File: `src/components/poker/OnlinePokerTable.tsx`**
 
-**Problem**: The flying card sprites use `--deal-center-dy: 46vh` (viewport height), but community cards render at `top: 48%` inside the table container (which is smaller than the viewport). The sprites overshoot.
+**Change 1 -- Delay game over detection**
 
-**Fix**: Change the target from `46vh` to `46cqh` (container query height units) to match the container-relative positioning of the actual cards. The table wrapper already has `container-type: size` set (line 490), so `cqh` units will work correctly.
+Currently (line 172-179), game over triggers immediately when `handWinners` populates and the player's stack is 0. Instead, delay the game over by 4 seconds so the winner banner has time to display first:
 
-**File**: `src/components/poker/OnlinePokerTable.tsx`
-- Change `['--deal-center-dy' as any]: '46vh'` to `['--deal-center-dy' as any]: '46cqh'`
+```typescript
+useEffect(() => {
+  if (!tableState || !user) return;
+  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+  if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
+    // Delay game over so winner banner + confetti play out first
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners(handWinners);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+}, [tableState, user, handWinners]);
+```
 
-### 3. Game over stats disappear without user input
+**File: `src/hooks/useOnlinePokerTable.ts`**
 
-**Problem**: The showdown timer (3.5s) clears `handWinners`, which causes the Game Over overlay to show empty winner data. The `gameOver` state itself persists, but the data it displays gets wiped.
+**Change 2 -- Extend showdown timer for final hands**
 
-**Fix**: 
-- When `gameOver` is true, save the winners into a separate `gameOverWinners` state that is NOT cleared by the showdown timer
-- The Game Over overlay uses `gameOverWinners` instead of `handWinners`
-- `gameOverWinners` is only cleared when the user explicitly clicks "Close Game"
+The showdown timer currently clears `handWinners` after 3.5s (or 7s for all-in). For the final hand, we need to keep `handWinners` alive longer so the game over overlay can snapshot them. Increase the base showdown delay to 5s (normal) and 8.5s (all-in runout) to give the delayed game over (4s) time to capture the data:
 
-**File**: `src/components/poker/OnlinePokerTable.tsx`
-- Add `gameOverWinners` state
-- In the `gameOver` detection effect, snapshot `handWinners` into `gameOverWinners`
-- Game Over `WinnerOverlay` reads from `gameOverWinners`
+```typescript
+// In hand_result handler (line 254):
+const showdownDelay = communityCount >= 5 ? 8500 : 5000;
+```
 
----
+### What This Achieves
 
-### Summary
-
-| Issue | Root Cause | Fix Location |
-|-------|-----------|--------------|
-| All-in ends instantly | Server sends all 5 cards + complete in one shot | Client-side staged reveal in OnlinePokerTable.tsx |
-| Deal sprites overshoot | `46vh` vs container-relative `48%` mismatch | Change to `46cqh` in OnlinePokerTable.tsx |
-| Stats vanish | showdown timer clears handWinners while gameOver overlay depends on them | Snapshot winners into separate gameOverWinners state |
-
-### Files to Modify
-- `src/components/poker/OnlinePokerTable.tsx` (all 3 fixes)
-- `src/hooks/useOnlinePokerTable.ts` (extend showdown timer for staged runout)
+| Step | Timing | What Happens |
+|------|--------|--------------|
+| 0s | Cards + hands revealed on table |
+| 0s | Winner banner appears with hand name |
+| 0s | Confetti bursts (if human won) |
+| 0-3s | Staged card reveal (if all-in) |
+| 0s-5s | Winner banner visible, pot chips fly to winner |
+| 4s | Game Over overlay appears (delayed) |
+| 5s+ | Showdown cleanup runs, but gameOverWinners already snapshotted |
+| User click | Close Game or Play Again |
 
 ### What Does NOT Change
 - No edge function changes
 - No database changes
-- Seat positions, card display styling, betting controls untouched
-- Winner overlay component itself unchanged
+- Winner overlay component unchanged
+- Card animations unchanged
+- Normal (non-final) hand timing stays the same for the banner (it still auto-clears)
 
