@@ -105,7 +105,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   // Card fan — 10deg tilt, tight overlap, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
-      style={{ zIndex: 3, top: compact ? '-30%' : '-25%' }}>
+      style={{ zIndex: 3, top: compact ? 'calc(-30% + 40px)' : 'calc(-25% + 40px)' }}>
       {cards.map((card, i) => {
         const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1 : i * 0.15;
         const isRevealed = useReveal ? revealedIndices.has(i) : true;
