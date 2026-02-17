@@ -138,7 +138,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     const timer = setTimeout(() => {
       setChatBubbles(prev => prev.filter(b => b.id !== id));
       chatBubbleTimers.current.delete(timer);
-    }, 6000);
+    }, 5000);
     chatBubbleTimers.current.add(timer);
   }, []);
 
