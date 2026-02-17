@@ -611,7 +611,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       prevAnimHandIdRef.current = null;
       setDealAnimDone(true);
     }
-  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase, tableState?.seats]);
+  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
 
   // Chip animation: pot flies to winner
   useEffect(() => {
