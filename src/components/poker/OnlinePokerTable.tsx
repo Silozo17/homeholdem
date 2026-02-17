@@ -26,7 +26,7 @@ import { callEdge } from '@/lib/poker/callEdge';
 import { Button } from '@/components/ui/button';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History } from 'lucide-react';
+import { ArrowLeft, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
 import { AchievementContext } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
+import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
 
 /** Blind timer countdown for multiplayer */
 function OnlineBlindTimer({ lastIncreaseAt, timerMinutes, currentSmall, currentBig }: {
@@ -112,7 +113,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
+  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
+  const prevActiveCountRef = useRef<number>(0);
+  const firstHandRef = useRef(true);
+  const bigPotAnnouncedRef = useRef(false);
   const { lastHand, startNewHand, recordAction, finalizeHand, exportCSV } = useHandHistory(tableId);
   const [replayOpen, setReplayOpen] = useState(false);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
@@ -151,15 +156,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
 
-  // Listen for blinds_up broadcast and show toast
+  // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
     onBlindsUp((payload: any) => {
       toast({
         title: '🔺 Blinds Up!',
         description: `Now ${payload.new_small}/${payload.new_big}`,
       });
+      announceBlindUp(payload.new_small, payload.new_big);
     });
-  }, [onBlindsUp]);
+  }, [onBlindsUp, announceBlindUp]);
 
   // Track starting stack when first seated
   useEffect(() => {
@@ -192,7 +198,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const currentPhase = tableState?.current_hand?.phase ?? null;
   useEffect(() => {
     if (currentPhase && currentPhase !== prevPhase) {
-      if (currentPhase === 'preflop' && !prevPhase) { play('shuffle'); haptic('deal'); }
+      if (currentPhase === 'preflop' && !prevPhase) {
+        play('shuffle'); haptic('deal');
+        // Voice: "Shuffling up and dealing" on first hand only
+        if (firstHandRef.current) { announceCustom("Shuffling up and dealing"); firstHandRef.current = false; }
+        bigPotAnnouncedRef.current = false;
+      }
       if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') { play('flip'); haptic('cardReveal'); }
       if (currentPhase === 'showdown' || currentPhase === 'complete') {
         play('win');
@@ -315,6 +326,49 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
+  // Voice: announce hand winners
+  useEffect(() => {
+    if (handWinners.length === 0 || !user) return;
+    const winner = handWinners[0];
+    const isHero = winner.player_id === user.id;
+    const name = isHero ? 'You' : winner.display_name;
+    announceWinner(name, winner.amount, winner.hand_name || undefined);
+  }, [handWinners, user, announceWinner]);
+
+  // Voice: detect all-in from lastActions
+  useEffect(() => {
+    if (!lastActions) return;
+    for (const [, actionStr] of Object.entries(lastActions)) {
+      if (actionStr === 'all_in' || actionStr === 'all-in') {
+        announceCustom("All in! We have an all in!");
+        break;
+      }
+    }
+  }, [lastActions, announceCustom]);
+
+  // Voice: detect heads-up
+  useEffect(() => {
+    if (!tableState) return;
+    const activeCount = tableState.seats.filter(s => s.player_id && s.stack > 0).length;
+    if (prevActiveCountRef.current > 2 && activeCount === 2) {
+      announceCustom("We're heads up!");
+    }
+    prevActiveCountRef.current = activeCount;
+  }, [tableState?.seats, announceCustom]);
+
+  // Voice: big pot detection
+  useEffect(() => {
+    if (!tableState || bigPotAnnouncedRef.current) return;
+    const pot = tableState.current_hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+    if (pot > tableState.table.big_blind * 10) {
+      bigPotAnnouncedRef.current = true;
+      announceCustom("Big pot building!");
+    }
+  }, [tableState?.current_hand?.pots, announceCustom]);
+
+  // Precache common voice phrases on mount
+  useEffect(() => { precache(); }, [precache]);
+
   // Your turn: sound + haptic + pre-action execution
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurnRef.current) {
@@ -383,6 +437,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     // LOSER: my stack is 0 after a hand result
     if (mySeatInfo.stack <= 0) {
+      const winner = handWinners[0];
+      announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
         setGameOver(true);
         setGameOverWinners(handWinners);
@@ -392,6 +448,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     // WINNER: I'm the last player with chips
     if (activePlayers.length === 1 && activePlayers[0].player_id === user.id) {
+      announceGameOver('You', true);
       const timer = setTimeout(() => {
         setGameOver(true);
         setGameOverWinners(handWinners);
@@ -472,10 +529,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (isMyTurn) {
       setLowTimeWarning(true);
       play('timerWarning');
+      announceCountdown();
       if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
       setTimeout(() => setLowTimeWarning(false), 2500);
     }
-  }, [isMyTurn, play]);
+  }, [isMyTurn, play, announceCountdown]);
 
   const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
 
@@ -705,6 +763,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
           >
             {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
+          </button>
+          <button onClick={toggleVoice}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+            title={voiceEnabled ? 'Voice announcements on' : 'Voice announcements off'}
+          >
+            {voiceEnabled ? <Mic className="h-3.5 w-3.5 text-foreground/80" /> : <MicOff className="h-3.5 w-3.5 text-foreground/40" />}
           </button>
           {isSpectator && (
             <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground font-bold">
