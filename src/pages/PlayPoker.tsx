@@ -24,6 +24,7 @@ export default function PlayPoker() {
   const savedRef = useRef(false);
   useEffect(() => {
     if (state.phase !== 'game_over' || !user?.id || savedRef.current) return;
+    if (state.handsPlayed === 0) return; // No XP for instant quit
     savedRef.current = true;
     const humanPlayer = state.players.find(p => p.id === 'human');
     const duration = Math.round((Date.now() - state.startTime) / 1000);
