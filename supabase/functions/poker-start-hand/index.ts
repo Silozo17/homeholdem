@@ -236,13 +236,14 @@ Deno.serve(async (req) => {
       .gt("stack", 0)
       .lt("joined_at", joinCutoff);
 
-    // Get active seats
+    // Get active seats — defence-in-depth: exclude players who joined < 3s ago
     const { data: seats } = await admin
       .from("poker_seats")
       .select("*")
       .eq("table_id", table_id)
       .eq("status", "active")
       .not("player_id", "is", null)
+      .lt("joined_at", joinCutoff)
       .order("seat_number");
 
     if (!seats || seats.length < 2) {

@@ -139,16 +139,8 @@ Deno.serve(async (req) => {
       // Additional invite_code validation can be added here
     }
 
-    // Check if a hand is in progress
-    const { data: activeHand } = await admin
-      .from("poker_hands")
-      .select("id")
-      .eq("table_id", table_id)
-      .is("completed_at", null)
-      .limit(1)
-      .maybeSingle();
-
-    const initialStatus = activeHand ? "sitting_out" : "active";
+    // Always insert as sitting_out — poker-start-hand will activate after 3s cooldown
+    const initialStatus = "sitting_out";
 
     // Insert seat
     const { data: seat, error: seatErr } = await admin
