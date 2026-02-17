@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useRef, useEffect } from 'react';
+import { useReducer, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Card, PokerPlayer, GameState, GamePhase, GameAction, LobbySettings,
   HAND_RANK_NAMES, BotPersonality,
@@ -527,6 +527,7 @@ function advancePhase(state: GameState): GameState {
 export function usePokerGame() {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dealAnimEndRef = useRef(0);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -546,6 +547,12 @@ export function usePokerGame() {
     if (state.phase === 'dealing') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'DEAL_HAND' });
+        // Calculate deal animation duration and store the end timestamp
+        // Formula matches PlayerSeat reveal: (cardIndex * totalActive + seatDealOrder) * 0.35 + 0.8
+        // Last card = card index 1, last seat = activePlayers - 1
+        const activePlayers = state.players.filter(p => p.status !== 'eliminated').length;
+        const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8;
+        dealAnimEndRef.current = Date.now() + lastCardDelay * 1000;
       }, 1800);
       return;
     }
@@ -589,6 +596,8 @@ export function usePokerGame() {
       const player = state.players[state.currentPlayerIndex];
       const maxBet = Math.max(...state.players.map(p => p.currentBet));
 
+      // Wait for deal animation to finish before bots act
+      const dealWait = Math.max(0, dealAnimEndRef.current - Date.now());
       botTimeoutRef.current = setTimeout(() => {
         const botAction = decideBotAction(
           player,
@@ -601,7 +610,7 @@ export function usePokerGame() {
           state.players.filter(p => p.status !== 'eliminated').length,
         );
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, 1500 + Math.random() * 1500); // 1.5-3.0s delay for realistic pacing
+      }, dealWait + 1500 + Math.random() * 1500); // wait for deal anim + 1.5-3.0s thinking
     }
   }, [state.phase, state.currentPlayerIndex, state.handNumber, state.players.map(p => p.status).join()]);
 
