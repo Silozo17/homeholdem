@@ -1,74 +1,105 @@
 
 
-# Fix Player Seat to Match Reference Design
+# Fix Player Seat Sizing for Mobile PWA (Landscape)
 
-## Key Differences (Current vs Reference)
+## Root Cause
 
-| Element | Current (Wrong) | Reference (Target) |
-|---------|----------------|-------------------|
-| Avatar size | 88px -- too small next to cards | Needs to be bigger (~96-100px) to dominate |
-| Card angle | 14 degrees -- too wide | 10 degrees, closer together |
-| Card gap | -14px margin overlap | Tighter: -18px or more overlap |
-| Card markings | `text-base` rank, `text-3xl` center suit -- too small | Much larger: `text-xl` rank, `text-4xl+` center suit, like the reference where "A" and "K" fill most of the card |
-| Nameplate shape | Tiny `rounded-full` pill, `min-w-[90px]` | Wide, tall `rounded-2xl` bar (~120px wide), more padding, clearly two-line layout |
-| Nameplate overlap | `-mt-3` (barely overlaps avatar) | Deeper overlap (~`-mt-4` to `-mt-5`) so it tucks under avatar chin |
-| Level badge | Inside avatar container, hidden behind nameplate z-index | Must render OUTSIDE avatar container at z-[5], anchored to avatar's bottom-left edge |
-| Country flag | Inside avatar container, hidden behind nameplate z-index | Must render OUTSIDE avatar container at z-[5], anchored to avatar's bottom-right edge |
-| Badge/flag size | 22px -- too small | Slightly larger (~24-26px) to be clearly visible beside the nameplate |
-| Badge/flag position | `absolute -bottom-1 -left-1` inside avatar parent | Needs absolute positioning relative to the whole seat, calculated to sit at the avatar circle edge, flanking the nameplate |
+The mobile PWA runs in **landscape mode**, which triggers `compact=true` in `PokerTablePro.tsx`. Compact mode uses avatar size `lg` = **56px** and card size `lg` = **48x68px**. This is why everything looks tiny compared to the reference.
 
-## Detailed Changes
+The non-compact `xl` size (96px avatar) is never used on mobile landscape. So all previous size increases to `xl` had zero effect on what the user actually sees.
+
+## What Needs to Change
+
+The fix targets the `lg` (compact) sizes primarily, plus keeping `xl` correct for non-compact. The reference image shows approximately:
+- Avatar: ~120-130px dominant circle
+- Cards: ~45-50px wide, markings filling the card
+- Wide nameplate bar below
+
+Since the table has 9 players in landscape and space is tight, we need to balance bigger profiles with table fit. The `lg` sizes need to increase significantly.
+
+### Size Comparison Table
+
+| Element | Current `lg` | Target `lg` | Current `xl` | Target `xl` |
+|---------|-------------|-------------|-------------|-------------|
+| Avatar | 56px (`w-14 h-14`) | 80px (`w-20 h-20`) | 96px | 96px (keep) |
+| Card | 48x68px (`w-12 h-[68px]`) | 40x58px (`w-10 h-[58px]`) | 50x72px | 50x72px (keep) |
+| Card rank text | `text-xs` | `text-base` | `text-xl` | `text-xl` (keep) |
+| Card center suit | `text-xl` | `text-3xl` | `text-5xl` | `text-5xl` (keep) |
+| Nameplate min-w | 68px | 100px | 120px | 120px (keep) |
+| Nameplate text | 9px/8px | 11px/10px | 13px/12px | 13px/12px (keep) |
+| Nameplate overlap | -mt-3 (est.) | -mt-4 | -mt-5 | -mt-5 (keep) |
+
+## Detailed File Changes
 
 ### 1. `src/components/poker/PlayerAvatar.tsx`
-- Increase `xl` size from `w-[88px] h-[88px]` to `w-[96px] h-[96px]`
+
+Increase `lg` avatar size from `w-14 h-14` (56px) to `w-20 h-20` (80px):
+
+```
+lg: 'w-14 h-14 text-base'  -->  lg: 'w-20 h-20 text-base'
+```
 
 ### 2. `src/components/poker/CardDisplay.tsx`
-- Increase `xl` text sizes significantly:
-  - Corner rank: from `text-base` to `text-xl` (bold, prominent like the reference "A", "K")
-  - Corner suit: from `text-sm` to `text-base`
-  - Center suit: from `text-3xl` to `text-5xl` (fills most of the card body)
-- Corner position: move slightly inward for better framing (top-1 left-1.5)
+
+**Reduce `lg` card dimensions** (cards are too big relative to avatar):
+```
+lg: 'w-12 h-[68px]'  -->  lg: 'w-10 h-[58px]'
+```
+
+**Increase `lg` text sizes** (markings need to fill the card):
+```
+lg rank:   'text-xs'     -->  'text-base'
+lg suit:   'text-[11px]' -->  'text-sm'
+lg center: 'text-xl'     -->  'text-3xl'
+```
 
 ### 3. `src/components/poker/PlayerSeat.tsx`
 
-**Cards:**
-- Reduce fan angle from 14deg to 10deg
-- Increase card overlap from `-14px` to `-18px` (cards closer together)
-
-**Nameplate:**
-- Change shape from `rounded-full` (pill) to `rounded-2xl` (wider rounded rectangle)
-- Increase `min-w` from `90px` to `120px`
-- Increase padding from `px-3 py-0.5` to `px-5 py-1.5`
-- Increase text sizes: name from `text-[11px]` to `text-[13px]`, chips from `text-[10px]` to `text-[12px]`
-- Deepen overlap from `-mt-3` to `-mt-5`
-
-**Level Badge and Country Flag -- fix z-index stacking:**
-- Move both OUT of the `<div className="relative">` (avatar container)
-- Render them as direct children of the outer seat container
-- Position them absolutely so they anchor at the avatar circle's bottom-left (level) and bottom-right (flag) edges
-- Set z-[5] so they paint ABOVE the nameplate (z-[4])
-- Increase badge/flag size for `xl` from 22px to 26px
-
-### 4. `src/components/common/LevelBadge.tsx`
-- Increase `xl` size from `w-[22px] h-[22px]` to `w-[26px] h-[26px]`
-- Increase font from `text-[12px]` to `text-[13px]`
-- Change positioning from `absolute -bottom-1 -left-1` to just flex (parent will position it)
-
-### 5. `src/components/poker/CountryFlag.tsx`
-- Increase `xl` size from `w-[22px] h-[22px]` to `w-[26px] h-[26px]`
-- Increase font from `text-[12px]` to `text-[14px]`
-- Same positioning change as LevelBadge
-
-## Z-Index Layering (unchanged logic, fixed implementation)
-
-```text
-z-[1]: Avatar body
-z-[2]: Active/All-in glow rings
-z-[3]: Cards (fanned above avatar, 10deg, tight)
-z-[4]: Nameplate bar (wide rounded rectangle, overlapping avatar bottom)
-z-[5]: Level badge + Country flag (at avatar edges, above nameplate)
+**Nameplate compact sizing** -- increase from tiny pill to wider bar:
+```
+compact: 'min-w-[68px] px-3 py-0.5'  -->  'min-w-[100px] px-4 py-1'
 ```
 
-## Visual Result
-The player seat will have a large dominant avatar circle, with two cards peeking above at a gentle 10-degree angle with bold prominent markings. Below sits a wide dark nameplate bar showing name and chips. The level badge and flag flank the nameplate at the avatar's bottom corners, always visible on top.
+**Nameplate compact text sizes:**
+```
+compact name:  'text-[9px] max-w-[56px]'   -->  'text-[11px] max-w-[80px]'
+compact chips: 'text-[8px]'                -->  'text-[10px]'
+```
+
+**Nameplate overlap for compact:**
+Change from `-mt-5` (shared) to conditional: compact uses `-mt-4`, non-compact uses `-mt-5`.
+
+**Card fan overlap for compact:**
+```
+marginLeft: i > 0 ? '-18px' : '0'  -->  marginLeft: i > 0 ? (compact uses '-14px') : '0'
+```
+
+Pass `compact` into cardFan so it can use tighter values for compact.
+
+**Level badge and flag positioning** -- adjust `bottom` for compact to match new bigger avatar:
+```
+compact bottom: '18px'  -->  '16px'
+```
+
+### 4. `src/components/common/LevelBadge.tsx`
+
+Increase `lg` size to match the bigger compact avatar:
+```
+lg: { wrapper: 'w-[18px] h-[18px]', font: 'text-[10px]' }
+-->
+lg: { wrapper: 'w-[22px] h-[22px]', font: 'text-[11px]' }
+```
+
+### 5. `src/components/poker/CountryFlag.tsx`
+
+Increase `lg` size:
+```
+lg: 'w-[18px] h-[18px] text-[10px]'
+-->
+lg: 'w-[22px] h-[22px] text-[12px]'
+```
+
+## Summary
+
+The core issue was that mobile landscape triggers `compact=true` which uses the `lg` size tier -- all previous changes to `xl` were invisible on mobile. This plan increases `lg` avatar from 56px to 80px (~1.4x), shrinks `lg` cards from 48x68 to 40x58, and makes card markings much bolder. The nameplate and badges also scale up proportionally.
 
