@@ -139,32 +139,40 @@ Deno.serve(async (req) => {
     let blindsIncreased = false;
     let oldSmall = table.small_blind;
     let oldBig = table.big_blind;
-    if (table.blind_timer_minutes > 0 && table.last_blind_increase_at) {
-      const lastIncrease = new Date(table.last_blind_increase_at).getTime();
-      const intervalMs = table.blind_timer_minutes * 60 * 1000;
-      const elapsed = Date.now() - lastIncrease;
-      let levelsToAdd = Math.floor(elapsed / intervalMs);
-      if (levelsToAdd > 0) {
-        const newLevel = (table.blind_level || 0) + levelsToAdd;
-        const origSmall = table.original_small_blind || table.small_blind;
-        const origBig = table.original_big_blind || table.big_blind;
-        const newSmall = origSmall * Math.pow(2, newLevel);
-        const newBig = origBig * Math.pow(2, newLevel);
-        // Update table in DB
-        await admin
-          .from("poker_tables")
-          .update({
-            small_blind: newSmall,
-            big_blind: newBig,
-            blind_level: newLevel,
-            last_blind_increase_at: new Date().toISOString(),
-          })
+    if (table.blind_timer_minutes > 0) {
+      if (!table.last_blind_increase_at) {
+        // First hand -- start the blind timer NOW
+        const now = new Date().toISOString();
+        await admin.from("poker_tables")
+          .update({ last_blind_increase_at: now })
           .eq("id", table_id);
-        table.small_blind = newSmall;
-        table.big_blind = newBig;
-        table.blind_level = newLevel;
-        table.last_blind_increase_at = new Date().toISOString();
-        blindsIncreased = true;
+        table.last_blind_increase_at = now;
+      } else {
+        const lastIncrease = new Date(table.last_blind_increase_at).getTime();
+        const intervalMs = table.blind_timer_minutes * 60 * 1000;
+        const elapsed = Date.now() - lastIncrease;
+        let levelsToAdd = Math.floor(elapsed / intervalMs);
+        if (levelsToAdd > 0) {
+          const newLevel = (table.blind_level || 0) + levelsToAdd;
+          const origSmall = table.original_small_blind || table.small_blind;
+          const origBig = table.original_big_blind || table.big_blind;
+          const newSmall = origSmall * Math.pow(2, newLevel);
+          const newBig = origBig * Math.pow(2, newLevel);
+          await admin
+            .from("poker_tables")
+            .update({
+              small_blind: newSmall,
+              big_blind: newBig,
+              blind_level: newLevel,
+              last_blind_increase_at: new Date().toISOString(),
+            })
+            .eq("id", table_id);
+          table.small_blind = newSmall;
+          table.big_blind = newBig;
+          table.blind_level = newLevel;
+          table.last_blind_increase_at = new Date().toISOString();
+          blindsIncreased = true;
+        }
       }
     }
 
@@ -500,7 +508,7 @@ Deno.serve(async (req) => {
       blind_timer: {
         blind_timer_minutes: table.blind_timer_minutes,
         blind_level: table.blind_level || 0,
-        last_blind_increase_at: table.last_blind_increase_at || new Date().toISOString(),
+        last_blind_increase_at: table.last_blind_increase_at || null,
       },
       state_version: 0,
     };
