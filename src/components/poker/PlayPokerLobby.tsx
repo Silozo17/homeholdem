@@ -9,12 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { BOT_PERSONAS } from '@/lib/poker/bot-personas';
 
 interface PlayPokerLobbyProps {
   onStart: (settings: LobbySettings) => void;
 }
 
-const BOT_NAMES = ['Alex', 'Blake', 'Casey', 'Drew', 'Ellis', 'Frankie', 'Gray', 'Harper'];
+// Bot names now come from BOT_PERSONAS
 const PRESETS = [
   { label: 'Casual', bots: 2, desc: 'Quick heads-up' },
   { label: 'Standard', bots: 4, desc: 'Classic table' },
@@ -96,11 +97,23 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
               <span className="text-primary font-bold">{botCount}</span>
             </div>
             <div className="flex justify-center gap-1.5">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className={cn(i < botCount ? 'opacity-100' : 'opacity-20', 'transition-opacity')}>
-                  <PlayerAvatar name={BOT_NAMES[i]} index={i + 1} status={i < botCount ? 'active' : 'eliminated'} isCurrentPlayer={false} size="sm" />
-                </div>
-              ))}
+              {Array.from({ length: 8 }).map((_, i) => {
+                const persona = BOT_PERSONAS[i];
+                return (
+                  <div key={i} className={cn(i < botCount ? 'opacity-100' : 'opacity-20', 'transition-opacity')}>
+                    <PlayerAvatar
+                      name={persona.name}
+                      index={i + 1}
+                      status={i < botCount ? 'active' : 'eliminated'}
+                      isCurrentPlayer={false}
+                      size="sm"
+                      avatarUrl={persona.avatarUrl}
+                      level={persona.level}
+                      countryCode={persona.countryCode}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <Slider value={[botCount]} min={1} max={8} step={1} onValueChange={([v]) => setBotCount(v)} />
           </div>

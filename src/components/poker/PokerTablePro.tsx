@@ -17,6 +17,7 @@ import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
+import { getBotPersona } from '@/lib/poker/bot-personas';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import pokerBg from '@/assets/poker-background.webp';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -430,7 +431,9 @@ export function PokerTablePro({
                   isShowdown={isShowdown}
                   cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape}
-                  avatarUrl={isHuman ? humanAvatarUrl : undefined}
+                  avatarUrl={isHuman ? humanAvatarUrl : (player.isBot ? getBotPersona(player.seatIndex - 1).avatarUrl : undefined)}
+                  level={player.isBot ? getBotPersona(player.seatIndex - 1).level : undefined}
+                  countryCode={player.isBot ? getBotPersona(player.seatIndex - 1).countryCode : undefined}
                   seatDealOrder={seatDealOrder}
                   totalActivePlayers={activeIndices.length}
                   onTimeout={isHuman && isActive ? () => handleAction({ type: 'fold' }) : undefined}

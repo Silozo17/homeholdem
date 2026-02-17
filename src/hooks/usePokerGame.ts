@@ -7,6 +7,7 @@ import { createDeck, shuffle, deal } from '@/lib/poker/deck';
 import { evaluateHand, compareHands } from '@/lib/poker/hand-evaluator';
 import { decideBotAction } from '@/lib/poker/bot-ai';
 import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
+import { getBotPersona } from '@/lib/poker/bot-personas';
 
 const ALL_PERSONALITIES: BotPersonality[] = ['shark', 'maniac', 'rock', 'fish', 'pro'];
 
@@ -22,7 +23,7 @@ type Action =
   | { type: 'QUIT' }
   | { type: 'RESET' };
 
-const BOT_NAMES = ['Alex', 'Blake', 'Casey', 'Drew', 'Ellis', 'Frankie', 'Gray', 'Harper'];
+// Bot names now come from bot-personas.ts
 
 function createInitialState(): GameState {
   return {
@@ -93,9 +94,10 @@ function reducer(state: GameState, action: Action): GameState {
 
       for (let i = 0; i < botCount; i++) {
         const personality = ALL_PERSONALITIES[i % ALL_PERSONALITIES.length];
+        const persona = getBotPersona(i);
         players.push({
           id: `bot-${i}`,
-          name: BOT_NAMES[i] || `Bot ${i + 1}`,
+          name: persona.name,
           chips: startingChips,
           holeCards: [],
           status: 'active',
