@@ -553,18 +553,27 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => { stagedRunoutRef.current.forEach(t => clearTimeout(t)); };
   }, []);
 
-  // Deal animation on new hand
+  // Deal animation on new hand + dealAnimDone gating for action buttons
+  const [dealAnimDone, setDealAnimDone] = useState(true);
   useEffect(() => {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
     if (currentHandId && currentHandId !== prevAnimHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
       setDealing(true);
+      setDealAnimDone(false);
       processedActionsRef.current.clear();
-      const timer = setTimeout(() => setDealing(false), 4500);
+      const activePlayers = (tableState?.seats ?? []).filter(s => s.player_id && s.status !== 'eliminated').length;
+      // Duration: 2 cards per player * 0.35s stagger + 0.8s buffer
+      const dealDurationMs = ((activePlayers * 2) * 0.35 + 0.8) * 1000;
+      const dealTimer = setTimeout(() => setDealAnimDone(true), dealDurationMs);
+      const visualTimer = setTimeout(() => setDealing(false), 4500);
       prevAnimHandIdRef.current = currentHandId;
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(dealTimer); clearTimeout(visualTimer); };
     }
-    if (!currentHandId) prevAnimHandIdRef.current = null;
-  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
+    if (!currentHandId) {
+      prevAnimHandIdRef.current = null;
+      setDealAnimDone(true);
+    }
+  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase, tableState?.seats]);
 
   // Chip animation: pot flies to winner
   useEffect(() => {
@@ -738,7 +747,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded';
+  const showActions = isMyTurn && dealAnimDone && !actionPending && mySeat && mySeat.status !== 'folded';
 
   return (
     <div className="fixed inset-0 overflow-hidden z-[60]">
