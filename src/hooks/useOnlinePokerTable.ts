@@ -249,6 +249,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
 
+        // Use longer delay when all community cards arrived at once (all-in runout)
+        const communityCount = (payload.community_cards || []).length;
+        const showdownDelay = communityCount >= 5 ? 7000 : 3500;
+
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {
             if (!prev) return prev;
@@ -259,7 +263,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setHandWinners([]);
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
-        }, 3500);
+        }, showdownDelay);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
         if (payload.player_id === userId) return;
