@@ -1,64 +1,53 @@
 
-
-# Fix: Blind Timer Starts on First Hand Deal, Not Table Creation
+# Fix: Wait for Card Deal Animation Before Bot Actions
 
 ## Problem
 
-Currently, `last_blind_increase_at` is set to `new Date().toISOString()` when the table is created (`poker-create-table/index.ts` line 113). This means if a player creates a table and waits 10 minutes for friends to join before starting, the blinds may have already escalated by the time the first hand is dealt.
+In bot games, when a new hand starts, the card dealing animation takes several seconds to complete (cards fly out one by one to each player). But the bot action timer starts immediately when the phase changes to `preflop`, so bots act before the human player has even received their cards visually. This breaks immersion -- in a real poker game, no one acts until all cards are dealt.
+
+## Root Cause
+
+The flow is:
+1. `dealing` phase -- 1.8s pause (shuffle sound)
+2. `DEAL_HAND` dispatch -- deals cards, sets phase to `preflop`, sets `currentPlayerIndex` to first-to-act
+3. Bot auto-action effect fires after 1.5-3.0s
+4. But the card reveal animation takes up to ~4.5s for the last card (depends on player count)
+
+The bot action delay (1.5-3.0s) is shorter than the deal animation duration (~4.5s with 6 players).
 
 ## Solution
 
-Three small, targeted changes:
+Add a "deal grace period" in the bot action `useEffect` inside `usePokerGame.ts`. When a new hand starts (phase transitions from `dealing` to `preflop`), calculate the total deal animation duration and delay bot actions until after all cards have been revealed.
 
-### 1. `poker-create-table/index.ts` -- Set `last_blind_increase_at` to null
+### Changes
 
-Instead of `new Date().toISOString()`, set it to `null` at creation time. The timer hasn't started yet because no hand has been dealt.
+**File: `src/hooks/usePokerGame.ts`**
 
-**Change**: Line 113, replace `last_blind_increase_at: new Date().toISOString()` with `last_blind_increase_at: null`.
+1. Add a `dealAnimEndRef = useRef(0)` to track when the deal animation finishes
+2. In the `dealing` -> `DEAL_HAND` timeout (line 547), after dispatching, calculate the total deal animation time and store it:
+   - Formula: `totalDealTime = ((1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8) * 1000` (matches PlayerSeat's reveal formula)
+   - Set `dealAnimEndRef.current = Date.now() + totalDealTime`
+3. In the bot action block (line 582-604), before scheduling the bot timeout, check if we're still within the deal animation grace period:
+   - `const dealWait = Math.max(0, dealAnimEndRef.current - Date.now())`
+   - Add `dealWait` to the existing bot delay: `dealWait + 1500 + Math.random() * 1500`
 
-### 2. `poker-start-hand/index.ts` -- Initialize timer on first hand
+This way:
+- First bot action after a deal waits for the full card animation to finish
+- Subsequent bot actions in the same betting round use normal timing (dealWait will be 0)
+- Human turn is unaffected (the betting controls appear immediately, but the player naturally waits to see their cards anyway)
+- No changes to the animation system, game state, or reducer
 
-In the blind escalation block (lines 138-169), if `last_blind_increase_at` is null (meaning this is the first hand), set it to now and skip escalation. This anchors the blind timer to the moment the first hand is dealt.
+### Also applies to human turn indicator
 
-**Change** at line 142:
-```
-if (table.blind_timer_minutes > 0) {
-  if (!table.last_blind_increase_at) {
-    // First hand -- start the blind timer NOW
-    const now = new Date().toISOString();
-    await admin.from("poker_tables")
-      .update({ last_blind_increase_at: now })
-      .eq("id", table_id);
-    table.last_blind_increase_at = now;
-  } else {
-    // Existing escalation logic (unchanged)
-    const lastIncrease = new Date(table.last_blind_increase_at).getTime();
-    ...
-  }
-}
-```
+The "YOUR TURN" badge and betting controls appear immediately too. Since the human also needs to see their cards first, add the same grace period to the `isHumanTurn` computation:
 
-Also update the fallback at line 503 to not inject a fake timestamp:
-```
-last_blind_increase_at: table.last_blind_increase_at || null,
-```
+**File: `src/components/poker/PokerTablePro.tsx`**
 
-Similarly in `poker-table-state/index.ts` line 191, stop falling back to `new Date().toISOString()`:
-```
-last_blind_increase_at: table.last_blind_increase_at || null,
-```
+Add a `dealAnimDoneState` that starts as `false` when `handNumber` changes, then flips to `true` after the deal animation duration. Gate `showActions` behind it so the human's betting controls don't appear until cards are dealt.
 
-### 3. UI -- Hide blind timer until first hand is dealt
-
-The `OnlineBlindTimer` component at `OnlinePokerTable.tsx` line 787 already has a guard: `table.blind_timer_minutes > 0 && table.last_blind_increase_at`. Since `last_blind_increase_at` will now be null until the first hand, the timer countdown simply won't render in the header until then. No UI code change needed.
-
-## Files Changed
+## File Summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/poker-create-table/index.ts` | Set `last_blind_increase_at: null` instead of `new Date().toISOString()` |
-| `supabase/functions/poker-start-hand/index.ts` | Initialize `last_blind_increase_at` to now on first hand; remove fallback at line 503 |
-| `supabase/functions/poker-table-state/index.ts` | Remove fallback `new Date().toISOString()` for `last_blind_increase_at` |
-
-No database migration needed -- the column is already nullable (`last_blind_increase_at: string`).
-
+| `src/hooks/usePokerGame.ts` | Add `dealAnimEndRef`, calculate deal duration after `DEAL_HAND`, delay bot actions by remaining deal time |
+| `src/components/poker/PokerTablePro.tsx` | Gate `showActions` behind a `dealAnimDone` state that activates after deal animation completes |
