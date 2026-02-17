@@ -11,7 +11,7 @@ const sizeStyles: Record<string, string> = {
   sm: 'w-3.5 h-3.5 text-[8px]',
   md: 'w-4 h-4 text-[9px]',
   lg: 'w-[18px] h-[18px] text-[10px]',
-  xl: 'w-[22px] h-[22px] text-[12px]',
+  xl: 'w-[26px] h-[26px] text-[14px]',
   '2xl': 'w-[22px] h-[22px] text-[12px]',
 };
 

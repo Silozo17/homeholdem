@@ -102,7 +102,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
-  // Card fan — 14deg tilt, on top of avatar
+  // Card fan — 10deg tilt, tight overlap, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
       style={{ zIndex: 3, top: '-30%' }}>
@@ -112,8 +112,8 @@ export const PlayerSeat = memo(function PlayerSeat({
         const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
         return (
           <div key={i} style={{
-            transform: `rotate(${i === 0 ? -14 : 14}deg)`,
-            marginLeft: i > 0 ? '-14px' : '0',
+            transform: `rotate(${i === 0 ? -10 : 10}deg)`,
+            marginLeft: i > 0 ? '-18px' : '0',
           }}>
             <CardDisplay
               card={displayCard}
@@ -174,49 +174,52 @@ export const PlayerSeat = memo(function PlayerSeat({
         {/* Human player cards fanned behind avatar */}
         {humanCards}
 
-        {/* Level badge — z-[5], bottom-left of avatar, ABOVE nameplate */}
-        {level != null && level > 0 && (
-          <LevelBadge level={level} size={avatarSize} className="!z-[5]" />
-        )}
-        {/* Country flag — z-[5], bottom-right of avatar, ABOVE nameplate */}
-        <CountryFlag countryCode={countryCode} size={avatarSize} className="!z-[5]" />
       </div>
 
-      {/* Nameplate pill — overlaps avatar bottom, sits above cards */}
+      {/* Nameplate bar — wide rounded rectangle, overlaps avatar bottom */}
       <div className={cn(
-        'relative flex flex-col items-center rounded-full px-3 py-0.5 -mt-3',
-        compact ? 'min-w-[68px]' : 'min-w-[90px]',
+        'relative flex flex-col items-center rounded-2xl -mt-5',
+        compact ? 'min-w-[68px] px-3 py-0.5' : 'min-w-[120px] px-5 py-1.5',
       )} style={{
         zIndex: 4,
-        background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.9), hsl(0 0% 5% / 0.85))',
+        background: isTimerActive
+          ? `conic-gradient(from 0deg, hsl(${timerHue} 74% ${timerLightness}%) ${timerRemaining * 100}%, transparent ${timerRemaining * 100}%) border-box`
+          : 'linear-gradient(180deg, hsl(0 0% 8% / 0.9), hsl(0 0% 5% / 0.85))',
         backdropFilter: 'blur(8px)',
-        border: isTimerActive
-          ? 'none'
-          : '1px solid hsl(0 0% 100% / 0.1)',
-        // Conic-gradient timer border via box-shadow trick
-        ...(isTimerActive ? {
-          padding: '1px',
-          background: `conic-gradient(from 0deg, hsl(${timerHue} 74% ${timerLightness}%) ${timerRemaining * 100}%, transparent ${timerRemaining * 100}%) border-box`,
-        } : {}),
+        border: isTimerActive ? 'none' : '1px solid hsl(0 0% 100% / 0.1)',
+        padding: isTimerActive ? '1px' : undefined,
       }}>
-        {/* Inner pill content (dark bg) */}
+        {/* Inner content (dark bg when timer active) */}
         <div className={cn(
-          'flex flex-col items-center w-full rounded-full',
-          isTimerActive ? 'px-3 py-0.5' : '',
+          'flex flex-col items-center w-full',
+          isTimerActive ? 'rounded-2xl px-5 py-1.5' : '',
         )} style={isTimerActive ? {
           background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.95), hsl(0 0% 5% / 0.9))',
         } : {}}>
           <p className={cn(
-            compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[80px]',
+            compact ? 'text-[9px] max-w-[56px]' : 'text-[13px] max-w-[100px]',
             'font-bold truncate leading-tight text-white',
           )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
             {player.name}
           </p>
-          <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-white/80 font-semibold leading-none')}>
+          <p className={cn(compact ? 'text-[8px]' : 'text-[12px]', 'text-white/80 font-semibold leading-none')}>
             {player.chips.toLocaleString()}
           </p>
         </div>
       </div>
+
+      {/* Level badge — z-[5], bottom-left of avatar edge, ABOVE nameplate */}
+      {level != null && level > 0 && (
+        <div className="absolute" style={{ zIndex: 5, bottom: compact ? '18px' : '22px', left: compact ? '2px' : '0px' }}>
+          <LevelBadge level={level} size={avatarSize} className="!relative !inset-auto" />
+        </div>
+      )}
+      {/* Country flag — z-[5], bottom-right of avatar edge, ABOVE nameplate */}
+      {countryCode && (
+        <div className="absolute" style={{ zIndex: 5, bottom: compact ? '18px' : '22px', right: compact ? '2px' : '0px' }}>
+          <CountryFlag countryCode={countryCode} size={avatarSize} className="!relative !inset-auto" />
+        </div>
+      )}
 
       {/* Action badge */}
       {player.lastAction && (
