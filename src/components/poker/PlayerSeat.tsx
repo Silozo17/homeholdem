@@ -1,4 +1,5 @@
 import { memo, useState, useEffect, useRef } from 'react';
+import { WifiOff } from 'lucide-react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -25,6 +26,7 @@ interface PlayerSeatProps {
   disableDealAnim?: boolean;
   onTimeout?: () => void;
   onLowTime?: () => void;
+  isDisconnected?: boolean;
 }
 
 /**
@@ -34,7 +36,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -178,6 +180,14 @@ export const PlayerSeat = memo(function PlayerSeat({
 
         {/* Human player cards fanned behind avatar */}
         {humanCards}
+
+        {/* Disconnect indicator */}
+        {isDisconnected && (
+          <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center animate-pulse"
+            style={{ zIndex: 6, background: 'hsl(0 70% 50%)', border: '2px solid hsl(0 0% 10%)' }}>
+            <WifiOff className="h-2.5 w-2.5 text-white" />
+          </div>
+        )}
 
       </div>
 

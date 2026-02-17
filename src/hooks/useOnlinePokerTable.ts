@@ -47,6 +47,7 @@ interface UseOnlinePokerTableReturn {
   connectionStatus: ConnectionStatus;
   lastKnownPhase: string | null;
   lastKnownStack: number | null;
+  onlinePlayerIds: Set<string>;
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
   leaveTable: () => Promise<void>;
@@ -94,6 +95,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
+  const [onlinePlayerIds, setOnlinePlayerIds] = useState<Set<string>>(new Set());
+  const timeoutPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
   useEffect(() => {
@@ -354,12 +357,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
         let spectators = 0;
+        const playerIds = new Set<string>();
         for (const key of Object.keys(presenceState)) {
           for (const p of presenceState[key] as any[]) {
             if (p.role === 'spectator') spectators++;
+            if (p.user_id) playerIds.add(p.user_id);
           }
         }
         setSpectatorCount(spectators);
+        setOnlinePlayerIds(playerIds);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -598,6 +604,29 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     scheduleBubbleRemoval(id);
   }, [userId, scheduleBubbleRemoval]);
 
+  // Fix 1: Periodic server-side timeout polling (leader-only, every 8s)
+  useEffect(() => {
+    if (!isAutoStartLeader || !tableId) return;
+    timeoutPollRef.current = setInterval(async () => {
+      const currentState = tableStateRef.current;
+      const currentHand = currentState?.current_hand;
+      if (!currentHand?.action_deadline) return;
+      const deadline = new Date(currentHand.action_deadline).getTime();
+      if (Date.now() > deadline + 3000) {
+        try {
+          await callEdge('poker-check-timeouts', { table_id: tableId });
+          refreshState();
+        } catch {}
+      }
+    }, 8000);
+    return () => {
+      if (timeoutPollRef.current) {
+        clearInterval(timeoutPollRef.current);
+        timeoutPollRef.current = null;
+      }
+    };
+  }, [isAutoStartLeader, tableId, refreshState]);
+
   return {
     tableState,
     myCards,
@@ -616,6 +645,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     connectionStatus,
     lastKnownPhase,
     lastKnownStack,
+    onlinePlayerIds,
     joinTable,
     leaveTable,
     startHand,
