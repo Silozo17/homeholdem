@@ -108,7 +108,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
-    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp,
+    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp, onlinePlayerIds,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -163,6 +163,44 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     requestWakeLock();
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
+
+  // Fix 3: Inactivity kick — 2 min no touch → warning → auto-leave
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inactivityWarningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [inactivityWarning, setInactivityWarning] = useState(false);
+
+  useEffect(() => {
+    if (!mySeatNumber) return; // only for seated players
+
+    const IDLE_MS = 120_000; // 2 minutes
+    const WARNING_MS = 10_000; // 10 second warning before kick
+
+    const resetInactivity = () => {
+      setInactivityWarning(false);
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
+
+      inactivityTimerRef.current = setTimeout(() => {
+        setInactivityWarning(true);
+        toast({ title: '⚠️ Inactivity Warning', description: 'You will be removed in 10 seconds. Tap anywhere to stay.' });
+
+        inactivityWarningRef.current = setTimeout(() => {
+          leaveTable().then(onLeave).catch(onLeave);
+        }, WARNING_MS);
+      }, IDLE_MS);
+    };
+
+    resetInactivity();
+
+    const events = ['mousedown', 'touchstart', 'keydown', 'pointermove'];
+    events.forEach(e => window.addEventListener(e, resetInactivity, { passive: true }));
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetInactivity));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
+    };
+  }, [mySeatNumber, leaveTable, onLeave]);
 
   // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
@@ -1152,7 +1190,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   countryCode={seatData!.country_code}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
-                  
+                  isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                 />
               </SeatAnchor>
             );

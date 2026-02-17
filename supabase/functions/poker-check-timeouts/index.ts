@@ -13,8 +13,11 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)) {
-      console.log("Warning: poker-check-timeouts called without service role key");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "No auth" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const admin = createClient(
