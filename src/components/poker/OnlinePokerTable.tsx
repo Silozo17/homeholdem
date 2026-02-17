@@ -67,11 +67,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
+    spectatorCount,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
+  const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
   const prevPhaseRef = useRef<string | null>(null);
@@ -113,21 +114,22 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sound triggers on phase changes
+  // Sound + haptic triggers on phase changes
   const currentPhase = tableState?.current_hand?.phase ?? null;
   useEffect(() => {
     if (currentPhase && currentPhase !== prevPhase) {
-      if (currentPhase === 'preflop' && !prevPhase) play('shuffle');
-      if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') play('flip');
+      if (currentPhase === 'preflop' && !prevPhase) { play('shuffle'); haptic('deal'); }
+      if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') { play('flip'); haptic('cardReveal'); }
       if (currentPhase === 'showdown' || currentPhase === 'complete') {
         play('win');
+        haptic('win');
         setDealerExpression('smile');
         setTimeout(() => setDealerExpression('neutral'), 2500);
       }
       setPrevPhase(currentPhase);
     }
     if (!currentPhase) setPrevPhase(null);
-  }, [currentPhase, prevPhase, play]);
+  }, [currentPhase, prevPhase, play, haptic]);
 
   // Community card deal sprites on phase change
   useEffect(() => {
@@ -149,11 +151,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurnRef.current) {
       play('yourTurn');
+      haptic('cardReveal'); // distinct from the old generic vibrate
       if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
     }
     prevIsMyTurnRef.current = isMyTurn;
     if (!isMyTurn) setLowTimeWarning(false);
-  }, [isMyTurn, play]);
+  }, [isMyTurn, play, haptic]);
 
   useEffect(() => {
     if (error && (error.includes('fetch') || error.includes('network') || error.includes('Failed'))) {
@@ -396,7 +399,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleAction = async (action: any) => {
-    if ('vibrate' in navigator) navigator.vibrate(50);
+    // Haptic feedback per action type
+    const hapticMap: Record<string, any> = { check: 'check', call: 'call', raise: 'raise', 'all-in': 'allIn', fold: 'fold' };
+    if (hapticMap[action.type]) haptic(hapticMap[action.type]);
     if (action.type === 'check') play('check');
     else if (action.type === 'call') play('chipClink');
     else if (action.type === 'raise') play('chipStack');
@@ -532,6 +537,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             <Users className="h-3 w-3" />
             <span>{activeSeats.length}/{table.max_seats}</span>
           </div>
+          {spectatorCount > 0 && (
+            <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/40 text-foreground/50 font-bold">
+              <Eye className="h-2.5 w-2.5" /> {spectatorCount}
+            </span>
+          )}
         </div>
       </div>
 

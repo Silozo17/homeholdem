@@ -4,6 +4,8 @@
 
 12 features organized into 5 stages, from easiest to hardest.
 
+### ✅ Stage 1: COMPLETE
+
 ---
 
 ### Stage 1: Quick Wins (CSS/state-only, no backend)
