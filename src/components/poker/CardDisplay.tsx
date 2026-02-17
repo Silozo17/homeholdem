@@ -30,11 +30,11 @@ export const CardDisplay = memo(function CardDisplay({ card, faceDown = false, s
         className={cn(
           sizeClasses[size],
           'rounded-lg overflow-hidden flex items-center justify-center select-none',
-          'shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_1px_rgba(255,215,0,0.3)] animate-card-deal-deck',
+          'shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_1px_rgba(255,215,0,0.3)] animate-card-arrive',
           'border border-primary/20',
           className,
         )}
-        style={{ animationDelay: `${dealDelay}s` }}
+        style={{ animationDelay: `${dealDelay + 0.7}s` }}
       >
         <img src={cardBackPremium} alt="" className="w-full h-full object-cover" draggable={false} />
       </div>

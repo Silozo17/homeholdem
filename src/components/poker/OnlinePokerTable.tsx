@@ -74,6 +74,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
+  const prevPhaseRef = useRef<string | null>(null);
+  const [communityDealSprites, setCommunityDealSprites] = useState<Array<{ id: number; delay: number }>>([]);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
@@ -123,6 +125,21 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!currentPhase) setPrevPhase(null);
   }, [currentPhase, prevPhase, play]);
 
+  // Community card deal sprites on phase change
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = currentPhase;
+    if (!currentPhase || currentPhase === prev) return;
+    let count = 0;
+    if (currentPhase === 'flop' && prev === 'preflop') count = 3;
+    else if (currentPhase === 'turn' && prev === 'flop') count = 1;
+    else if (currentPhase === 'river' && prev === 'turn') count = 1;
+    if (count > 0) {
+      const sprites = Array.from({ length: count }, (_, i) => ({ id: Date.now() + i, delay: i * 0.18 }));
+      setCommunityDealSprites(sprites);
+      setTimeout(() => setCommunityDealSprites([]), 1200);
+    }
+  }, [currentPhase]);
 
   // Your turn: sound + haptic
   useEffect(() => {
@@ -656,6 +673,23 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             });
           })()}
 
+          {/* Community card deal sprites — fly from dealer to center */}
+          {communityDealSprites.map(sprite => (
+            <div
+              key={sprite.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: '50%',
+                top: '2%',
+                zIndex: Z.EFFECTS,
+                animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`,
+                ['--deal-center-dy' as any]: '46vh',
+              }}
+            >
+              <div className="w-8 h-11 rounded card-back-premium border border-white/10" />
+            </div>
+          ))}
+
           {/* Chat bubbles near player seats */}
           {chatBubbles.map(bubble => {
             const seatInfo = tableState.seats.find(s => s.player_id === bubble.player_id);
@@ -777,10 +811,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* 5 SEC LEFT warning pill */}
+      {/* 5 SEC LEFT warning pill — positioned under pot total */}
       {lowTimeWarning && (
         <div className="absolute pointer-events-none animate-low-time-pill" style={{
-          bottom: isLandscape ? 'calc(22% + 65px)' : 'calc(26% + 65px)',
+          top: '28%',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: Z.ACTIONS + 1,
