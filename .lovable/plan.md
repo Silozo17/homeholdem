@@ -1,59 +1,41 @@
 
 
-# Fix: 3 Multiplayer Poker Issues
+# Move & Resize Action Buttons
 
-## Issue 1: Action buttons appear before cards are dealt
+## 1. Fold / Check / Raise buttons -> bottom-right, 25% smaller
 
-**Root cause**: In `OnlinePokerTable.tsx` line 741, `showActions` is simply `isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded'`. There is no deal animation grace period -- the buttons appear as soon as the server broadcasts that it is the player's turn, which happens instantly when the hand starts, while the card dealing animation (sprites flying from dealer to each seat) takes 3-5 seconds.
+**Current**: In mobile landscape, the betting panel is vertically centered on the right (`top: 50%, -translate-y-1/2`). In desktop landscape, it sits at `bottom: 12px, right: 10px`.
 
-**Fix**: Add a `dealAnimDone` state (similar to the single-player fix in `PokerTablePro.tsx`):
-- When a new hand starts (new `hand_id` detected at `preflop` phase), set `dealAnimDone = false`
-- Calculate the total deal animation duration based on active player count: `((1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8) * 1000` ms
-- After that delay, set `dealAnimDone = true`
-- Gate `showActions` behind `dealAnimDone` so controls only appear after all cards are visually dealt
+**Change**: Move the mobile landscape panel to bottom-right (anchored to `bottom` instead of `top: 50%`). Reduce only the main action buttons (Fold, Check/Call, Raise) by 25% -- from `h-11` to `h-8` and text from `text-sm` to `text-xs`. The raise slider/quick-bet menu keeps its current size.
 
-**File**: `src/components/poker/OnlinePokerTable.tsx`
+### Files:
+- `src/components/poker/OnlinePokerTable.tsx` (lines 1162-1169): Change from `top-1/2 -translate-y-1/2` to `bottom` anchored positioning with safe-area padding
+- `src/components/poker/BettingControls.tsx`: In landscape mode, reduce action button height from `h-11` to `h-8` and text from `text-sm` to `text-xs`. Leave the raise slider panel (`showRaiseSlider` block) untouched.
 
----
+## 2. Pre-action buttons (Check/Fold, Call Any, Check) -> closer to right edge
 
-## Issue 2: Deal card sprites should fade out before reaching the player, then cards appear at the player
+**Current**: Positioned at `right: calc(env(safe-area-inset-right) + 10px)`, `top: calc(env(safe-area-inset-top) + 48px)` (line 1210).
 
-**Root cause**: The `deal-card-fly` keyframe (line 706-711 in `index.css`) currently ends at `opacity: 0.9` -- the sprite remains visible when it lands at the player position. The user wants the sprite to fade out just before reaching the player, and then the card appears directly at the player's avatar position.
+**Change**: Keep the `right: 10px` from safe-area but move the buttons to the bottom-right area instead of top-right, aligning them above the main action buttons area. The `items-end` alignment on the `PreActionButtons` flex container already right-aligns the buttons, so this just needs the positioning tweak to ensure exactly 10px from the right edge.
 
-**Fix**: Modify the `deal-card-fly` keyframe so the card fades out around 70-80% of the animation, reaching `opacity: 0` at 100%. The actual card reveal at the player seat is already handled by `PlayerSeat`'s `revealedIndices` timer, so this change makes the visual transition clean: sprite fades out mid-flight, then card appears at the player.
+### Files:
+- `src/components/poker/OnlinePokerTable.tsx` (line 1210): Update the right padding to ensure exactly 10px from screen edge: `right: 'calc(env(safe-area-inset-right, 0px) + 10px)'` (already correct, but verify no extra offset)
 
+### Technical Details
+
+**BettingControls.tsx landscape buttons (reduce 25%)**:
+- `h-11` -> `h-8`
+- `text-sm` -> `text-xs`  
+- Icon size `14` -> `12`
+- Gap between buttons `gap-2` -> `gap-1.5`
+
+**OnlinePokerTable.tsx mobile landscape panel**:
 ```
-@keyframes deal-card-fly {
-  0% { transform: translate(0, 0) scale(0.5); opacity: 0.8; }
-  40% { opacity: 1; }
-  75% { opacity: 0.6; }
-  100% { transform: translate(var(--deal-dx), var(--deal-dy)) scale(1); opacity: 0; }
-}
+// Before: centered vertically
+top-1/2 -translate-y-1/2
+
+// After: bottom-right corner
+bottom: calc(env(safe-area-inset-bottom) + 12px)
+right: 0
 ```
-
-**File**: `src/index.css`
-
----
-
-## Issue 3: Emojis should float up slowly and fade out (max 5 seconds)
-
-**Root cause**: The current `float-up` animation runs for 6 seconds and only moves `-20px` upward, barely noticeable. The `animate-emote-pop` class referenced for single emojis has no keyframe definition at all (missing from CSS). Emojis either use a missing animation or barely float.
-
-**Fix**:
-1. Update the `float-up` keyframe to drift upward more visibly (~40px) and fade out over the duration
-2. Change the animation duration from 6s to 5s max
-3. Add the missing `emote-pop` keyframe: a quick scale-up pop followed by slow upward drift and fade-out over 5s
-4. Also update the chat bubble auto-removal timer in `useOnlinePokerTable.ts` from 6000ms to 5000ms to match
-
-**Files**: `src/index.css`, `src/hooks/useOnlinePokerTable.ts`
-
----
-
-## Technical Summary
-
-| File | Change |
-|------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Add `dealAnimDone` state gating `showActions` behind deal animation completion |
-| `src/index.css` | Fix `deal-card-fly` to fade out before landing; fix `float-up` to drift up more and last 5s; add missing `emote-pop` keyframe |
-| `src/hooks/useOnlinePokerTable.ts` | Change chat bubble removal timer from 6000ms to 5000ms |
 
