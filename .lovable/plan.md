@@ -1,163 +1,170 @@
 
+# Fix XP System + Add Level-Up Animation + Tournament Level Gate
 
-# Fix: Voice Announces All Wins + Speed Up Game
+## Problem Analysis
 
-## Changes Overview
+**Why XP shows 0 for all players:**
 
-Three files modified. No style, layout, navigation, or BottomNav changes.
+XP is ONLY awarded inside a `useEffect` that depends on `gameOver` being `true` (line 537 of OnlinePokerTable.tsx). But `gameOver` only becomes `true` when:
+- A player busts out (stack = 0)
+- A player is the last one standing
 
----
+In practice, most players simply **leave the table** via the "Leave Table" button. The `handleLeave` function calls `leaveTable()` then `onLeave()` -- unmounting the component instantly. `gameOver` is never set to `true`, so the XP-saving effect never fires.
 
-## Fix 1: Voice Announces ALL Winners with Hand Name
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`, lines 392-398
-
-**Problem:** Only `handWinners[0]` is announced. If there are multiple winners (split pot, side pots), only the first winner is voiced. Also, fold-wins say "with Last standing" which sounds wrong.
-
-**Fix:** Loop through ALL winners. For fold-wins ("Last standing"), say "takes the pot" instead. For real showdowns, announce the hand name (pair, straight, flush, etc.).
-
-Before:
-```tsx
-useEffect(() => {
-  if (handWinners.length === 0 || !user) return;
-  const winner = handWinners[0];
-  const isHero = winner.player_id === user.id;
-  const name = isHero ? 'You' : winner.display_name;
-  announceWinner(name, winner.amount, winner.hand_name || undefined);
-}, [handWinners, user, announceWinner]);
-```
-
-After:
-```tsx
-useEffect(() => {
-  if (handWinners.length === 0 || !user) return;
-  for (const winner of handWinners) {
-    const isHero = winner.player_id === user.id;
-    const name = isHero ? 'You' : winner.display_name;
-    const handName = winner.hand_name && winner.hand_name !== 'Last standing'
-      ? winner.hand_name
-      : undefined;
-    if (handName) {
-      announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
-    } else {
-      announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
-    }
-  }
-}, [handWinners, user, announceCustom]);
-```
-
-This ensures:
-- Every winner is announced (split pots, side pots)
-- Showdown wins say the hand name: "Tomek wins 5000 chips with Two Pair"
-- Fold wins say: "Tomek takes the pot, 200 chips"
+This means **no XP is awarded to players who leave voluntarily**, which is the majority of sessions.
 
 ---
 
-## Fix 2: Sync Deal Animation Sprite Stagger
+## Changes
 
-**File:** `src/components/poker/OnlinePokerTable.tsx`, line 1114
+### Fix 1: Award XP When Player Leaves (not just on game over)
 
-**Problem:** The visual flying card sprites still use `0.35` stagger while the card reveal uses `0.18`. Cards appear to still be flying after the reveal happens.
+**File:** `src/components/poker/OnlinePokerTable.tsx`
 
-Before:
-```tsx
-const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;
-```
+Move the XP/stats saving logic so it fires in TWO scenarios:
+1. On `gameOver` (existing -- bust out or winner)
+2. On `handleLeave` -- before calling `leaveTable()`
 
-After:
-```tsx
-const delay = (cardIdx * activeSeatCount + seatOrder) * 0.18;
-```
+Create a helper function `saveXpAndStats()` that both paths call, guarded by `xpSavedRef` to prevent double-saving.
 
----
+XP awards per game:
+- 25 XP for participating (always)
+- 1 XP per hand played
+- 10 XP per hand won
+- 100 XP bonus for winning the game
+- 15% bonus multiplier for tournament games (future)
 
-## Fix 3: Reduce actionPending Fallback from 3s to 1.5s
+### Fix 2: Capture Pre-Game Level for Animation
 
-**File:** `src/hooks/useOnlinePokerTable.ts`, line 478
+**File:** `src/components/poker/OnlinePokerTable.tsx`
 
-**Problem:** If a broadcast is missed or delayed, the player's buttons stay hidden for 3 full seconds before the fallback kicks in. This feels laggy.
+On component mount, fetch the player's current XP/level from `player_xp` table and store it in a ref (`startLevelRef`). When the game ends or the player leaves, compare the new level to the start level. If levels were gained, show the level-up animation overlay.
 
-Before:
-```tsx
-}, 3000);
-```
+### Fix 3: Create Level-Up Animation Overlay
 
-After:
-```tsx
-}, 1500);
-```
+**New file:** `src/components/poker/XPLevelUpOverlay.tsx`
 
----
+A full-screen overlay (like WinnerOverlay) that shows:
+- Starting level and ending level
+- Animated progress bar that fills through each level (CoD-style)
+- Each level-up triggers a brief "flash" animation and level number increment
+- Total XP gained summary
+- "Continue" button to dismiss
 
-## Fix 4: Speed Up Game Pace
+The animation sequence:
+1. Show "XP Earned" header with total XP gained
+2. Progress bar starts at the pre-game position
+3. Bar fills toward next level; when it hits 100%, flash + increment level number
+4. Repeat for each level gained
+5. Bar settles at final position
+6. Show "Continue" button
 
-### 4a. Reduce Turn Timer from 30s to 20s
-**File:** `supabase/functions/poker-action/index.ts`, line 538
+Timing: ~1.5s per level traversed, max 10s total animation.
 
-Before:
-```tsx
-const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 30_000).toISOString() : null;
-```
+### Fix 4: Tournament Level Gate (Level 5 Required)
 
-After:
-```tsx
-const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 20_000).toISOString() : null;
-```
+**File:** `src/components/poker/TournamentLobby.tsx`
 
-20 seconds is standard for online poker (PokerStars uses 15-25s depending on format). 30s feels sluggish.
+Add a check using `usePlayerLevel` hook. If the player's level is below 5, show a locked state instead of the "Create Tournament" / "Register" buttons, with a message: "Reach Level 5 to unlock Tournaments" and their current progress.
 
-### 4b. Reduce Auto-Deal Delay from 2s to 1.2s
-**File:** `src/hooks/useOnlinePokerTable.ts`, line 534
+### Fix 5: Show Level-Up Overlay on Leave/Game Over
 
-Before:
-```tsx
-}, 2000 + jitter);
-```
+**File:** `src/components/poker/OnlinePokerTable.tsx`
 
-After:
-```tsx
-}, 1200 + jitter);
-```
-
-This starts the next hand faster after the showdown display clears.
-
-### 4c. Reduce Showdown Display Time
-**File:** `src/hooks/useOnlinePokerTable.ts`, line 318
-
-Before:
-```tsx
-const showdownDelay = communityCount >= 5 ? 8500 : 5000;
-```
-
-After:
-```tsx
-const showdownDelay = communityCount >= 5 ? 6000 : 3500;
-```
-
-8.5 seconds for showdown display is too long. 6 seconds for runout showdowns and 3.5 seconds for normal showdowns is snappier while still giving players time to see the result.
-
-### 4d. Reduce Turn Timer in poker-start-hand
-**File:** `supabase/functions/poker-start-hand/index.ts`
-
-The same 30s timer is likely set in start-hand for the first actor. Need to change to 20s there too.
+After XP is saved, wait for the `player_xp` table trigger to update, then fetch new level. If new level > start level, show the `XPLevelUpOverlay` instead of immediately calling `onLeave()`. The overlay's "Continue" button then calls `onLeave()`.
 
 ---
 
-## Summary
+## Technical Details
 
-| Change | File | What |
-|--------|------|------|
-| Announce all winners with hand name | OnlinePokerTable.tsx | Loop all winners, use hand name or "takes the pot" |
-| Sync deal sprite stagger | OnlinePokerTable.tsx | 0.35 to 0.18 |
-| Faster button recovery | useOnlinePokerTable.ts | 3000ms to 1500ms |
-| Turn timer 30s to 20s | poker-action/index.ts + poker-start-hand/index.ts | Faster pace |
-| Auto-deal 2s to 1.2s | useOnlinePokerTable.ts | Quicker next hand |
-| Showdown display 8.5s/5s to 6s/3.5s | useOnlinePokerTable.ts | Less waiting |
+### XP Saving Helper (OnlinePokerTable.tsx)
+
+```typescript
+const saveXpAndStats = useCallback(async () => {
+  if (xpSavedRef.current || !user) return;
+  xpSavedRef.current = true;
+
+  const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
+  const finalChips = mySeatInfo?.stack ?? 0;
+  const isWinner = finalChips > 0 && 
+    tableState?.seats.filter(s => s.player_id && s.stack > 0).length === 1;
+
+  // Save play result
+  await supabase.from('poker_play_results').insert({...});
+
+  // Award XP
+  const xpEvents = [];
+  xpEvents.push({ user_id: user.id, xp_amount: 25, reason: 'game_complete' });
+  if (isWinner) xpEvents.push({ user_id: user.id, xp_amount: 100, reason: 'game_win' });
+  if (handsPlayedRef.current > 0) 
+    xpEvents.push({ user_id: user.id, xp_amount: handsPlayedRef.current, reason: 'hands_played' });
+  if (handsWonRef.current > 0) 
+    xpEvents.push({ user_id: user.id, xp_amount: handsWonRef.current * 10, reason: 'hands_won' });
+
+  await supabase.from('xp_events').insert(xpEvents);
+  
+  // Fetch updated level for animation
+  const { data: newXp } = await supabase.from('player_xp')
+    .select('total_xp').eq('user_id', user.id).maybeSingle();
+  return newXp?.total_xp ?? 0;
+}, [user, tableState, ...]);
+```
+
+### XP Level-Up Overlay (new component)
+
+```
++-----------------------------+
+|                             |
+|       XP EARNED: +135       |
+|                             |
+|   Level 2  >>>>>>>>  Lv 3   |
+|   [=============>----]      |
+|   Level 3  >>>>>>>>  Lv 4   |
+|   [======>-----------]      |
+|                             |
+|       [ Continue ]          |
++-----------------------------+
+```
+
+The progress bars animate sequentially, each taking ~1.2s. Gold color scheme matching the existing poker UI (hsl(43 74% 49%)).
+
+### handleLeave Updated Flow
+
+```
+handleLeave() {
+  1. saveXpAndStats()
+  2. if (levels gained > 0) -> show XPLevelUpOverlay
+  3. else -> leaveTable() + onLeave()
+}
+```
+
+The overlay's "Continue" button calls `leaveTable()` then `onLeave()`.
+
+### Tournament Level Gate
+
+In TournamentLobby, wrap the create/register actions:
+```tsx
+const levelData = usePlayerLevel(user?.id);
+const canPlayTournaments = (levelData?.level ?? 0) >= 5;
+```
+
+If `!canPlayTournaments`, show a locked badge with progress toward level 5.
+
+---
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/components/poker/OnlinePokerTable.tsx` | Extract XP save helper, call on leave + game over, capture start level, show level-up overlay |
+| `src/components/poker/XPLevelUpOverlay.tsx` | NEW - animated level-up progress screen |
+| `src/components/poker/TournamentLobby.tsx` | Add level 5 gate for tournament access |
 
 ## What Does NOT Change
-- No style, layout, navigation, or spacing changes
+
+- No style, layout, navigation, or spacing changes to existing components
 - No changes to BottomNav
 - No refactoring or renaming
-- Chip accounting logic unchanged
-- All-in logic unchanged (already fixed)
-- ElevenLabs edge function unchanged
+- WinnerOverlay unchanged (level-up overlay is a separate component shown after)
+- XP trigger and player_xp table unchanged (already working correctly)
+- No server-side changes needed
