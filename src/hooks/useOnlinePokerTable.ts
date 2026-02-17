@@ -150,27 +150,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (!tableId) return;
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
-      const currentState = tableStateRef.current;
-      const currentPhase = currentState?.current_hand?.phase;
-      // Option A: showdown is protected (animations/reveals running)
-      const handActive = !!currentState?.current_hand
-        && currentPhase !== 'complete';
-
-      if (handActive) {
-        // Mid-hand: only update table metadata; seats/hand come from broadcasts only
-        // If prev is null mid-hand (shouldn't happen), skip entirely — don't blank UI
-        if (typeof window !== 'undefined' && window.location.search.includes('debug=1')) {
-          console.log(`[DEBUG] refreshState mid-hand SKIPPED seats/hand replacement. phase=${currentPhase}`);
-        }
-        setTableState(prev => prev ? { ...prev, table: data.table } : prev);
-      } else {
-        // No active hand OR phase === 'complete': full replacement is safe
-        setTableState(data);
-        lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
-      }
+      setTableState(data);
       setMyCards(data.my_cards || null);
       setError(null);
       setConnectionStatus('connected');
+      lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
     } catch (err: any) {
       setError(err.message);
       setConnectionStatus('disconnected');
@@ -298,28 +282,24 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           if (handActive) {
             // Mid-hand join: add seat locally as sitting_out with has_cards=false
             // Do NOT refreshState — it would replace the active hand's seat array
-            if (typeof window !== 'undefined' && window.location.search.includes('debug=1')) {
-              console.log(`[DEBUG] seat_change join mid-hand: seat=${payload.seat} has_cards=false status=sitting_out`);
-            }
             setTableState(prev => {
               if (!prev) return prev;
+              const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
+              if (alreadyExists) return prev;
               return {
                 ...prev,
-                seats: prev.seats.map(s =>
-                  s.seat === payload.seat
-                    ? {
-                        ...s,
-                        player_id: payload.player_id,
-                        display_name: payload.display_name || 'Player',
-                        avatar_url: payload.avatar_url || null,
-                        stack: payload.stack || 0,
-                        status: 'sitting_out',
-                        has_cards: false,
-                        current_bet: 0,
-                        last_action: null,
-                      }
-                    : s
-                ),
+                seats: [...prev.seats, {
+                  seat: payload.seat,
+                  player_id: payload.player_id,
+                  display_name: payload.display_name || 'Player',
+                  avatar_url: payload.avatar_url || null,
+                  country_code: null,
+                  stack: payload.stack || 0,
+                  status: 'sitting_out',
+                  has_cards: false,
+                  current_bet: 0,
+                  last_action: null,
+                }],
               };
             });
             return; // Skip refreshState during active hand
@@ -637,8 +617,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
-        // Option A: only trigger timeout check; broadcasts deliver state updates
         callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
+        refreshState();
       }
     }, 5000);
     return () => clearInterval(interval);
@@ -667,8 +647,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const deadline = new Date(currentHand.action_deadline).getTime();
       if (Date.now() > deadline + 3000) {
         try {
-          // Only trigger timeout check; broadcasts will deliver state updates
           await callEdge('poker-check-timeouts', { table_id: tableId });
+          refreshState();
         } catch {}
       }
     }, 8000);

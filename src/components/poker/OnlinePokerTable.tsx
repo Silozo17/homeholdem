@@ -739,21 +739,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const totalPot = useMemo(() => hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0, [hand?.pots]);
   const isShowdown = hand?.phase === 'showdown' || hand?.phase === 'complete' || revealedCards.length > 0;
 
-  // P0-E: Memoize player objects so PlayerSeat memo is effective
-  const memoizedPlayers = useMemo(() => {
-    return rotatedSeats.map((seatData, screenPos) => {
-      if (!seatData?.player_id) return null;
-      const actualSeatNumber = (heroSeat + screenPos) % maxSeats;
-      const isMe = seatData.player_id === user?.id;
-      const isDealer = hand?.dealer_seat === actualSeatNumber;
-      const opponentRevealed = !isMe
-        ? revealedCards.find(rc => rc.player_id === seatData.player_id)?.cards ?? null
-        : null;
-      const playerLastAction = seatData.player_id ? lastActions[seatData.player_id] : undefined;
-      return toPokerPlayer(seatData, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction);
-    });
-  }, [seatsKey, hand?.dealer_seat, heroSeat, maxSeats, myCards, revealedCards, lastActions, user?.id]);
-
   const particlePositions = useMemo(() =>
     Array.from({ length: 8 }, (_, i) => ({
       left: 20 + ((i * 37 + 13) % 60),
@@ -1239,13 +1224,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             );
           })}
 
-          {/* SEATS — P0-E: memoized player objects created above */}
+          {/* SEATS */}
           {rotatedSeats.map((seatData, screenPos) => {
             const actualSeatNumber = (heroSeat + screenPos) % maxSeats;
             const pos = positions[screenPos];
             if (!pos) return null;
             const isEmpty = !seatData?.player_id;
             const isMe = seatData?.player_id === user?.id;
+            const isDealer = hand?.dealer_seat === actualSeatNumber;
             const isCurrentActor = hand?.current_actor_seat === actualSeatNumber;
             const isFolded = seatData?.status === 'folded';
 
@@ -1257,14 +1243,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               );
             }
 
-            const memoPlayer = memoizedPlayers[screenPos];
-            if (!memoPlayer) return null;
+            const opponentRevealed = !isMe ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null : null;
+            const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
+            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
             return (
               <SeatAnchor key={seatData!.player_id} xPct={pos.xPct} yPct={pos.yPct} zIndex={isMe ? Z.SEATS + 1 : Z.SEATS}>
                 <PlayerSeat
-                  player={memoPlayer} isCurrentPlayer={!!isCurrentActor && !isFolded} showCards={showCards}
+                  player={player} isCurrentPlayer={!!isCurrentActor && !isFolded} showCards={showCards}
                   isHuman={!!isMe} isShowdown={!!isShowdown} cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
                   seatDealOrder={Math.max(0, clockwiseOrder.indexOf(screenPos))} totalActivePlayers={activeSeats.length}

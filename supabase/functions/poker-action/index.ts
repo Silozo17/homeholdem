@@ -195,20 +195,6 @@ Deno.serve(async (req) => {
     const playerSeat = seats.find((s: any) => s.player_id === user.id);
     if (!playerSeat) return new Response(JSON.stringify({ error: "Not seated" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Reject if player has no hole cards for this hand (mid-hand joiner guard)
-    const { count: playerHoleCards } = await admin
-      .from("poker_hole_cards")
-      .select("id", { count: "exact", head: true })
-      .eq("hand_id", hand_id)
-      .eq("player_id", user.id);
-
-    if (!playerHoleCards || playerHoleCards === 0) {
-      return new Response(
-        JSON.stringify({ error: "Not in this hand" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     let actualAction = action;
     let actualAmount = amount;
 
@@ -604,14 +590,10 @@ async function processAction(
   }
   console.log(`[ACTION] committed hand=${hand.id} seat=${actorSeatNum} action=${action} phase=${hand.phase}->${newPhase} next_actor=${nextActorSeat} complete=${handComplete}`);
 
-  // 10. Get profiles + hole card ownership for broadcast
+  // 10. Get profiles for broadcast
   const playerIds = seatStates.map(s => s.player_id);
-  const [{ data: profiles }, { data: holeCardRows }] = await Promise.all([
-    admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds),
-    admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id),
-  ]);
+  const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds);
   const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-  const holeCardPlayerIds = new Set((holeCardRows || []).map((r: any) => r.player_id));
 
   // 11. Broadcast public state
   const publicState = {
@@ -637,7 +619,7 @@ async function processAction(
         status: s.status,
         current_bet: s.current_round_bet,
         last_action: s.player_id === actorSeat.player_id ? action : null,
-        has_cards: holeCardPlayerIds.has(s.player_id) && s.status !== "folded",
+        has_cards: s.status !== "folded",
       };
     }),
     action_deadline: actionDeadline,
