@@ -14,7 +14,7 @@ const sizeMap = {
   sm: 'w-9 h-9 text-xs',
   md: 'w-11 h-11 text-sm',
   lg: 'w-14 h-14 text-base',
-  xl: 'w-[88px] h-[88px] text-lg',
+  xl: 'w-[96px] h-[96px] text-lg',
   '2xl': 'w-24 h-24 text-xl',
 };
 
