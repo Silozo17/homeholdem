@@ -813,6 +813,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
           </button>
 
+          {/* QuickChat — always visible in header */}
+          <QuickChat onSend={trackedSendChat} />
+
           {/* In mobile landscape, collapse non-essential buttons into three-dot menu */}
           {isMobileLandscape ? (
             <DropdownMenu>
@@ -867,7 +870,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
                 </button>
               )}
-              <QuickChat onSend={trackedSendChat} />
               <button onClick={() => setInviteOpen(true)}
                 className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
               >
@@ -926,28 +928,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* TABLE SCENE */}
       {(() => {
-        const panelW = isMobileLandscape && typeof window !== 'undefined' && window.innerWidth < 900 ? 130 : 160;
-        const useGrid = isMobileLandscape && showActions;
+        const panelW = isMobileLandscape && typeof window !== 'undefined' && window.innerWidth < 900 ? 160 : 200;
         return (
       <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: Z.TABLE }}>
-        <div className="w-full h-full"
-          style={{
-            display: useGrid ? 'grid' : 'flex',
-            gridTemplateColumns: useGrid ? `1fr ${panelW}px` : undefined,
-            alignItems: 'center',
-            justifyContent: useGrid ? undefined : 'center',
-          }}
-        >
+        <div className="w-full h-full flex items-center justify-center">
         <div
           className="relative"
           style={{
             aspectRatio: '16 / 9',
-            width: useGrid ? '100%' : (isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)'),
-            maxWidth: useGrid ? undefined : '990px',
+            width: isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)',
+            maxWidth: '990px',
             maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
             containerType: 'size',
-            margin: useGrid ? '0 auto' : undefined,
           }}
         >
           <TableFelt />
@@ -1157,13 +1150,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           })}
         </div>
 
-        {/* Betting panel — grid column in landscape */}
-        {useGrid && mySeat && (
-          <aside className="h-full flex items-center justify-center"
-            style={{ paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)' }}
+        {/* Betting panel — absolute overlay in mobile landscape */}
+        {isMobileLandscape && showActions && mySeat && (
+          <div className="absolute right-0 top-1/2 -translate-y-1/2"
+            style={{ width: `${panelW}px`, paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)', zIndex: Z.ACTIONS }}
           >
             <BettingControls landscape panelWidth={panelW} canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
-          </aside>
+          </div>
         )}
         </div>
       </div>

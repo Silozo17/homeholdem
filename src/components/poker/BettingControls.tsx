@@ -69,7 +69,7 @@ export function BettingControls({
   // ── Landscape: vertical right-thumb panel ──
   if (landscape) {
     return (
-      <div className="flex flex-col gap-2 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '160px' }}>
+      <div className="flex flex-col gap-2 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '180px' }}>
         {showRaiseSlider && canRaise && (
           <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl"
             style={{
@@ -84,7 +84,7 @@ export function BettingControls({
                 const isActive = raiseAmount === capped;
                 return (
                   <button key={qb.label}
-                    className="text-[10px] py-1 px-2 rounded-full font-bold active:scale-90 transition-all"
+                    className="text-[11px] py-1.5 px-2.5 rounded-full font-bold active:scale-90 transition-all"
                     style={{
                       background: isActive
                         ? 'linear-gradient(135deg, hsl(43 80% 50%), hsl(43 74% 38%))'
