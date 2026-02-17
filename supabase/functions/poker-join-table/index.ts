@@ -139,6 +139,17 @@ Deno.serve(async (req) => {
       // Additional invite_code validation can be added here
     }
 
+    // Check if a hand is in progress
+    const { data: activeHand } = await admin
+      .from("poker_hands")
+      .select("id")
+      .eq("table_id", table_id)
+      .is("completed_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    const initialStatus = activeHand ? "sitting_out" : "active";
+
     // Insert seat
     const { data: seat, error: seatErr } = await admin
       .from("poker_seats")
@@ -147,7 +158,7 @@ Deno.serve(async (req) => {
         seat_number,
         player_id: user.id,
         stack: buy_in_amount,
-        status: "active",
+        status: initialStatus,
       })
       .select()
       .single();
