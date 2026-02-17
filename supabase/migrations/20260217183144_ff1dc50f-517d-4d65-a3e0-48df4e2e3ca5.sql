@@ -1,0 +1,1 @@
+ALTER TABLE public.poker_tables ALTER COLUMN last_blind_increase_at DROP NOT NULL;

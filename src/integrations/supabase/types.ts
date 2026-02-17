@@ -1401,7 +1401,7 @@ export type Database = {
           created_by: string
           id: string
           invite_code: string | null
-          last_blind_increase_at: string
+          last_blind_increase_at: string | null
           max_buy_in: number
           max_seats: number
           min_buy_in: number
@@ -1424,7 +1424,7 @@ export type Database = {
           created_by?: string
           id?: string
           invite_code?: string | null
-          last_blind_increase_at?: string
+          last_blind_increase_at?: string | null
           max_buy_in?: number
           max_seats?: number
           min_buy_in?: number
@@ -1447,7 +1447,7 @@ export type Database = {
           created_by?: string
           id?: string
           invite_code?: string | null
-          last_blind_increase_at?: string
+          last_blind_increase_at?: string | null
           max_buy_in?: number
           max_seats?: number
           min_buy_in?: number
