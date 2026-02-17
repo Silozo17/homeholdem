@@ -1181,10 +1181,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               const seatOrder = clockwiseOrder.indexOf(screenPos);
               if (seatOrder < 0) return null;
               return [0, 1].map(cardIdx => {
-                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.18;
+                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.12;
                 return (
                   <div key={`deal-${screenPos}-${cardIdx}`} className="absolute pointer-events-none"
-                    style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.7s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}cqw`, ['--deal-dy' as any]: `${pos.yPct - 2}cqh` }}>
+                    style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.45s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}cqw`, ['--deal-dy' as any]: `${pos.yPct - 2}cqh` }}>
                     <div className="w-6 h-9 rounded card-back-premium border border-white/10" />
                   </div>
                 );
