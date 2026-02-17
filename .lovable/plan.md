@@ -1,62 +1,74 @@
 
 
-# Fix Player Profile to Match Reference
+# Fix Player Seat to Match Reference Design
 
-## Problems Identified (Reference IMG_3984 vs Current IMG_3985)
+## Key Differences (Current vs Reference)
 
-### 1. Level Badge and Country Flag Hidden Behind Nameplate
-The badge and flag are children of `PlayerAvatar` (which has `z-[2]`). CSS stacking contexts mean their `z-10` only applies within that parent -- so the nameplate at `z-[4]` paints over them completely.
-**Fix:** Move `LevelBadge` and `CountryFlag` out of `PlayerAvatar` and render them in `PlayerSeat.tsx` as siblings positioned absolutely at `z-[5]`, anchored to the avatar's bottom-left and bottom-right edges.
+| Element | Current (Wrong) | Reference (Target) |
+|---------|----------------|-------------------|
+| Avatar size | 88px -- too small next to cards | Needs to be bigger (~96-100px) to dominate |
+| Card angle | 14 degrees -- too wide | 10 degrees, closer together |
+| Card gap | -14px margin overlap | Tighter: -18px or more overlap |
+| Card markings | `text-base` rank, `text-3xl` center suit -- too small | Much larger: `text-xl` rank, `text-4xl+` center suit, like the reference where "A" and "K" fill most of the card |
+| Nameplate shape | Tiny `rounded-full` pill, `min-w-[90px]` | Wide, tall `rounded-2xl` bar (~120px wide), more padding, clearly two-line layout |
+| Nameplate overlap | `-mt-3` (barely overlaps avatar) | Deeper overlap (~`-mt-4` to `-mt-5`) so it tucks under avatar chin |
+| Level badge | Inside avatar container, hidden behind nameplate z-index | Must render OUTSIDE avatar container at z-[5], anchored to avatar's bottom-left edge |
+| Country flag | Inside avatar container, hidden behind nameplate z-index | Must render OUTSIDE avatar container at z-[5], anchored to avatar's bottom-right edge |
+| Badge/flag size | 22px -- too small | Slightly larger (~24-26px) to be clearly visible beside the nameplate |
+| Badge/flag position | `absolute -bottom-1 -left-1` inside avatar parent | Needs absolute positioning relative to the whole seat, calculated to sit at the avatar circle edge, flanking the nameplate |
 
-### 2. Avatar Too Small Relative to Cards
-Avatar `xl` = 80px. Card `xl` = 56x80px. In the reference, the avatar is clearly the dominant element with cards peeking above it. The avatar needs to be bigger.
-**Fix:** Increase `xl` avatar from `w-20 h-20` (80px) to `w-[88px] h-[88px]` (88px). This makes the avatar clearly larger than the cards.
+## Detailed Changes
 
-### 3. Card Markings Too Small
-Reference shows large, bold rank letters (A, K, 7) that nearly fill the card face. Current `xl` uses `text-sm` for rank (14px) and `text-2xl` for center suit.
-**Fix:** Bump `xl` rank to `text-base` (16px), suit to `text-sm` (14px), and center suit to `text-3xl`. Makes the card face bolder and more readable like the reference.
+### 1. `src/components/poker/PlayerAvatar.tsx`
+- Increase `xl` size from `w-[88px] h-[88px]` to `w-[96px] h-[96px]`
 
-### 4. Cards Slightly Too Large
-User confirmed cards are close but slightly oversized.
-**Fix:** Reduce `xl` card from `w-14 h-[80px]` to `w-[50px] h-[72px]` -- a small trim.
+### 2. `src/components/poker/CardDisplay.tsx`
+- Increase `xl` text sizes significantly:
+  - Corner rank: from `text-base` to `text-xl` (bold, prominent like the reference "A", "K")
+  - Corner suit: from `text-sm` to `text-base`
+  - Center suit: from `text-3xl` to `text-5xl` (fills most of the card body)
+- Corner position: move slightly inward for better framing (top-1 left-1.5)
 
-### 5. Turn Timer Circle Overlapping Cards
-The SVG timer ring wraps the avatar center at `z-10`, painting over the cards and everything else.
-**Fix:** Integrate the timer into the nameplate pill. When it is the player's turn, the nameplate border becomes a gold animated countdown line (using a CSS conic-gradient that sweeps). Keep the timer logic (countdown, onTimeout, onLowTime) but render a thin gold progress border around the nameplate instead of a big circle over the avatar.
+### 3. `src/components/poker/PlayerSeat.tsx`
 
-### 6. Card Fan Angle
-Reference shows a wider spread between the two cards (~14-15 degrees each).
-**Fix:** Increase rotation from 10deg to 14deg.
+**Cards:**
+- Reduce fan angle from 14deg to 10deg
+- Increase card overlap from `-14px` to `-18px` (cards closer together)
 
-## Files to Change
+**Nameplate:**
+- Change shape from `rounded-full` (pill) to `rounded-2xl` (wider rounded rectangle)
+- Increase `min-w` from `90px` to `120px`
+- Increase padding from `px-3 py-0.5` to `px-5 py-1.5`
+- Increase text sizes: name from `text-[11px]` to `text-[13px]`, chips from `text-[10px]` to `text-[12px]`
+- Deepen overlap from `-mt-3` to `-mt-5`
 
-### `src/components/poker/PlayerAvatar.tsx`
-- Increase `xl` size to `w-[88px] h-[88px]`
-- Remove `LevelBadge` and `CountryFlag` rendering (move to PlayerSeat)
-- Remove `level` and `countryCode` props
+**Level Badge and Country Flag -- fix z-index stacking:**
+- Move both OUT of the `<div className="relative">` (avatar container)
+- Render them as direct children of the outer seat container
+- Position them absolutely so they anchor at the avatar circle's bottom-left (level) and bottom-right (flag) edges
+- Set z-[5] so they paint ABOVE the nameplate (z-[4])
+- Increase badge/flag size for `xl` from 22px to 26px
 
-### `src/components/poker/PlayerSeat.tsx`
-- Render `LevelBadge` at `z-[5]` positioned at avatar's bottom-left edge
-- Render `CountryFlag` at `z-[5]` positioned at avatar's bottom-right edge
-- Remove circular `TurnTimer` from avatar area
-- Add turn timer as a gold conic-gradient border on the nameplate pill (sweeping countdown)
-- Increase card fan angle from 10 to 14 degrees
-- Use the timer's elapsed/duration state to drive the nameplate border animation
+### 4. `src/components/common/LevelBadge.tsx`
+- Increase `xl` size from `w-[22px] h-[22px]` to `w-[26px] h-[26px]`
+- Increase font from `text-[12px]` to `text-[13px]`
+- Change positioning from `absolute -bottom-1 -left-1` to just flex (parent will position it)
 
-### `src/components/poker/CardDisplay.tsx`
-- Reduce `xl` dimensions to `w-[50px] h-[72px]`
-- Increase `xl` text sizes: rank `text-base`, corner suit `text-sm`, center suit `text-3xl`
+### 5. `src/components/poker/CountryFlag.tsx`
+- Increase `xl` size from `w-[22px] h-[22px]` to `w-[26px] h-[26px]`
+- Increase font from `text-[12px]` to `text-[14px]`
+- Same positioning change as LevelBadge
 
-## Revised Z-Index Layering
+## Z-Index Layering (unchanged logic, fixed implementation)
 
 ```text
-z-[1]: Avatar body (profile picture)
-z-[2]: Active player gold ring / All-in ring
-z-[3]: Cards (fanned over avatar top)
-z-[4]: Nameplate pill (overlaps card bottoms + avatar bottom)
-z-[5]: Level badge + Country flag (on avatar edges, above nameplate)
+z-[1]: Avatar body
+z-[2]: Active/All-in glow rings
+z-[3]: Cards (fanned above avatar, 10deg, tight)
+z-[4]: Nameplate bar (wide rounded rectangle, overlapping avatar bottom)
+z-[5]: Level badge + Country flag (at avatar edges, above nameplate)
 ```
 
-## Turn Timer Redesign
-Instead of a large SVG circle overlaying the avatar and cards, the timer becomes a conic-gradient border on the nameplate pill that sweeps from full gold to empty as time runs out, transitioning gold to orange to red. This keeps the timer visible without occluding cards or badges.
+## Visual Result
+The player seat will have a large dominant avatar circle, with two cards peeking above at a gentle 10-degree angle with bold prominent markings. Below sits a wide dark nameplate bar showing name and chips. The level badge and flag flank the nameplate at the avatar's bottom corners, always visible on top.
 
