@@ -391,11 +391,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Voice: announce hand winners
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
-    const winner = handWinners[0];
-    const isHero = winner.player_id === user.id;
-    const name = isHero ? 'You' : winner.display_name;
-    announceWinner(name, winner.amount, winner.hand_name || undefined);
-  }, [handWinners, user, announceWinner]);
+    for (const winner of handWinners) {
+      const isHero = winner.player_id === user.id;
+      const name = isHero ? 'You' : winner.display_name;
+      const handName = winner.hand_name && winner.hand_name !== 'Last standing'
+        ? winner.hand_name
+        : undefined;
+      if (handName) {
+        announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
+      } else {
+        announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
+      }
+    }
+  }, [handWinners, user, announceCustom]);
 
   // Voice: detect all-in from lastActions
   useEffect(() => {
@@ -1111,7 +1119,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               const seatOrder = clockwiseOrder.indexOf(screenPos);
               if (seatOrder < 0) return null;
               return [0, 1].map(cardIdx => {
-                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;
+                const delay = (cardIdx * activeSeatCount + seatOrder) * 0.18;
                 return (
                   <div key={`deal-${screenPos}-${cardIdx}`} className="absolute pointer-events-none"
                     style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.7s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}cqw`, ['--deal-dy' as any]: `${pos.yPct - 2}cqh` }}>

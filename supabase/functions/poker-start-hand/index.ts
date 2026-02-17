@@ -401,7 +401,7 @@ Deno.serve(async (req) => {
       firstActor = nextActiveSeat(activePlayers, bbSeat, table.max_seats);
     }
 
-    const actionDeadline = new Date(Date.now() + 30_000).toISOString();
+    const actionDeadline = new Date(Date.now() + 20_000).toISOString();
 
     // Create hand row
     const { data: hand, error: handErr } = await admin
