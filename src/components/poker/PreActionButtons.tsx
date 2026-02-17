@@ -20,7 +20,7 @@ export const PreActionButtons = memo(function PreActionButtons({
   canPreCheck, amountToCall, onQueue, queued,
 }: PreActionButtonsProps) {
   return (
-    <div className="flex items-center justify-center gap-1.5">
+    <div className="flex flex-col items-end gap-1">
       {ACTIONS.map(action => {
         // Hide "Check" option if there's already a bet to call
         if (action.id === 'check' && amountToCall > 0 && !canPreCheck) return null;

@@ -1,7 +1,6 @@
 import { memo, useState, useEffect } from 'react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
-import { PeekableCard } from './PeekableCard';
 import { PlayerAvatar } from './PlayerAvatar';
 import { DealerButton } from './DealerButton';
 import { TurnTimer } from './TurnTimer';
@@ -22,9 +21,6 @@ interface PlayerSeatProps {
   compact?: boolean;
   onTimeout?: () => void;
   onLowTime?: () => void;
-  /** Card peek feature: controlled by parent */
-  isPeeked?: boolean;
-  onPeek?: () => void;
 }
 
 /**
@@ -35,7 +31,6 @@ interface PlayerSeatProps {
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
   cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, onTimeout, onLowTime,
-  isPeeked, onPeek,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isFolded = player.status === 'folded';
@@ -88,8 +83,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     </div>
   ) : null;
 
-  // Human player cards (fanned behind avatar) — sequential reveal or peekable
-  const usePeek = isHuman && onPeek && isPeeked !== undefined;
+  // Human player cards (fanned behind avatar) — sequential reveal
   const humanCards = isHuman && player.holeCards.length > 0 ? (
    <div className="absolute left-1/2 -translate-x-1/2 flex justify-center" style={{ zIndex: 1, bottom: 'calc(30% + 9px)', transform: 'translateX(-50%) scale(1.0)', transformOrigin: 'center bottom' }}>
       {player.holeCards.map((card, i) => {
@@ -97,24 +91,13 @@ export const PlayerSeat = memo(function PlayerSeat({
         const isRevealed = revealedIndices.has(i);
         return (
           <div key={i} style={{ transform: `rotate(${i === 0 ? -3 : 3}deg)`, marginLeft: i > 0 ? '-12px' : '0' }}>
-            {usePeek && isRevealed ? (
-              <PeekableCard
-                card={card}
-                size={humanCardSize}
-                dealDelay={dealDelay}
-                isPeeked={isPeeked!}
-                onPeek={onPeek!}
-                className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
-              />
-            ) : (
-              <CardDisplay
-                card={isRevealed && (!usePeek || isPeeked) ? card : undefined}
-                faceDown={!isRevealed || (usePeek && !isPeeked)}
-                size={humanCardSize}
-                dealDelay={dealDelay}
-                className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
-              />
-            )}
+            <CardDisplay
+              card={isRevealed ? card : undefined}
+              faceDown={!isRevealed}
+              size={humanCardSize}
+              dealDelay={dealDelay}
+              className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
+            />
           </div>
         );
       })}
