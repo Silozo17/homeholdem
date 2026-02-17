@@ -216,6 +216,7 @@ Deno.serve(async (req) => {
       actualAmount = 0;
     }
 
+    console.log(`[ACTION] hand=${hand_id} player=${user.id} action=${actualAction} amount=${actualAmount} deadline_passed=${deadlinePassed}`);
     return await processAction(admin, table, hand, seats, playerSeat.seat_number, actualAction, actualAmount, false);
   } catch (err) {
     console.error("poker-action error:", err);
@@ -584,8 +585,10 @@ async function processAction(
 
   if (commitErr) throw commitErr;
   if (commitResult?.error === "version_conflict") {
+    console.log(`[ACTION] version_conflict hand=${hand.id} seat=${actorSeatNum} v=${hand.state_version}`);
     return new Response(JSON.stringify({ error: "action_superseded" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
+  console.log(`[ACTION] committed hand=${hand.id} seat=${actorSeatNum} action=${action} phase=${hand.phase}->${newPhase} next_actor=${nextActorSeat} complete=${handComplete}`);
 
   // 10. Get profiles for broadcast
   const playerIds = seatStates.map(s => s.player_id);

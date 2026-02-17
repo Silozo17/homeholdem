@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     }
 
     const results: any[] = [];
+    console.log(`[CHECK-TIMEOUTS] Found ${(stuckHands || []).length} stuck hand(s)`);
 
     for (const hand of stuckHands || []) {
       try {

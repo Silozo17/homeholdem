@@ -396,7 +396,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   // Fetch my cards when a new hand starts
   useEffect(() => {
     if (!hand?.hand_id || !userId || mySeatNumber === null) return;
-    // Delay setting myCards by 800ms so the deal animation sprites start flying first
+    // Delay setting myCards by 200ms so cards arrive before first reveal animation (~500ms)
     const timer = setTimeout(async () => {
       try {
         const data = await callEdge('poker-my-cards', { hand_id: hand.hand_id }, 'GET');
@@ -404,7 +404,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       } catch {
         // not in hand
       }
-    }, 800);
+    }, 200);
     return () => clearTimeout(timer);
   }, [hand?.hand_id, userId, mySeatNumber]);
 
