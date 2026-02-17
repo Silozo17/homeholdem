@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Card } from '@/lib/poker/types';
 import { RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface HandAction {
   playerName: string;
@@ -44,18 +45,15 @@ function loadFromStorage(tableId: string): HandRecord[] {
 
 function saveToStorage(tableId: string, records: HandRecord[]) {
   try {
-    // Keep only last MAX_HANDS
     const trimmed = records.slice(-MAX_HANDS);
     localStorage.setItem(`${STORAGE_PREFIX}${tableId}`, JSON.stringify(trimmed));
 
-    // Prune old tables if too many
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key?.startsWith(STORAGE_PREFIX)) keys.push(key);
     }
     if (keys.length > MAX_TABLES) {
-      // Remove oldest (by first record timestamp)
       const sorted = keys.map(k => {
         try {
           const data = JSON.parse(localStorage.getItem(k) || '[]');
@@ -72,11 +70,8 @@ function saveToStorage(tableId: string, records: HandRecord[]) {
 export interface UseHandHistoryReturn {
   lastHand: HandRecord | null;
   handHistory: HandRecord[];
-  /** Call when a new hand starts to snapshot players */
   startNewHand: (handId: string, handNumber: number, players: HandPlayerSnapshot[]) => void;
-  /** Record an action */
   recordAction: (action: HandAction) => void;
-  /** Finalize hand with results */
   finalizeHand: (data: {
     communityCards: Card[];
     winners: HandWinner[];
@@ -84,7 +79,6 @@ export interface UseHandHistoryReturn {
     myCards: Card[] | null;
     revealedCards: RevealedCard[];
   }) => void;
-  /** Export as CSV text */
   exportCSV: () => string;
 }
 
@@ -115,7 +109,7 @@ export function useHandHistory(tableId: string): UseHandHistoryReturn {
     }
   }, []);
 
-  const finalizeHand = useCallback((data: {
+  const finalizeHand = useCallback(async (data: {
     communityCards: Card[];
     winners: HandWinner[];
     pots: Array<{ amount: number }>;
@@ -125,11 +119,34 @@ export function useHandHistory(tableId: string): UseHandHistoryReturn {
     const current = currentHandRef.current;
     if (!current || !current.handId) return;
 
+    // Fetch full action log from the server for complete history
+    let serverActions: HandAction[] = current.actions || [];
+    try {
+      const { data: actionsData } = await supabase
+        .from('poker_actions')
+        .select('*')
+        .eq('hand_id', current.handId)
+        .order('sequence');
+
+      if (actionsData && actionsData.length > 0) {
+        const playerMap = new Map((current.players || []).map(p => [p.playerId, p.name]));
+        serverActions = actionsData.map(a => ({
+          playerName: playerMap.get(a.player_id) || 'Unknown',
+          action: a.action_type,
+          amount: a.amount || 0,
+          phase: a.phase,
+          timestamp: new Date(a.server_timestamp).getTime(),
+        }));
+      }
+    } catch {
+      // Fall back to locally recorded actions
+    }
+
     const record: HandRecord = {
       handId: current.handId!,
       handNumber: current.handNumber!,
       players: current.players || [],
-      actions: current.actions || [],
+      actions: serverActions,
       communityCards: data.communityCards,
       winners: data.winners,
       pots: data.pots,

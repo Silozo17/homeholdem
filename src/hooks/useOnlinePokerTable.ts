@@ -262,10 +262,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Detect all-in runout: community cards jumped to 5 from < 3
-        const prevCommunityCount = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
+        // Detect all-in runout: payload now includes community_cards reliably
         const incomingCommunityCount = (payload.community_cards || []).length;
-        const isRunout = prevCommunityCount < 3 && incomingCommunityCount >= 5;
+        const hasRevealedCards = (payload.revealed_cards || []).length > 0;
+        // Runout = showdown with 5 community cards dealt at once (all-in scenario)
+        const isRunout = hasRevealedCards && incomingCommunityCount >= 5;
         const winnerDelay = isRunout ? 4000 : 0;
 
         if (winnerDelay > 0) {

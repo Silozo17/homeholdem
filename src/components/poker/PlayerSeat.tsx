@@ -107,7 +107,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
       style={{ zIndex: 3, top: compact ? 'calc(-30% + 40px)' : 'calc(-25% + 40px)' }}>
       {cards.map((card, i) => {
-        const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1 : i * 0.15;
+        const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.35 + 0.1 : i * 0.15;
         const isRevealed = useReveal ? revealedIndices.has(i) : true;
         const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
         return (

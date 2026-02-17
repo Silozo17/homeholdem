@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
 import { WinnerOverlay } from './WinnerOverlay';
 import { useAuth } from '@/contexts/AuthContext';
@@ -145,6 +146,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const chipAnimIdRef = useRef(0);
   const winStreakRef = useRef(0);
   const handsPlayedRef = useRef(0);
+  const handsWonRef = useRef(0);
+  const bestHandNameRef = useRef('');
+  const bestHandRankRef = useRef(-1);
+  const biggestPotRef = useRef(0);
+  const gameStartTimeRef = useRef(Date.now());
+  const xpSavedRef = useRef(false);
   const chatCountRef = useRef(0);
   const startingStackRef = useRef(0);
   const isLandscape = useIsLandscape();
@@ -280,12 +287,25 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       revealedCards,
     });
 
-    // Achievement check
+    // Track stats for game over
     const heroWon = handWinners.some(w => w.player_id === user.id);
     if (heroWon) {
       winStreakRef.current++;
+      handsWonRef.current++;
     } else {
       winStreakRef.current = 0;
+    }
+    const totalPotThisHand = (hand?.pots ?? []).reduce((s, p) => s + p.amount, 0);
+    if (totalPotThisHand > biggestPotRef.current) biggestPotRef.current = totalPotThisHand;
+    const winnerHand0 = handWinners.find(w => w.player_id === user.id);
+    if (winnerHand0?.hand_name) {
+      // Simple rank comparison by name — not perfect but good enough for display
+      const rankOrder = ['High Card', 'One Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'];
+      const newRank = rankOrder.indexOf(winnerHand0.hand_name);
+      if (newRank > bestHandRankRef.current) {
+        bestHandRankRef.current = newRank;
+        bestHandNameRef.current = winnerHand0.hand_name;
+      }
     }
 
     const mySeat = tableState.seats.find(s => s.player_id === user.id);
@@ -456,6 +476,41 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       return () => clearTimeout(timer);
     }
   }, [tableState, user, handWinners]);
+
+  // Save XP and stats on game over
+  useEffect(() => {
+    if (!gameOver || !user || xpSavedRef.current) return;
+    xpSavedRef.current = true;
+
+    const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
+    const finalChips = mySeatInfo?.stack ?? 0;
+    const isWinner = finalChips > 0;
+    const playerCount = tableState?.seats.filter(s => s.player_id).length ?? 0;
+
+    // Save play result
+    supabase.from('poker_play_results').insert({
+      user_id: user.id,
+      game_mode: 'multiplayer',
+      hands_played: handsPlayedRef.current,
+      hands_won: handsWonRef.current,
+      best_hand_name: bestHandNameRef.current || null,
+      best_hand_rank: bestHandRankRef.current >= 0 ? bestHandRankRef.current : null,
+      biggest_pot: biggestPotRef.current,
+      starting_chips: startingStackRef.current,
+      final_chips: finalChips,
+      bot_count: 0,
+      duration_seconds: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+    }).then(() => {});
+
+    // Award XP
+    const xpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
+    xpEvents.push({ user_id: user.id, xp_amount: 25, reason: 'game_complete' });
+    if (isWinner) xpEvents.push({ user_id: user.id, xp_amount: 100, reason: 'game_win' });
+    xpEvents.push({ user_id: user.id, xp_amount: handsPlayedRef.current, reason: 'hands_played' });
+    xpEvents.push({ user_id: user.id, xp_amount: handsWonRef.current * 10, reason: 'hands_won' });
+
+    supabase.from('xp_events').insert(xpEvents).then(() => {});
+  }, [gameOver, user, tableState]);
 
   // Staged community card reveal for all-in runouts
   useEffect(() => {
@@ -838,7 +893,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
+          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '44%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
             {visibleCommunityCards.map((card, i) => {
               const isFlop = i < 3;
               const dealDelay = isFlop ? i * 0.18 : 0.1;
@@ -896,7 +951,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           {gameOver && (
             <WinnerOverlay
               winners={gameOverWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
-              isGameOver={true} onNextHand={() => { leaveTable().then(onLeave).catch(onLeave); }} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
+              isGameOver={true}
+              stats={{
+                handsPlayed: handsPlayedRef.current,
+                handsWon: handsWonRef.current,
+                bestHandName: bestHandNameRef.current,
+                biggestPot: biggestPotRef.current,
+                duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+              }}
+              onNextHand={() => { leaveTable().then(onLeave).catch(onLeave); }} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
             />
           )}
 
@@ -919,16 +982,29 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const activeScreenPos: number[] = [];
             rotatedSeats.forEach((seatData, screenPos) => { if (seatData?.player_id) activeScreenPos.push(screenPos); });
             const activeSeatCount = activeScreenPos.length;
+
+            // Reorder dealing to start from dealer+1 (clockwise from dealer)
+            const dealerScreenPos = hand ? (() => {
+              const dealerActual = hand.dealer_seat;
+              return ((dealerActual - heroSeat) + maxSeats) % maxSeats;
+            })() : 0;
+            // Rotate activeScreenPos so dealing starts from the seat after the dealer
+            const dealerIdx = activeScreenPos.indexOf(dealerScreenPos);
+            const clockwiseOrder = dealerIdx >= 0
+              ? [...activeScreenPos.slice(dealerIdx + 1), ...activeScreenPos.slice(0, dealerIdx + 1)]
+              : activeScreenPos;
+
             return rotatedSeats.map((seatData, screenPos) => {
               if (!seatData?.player_id) return null;
               const pos = posArr[screenPos];
               if (!pos) return null;
-              const seatOrder = activeScreenPos.indexOf(screenPos);
+              const seatOrder = clockwiseOrder.indexOf(screenPos);
+              if (seatOrder < 0) return null;
               return [0, 1].map(cardIdx => {
                 const delay = (cardIdx * activeSeatCount + seatOrder) * 0.35;
                 return (
                   <div key={`deal-${screenPos}-${cardIdx}`} className="absolute pointer-events-none"
-                    style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.7s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}vw`, ['--deal-dy' as any]: `${pos.yPct - 2}vh` }}>
+                    style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly 0.7s ease-out ${delay}s both`, ['--deal-dx' as any]: `${pos.xPct - 50}cqw`, ['--deal-dy' as any]: `${pos.yPct - 2}cqh` }}>
                     <div className="w-6 h-9 rounded card-back-premium border border-white/10" />
                   </div>
                 );
