@@ -141,7 +141,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const prevBetRef = useRef<number>(0);
   const stagedRunoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const prevCommunityCountRef = useRef(0);
-  const prevHandIdRef = useRef<string | null>(null);
+  const prevAnimHandIdRef = useRef<string | null>(null);
   const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
   const winStreakRef = useRef(0);
@@ -244,7 +244,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const hand = tableState?.current_hand;
     if (!hand) return;
     const currentHandId = hand.hand_id;
-    if (currentHandId && currentHandId !== prevHandIdRef.current && hand.phase === 'preflop') {
+    if (currentHandId && currentHandId !== prevAnimHandIdRef.current && hand.phase === 'preflop') {
       handsPlayedRef.current++;
       const players: HandPlayerSnapshot[] = (tableState?.seats ?? [])
         .filter(s => s.player_id)
@@ -547,13 +547,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Deal animation on new hand
   useEffect(() => {
     const currentHandId = tableState?.current_hand?.hand_id ?? null;
-    if (currentHandId && currentHandId !== prevHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
+    if (currentHandId && currentHandId !== prevAnimHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
       setDealing(true);
       const timer = setTimeout(() => setDealing(false), 4500);
-      prevHandIdRef.current = currentHandId;
+      prevAnimHandIdRef.current = currentHandId;
       return () => clearTimeout(timer);
     }
-    if (!currentHandId) prevHandIdRef.current = null;
+    if (!currentHandId) prevAnimHandIdRef.current = null;
   }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
 
   // Chip animation: pot flies to winner
@@ -599,13 +599,16 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const maxSeats = table?.max_seats ?? 9;
   const heroSeat = mySeatNumber ?? 0;
 
+  const seatsKey = seats.map(s => `${s.seat}|${s.player_id}|${s.status}|${s.stack}|${s.current_bet}`).join(';');
+  const seatsRef = useRef(seats);
+  seatsRef.current = seats;
   const rotatedSeats = useMemo<(OnlineSeatInfo | null)[]>(() => Array.from(
     { length: maxSeats },
     (_, i) => {
       const actualSeat = (heroSeat + i) % maxSeats;
-      return seats.find(s => s.seat === actualSeat) || null;
+      return seatsRef.current.find(s => s.seat === actualSeat) || null;
     }
-  ), [maxSeats, heroSeat, seats]);
+  ), [seatsKey, maxSeats, heroSeat]);
 
   const activeScreenPositions = useMemo(() => {
     const pos: number[] = [];
@@ -793,44 +796,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Last Hand replay button */}
-          {lastHand && (
-            <button onClick={() => setReplayOpen(true)}
-              className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-            >
-              <History className="h-3.5 w-3.5 text-foreground/80" />
-            </button>
-          )}
-          {table.invite_code && (
-            <button onClick={copyInviteCode}
-              className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-            >
-              {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
-            </button>
-          )}
-          <QuickChat onSend={trackedSendChat} />
-          <button onClick={() => setInviteOpen(true)}
-            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-          >
-            <UserPlus className="h-3.5 w-3.5 text-foreground/80" />
-          </button>
+          {/* Sound toggle — always visible */}
           <button onClick={toggleSound}
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
           >
             {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
           </button>
-          <button onClick={toggleVoice}
-            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-            title={voiceEnabled ? 'Voice announcements on' : 'Voice announcements off'}
-          >
-            {voiceEnabled ? <Mic className="h-3.5 w-3.5 text-foreground/80" /> : <MicOff className="h-3.5 w-3.5 text-foreground/40" />}
-          </button>
-          {isSpectator && (
-            <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground font-bold">
-              <Eye className="h-2.5 w-2.5" /> Watching
-            </span>
-          )}
-          {isCreator && (
+
+          {/* In mobile landscape, collapse non-essential buttons into three-dot menu */}
+          {isMobileLandscape ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
@@ -838,23 +812,95 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="z-[70]">
-                {canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
+                {lastHand && (
+                  <DropdownMenuItem onClick={() => setReplayOpen(true)}>
+                    <History className="h-3.5 w-3.5 mr-2" /> Hand History
+                  </DropdownMenuItem>
+                )}
+                {table.invite_code && (
+                  <DropdownMenuItem onClick={copyInviteCode}>
+                    <Copy className="h-3.5 w-3.5 mr-2" /> {codeCopied ? 'Copied!' : 'Copy Code'}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+                  <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite Players
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleVoice}>
+                  {voiceEnabled ? <Mic className="h-3.5 w-3.5 mr-2" /> : <MicOff className="h-3.5 w-3.5 mr-2" />}
+                  {voiceEnabled ? 'Voice On' : 'Voice Off'}
+                </DropdownMenuItem>
+                {isCreator && canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
                   <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
                     <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
                   </DropdownMenuItem>
                 ))}
-                {canModerate && (
+                {isCreator && canModerate && (
                   <DropdownMenuItem onClick={() => setCloseConfirm(true)} className="text-destructive">
                     <XCircle className="h-3.5 w-3.5 mr-2" /> Close Table
                   </DropdownMenuItem>
                 )}
-                {!canModerate && hand && (
-                  <DropdownMenuItem disabled className="text-muted-foreground text-xs">
-                    Wait for hand to end
-                  </DropdownMenuItem>
-                )}
               </DropdownMenuContent>
             </DropdownMenu>
+          ) : (
+            <>
+              {lastHand && (
+                <button onClick={() => setReplayOpen(true)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+                >
+                  <History className="h-3.5 w-3.5 text-foreground/80" />
+                </button>
+              )}
+              {table.invite_code && (
+                <button onClick={copyInviteCode}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+                >
+                  {codeCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5 text-foreground/80" />}
+                </button>
+              )}
+              <QuickChat onSend={trackedSendChat} />
+              <button onClick={() => setInviteOpen(true)}
+                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-foreground/80" />
+              </button>
+              <button onClick={toggleVoice}
+                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+                title={voiceEnabled ? 'Voice announcements on' : 'Voice announcements off'}
+              >
+                {voiceEnabled ? <Mic className="h-3.5 w-3.5 text-foreground/80" /> : <MicOff className="h-3.5 w-3.5 text-foreground/40" />}
+              </button>
+              {isSpectator && (
+                <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground font-bold">
+                  <Eye className="h-2.5 w-2.5" /> Watching
+                </span>
+              )}
+              {isCreator && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+                      <MoreVertical className="h-3.5 w-3.5 text-foreground/80" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-[70]">
+                    {canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
+                      <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
+                        <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
+                      </DropdownMenuItem>
+                    ))}
+                    {canModerate && (
+                      <DropdownMenuItem onClick={() => setCloseConfirm(true)} className="text-destructive">
+                        <XCircle className="h-3.5 w-3.5 mr-2" /> Close Table
+                      </DropdownMenuItem>
+                    )}
+                    {!canModerate && hand && (
+                      <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                        Wait for hand to end
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </>
           )}
           <div className="flex items-center gap-0.5 text-[10px] text-foreground/50">
             <Users className="h-3 w-3" />
@@ -869,15 +915,29 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       </div>
 
       {/* TABLE SCENE */}
+      {(() => {
+        const panelW = isMobileLandscape && typeof window !== 'undefined' && window.innerWidth < 900 ? 130 : 160;
+        const useGrid = isMobileLandscape && showActions;
+        return (
       <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: Z.TABLE }}>
+        <div className="w-full h-full"
+          style={{
+            display: useGrid ? 'grid' : 'flex',
+            gridTemplateColumns: useGrid ? `1fr ${panelW}px` : undefined,
+            alignItems: 'center',
+            justifyContent: useGrid ? undefined : 'center',
+          }}
+        >
         <div
           className="relative"
           style={{
             aspectRatio: '16 / 9',
-            width: isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)',
+            width: useGrid ? '100%' : (isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)'),
+            maxWidth: useGrid ? undefined : '990px',
             maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
             containerType: 'size',
+            margin: useGrid ? '0 auto' : undefined,
           }}
         >
           <TableFelt />
@@ -1014,7 +1074,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
           {communityDealSprites.map(sprite => (
             <div key={sprite.id} className="absolute pointer-events-none"
-              style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`, ['--deal-center-dy' as any]: '46cqh' }}>
+              style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`, ['--deal-center-dy' as any]: '44cqh' }}>
               <div className="w-8 h-11 rounded card-back-premium border border-white/10" />
             </div>
           ))}
@@ -1074,7 +1134,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   player={player} isCurrentPlayer={!!isCurrentActor && !isFolded} showCards={showCards}
                   isHuman={!!isMe} isShowdown={!!isShowdown} cardsPlacement={CARDS_PLACEMENT[pos.seatKey]}
                   compact={isMobileLandscape} avatarUrl={seatData!.avatar_url}
-                  seatDealOrder={activeScreenPositions.indexOf(screenPos)} totalActivePlayers={activeSeats.length}
+                  seatDealOrder={Math.max(0, activeScreenPositions.indexOf(screenPos))} totalActivePlayers={activeSeats.length}
+                  disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
@@ -1085,7 +1146,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             );
           })}
         </div>
+
+        {/* Betting panel — grid column in landscape */}
+        {useGrid && mySeat && (
+          <aside className="h-full flex items-center justify-center"
+            style={{ paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)' }}
+          >
+            <BettingControls landscape panelWidth={panelW} canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
+          </aside>
+        )}
+        </div>
       </div>
+        );
+      })()}
 
       {/* YOUR TURN badge */}
       {showActions && (
@@ -1107,8 +1180,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* ACTION CONTROLS */}
-      {showActions && mySeat && (
+      {/* ACTION CONTROLS — only render non-grid landscape/portrait here */}
+      {showActions && mySeat && !(isMobileLandscape) && (
         isLandscape ? (
           <div className="absolute" style={{ zIndex: Z.ACTIONS, right: 'calc(env(safe-area-inset-right, 0px) + 10px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <BettingControls landscape canCheck={canCheck} amountToCall={amountToCall} minRaise={hand?.min_raise ?? table.big_blind} maxBet={hand?.current_bet ?? 0} playerChips={mySeat.stack} bigBlind={table.big_blind} pot={totalPot} onAction={handleAction} />
@@ -1183,7 +1256,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
 
       {/* Hand Replay sheet */}
-      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} onExportCSV={exportCSV} />
+      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} isLandscape={isLandscape} onExportCSV={exportCSV} />
 
       {/* Quit confirmation dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>

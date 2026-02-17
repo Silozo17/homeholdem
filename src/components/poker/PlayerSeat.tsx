@@ -22,6 +22,7 @@ interface PlayerSeatProps {
   compact?: boolean;
   level?: number;
   countryCode?: string | null;
+  disableDealAnim?: boolean;
   onTimeout?: () => void;
   onLowTime?: () => void;
 }
@@ -33,10 +34,9 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, onTimeout, onLowTime,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
-  const isFolded = player.status === 'folded';
   const isAllIn = player.status === 'all-in';
   const avatarSize = compact ? 'lg' : 'xl';
   const humanCardSize = compact ? 'lg' : 'xl';
@@ -87,6 +87,11 @@ export const PlayerSeat = memo(function PlayerSeat({
       setRevealedIndices(new Set());
       return;
     }
+    // If deal animation is disabled (mid-hand joiner), reveal all cards immediately
+    if (disableDealAnim) {
+      setRevealedIndices(new Set(player.holeCards.map((_, i) => i)));
+      return;
+    }
     setRevealedIndices(new Set());
     const timers: ReturnType<typeof setTimeout>[] = [];
     player.holeCards.forEach((_, i) => {
@@ -97,7 +102,7 @@ export const PlayerSeat = memo(function PlayerSeat({
       }, revealMs));
     });
     return () => timers.forEach(clearTimeout);
-  }, [cardKey, isHuman, totalActivePlayers, seatDealOrder]);
+  }, [cardKey, isHuman, totalActivePlayers, seatDealOrder, disableDealAnim]);
 
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
@@ -105,7 +110,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   // Card fan — 10deg tilt, tight overlap, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
-      style={{ zIndex: 3, top: compact ? 'calc(-30% + 40px)' : 'calc(-25% + 40px)' }}>
+      style={{ zIndex: 3, top: 'calc(-28% + 40px)' }}>
       {cards.map((card, i) => {
         const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.35 + 0.1 : i * 0.15;
         const isRevealed = useReveal ? revealedIndices.has(i) : true;

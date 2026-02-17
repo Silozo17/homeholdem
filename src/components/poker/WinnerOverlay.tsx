@@ -34,10 +34,10 @@ function AnimatedChips({ target }: { target: number }) {
 }
 
 export function WinnerOverlay({ winners, isGameOver, stats, onNextHand, onQuit }: WinnerOverlayProps) {
-  const formatTime = (ms: number) => {
-    const mins = Math.floor(ms / 60000);
-    const secs = Math.floor((ms % 60000) / 1000);
-    return `${mins}m ${secs}s`;
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${mins}m ${s}s`;
   };
 
   // Determine if the human player won or lost (for game over)

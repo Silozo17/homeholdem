@@ -12,11 +12,12 @@ interface BettingControlsProps {
   bigBlind: number;
   pot: number;
   landscape?: boolean;
+  panelWidth?: number;
   onAction: (action: { type: 'fold' | 'check' | 'call' | 'raise' | 'all-in'; amount?: number }) => void;
 }
 
 export function BettingControls({
-  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, onAction,
+  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, panelWidth, onAction,
 }: BettingControlsProps) {
   const minRaiseTotal = maxBet + minRaise;
   const maxRaiseTotal = maxBet + playerChips;
@@ -68,7 +69,7 @@ export function BettingControls({
   // ── Landscape: vertical right-thumb panel ──
   if (landscape) {
     return (
-      <div className="flex flex-col gap-2 w-[160px] animate-fade-in">
+      <div className="flex flex-col gap-2 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '160px' }}>
         {showRaiseSlider && canRaise && (
           <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl"
             style={{
