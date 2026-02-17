@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
         original_small_blind: small_blind,
         original_big_blind: big_blind,
         blind_level: 0,
-        last_blind_increase_at: new Date().toISOString(),
+        last_blind_increase_at: null,
       })
       .select()
       .single();

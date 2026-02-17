@@ -20,7 +20,7 @@ export interface OnlineTableInfo {
   blind_level: number;
   original_small_blind: number;
   original_big_blind: number;
-  last_blind_increase_at: string;
+  last_blind_increase_at: string | null;
 }
 
 export interface OnlineSeatInfo {
