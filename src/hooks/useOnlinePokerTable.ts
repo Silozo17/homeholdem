@@ -152,24 +152,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
       const currentState = tableStateRef.current;
       const currentPhase = currentState?.current_hand?.phase;
+      // Option A: showdown is protected (animations/reveals running)
       const handActive = !!currentState?.current_hand
-        && currentPhase !== 'complete'
-        && currentPhase !== 'showdown';
+        && currentPhase !== 'complete';
 
-      if (handActive && data.current_hand) {
-        const snapshotVersion = data.current_hand.state_version ?? 0;
-        const localVersion = lastAppliedVersionRef.current;
-
-        if (snapshotVersion > localVersion) {
-          // Snapshot is strictly newer: safe-merge everything
-          setTableState(prev => prev ? { ...prev, table: data.table, seats: data.seats, current_hand: data.current_hand } : data);
-          lastAppliedVersionRef.current = snapshotVersion;
-        } else {
-          // Snapshot is same or older: only merge table metadata
-          setTableState(prev => prev ? { ...prev, table: data.table } : data);
-        }
+      if (handActive) {
+        // Mid-hand: only update table metadata; seats/hand come from broadcasts only
+        setTableState(prev => prev ? { ...prev, table: data.table } : data);
       } else {
-        // No active hand or hand completed: full replacement is safe
+        // No active hand OR phase === 'complete': full replacement is safe
         setTableState(data);
         lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
       }
@@ -639,9 +630,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const elapsed = Date.now() - lastBroadcastRef.current;
       if (elapsed > 12000) {
         lastBroadcastRef.current = Date.now();
-        // Trigger timeout check + safe-merge refresh (version-gated inside refreshState)
+        // Option A: only trigger timeout check; broadcasts deliver state updates
         callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
-        refreshState();
       }
     }, 5000);
     return () => clearInterval(interval);
