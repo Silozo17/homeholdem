@@ -195,6 +195,20 @@ Deno.serve(async (req) => {
     const playerSeat = seats.find((s: any) => s.player_id === user.id);
     if (!playerSeat) return new Response(JSON.stringify({ error: "Not seated" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // Reject if player has no hole cards for this hand (mid-hand joiner guard)
+    const { count: playerHoleCards } = await admin
+      .from("poker_hole_cards")
+      .select("id", { count: "exact", head: true })
+      .eq("hand_id", hand_id)
+      .eq("player_id", user.id);
+
+    if (!playerHoleCards || playerHoleCards === 0) {
+      return new Response(
+        JSON.stringify({ error: "Not in this hand" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let actualAction = action;
     let actualAmount = amount;
 

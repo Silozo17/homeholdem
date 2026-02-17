@@ -284,22 +284,23 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             // Do NOT refreshState — it would replace the active hand's seat array
             setTableState(prev => {
               if (!prev) return prev;
-              const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
-              if (alreadyExists) return prev;
               return {
                 ...prev,
-                seats: [...prev.seats, {
-                  seat: payload.seat,
-                  player_id: payload.player_id,
-                  display_name: payload.display_name || 'Player',
-                  avatar_url: payload.avatar_url || null,
-                  country_code: null,
-                  stack: payload.stack || 0,
-                  status: 'sitting_out',
-                  has_cards: false,
-                  current_bet: 0,
-                  last_action: null,
-                }],
+                seats: prev.seats.map(s =>
+                  s.seat === payload.seat
+                    ? {
+                        ...s,
+                        player_id: payload.player_id,
+                        display_name: payload.display_name || 'Player',
+                        avatar_url: payload.avatar_url || null,
+                        stack: payload.stack || 0,
+                        status: 'sitting_out',
+                        has_cards: false,
+                        current_bet: 0,
+                        last_action: null,
+                      }
+                    : s
+                ),
               };
             });
             return; // Skip refreshState during active hand
