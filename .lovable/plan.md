@@ -1,41 +1,65 @@
 
 
-# Fix: Content Hidden Behind Bottom Navigation
+# Fix: Missing Translations for OTP and Auth Screens
 
 ## Problem
 
-The bottom navigation bar is `h-16` (64px) + `pb-[5px]` (5px) + `safe-area-bottom` (up to ~34px on iPhones with home indicator) = up to ~103px total height.
+The OTP verification screen and parts of the AuthForm use translation keys that either:
+1. Reference the wrong namespace (`auth.check_email` instead of `otp.check_email`)
+2. Don't exist at all in the translation files
 
-However, the main content wrapper in `AppLayout.tsx` only applies `pb-20` (80px) of bottom padding. This means on devices with a safe-area inset, the last ~23px of content is hidden behind the nav bar and users cannot scroll to see it.
+This causes raw key strings like `auth.otp_enter_code` to display instead of readable text.
 
-## Fix
+## Missing Key Mapping
 
-**File: `src/components/layout/AppLayout.tsx`** (line 55)
+| Code uses | Should map to (en.json) | Status |
+|-----------|------------------------|--------|
+| `auth.check_email` | `otp.check_email` | Wrong namespace |
+| `auth.otp_sent_to` | `otp.code_sent_to` | Wrong namespace + wrong key name |
+| `auth.otp_enter_code` | `otp.please_enter_code` | Wrong namespace + wrong key name |
+| `auth.verify_create` | `otp.verify_create_account` | Wrong namespace + wrong key name |
+| `auth.verifying` | `otp.verifying` | Wrong namespace |
+| `auth.sending` | `otp.sending` | Wrong namespace |
+| `auth.otp_invalid` | `otp.invalid_code` | Wrong namespace + wrong key name |
+| `auth.otp_new_sent` | `otp.new_code_sent` | Wrong namespace + wrong key name |
+| `auth.otp_resend_failed` | -- | Completely missing |
+| `auth.resend_code` | `otp.resend_code` | Wrong namespace |
+| `auth.resend_countdown` | `otp.resend_in` | Wrong namespace + wrong key name |
+| `auth.account_created` | -- | Completely missing |
+| `auth.otp_send_failed` | -- | Completely missing |
+| `auth.otp_sent` | `otp.code_sent` | Wrong namespace + wrong key name |
+| `auth.have_account` | `auth.already_have_account` | Wrong key name |
+| `auth.signup_description` | `auth.join_club_description` | Wrong key name |
 
-Change the bottom padding from a fixed `pb-20` to a value that accounts for the safe-area inset:
+## Fix Approach
 
-```
-// Before
-showBottomNav ? 'pb-20' : ''
+Rather than changing all the component code, add the missing keys directly into the `auth` section of both `en.json` and `pl.json`. This is simpler and avoids touching multiple component files.
 
-// After  
-showBottomNav ? 'pb-24' : ''
-```
+**File: `src/i18n/locales/en.json`** -- Add to the `auth` section:
+- `"check_email": "Check your email"`
+- `"otp_sent_to": "We've sent a verification code to"`
+- `"otp_enter_code": "Please enter the verification code"`
+- `"verify_create": "Verify & Create Account"`
+- `"verifying": "Verifying..."`
+- `"sending": "Sending..."`
+- `"otp_invalid": "Invalid verification code"`
+- `"otp_new_sent": "New verification code sent"`
+- `"otp_resend_failed": "Failed to resend code"`
+- `"resend_code": "Resend code"`
+- `"resend_countdown": "Resend in {{seconds}}s"`
+- `"account_created": "Account created successfully!"`
+- `"otp_send_failed": "Failed to send verification code"`
+- `"otp_sent": "Verification code sent"`
+- `"have_account": "Already have an account?"`
+- `"signup_description": "Join your poker club and start playing"`
 
-Additionally, add an inline style to include the device safe-area inset on top of the Tailwind padding, ensuring the content clears the nav on all devices:
-
-```tsx
-style={showBottomNav ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}
-```
-
-This ensures:
-- Base padding of `6rem` (96px) covers the nav height (64px + 5px + margin)
-- `env(safe-area-inset-bottom)` adds the device-specific home indicator area
-- No changes to BottomNav or any other component
+**File: `src/i18n/locales/pl.json`** -- Add equivalent Polish translations to the `auth` section.
 
 ## Summary
 
-| File | Line | Change |
-|------|------|--------|
-| `AppLayout.tsx` | 55 | Replace `pb-20` class with inline `paddingBottom: calc(6rem + env(safe-area-inset-bottom, 0px))` |
+| File | Change |
+|------|--------|
+| `src/i18n/locales/en.json` | Add 16 missing keys to `auth` section |
+| `src/i18n/locales/pl.json` | Add 16 matching Polish keys to `auth` section |
 
+No component files need to change -- only the translation JSON files.
