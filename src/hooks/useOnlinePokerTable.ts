@@ -240,7 +240,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             blinds: payload.blinds || { small: prev.table.small_blind, big: prev.table.big_blind, ante: prev.table.ante },
             current_actor_id: payload.current_actor_id ?? null,
           };
-          return { ...prev, current_hand: broadcastHand, seats: seats.length > 0 ? seats : prev.seats };
+          // Merge seat DATA without changing seat array membership mid-hand
+          // New seats only arrive via seat_change or refreshState
+          const mergedSeats = prev.seats.map(existingSeat => {
+            const updated = seats.find(s => s.seat === existingSeat.seat);
+            return updated ? { ...existingSeat, ...updated } : existingSeat;
+          });
+          return { ...prev, current_hand: broadcastHand, seats: mergedSeats };
         });
 
         // Fallback: if hand_result never arrives after complete, force cleanup after 6s

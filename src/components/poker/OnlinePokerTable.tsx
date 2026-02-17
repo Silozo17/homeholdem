@@ -26,6 +26,7 @@ import { useHandHistory, HandPlayerSnapshot } from '@/hooks/useHandHistory';
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
 import { callEdge } from '@/lib/poker/callEdge';
 import { Button } from '@/components/ui/button';
+import { PokerErrorBoundary } from './PokerErrorBoundary';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff } from 'lucide-react';
@@ -866,6 +867,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
 
   return (
+    <PokerErrorBoundary onReconnect={handleReconnect} onLeave={onLeave}>
     <div className="fixed inset-0 overflow-hidden z-[60]">
       {/* Portrait block overlay */}
       {!isLandscape && (
@@ -1415,6 +1417,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         />
       )}
     </div>
+    </PokerErrorBoundary>
   );
 }
 
