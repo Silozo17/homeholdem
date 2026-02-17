@@ -1,175 +1,138 @@
 
-# Comprehensive Fix: 4 Critical Poker Game Issues
+# Fix Blind Timer: Doubling Logic + Multiplayer Implementation + Notifications
 
-## Issue 1: Emoji and Achievement Jitter (Jump to Left)
+## Current Problems
 
-**Root Cause**: CSS `transform` property conflict. When an element uses `translateX(-50%)` for centering AND has an animation that sets `transform` (like `translateY`, `scale`), the animation **overwrites** the entire `transform` property, removing the horizontal centering. This causes a visible snap/jump to the left.
+### Bot Game (Practice Mode)
+The blind timer uses a hardcoded `BLIND_LEVELS` array (25/50, 50/100, 75/150, ...) which does NOT match the user's expectation. The correct behavior is: **blinds double from whatever the starting value is**. If you start at 50/100, after the timer elapses they become 100/200, then 200/400, etc. The current code jumps through an unrelated fixed schedule.
 
-**Affected locations**:
-- `AchievementToast.tsx` (line 60): outer div uses `left-1/2 -translate-x-1/2`, inner div uses `animation: 'fade-in 0.3s'` which has `translateY(10px)` -- overwrites the `-translate-x-1/2`
-- `OnlinePokerTable.tsx` (line 828-829): chat bubbles use inline `transform: 'translateX(-50%)'` with `animate-emote-pop` (scale transform) and `animate-float-up` (translateY transform)
-- `tailwind.config.ts` lines 103-111: `fade-in` keyframes include `translateY` which conflicts
-
-**Fix** (3 files):
-
-1. **`tailwind.config.ts`** -- Remove `translateY` from `fade-in` keyframes, use opacity-only:
-```
-"fade-in": {
-  from: { opacity: "0" },
-  to: { opacity: "1" },
-}
-```
-
-2. **`src/index.css`** -- Update `float-up` keyframes to include `translateX(-50%)` so it preserves centering:
-```css
-@keyframes float-up {
-  0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
-  75%  { opacity: 1; transform: translateX(-50%) translateY(-8px); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-}
-```
-
-3. **`src/components/poker/OnlinePokerTable.tsx`** (lines 828-831) -- For emote-pop, wrap in a positioning div and apply animation to inner element:
-```tsx
-// Outer div: positioning only (no animation)
-<div style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: 'translateX(-50%)', zIndex: Z.EFFECTS + 5 }}>
-  {/* Inner div: animation only (no positioning transform) */}
-  <div className={cn('pointer-events-none', isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up')}
-       style={isSingleEmoji ? {} : { transform: undefined }}>
-    ...
-  </div>
-</div>
-```
-For `animate-float-up`, since the keyframes now include `translateX(-50%)`, the outer div's inline `transform` will be overridden correctly. For `animate-emote-pop`, the scale animation goes on the inner div so it doesn't touch the outer positioning.
+### Multiplayer Game
+The blind timer is **completely unimplemented**. The `blind_timer_minutes` value is saved to the database but never used:
+- `poker-start-hand` always uses static `table.small_blind` / `table.big_blind`
+- No columns exist to track blind escalation state
+- No client-side countdown is shown in `OnlinePokerTable.tsx`
 
 ---
 
-## Issue 2: Users Cannot Change Usernames
+## Solution: Doubling Blinds Logic
 
-**Current state**: `Profile.tsx` displays `display_name` as read-only text (line 244). No edit UI exists.
+When the timer elapses during a hand, blinds increase from the **start of the next hand**.
 
-**Fix** (`src/pages/Profile.tsx`):
-- Add an edit icon button next to the display name
-- On tap, replace the name with an input field pre-filled with current name
-- Add Save/Cancel buttons
-- On save, call `supabase.from('profiles').update({ display_name }).eq('id', user.id)`
-- Show a success toast on save
-
-State additions: `editingName` (boolean), `newName` (string), `savingName` (boolean)
+```text
+Example: Starting 50/100, timer = 5 minutes
+  Hand 1 (0:00): 50/100
+  Hand 5 (5:01): 100/200   <-- doubled
+  Hand 9 (10:02): 200/400  <-- doubled again
+  Hand 12 (15:03): 400/800 <-- and so on
+```
 
 ---
 
-## Issue 3: XP System Completely Broken
+## Changes
 
-**Root Cause**: Two problems found:
-1. The `xp_events` table has **zero INSERT policies** -- users cannot insert rows. The `update_player_xp()` trigger function exists but is never triggered because nothing can write to `xp_events`.
-2. `PlayPoker.tsx` saves to `poker_play_results` but **never inserts into `xp_events`**. No code in the entire codebase writes to `xp_events`.
+### 1. Database Migration -- Add blind tracking columns to `poker_tables`
 
-**Fix** (2 changes):
-
-1. **Database migration** -- Add INSERT RLS policy:
 ```sql
-CREATE POLICY "Users can insert own xp_events"
-  ON public.xp_events FOR INSERT
-  WITH CHECK (user_id = auth.uid());
+ALTER TABLE public.poker_tables
+  ADD COLUMN blind_level integer NOT NULL DEFAULT 0,
+  ADD COLUMN original_small_blind integer,
+  ADD COLUMN original_big_blind integer,
+  ADD COLUMN last_blind_increase_at timestamptz NOT NULL DEFAULT now();
+
+-- Backfill originals from current values
+UPDATE public.poker_tables
+SET original_small_blind = small_blind,
+    original_big_blind = big_blind;
 ```
 
-2. **`src/pages/PlayPoker.tsx`** -- After inserting into `poker_play_results`, also insert XP events:
-```typescript
-// Calculate XP
-const xpEvents = [];
-const isWinner = humanPlayer && humanPlayer.chips > 0 &&
-  state.players.filter(p => p.chips > 0).length === 1;
+- `blind_level`: how many times blinds have doubled (0 = original, 1 = 2x, 2 = 4x, ...)
+- `original_small_blind` / `original_big_blind`: the starting blinds (so we can always calculate: current = original * 2^level)
+- `last_blind_increase_at`: timestamp of last increase (used for countdown)
 
-// +25 for game completion
-xpEvents.push({ user_id: user.id, reason: 'game_complete', xp_amount: 25 });
-// +100 for winning
-if (isWinner) xpEvents.push({ user_id: user.id, reason: 'game_win', xp_amount: 100 });
-// +10 per hand won
-if (state.handsWon > 0) xpEvents.push({ user_id: user.id, reason: 'hands_won', xp_amount: state.handsWon * 10 });
+### 2. Edge Function: `poker-start-hand/index.ts` -- Add blind escalation
 
-await supabase.from('xp_events').insert(xpEvents);
+Before posting blinds, check if blinds should increase:
+
+```text
+1. Read table.blind_timer_minutes, table.blind_level, table.last_blind_increase_at
+2. If blind_timer_minutes > 0:
+   a. Calculate elapsed = now - last_blind_increase_at
+   b. While elapsed >= blind_timer_minutes * 60s:
+      - Increment blind_level
+      - Subtract one interval from elapsed
+   c. If blind_level changed:
+      - new_small = original_small_blind * (2 ^ blind_level)
+      - new_big = original_big_blind * (2 ^ blind_level)
+      - Update poker_tables: small_blind, big_blind, blind_level, last_blind_increase_at
+3. Use updated blinds for posting SB/BB
+4. Include blind_timer_minutes, blind_level, last_blind_increase_at in broadcast payload
+5. If blinds increased, broadcast a "blinds_up" event with old and new values
 ```
 
----
+### 3. Bot Game: `src/hooks/usePokerGame.ts` -- Replace BLIND_LEVELS with doubling
 
-## Issue 4: Winner Has No End Game Screen (Stuck at Table)
+In the `DEAL_HAND` case (lines 140-155), replace the `BLIND_LEVELS` lookup with simple doubling:
 
-**Root Cause**: Two separate paths are broken:
-
-### Practice mode (`usePokerGame.ts`):
-- Line 452: `case 'QUIT': return { ...state, phase: 'game_over' }` -- does NOT populate `lastHandWinners`, so the game-over overlay has no winner data.
-- The auto-advance at line 554-558 fires `NEXT_HAND` after 4.5s on `hand_complete`. When `alivePlayers <= 1`, lines 427-435 correctly transition to `game_over` with winners populated. This path **should work** for the winner.
-- However, if the winner clicks the exit button instead of waiting for auto-advance, the `QUIT` path loses all winner data.
-
-### Multiplayer mode (`OnlinePokerTable.tsx`):
-- Lines 336-346: Game over detection ONLY fires when `mySeatInfo.stack <= 0` (the **loser**). **Winners are never shown the game over screen.** The winner stays at the table indefinitely with no overlay, no stats, and no way to see they won.
-
-**Fix**:
-
-1. **`src/hooks/usePokerGame.ts`** (line 452) -- `QUIT` case must populate `lastHandWinners`:
 ```typescript
-case 'QUIT': {
-  const alivePlayers = state.players.filter(p => p.chips > 0);
-  const gameOverWinners = alivePlayers.length > 0
-    ? alivePlayers.map(p => ({
-        playerId: p.id,
-        name: p.name,
-        handName: state.lastHandWinners?.[0]?.handName || 'N/A',
-        chipsWon: p.chips,
-      }))
-    : state.lastHandWinners || [];
-  return { ...state, phase: 'game_over', lastHandWinners: gameOverWinners };
+// Replace current blind escalation logic with:
+if (state.blindTimer > 0 && Date.now() - state.lastBlindIncrease >= state.blindTimer * 60000) {
+  blindLevel = state.blindLevel + 1;
+  currentSmallBlind = state.smallBlind * 2;  // Double current blinds
+  currentBigBlind = state.bigBlind * 2;
+  lastBlindIncrease = Date.now();
 }
 ```
 
-2. **`src/components/poker/OnlinePokerTable.tsx`** (lines 336-346) -- Fix game over detection to also trigger for **winners** (last player standing):
+Also update the `BlindTimerCountdown` in `PokerTablePro.tsx` to show the doubled values instead of looking up `BLIND_LEVELS`:
+
 ```typescript
-useEffect(() => {
-  if (!tableState || !user) return;
-  const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
-  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-
-  // LOSER: my stack is 0 after a hand result
-  if (mySeatInfo && mySeatInfo.stack <= 0 && handWinners.length > 0) {
-    const timer = setTimeout(() => {
-      setGameOver(true);
-      setGameOverWinners(handWinners);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }
-
-  // WINNER: I'm the last player with chips
-  if (mySeatInfo && mySeatInfo.stack > 0 && activePlayers.length === 1
-      && activePlayers[0].player_id === user.id && handWinners.length > 0) {
-    const timer = setTimeout(() => {
-      setGameOver(true);
-      setGameOverWinners(handWinners);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }
-}, [tableState, user, handWinners]);
+// Instead of: const next = BLIND_LEVELS[blindLevel + 1];
+// Use: const next = { small: currentSmall * 2, big: currentBig * 2 };
 ```
 
+Pass `currentSmall` and `currentBig` as props instead of `blindLevel`.
+
+### 4. Client: `src/components/poker/OnlinePokerTable.tsx` -- Add blind timer countdown
+
+Add a countdown display in the header bar (next to the blinds display at line 619):
+- Show time remaining until next blind increase
+- Show upcoming doubled blind values
+- Only visible when `blind_timer_minutes > 0`
+
+### 5. Client: `src/lib/poker/online-types.ts` -- Update types
+
+Add new fields to `OnlineTableInfo`:
+```typescript
+blind_level: number;
+original_small_blind: number;
+original_big_blind: number;
+last_blind_increase_at: string;
+```
+
+### 6. Notifications -- Blinds increased alert
+
+**Bot game**: Show a toast notification when blinds increase at the start of a new hand. In `usePokerGame.ts`, return a flag `blindsIncreased` from `DEAL_HAND`, and in `PokerTablePro.tsx` display a toast.
+
+**Multiplayer**: Broadcast a `blinds_up` event from `poker-start-hand` when blinds escalate. In `OnlinePokerTable.tsx`, listen for this event and show a toast with the new blind values.
+
+Toast format: "Blinds Up! Now 200/400"
+
+### 7. Bot Game Display Enhancement
+
+Make the `BlindTimerCountdown` more visible:
+- Increase font from 9px to 12px
+- Add a pulsing glow effect when under 60 seconds remaining
+- Use gold/amber color to stand out
+
 ---
 
-## Additional Issue Found: "Play Again" Button in Game Over
-
-**In practice mode**: `PokerTablePro.tsx` line 521 passes `onNextHand={onQuit}` for game over. `onQuit` is `resetGame` which dispatches `RESET` returning to idle/lobby. This should work correctly now.
-
-**In multiplayer mode**: `OnlinePokerTable.tsx` line 772 passes `onNextHand={() => {}}` (no-op) for game over. The "Play Again" button does nothing. Fix: make it call `leaveTable().then(onLeave)` same as the quit button, so the user returns to the lobby.
-
----
-
-## Summary of All File Changes
+## File Summary
 
 | File | Change |
 |------|--------|
-| `tailwind.config.ts` | Remove `translateY` from `fade-in` keyframes |
-| `src/index.css` | Update `float-up` keyframes to preserve `translateX(-50%)` |
-| `src/components/poker/OnlinePokerTable.tsx` | Fix game over for winners, fix emoji jitter wrapping, fix "Play Again" button |
-| `src/components/poker/AchievementToast.tsx` | No further changes needed (fade-in fix in tailwind handles it) |
-| `src/hooks/usePokerGame.ts` | Fix QUIT action to populate `lastHandWinners` |
-| `src/pages/PlayPoker.tsx` | Add XP event insertion after game results save |
-| `src/pages/Profile.tsx` | Add inline username editing with save to database |
-| **Database migration** | Add INSERT RLS policy on `xp_events` for `auth.uid()` |
+| **Database migration** | Add `blind_level`, `original_small_blind`, `original_big_blind`, `last_blind_increase_at` to `poker_tables` |
+| `supabase/functions/poker-start-hand/index.ts` | Check timer, double blinds, update table, broadcast `blinds_up` event |
+| `src/hooks/usePokerGame.ts` | Replace `BLIND_LEVELS` lookup with doubling logic in `DEAL_HAND` |
+| `src/components/poker/PokerTablePro.tsx` | Update `BlindTimerCountdown` to show doubled values, bigger display, show toast on blind increase |
+| `src/components/poker/OnlinePokerTable.tsx` | Add blind timer countdown, listen for `blinds_up` broadcast, show toast |
+| `src/lib/poker/online-types.ts` | Add blind tracking fields to `OnlineTableInfo` |
