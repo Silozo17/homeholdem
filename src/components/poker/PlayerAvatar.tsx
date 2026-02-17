@@ -1,6 +1,4 @@
 import { cn } from '@/lib/utils';
-import { LevelBadge } from '@/components/common/LevelBadge';
-import { CountryFlag } from '@/components/poker/CountryFlag';
 
 interface PlayerAvatarProps {
   name: string;
@@ -9,8 +7,6 @@ interface PlayerAvatarProps {
   isCurrentPlayer: boolean;
   avatarUrl?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-  level?: number;
-  countryCode?: string | null;
 }
 
 const sizeMap = {
@@ -18,7 +14,7 @@ const sizeMap = {
   sm: 'w-9 h-9 text-xs',
   md: 'w-11 h-11 text-sm',
   lg: 'w-14 h-14 text-base',
-  xl: 'w-20 h-20 text-lg',
+  xl: 'w-[88px] h-[88px] text-lg',
   '2xl': 'w-24 h-24 text-xl',
 };
 
@@ -34,7 +30,7 @@ const AVATAR_COLORS = [
   'hsl(220 70% 55%)',
 ];
 
-export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md', level, countryCode }: PlayerAvatarProps) {
+export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, size = 'md' }: PlayerAvatarProps) {
   const initial = name.charAt(0).toUpperCase();
   const color = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const isOut = status === 'folded' || status === 'eliminated';
@@ -87,12 +83,6 @@ export function PlayerAvatar({ name, index, status, isCurrentPlayer, avatarUrl, 
           initial
         )}
       </div>
-      {/* Level badge (bottom-left) */}
-      {level != null && level > 0 && (
-        <LevelBadge level={level} size={size} />
-      )}
-      {/* Country flag (bottom-right) */}
-      <CountryFlag countryCode={countryCode} size={size} />
     </div>
   );
 }

@@ -1,10 +1,11 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
 import { DealerButton } from './DealerButton';
-import { TurnTimer } from './TurnTimer';
 import { PokerChip } from './PokerChip';
+import { LevelBadge } from '@/components/common/LevelBadge';
+import { CountryFlag } from '@/components/poker/CountryFlag';
 import { CardsPlacement } from '@/lib/poker/ui/seatLayout';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,43 @@ export const PlayerSeat = memo(function PlayerSeat({
   const avatarSize = compact ? 'lg' : 'xl';
   const humanCardSize = compact ? 'lg' : 'xl';
 
+  // --- Turn timer logic (nameplate-integrated) ---
+  const TIMER_DURATION = 30;
+  const [timerElapsed, setTimerElapsed] = useState(0);
+  const lowTimeFired = useRef(false);
+  const isTimerActive = isCurrentPlayer && !isOut;
+
+  useEffect(() => {
+    if (!isTimerActive) {
+      setTimerElapsed(0);
+      lowTimeFired.current = false;
+      return;
+    }
+    setTimerElapsed(0);
+    lowTimeFired.current = false;
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const secs = (Date.now() - start) / 1000;
+      if (secs >= TIMER_DURATION) {
+        setTimerElapsed(TIMER_DURATION);
+        clearInterval(interval);
+        onTimeout?.();
+      } else {
+        setTimerElapsed(secs);
+        if (!lowTimeFired.current && (TIMER_DURATION - secs) <= 5) {
+          lowTimeFired.current = true;
+          onLowTime?.();
+        }
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [isTimerActive, onTimeout, onLowTime]);
+
+  const timerProgress = isTimerActive ? Math.min(timerElapsed / TIMER_DURATION, 1) : 0;
+  const timerRemaining = 1 - timerProgress;
+  const timerHue = timerRemaining > 0.5 ? 43 : timerRemaining > 0.3 ? 25 : 0;
+  const timerLightness = timerRemaining > 0.3 ? 49 : 45;
+
   // Sequential card reveal: cards stay face-down until their deal delay elapses
   const [revealedIndices, setRevealedIndices] = useState<Set<number>>(new Set());
   const cardKey = player.holeCards.map(c => `${c.suit}-${c.rank}`).join(',');
@@ -49,12 +87,10 @@ export const PlayerSeat = memo(function PlayerSeat({
       setRevealedIndices(new Set());
       return;
     }
-    // Reset on new cards
     setRevealedIndices(new Set());
     const timers: ReturnType<typeof setTimeout>[] = [];
     player.holeCards.forEach((_, i) => {
       const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.1;
-      // Reveal after deal animation completes (delay + flight duration ~0.7s)
       const revealMs = (dealDelay + 0.7) * 1000;
       timers.push(setTimeout(() => {
         setRevealedIndices(prev => new Set(prev).add(i));
@@ -63,11 +99,10 @@ export const PlayerSeat = memo(function PlayerSeat({
     return () => timers.forEach(clearTimeout);
   }, [cardKey, isHuman, totalActivePlayers, seatDealOrder]);
 
-  // Only show cards for: human player always, opponents only at showdown
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
-  // Shared card fan layout — cards ON TOP of avatar, fanned with ~10deg tilt
+  // Card fan — 14deg tilt, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
       style={{ zIndex: 3, top: '-30%' }}>
@@ -77,7 +112,7 @@ export const PlayerSeat = memo(function PlayerSeat({
         const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
         return (
           <div key={i} style={{
-            transform: `rotate(${i === 0 ? -10 : 10}deg)`,
+            transform: `rotate(${i === 0 ? -14 : 14}deg)`,
             marginLeft: i > 0 ? '-14px' : '0',
           }}>
             <CardDisplay
@@ -93,12 +128,10 @@ export const PlayerSeat = memo(function PlayerSeat({
     </div>
   );
 
-  // Opponent showdown cards (on top of avatar)
   const opponentShowdownCards = !isHuman && shouldRenderCards && player.holeCards.length > 0
     ? cardFan(player.holeCards, humanCardSize, false)
     : null;
 
-  // Human player cards (on top of avatar) — sequential reveal
   const humanCards = isHuman && player.holeCards.length > 0
     ? cardFan(player.holeCards, humanCardSize, true)
     : null;
@@ -109,7 +142,7 @@ export const PlayerSeat = memo(function PlayerSeat({
       isOut && 'opacity-50',
       isCurrentPlayer && !isOut && 'animate-spotlight-pulse',
     )}>
-      {/* Avatar with ring + timer + dealer */}
+      {/* Avatar with ring + dealer */}
       <div className="relative">
         {/* Active player spotlight glow */}
         {isCurrentPlayer && !isOut && (
@@ -128,8 +161,6 @@ export const PlayerSeat = memo(function PlayerSeat({
           isCurrentPlayer={isCurrentPlayer && !isOut}
           avatarUrl={avatarUrl}
           size={avatarSize}
-          level={level}
-          countryCode={countryCode}
         />
 
         {/* Dealer button */}
@@ -137,16 +168,18 @@ export const PlayerSeat = memo(function PlayerSeat({
           <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />
         )}
 
-        {/* Turn timer wraps the avatar */}
-        {isCurrentPlayer && !isOut && (
-          <TurnTimer active={true} size={compact ? 56 : 80} strokeWidth={4} onTimeout={onTimeout} onLowTime={onLowTime} />
-        )}
-
         {/* Opponent showdown cards overlaying avatar */}
         {opponentShowdownCards}
 
         {/* Human player cards fanned behind avatar */}
         {humanCards}
+
+        {/* Level badge — z-[5], bottom-left of avatar, ABOVE nameplate */}
+        {level != null && level > 0 && (
+          <LevelBadge level={level} size={avatarSize} className="!z-[5]" />
+        )}
+        {/* Country flag — z-[5], bottom-right of avatar, ABOVE nameplate */}
+        <CountryFlag countryCode={countryCode} size={avatarSize} className="!z-[5]" />
       </div>
 
       {/* Nameplate pill — overlaps avatar bottom, sits above cards */}
@@ -157,20 +190,35 @@ export const PlayerSeat = memo(function PlayerSeat({
         zIndex: 4,
         background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.9), hsl(0 0% 5% / 0.85))',
         backdropFilter: 'blur(8px)',
-        border: '1px solid hsl(0 0% 100% / 0.1)',
+        border: isTimerActive
+          ? 'none'
+          : '1px solid hsl(0 0% 100% / 0.1)',
+        // Conic-gradient timer border via box-shadow trick
+        ...(isTimerActive ? {
+          padding: '1px',
+          background: `conic-gradient(from 0deg, hsl(${timerHue} 74% ${timerLightness}%) ${timerRemaining * 100}%, transparent ${timerRemaining * 100}%) border-box`,
+        } : {}),
       }}>
-        <p className={cn(
-          compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[80px]',
-          'font-bold truncate leading-tight text-white',
-        )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-          {player.name}
-        </p>
-        <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-white/80 font-semibold leading-none')}>
-          {player.chips.toLocaleString()}
-        </p>
+        {/* Inner pill content (dark bg) */}
+        <div className={cn(
+          'flex flex-col items-center w-full rounded-full',
+          isTimerActive ? 'px-3 py-0.5' : '',
+        )} style={isTimerActive ? {
+          background: 'linear-gradient(180deg, hsl(0 0% 8% / 0.95), hsl(0 0% 5% / 0.9))',
+        } : {}}>
+          <p className={cn(
+            compact ? 'text-[9px] max-w-[56px]' : 'text-[11px] max-w-[80px]',
+            'font-bold truncate leading-tight text-white',
+          )} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+            {player.name}
+          </p>
+          <p className={cn(compact ? 'text-[8px]' : 'text-[10px]', 'text-white/80 font-semibold leading-none')}>
+            {player.chips.toLocaleString()}
+          </p>
+        </div>
       </div>
 
-      {/* Action badge (floating near nameplate) — hero gets it to the right */}
+      {/* Action badge */}
       {player.lastAction && (
         <span className={cn(
           'absolute text-[8px] px-1.5 py-0.5 rounded-full font-bold animate-fade-in leading-tight whitespace-nowrap',
