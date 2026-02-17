@@ -125,6 +125,10 @@ export default {
           "60%": { transform: "scale(1.3)", opacity: "1" },
           "100%": { transform: "scale(1)", opacity: "1" },
         },
+        "shimmer-sweep": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
