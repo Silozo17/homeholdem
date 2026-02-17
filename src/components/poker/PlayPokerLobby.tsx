@@ -108,8 +108,6 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
                       isCurrentPlayer={false}
                       size="sm"
                       avatarUrl={persona.avatarUrl}
-                      level={persona.level}
-                      countryCode={persona.countryCode}
                     />
                   </div>
                 );
