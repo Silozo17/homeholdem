@@ -51,10 +51,12 @@ export function AppLayout({ children }: AppLayoutProps) {
       {showMiniBar && <TournamentMiniBar />}
       
       {/* Main content with padding for mini bar and bottom nav */}
-      <div className={cn(
-        showBottomNav ? 'pb-20' : '',
-        showMiniBar ? 'pt-16' : ''
-      )}>
+      <div
+        className={cn(
+          showMiniBar ? 'pt-16' : ''
+        )}
+        style={showBottomNav ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+      >
         {children}
       </div>
       
