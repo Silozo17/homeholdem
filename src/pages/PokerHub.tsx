@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Users, ArrowLeft, Crown, Coins } from 'lucide-react';
+import { Bot, Users, ArrowLeft, Crown, Coins, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
@@ -44,6 +44,16 @@ export default function PokerHub() {
 
         {/* Game mode cards */}
         <div className="w-full max-w-md space-y-2.5">
+          <GameModeCard
+            icon={BookOpen}
+            title="Learn to Play"
+            description="Interactive lessons teaching Texas Hold'em"
+            hint="10 lessons • Guided hands"
+            accentClass="bg-sky-500/15"
+            ctaLabel="Start Learning"
+            onClick={() => navigate('/learn-poker')}
+            compact
+          />
           <GameModeCard
             icon={Bot}
             title="Play with Bots"
