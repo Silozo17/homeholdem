@@ -1153,7 +1153,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           )}
 
           {/* 5-slot community card layout */}
-          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: isMobileLandscape ? '44%' : 'calc(44% + 12px)', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
+          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '50%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
             {[0, 1, 2, 3, 4].map(slotIdx => {
               const card = visibleCommunityCards[slotIdx];
               // Determine if this card was just dealt (new in current phase)
