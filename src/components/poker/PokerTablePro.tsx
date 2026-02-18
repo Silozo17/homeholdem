@@ -359,7 +359,7 @@ export function PokerTablePro({
           {/* Community cards - 5-slot layout */}
           <div
             className="absolute left-1/2 flex gap-1.5 items-center"
-            style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
+            style={{ top: '50%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
             {[0, 1, 2, 3, 4].map(slotIdx => {
               const card = state.communityCards[slotIdx];
