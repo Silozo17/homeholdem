@@ -37,6 +37,7 @@ export default function LearnPoker() {
     state, startLesson, playerAction, nextHand, quitGame,
     isHumanTurn, humanPlayer, amountToCall, canCheck, maxBet,
     isPaused, currentStep, currentIntroStep, dismissCoach, allowedAction,
+    stepIndex, totalSteps, stepPhase,
   } = useTutorialGame(activeLesson);
 
   // Action guard: only allow the required action when coach step demands it
@@ -50,9 +51,9 @@ export default function LearnPoker() {
     playerAction(action);
   }, [allowedAction, playerAction]);
 
-  // Detect hand completion → show overlay
+  // Detect step-driven completion → show LessonCompleteOverlay
   useEffect(() => {
-    if (isPlaying && !showComplete && (state.phase === 'hand_complete' || state.phase === 'game_over')) {
+    if (isPlaying && !showComplete && stepPhase === 'done') {
       const timer = setTimeout(() => {
         setShowComplete(true);
         if (!completedLessons.includes(activeLessonIdx)) {
@@ -60,10 +61,17 @@ export default function LearnPoker() {
           setCompletedLessons(next);
           saveProgress(next);
         }
-      }, 2000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [state.phase, isPlaying, showComplete, activeLessonIdx, completedLessons]);
+  }, [stepPhase, isPlaying, showComplete, activeLessonIdx, completedLessons]);
+
+  // Also detect hand_complete / game_over from reducer (fallback)
+  useEffect(() => {
+    if (isPlaying && !showComplete && stepPhase === 'done' && (state.phase === 'hand_complete' || state.phase === 'game_over')) {
+      // Already handled above
+    }
+  }, [state.phase, isPlaying, showComplete, stepPhase]);
 
   const startLessonHandler = useCallback((idx: number) => {
     setActiveLessonIdx(idx);
@@ -77,12 +85,10 @@ export default function LearnPoker() {
 
   const handleNextLesson = useCallback(() => {
     if (activeLessonIdx >= TUTORIAL_LESSONS.length - 1) {
-      // Last lesson — back to select
       quitGame();
       setIsPlaying(false);
       setShowComplete(false);
     } else {
-      // Start next lesson seamlessly
       startLessonHandler(activeLessonIdx + 1);
     }
   }, [activeLessonIdx, startLessonHandler, quitGame]);
@@ -109,6 +115,9 @@ export default function LearnPoker() {
   // --- PLAYING ---
   if (isPlaying) {
     const isLastLesson = activeLessonIdx >= TUTORIAL_LESSONS.length - 1;
+    const showCoach = isPaused && !currentIntroStep && currentStep;
+    const showIntro = isPaused && currentIntroStep;
+
     return (
       <>
         <div className="fixed inset-0 z-10 bg-background">
@@ -122,20 +131,22 @@ export default function LearnPoker() {
             onNextHand={nextHand}
             onQuit={handleQuit}
             tutorialAllowedAction={allowedAction}
-            forceShowControls={!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions'}
+            forceShowControls={!!currentStep?.highlight && currentStep.highlight === 'actions'}
           />
         </div>
-        {isPaused && currentIntroStep && (
+        {showIntro && (
           <CoachOverlay
             introStep={currentIntroStep}
             onDismiss={dismissCoach}
           />
         )}
-        {isPaused && currentStep && !currentIntroStep && (
+        {showCoach && (
           <CoachOverlay
             step={currentStep}
             onDismiss={dismissCoach}
-            requiredAction={currentStep.requiredAction}
+            requiredAction={currentStep?.requiredAction}
+            currentStepNum={stepIndex + 1}
+            totalSteps={totalSteps}
           />
         )}
         {showComplete && activeLesson && (
