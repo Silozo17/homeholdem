@@ -1,30 +1,39 @@
 
 
-# Remove Free Tournaments Card from Poker Hub
+# Fix: Auto-Publish Tournaments on Creation
 
-## What Changes
+## Problem
+Tournaments are created with `status: "draft"` but there is no "Publish" button in the UI, so they never become visible. The listing page only shows tournaments with status `scheduled`, `running`, or `complete`.
 
-Only one file needs editing: `src/pages/PokerHub.tsx`
+## Solution
+The simplest fix: change the `paid-tournament-create` edge function to set `status: "scheduled"` instead of `"draft"`, so tournaments appear immediately after creation. The draft/publish workflow adds unnecessary complexity for a single-admin app.
 
-Remove the "Tournaments" `GameModeCard` (the one with the Trophy icon, purple accent, PRO badge, and route `/poker-tournament`). The "Paid Tournaments" card stays as the single tournaments option.
+Also update the existing draft tournament in the database to `scheduled` so it shows up right away.
 
-The free tournament routes (`/poker-tournament`, `/club/:clubId/tournament`) and their page (`PokerTournament.tsx`) will remain in the codebase but simply won't be linked from the hub. This avoids breaking any existing deep links or club-level tournament references.
+## Technical Details
 
-## Result
+### 1. Update edge function (`supabase/functions/paid-tournament-create/index.ts`)
+- Change `status: "draft"` to `status: "scheduled"` in the insert statement (line ~50)
 
-The Poker Hub will show 3 cards:
-1. Play with Bots
-2. Online Multiplayer (PRO)
-3. Paid Tournaments
+### 2. Fix existing data (SQL migration)
+- `UPDATE paid_tournaments SET status = 'scheduled' WHERE status = 'draft';`
+
+### 3. Update admin UI text (`src/components/poker/PaidTournamentAdmin.tsx`)
+- Change button text from "Create Tournament (Draft)" to "Create Tournament"
+- Remove the "Publish it to open registration" hint text
+
+### 4. Remove publish action references
+- The `paid-tournament-manage` edge function still has the `publish` action -- keep it for backward compatibility but it is no longer needed in the flow.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/PokerHub.tsx` | Remove the "Tournaments" GameModeCard block (lines ~60-75 approximately) |
+| `supabase/functions/paid-tournament-create/index.ts` | `status: "draft"` -> `status: "scheduled"` |
+| `supabase/migrations/xxx.sql` | Update existing draft tournaments to scheduled |
+| `src/components/poker/PaidTournamentAdmin.tsx` | Update button label and remove draft hint |
 
 ## NOT Changed
 - Bottom navigation
-- Routes in App.tsx (kept for backward compatibility)
-- Paid Tournaments page or components
 - Styles, layout, spacing
+- Routes or other components
