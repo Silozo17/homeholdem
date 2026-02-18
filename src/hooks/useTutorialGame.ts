@@ -374,6 +374,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   const [introStepIdx, setIntroStepIdx] = useState<number>(-1);
   const [introComplete, setIntroComplete] = useState(false);
   const [postDismissDelay, setPostDismissDelay] = useState(false);
+  const [pendingRequiredAction, setPendingRequiredAction] = useState<PlayerAction | null>(null);
   const shownStepsRef = useRef<Set<string>>(new Set());
   const botActionCountRef = useRef<Record<string, number>>({});
 
@@ -477,6 +478,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     setCoachStep(-1);
     setIsPaused(false);
     setPostDismissDelay(false);
+    setPendingRequiredAction(null);
     setIntroStepIdx(-1);
     setIntroComplete(!l.introSteps || l.introSteps.length === 0);
     dispatch({ type: 'RESET' });
@@ -501,16 +503,24 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
       setTimeout(() => setPostDismissDelay(false), 1200);
       return;
     }
-    // Normal coach step dismiss — add delay before bots act
+    // Normal coach step dismiss — persist requiredAction, then add delay before bots act
+    const step = lesson?.steps[coachStep];
+    if (step?.requiredAction) {
+      setPendingRequiredAction(step.requiredAction);
+    }
     setIsPaused(false);
     setCoachStep(-1);
     setPostDismissDelay(true);
     setTimeout(() => setPostDismissDelay(false), 1200);
-  }, [introStepIdx, lesson]);
+  }, [introStepIdx, lesson, coachStep]);
 
   const playerAction = useCallback((action: GameAction) => {
+    // Clear pending required action when the user performs the correct action
+    if (pendingRequiredAction && action.type === pendingRequiredAction) {
+      setPendingRequiredAction(null);
+    }
     dispatch({ type: 'PLAYER_ACTION', action });
-  }, []);
+  }, [pendingRequiredAction]);
 
   const nextHand = useCallback(() => {
     dispatch({ type: 'NEXT_HAND' });
@@ -537,8 +547,8 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   const currentStep = coachStep >= 0 && lesson ? lesson.steps[coachStep] : null;
   const currentIntroStep = introStepIdx >= 0 && lesson?.introSteps ? lesson.introSteps[introStepIdx] : null;
 
-  // Derive allowed action from the current coach step
-  const allowedAction: PlayerAction | null = currentStep?.requiredAction || null;
+  // Derive allowed action: pendingRequiredAction persists after coach dismiss
+  const allowedAction: PlayerAction | null = pendingRequiredAction || currentStep?.requiredAction || null;
 
   return {
     state,
