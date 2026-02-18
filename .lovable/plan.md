@@ -1,43 +1,28 @@
 
 
-# Add Home Hold'em Logo to Center of Poker Table
+# Update Logo Component Across the App
 
-Place the uploaded HH logo image at the center of the table felt, at 75% opacity, layered below the community cards so cards appear on top when dealt.
+Redesign the `Logo` component to show the HH logo image on the left with the "Home Hold'em" text and "Club" subtitle on the right, removing the heart and spade card suit icons.
 
-## Steps
+## Changes
 
-1. **Copy the uploaded image** into the project at `src/assets/poker/hh-logo.webp`.
+### 1. Copy the logo image
+Copy the uploaded logo to `src/assets/poker/hh-logo.webp` (already exists from the table logo -- reuse the same file).
 
-2. **Add a LOGO z-index** to `src/components/poker/z.ts` with value `3` (between TRIM_GLOW at 2 and CARDS at 5), so the logo sits above the table but below cards.
+### 2. Update `src/components/layout/Logo.tsx`
+- Remove the `CardSuit` imports and the heart/spade icons
+- Import the `hh-logo.webp` image
+- Restructure layout: horizontal flex with logo image on left, text block on right
+- Logo image sizes scale with the `size` prop (sm: 24px, md: 32px, lg: 48px)
+- "Home Hold'em" title and "Club" subtitle stack vertically on the right side, left-aligned
 
-3. **Add the logo element** in `src/components/poker/OnlinePokerTable.tsx`, right after the `<TableFelt />` line (~line 1119). It will be an absolutely positioned `<img>` centered on the table at 75% opacity using `zIndex: Z.LOGO`.
-
-## Technical Details
-
-**File: `src/components/poker/z.ts`**
-- Add `LOGO: 3` entry between TRIM_GLOW and CARDS.
-
-**File: `src/components/poker/OnlinePokerTable.tsx`**
-- Import the logo: `import hhLogo from '@/assets/poker/hh-logo.webp';`
-- After `<TableFelt />`, add:
-```tsx
-<img
-  src={hhLogo}
-  alt=""
-  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-auto pointer-events-none select-none"
-  style={{ zIndex: Z.LOGO, opacity: 0.75 }}
-  draggable={false}
-/>
-```
-
-## Files Changed
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/assets/poker/hh-logo.webp` | New file (copied from upload) |
-| `src/components/poker/z.ts` | Add `LOGO: 3` |
-| `src/components/poker/OnlinePokerTable.tsx` | Add centered logo image below cards |
+| `src/components/layout/Logo.tsx` | Replace card suits with logo image, horizontal layout |
 
-## NOT Changed
-- Mobile layout, seat positions, bottom navigation, dealer position, card positions
+### NOT Changed
+- No page files changed (they all import `Logo` and will pick up the new design automatically)
+- No seat positions, bottom navigation, spacing, or other layout changes
 
