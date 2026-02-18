@@ -78,7 +78,7 @@ export function BettingControls({
   // ── Landscape: vertical right-thumb panel ──
   if (landscape) {
     return (
-      <div className="flex flex-col gap-1.5 animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '180px' }}>
+      <div className="flex flex-col gap-[9px] animate-fade-in" style={{ width: panelWidth ? `${panelWidth}px` : '180px' }}>
         {showRaiseSlider && canRaise && (
           <div className="flex flex-col gap-1.5 px-3 py-3 rounded-xl"
             style={{
@@ -122,7 +122,7 @@ export function BettingControls({
         )}
         {showRaiseSlider && canRaise && (
           <button
-            className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
+            className="h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
             style={btnStyle(
               'linear-gradient(180deg, hsl(0 0% 30%), hsl(0 0% 22%))',
               'hsl(0 0% 35%)',
@@ -135,7 +135,7 @@ export function BettingControls({
         )}
         <button
           className={cn(
-            `h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all`,
+            `h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all`,
             showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92]',
             !isAllowed('fold') && blockedStyle,
             isAllowed('fold') && glowStyle,
@@ -151,7 +151,7 @@ export function BettingControls({
         </button>
         <button
           className={cn(
-            "h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
+            "h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
             !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
             isAllowed(canCheck ? 'check' : 'call') && glowStyle,
           )}
@@ -174,7 +174,7 @@ export function BettingControls({
         {canRaise && (
           <button
             className={cn(
-              "h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
+              "h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
               !isAllowed('raise') && blockedStyle,
               isAllowed('raise') && glowStyle,
             )}
@@ -254,10 +254,10 @@ export function BettingControls({
           </button>
         </div>
       )}
-      <div className="flex gap-2 w-full">
+      <div className="flex gap-[11px] w-full">
         <button
           className={cn(
-            'flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1',
+            'flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1',
             showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92] active:shadow-none',
             !isAllowed('fold') && blockedStyle,
             isAllowed('fold') && glowStyle,
@@ -273,7 +273,7 @@ export function BettingControls({
         </button>
         <button
           className={cn(
-            "flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
+            "flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
             !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
             isAllowed(canCheck ? 'check' : 'call') && glowStyle,
           )}
@@ -296,7 +296,7 @@ export function BettingControls({
         {canRaise && (
           <button
             className={cn(
-              "flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
+              "flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
               !isAllowed('raise') && blockedStyle,
               isAllowed('raise') && glowStyle,
             )}
