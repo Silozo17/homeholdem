@@ -1,80 +1,78 @@
 
+# Fix: Game Over Screen Missing When Last Opponent Leaves
 
-# Fix: Cards Re-Reveal When Players Join/Leave
+## Problem
 
-## Root Cause
+When the last opponent leaves the table (instead of busting out), the player hears the "Congratulations" voice but sees no confetti, no game over stats screen, and no XP overlay. They're stuck on the table with no way out except manually quitting.
 
-In `PlayerSeat.tsx` (line 86-102), the card reveal animation effect depends on `totalActivePlayers` and `seatDealOrder`:
+**Root cause:** The game over detection in `OnlinePokerTable.tsx` line 528 requires `handWinners.length > 0`:
 
 ```typescript
-useEffect(() => {
-  // ... resets revealedIndices to empty Set, then re-schedules reveal timers
-  setRevealedIndices(new Set());
-  // ...
-}, [cardKey, isHuman, totalActivePlayers, seatDealOrder, disableDealAnim]);
+if (!mySeatInfo || handWinners.length === 0) return; // <-- blocks game over
 ```
 
-When a player joins or leaves:
-- `totalActivePlayers` (passed as `activeSeats.length`) changes
-- `seatDealOrder` (derived from `clockwiseOrder`) shifts
-
-This triggers the effect, which wipes `revealedIndices` back to empty and re-runs the timed reveal animation -- making all players see their cards flip face-down and re-reveal.
+When opponents leave mid-hand or between hands, there is no `hand_result` broadcast, so `handWinners` stays empty and the game over screen never triggers.
 
 ## Fix
 
-**File:** `src/components/poker/PlayerSeat.tsx`
+**File:** `src/components/poker/OnlinePokerTable.tsx`
 
-Remove `totalActivePlayers` and `seatDealOrder` from the effect dependency array. These values only matter for calculating the initial deal delay timing -- they should NOT cause a re-reveal once cards are already shown.
+### Change 1: Add a separate "last standing" detection that doesn't depend on handWinners
 
-To still use the correct timing values when the effect first runs (on `cardKey` change), capture them via refs so the effect reads the latest values without depending on them.
+Add a new `useEffect` that watches `tableState.seats` independently. When only 1 player with chips remains (the hero) and there is no active hand in progress, trigger the game over screen directly -- without needing `handWinners`.
 
-### Changes
-
-1. Add two refs to hold the latest values:
 ```typescript
-const totalActiveRef = useRef(totalActivePlayers);
-totalActiveRef.current = totalActivePlayers;
-const seatDealOrderRef = useRef(seatDealOrder);
-seatDealOrderRef.current = seatDealOrder;
-```
-
-2. Update the effect to read from refs and remove the two props from the dependency array:
-```typescript
+// Game over: last player standing (opponent left, no hand result)
 useEffect(() => {
-  if (!isHuman || player.holeCards.length === 0) {
-    setRevealedIndices(new Set());
-    return;
-  }
-  if (disableDealAnim) {
-    setRevealedIndices(new Set(player.holeCards.map((_, i) => i)));
-    return;
-  }
-  setRevealedIndices(new Set());
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  player.holeCards.forEach((_, i) => {
-    const dealDelay = (i * totalActiveRef.current + seatDealOrderRef.current) * 0.15 + 0.05;
-    const revealMs = (dealDelay + 0.45) * 1000;
-    timers.push(setTimeout(() => {
-      setRevealedIndices(prev => new Set(prev).add(i));
-    }, revealMs));
-  });
-  return () => timers.forEach(clearTimeout);
-}, [cardKey, isHuman, disableDealAnim]);
+  if (gameOver || !tableState || !user) return;
+  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+  if (!mySeatInfo || mySeatInfo.stack <= 0) return;
+
+  const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+  if (activePlayers.length !== 1 || activePlayers[0].player_id !== user.id) return;
+
+  // Don't trigger if handWinners already handled it (avoids double-fire)
+  if (handWinners.length > 0) return;
+
+  // Only trigger if no hand is in progress (between hands or hand just completed)
+  const handPhase = tableState.current_hand?.phase;
+  if (handPhase && handPhase !== 'complete') return;
+
+  announceGameOver('You', true);
+  const timer = setTimeout(() => {
+    setGameOver(true);
+    // Create synthetic winner entry for the game over screen
+    setGameOverWinners([{
+      player_id: user.id,
+      display_name: 'You',
+      amount: mySeatInfo.stack,
+      hand_name: 'Last Standing',
+    }]);
+  }, 4000);
+  return () => clearTimeout(timer);
+}, [tableState?.seats, user, gameOver, handWinners]);
 ```
 
-The dependency array becomes `[cardKey, isHuman, disableDealAnim]` -- only values that genuinely indicate "new cards" or "new player identity."
+### Change 2: Show confetti on gameOver too, not just handWinners
+
+Update the confetti rendering condition (line 1169) to also trigger when `gameOver` is true and the player won:
+
+```typescript
+{((handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id)) || 
+  (gameOver && gameOverWinners.some(w => w.player_id === user?.id))) && (
+```
 
 ## Summary
 
-| File | Change |
-|------|--------|
-| `src/components/poker/PlayerSeat.tsx` | Use refs for `totalActivePlayers` and `seatDealOrder`; remove them from reveal effect deps |
+| File | Change | Lines |
+|------|--------|-------|
+| `src/components/poker/OnlinePokerTable.tsx` | Add separate last-standing detection effect (no handWinners dependency) | After line 552 |
+| `src/components/poker/OnlinePokerTable.tsx` | Update confetti condition to include gameOver winners | Line 1169 |
 
 ## What Does NOT Change
 
 - No layout, style, navigation, spacing, or BottomNav changes
 - No database or edge function changes
 - No file renames or refactoring
-- The deal animation timing still uses the correct values (via refs)
-- Only the re-trigger condition changes: cards will only re-animate when `cardKey` changes (i.e., new cards are dealt)
-
+- The existing handWinners-based game over detection stays intact for bust-out scenarios
+- XP save and overlay logic already triggers from `gameOver` state, so no changes needed there
