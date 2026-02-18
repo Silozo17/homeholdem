@@ -554,6 +554,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Game over: last player standing when opponent LEFT (no hand result)
   useEffect(() => {
     if (gameOver || !tableState || !user) return;
+    // Don't trigger on a fresh table where no hands have been played yet
+    if (handsPlayedRef.current === 0) return;
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     if (!mySeatInfo || mySeatInfo.stack <= 0) return;
 
