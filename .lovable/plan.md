@@ -1,53 +1,72 @@
 
 
-# Speed Up Card Dealing Animation
+# Poker Table Improvements
 
-The delay has two parts: a network pre-fetch delay and a slow animation stagger. Here is what to change.
+Four changes to the online poker table experience.
 
-## Root Causes
+## 1. Leave Seat (Spectate) vs Leave Table
 
-1. **200ms artificial delay** before fetching hole cards from the server (line 462 of `useOnlinePokerTable.ts`). This was added so the animation has time to start before cards arrive, but it adds unnecessary latency.
+Currently there is only one "leave" action that removes the player from the table entirely. We need two separate actions:
 
-2. **Slow stagger multiplier (0.30s per card)** in `PlayerSeat.tsx` line 105. With 6 players, each "round" of dealing takes 6 x 0.30 = 1.8s, meaning your 2nd card arrives 1.8s after your 1st.
+- **Leave Seat**: Player gives up their seat but stays at the table as a spectator. They can rejoin an empty seat later.
+- **Leave Table**: Player exits the table completely and navigates away.
 
-3. **0.45s flip animation** added on top of the stagger (line 106).
+### Implementation
+- **`src/hooks/useOnlinePokerTable.ts`**: Add a `leaveSeat()` function that calls the existing `poker-leave-table` edge function but does NOT navigate away. After leaving, `mySeatNumber` becomes `null` and the player becomes a spectator. The existing `leaveTable()` calls `leaveSeat()` internally then triggers navigation.
+- **`src/components/poker/OnlinePokerTable.tsx`**:
+  - Add state `showLeaveSeatConfirm` for the seat-exit confirmation dialog.
+  - Replace the single back button (ArrowLeft) with two buttons:
+    - A `DoorOpen` (lucide) icon for "Leave Table" (navigates away).
+    - A `UserMinus` (lucide) icon for "Leave Seat" (become spectator).
+  - Both buttons show a confirmation dialog before executing.
+  - When spectating (no seat), the "Leave Seat" button is hidden or disabled, and only the "Leave Table" door icon shows.
 
-## Changes
+## 2. Fix Hand History (HandReplay) Freezing Controls
 
-### 1. Reduce network pre-fetch delay
-**File:** `src/hooks/useOnlinePokerTable.ts`
-- Change the 200ms setTimeout to 50ms (just enough to let the hand state settle, but fetch cards much sooner).
+The `HandReplay` component uses a `Sheet` component. When the sheet opens, it likely traps focus and intercepts pointer events, freezing the game controls underneath.
 
-### 2. Speed up the dealing stagger
-**File:** `src/components/poker/PlayerSeat.tsx`
-- Change the per-card stagger from `0.30` to `0.18` seconds (lines 105 and 122).
-- This reduces the gap between 1st and 2nd card from 1.8s to ~1.1s for 6 players.
+### Root Cause
+The `Sheet` (built on Radix Dialog) uses a modal overlay that blocks interaction with the rest of the page. The `HandHistory` component (fixed bottom panel) is imported but never rendered.
 
-### 3. Shorten the card flip overlay
-**File:** `src/components/poker/PlayerSeat.tsx`
-- Change the extra flip time from `0.45` to `0.30` seconds (line 106).
+### Fix
+- **`src/components/poker/HandReplay.tsx`**: Add `modal={false}` to the `Sheet` component so it doesn't create a blocking overlay. This allows the game controls to remain interactive while the history panel is open.
+- Alternatively, if `modal={false}` is insufficient, switch to a non-modal approach: render the hand replay as a collapsible panel (similar to `HandHistory`) instead of a sheet, or ensure the sheet's overlay doesn't block z-index layers above it.
 
-### 4. Match the CSS card-reveal animation
-**File:** `src/components/poker/CardDisplay.tsx`
-- Change the face-down overlay animationDelay from `dealDelay + 0.45` to `dealDelay + 0.30` (line 37).
+## 3. Expanded QuickChat with 20+ Presets and Scroll
 
-## Result
+Current state: 8 emoji reactions + 6 text messages = 14 items. Top 3 recent emojis tracked.
 
-| Metric (6 players) | Before | After |
-|---------------------|--------|-------|
-| Network pre-delay | 200ms | 50ms |
-| Per-card stagger | 300ms | 180ms |
-| Flip animation add | 450ms | 300ms |
-| Gap between your 2 cards | ~1.8s | ~1.1s |
-| Total deal animation | ~4.1s | ~2.5s |
+### Changes to `src/components/poker/QuickChat.tsx`:
+- Expand to ~28 total items:
+  - **Emojis (12)**: Keep existing 8, add: `{ emoji: '💀', label: 'Dead' }`, `{ emoji: '🤑', label: 'Money' }`, `{ emoji: '🫣', label: 'Peeking' }`, `{ emoji: '🤡', label: 'Clown' }`
+  - **Messages (20)**: Keep existing 6, add 14 more poker phrases across categories:
+    - Playful: "Ship it!", "You're bluffing!", "I knew it!", "Slow roll much?"
+    - Fun: "Donkey!", "Fish on!", "Run it twice?", "That's poker baby"
+    - Competitive: "All day!", "Come at me", "Easy game", "Pay me"
+    - Classic: "Wow", "Brutal"
+- **Top 5 Most Used**: Change the tracking from `recent emojis only (top 3)` to `all items (emoji + text), top 5`, stored by usage count not recency. Rename localStorage key to `poker-chat-freq`.
+- **Scrollable container**: Keep the popover at `w-64` and add `max-h-[280px] overflow-y-auto` to the inner content so all items are accessible via scroll. The "Top 5" section stays pinned at the top (outside the scroll area).
+
+## 4. Header Buttons: Door Exit + Seat Exit Icons
+
+### Changes to `src/components/poker/OnlinePokerTable.tsx`:
+- Import `DoorOpen` and `UserMinus` from lucide-react (remove `ArrowLeft` import).
+- Replace the single back button with two side-by-side buttons:
+  - `DoorOpen` icon button: triggers `showQuitConfirm` (leave table entirely).
+  - `UserMinus` icon button: triggers `showLeaveSeatConfirm` (leave seat, become spectator). Only visible when seated.
+- **Two confirmation dialogs**:
+  - "Leave Table?" dialog (existing, update text): "You will leave the table completely."
+  - "Leave Seat?" dialog (new): "You will become a spectator. You can rejoin an empty seat later."
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Reduce pre-fetch delay from 200ms to 50ms |
-| `src/components/poker/PlayerSeat.tsx` | Stagger 0.30 to 0.18, flip 0.45 to 0.30 |
-| `src/components/poker/CardDisplay.tsx` | Match flip overlay to 0.30 |
+| `src/hooks/useOnlinePokerTable.ts` | Add `leaveSeat()` function, export it |
+| `src/components/poker/OnlinePokerTable.tsx` | Two header buttons with confirmation dialogs, leaveSeat integration, icon swaps |
+| `src/components/poker/QuickChat.tsx` | 12 emojis, 20 messages, frequency-based top 5, scrollable container |
+| `src/components/poker/HandReplay.tsx` | Add `modal={false}` to Sheet to prevent control freezing |
 
 ## NOT Changed
-- Edge functions, server logic, bottom navigation, layout, styles, logo
+- Edge functions, server logic, bottom navigation, layout, logo, card animations, seat positions
+
