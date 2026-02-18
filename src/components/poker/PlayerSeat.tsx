@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useRef } from 'react';
-import { WifiOff } from 'lucide-react';
+import { WifiOff, Volume2 } from 'lucide-react';
 import { PokerPlayer } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -27,6 +27,7 @@ interface PlayerSeatProps {
   onTimeout?: () => void;
   onLowTime?: () => void;
   isDisconnected?: boolean;
+  isSpeaking?: boolean;
 }
 
 /**
@@ -36,7 +37,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -191,6 +192,14 @@ export const PlayerSeat = memo(function PlayerSeat({
           <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center animate-pulse"
             style={{ zIndex: 6, background: 'hsl(0 70% 50%)', border: '2px solid hsl(0 0% 10%)' }}>
             <WifiOff className="h-2.5 w-2.5 text-white" />
+          </div>
+        )}
+
+        {/* Speaking indicator */}
+        {isSpeaking && !isDisconnected && (
+          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center animate-pulse"
+            style={{ zIndex: 6, background: 'hsl(142 70% 45%)', border: '2px solid hsl(0 0% 10%)' }}>
+            <Volume2 className="h-2.5 w-2.5 text-white" />
           </div>
         )}
 
