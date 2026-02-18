@@ -1,63 +1,71 @@
 
 
-# Fix Tutorial Controls Visibility and Clickability
+# Reduce Multiplayer Poker Freezes
 
-## Issues Found
+## Root Cause Analysis
 
-### Issue 1: Intro step "actions" highlight doesn't show betting controls
-In `LearnPoker.tsx` line 134, `forceShowControls` only checks `currentStep?.highlight === 'actions'`. During intro steps, `currentStep` is null (it's populated only for scripted steps). The intro step on line 110 of tutorial-lessons.ts says "When it's your turn, action buttons appear at the bottom" with `highlight: 'actions'`, but the controls never render.
+From the logs and code, the freezes stem from **three overlapping issues**:
 
-**Fix:** Also check `currentIntroStep?.highlight === 'actions'` in the `forceShowControls` prop.
+### 1. Redundant polling storms (client-side)
+The client runs **three overlapping timers** that all hit the server simultaneously:
+- **Heartbeat**: every 30s (`poker-heartbeat`)
+- **Stale hand recovery**: every 5s checks if no broadcast in 12s, then calls `poker-check-timeouts` + `refreshState` sequentially
+- **Leader timeout poll**: every 8s calls `poker-check-timeouts` + `refreshState`
 
-### Issue 2: Buttons not clickable during `require_action` steps  
-The CoachOverlay renders a full-screen dim `div` with `pointer-events-auto` at `z-50`. The BettingControls render at `Z.ACTIONS = 50` (same z-index). The dim overlay captures all pointer events, blocking clicks on the buttons underneath.
+When the stale recovery and leader poll overlap (which they do frequently), the client fires 2x `check-timeouts` + 2x `refreshState` = 4 HTTP requests in rapid succession. Each causes a React state update, leading to a visible freeze.
 
-**Fix:** During `require_action` steps, the dim overlay must NOT block the action buttons area. Two changes:
-1. Change the CoachOverlay's root container from `z-50` to `z-[45]` so it sits BELOW the action controls (z-50), OR
-2. Better: when `isRequireAction` is true, make the dim overlay `pointer-events-none` so clicks pass through to the buttons beneath. The user shouldn't be able to dismiss by tapping the overlay during require_action anyway.
+### 2. Broadcast REST fallback (server-side)
+Every edge function logs: `"Realtime send() is automatically falling back to REST API"`. The Supabase SDK's `channel.send()` is falling back to a slower REST delivery path. This adds latency between a player acting and others seeing the update.
 
-The cleanest fix is option 2: change the dim overlay to `pointer-events-none` when `isRequireAction` is true.
+### 3. Sequential DB queries in edge functions (server-side)
+After each action, `poker-action` runs 3 sequential queries before broadcasting: `commit_poker_state` RPC, then `profiles` fetch, then `poker_hole_cards` fetch. These run one after another, adding ~100-200ms total.
 
-### Issue 3: Scan all lessons for similar problems
-Reviewed all 10 lessons' scripted steps. Every `require_action` step uses `highlight: 'actions'` which triggers the same clickability bug. The fix to CoachOverlay applies globally, fixing all lessons at once.
+## Fixes
+
+### Fix 1: Merge redundant client polling into one timer
+Replace the two overlapping poll intervals (stale hand recovery at 5s + leader timeout poll at 8s) with a **single 8s interval** that handles both cases. This halves the number of background HTTP calls.
+
+**File: `src/hooks/useOnlinePokerTable.ts`**
+- Remove the standalone stale hand recovery interval (lines 665-678)
+- Expand the leader timeout poll (lines 694-714) to also cover the stale broadcast detection
+- Non-leaders keep a single 15s fallback `refreshState` instead of the aggressive 5s poll
+
+### Fix 2: Debounce `refreshState` calls
+Add a debounce guard so multiple rapid `refreshState` calls (e.g. from seat_change + timeout poll) collapse into one.
+
+**File: `src/hooks/useOnlinePokerTable.ts`**
+- Add a `lastRefreshRef` timestamp
+- Skip `refreshState` if called within 2s of the last one
+
+### Fix 3: Parallelize post-commit queries in edge functions
+Run the `profiles` fetch and `poker_hole_cards` fetch in parallel using `Promise.all` instead of sequentially.
+
+**Files:**
+- `supabase/functions/poker-action/index.ts` (lines 622-629)
+- `supabase/functions/poker-start-hand/index.ts` (profile fetch section)
+- `supabase/functions/poker-check-timeouts/index.ts` (profile + hole card fetches)
+
+### Fix 4: Use `httpSend()` for broadcasts
+Replace `channel.send()` with `channel.send()` using the REST-explicit path to avoid the deprecation warning and potential future breakage. The SDK recommends `httpSend()`.
+
+**Files:**
+- `supabase/functions/poker-action/index.ts`
+- `supabase/functions/poker-start-hand/index.ts`
+- `supabase/functions/poker-check-timeouts/index.ts`
 
 ---
 
-## Changes
+## Summary of Changes
 
-### File: `src/pages/LearnPoker.tsx` (line 134)
+| File | Change | Impact |
+|------|--------|--------|
+| `src/hooks/useOnlinePokerTable.ts` | Merge 2 polling intervals into 1; add refreshState debounce | Halves background HTTP calls, reduces React re-render storms |
+| `supabase/functions/poker-action/index.ts` | Parallelize profile + hole card queries | ~100ms faster broadcasts |
+| `supabase/functions/poker-start-hand/index.ts` | Parallelize profile fetch | ~50ms faster hand start |
+| `supabase/functions/poker-check-timeouts/index.ts` | Parallelize profile + hole card queries | ~100ms faster timeout resolution |
 
-Change `forceShowControls` to also check intro steps:
-
-```tsx
-// Before
-forceShowControls={!!currentStep?.highlight && currentStep.highlight === 'actions'}
-
-// After
-forceShowControls={
-  (!!currentStep?.highlight && currentStep.highlight === 'actions') ||
-  (!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions')
-}
-```
-
-### File: `src/components/poker/CoachOverlay.tsx` (line 97)
-
-Make the dim overlay `pointer-events-none` during `require_action` so the action buttons beneath remain clickable:
-
-```tsx
-// Before
-<div className="fixed inset-0 bg-black/25 pointer-events-auto" onClick={isRequireAction ? undefined : onDismiss} />
-
-// After
-<div
-  className={cn("fixed inset-0 bg-black/25", isRequireAction ? "pointer-events-none" : "pointer-events-auto")}
-  onClick={isRequireAction ? undefined : onDismiss}
-/>
-```
-
-### No other files changed
-- Bottom navigation: untouched
-- BettingControls: untouched  
-- PokerTablePro: untouched
-- Tutorial lessons data: untouched
+## What Is NOT Changed
+- Bottom navigation, UI components, game logic, RLS policies
+- No new tables or schema changes
+- No changes to betting controls, seat layout, or visual components
 
