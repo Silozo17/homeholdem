@@ -164,7 +164,7 @@ export default function LearnPoker() {
           <NotificationBell className="absolute right-4" />
         </div>
       </header>
-      <div className="pt-14 safe-area-top shrink-0" aria-hidden="true" />
+      <div className="h-14 safe-area-top shrink-0" />
 
       <div className="flex-1 overflow-auto px-4 py-6 space-y-5 pb-8">
         {/* Header */}
