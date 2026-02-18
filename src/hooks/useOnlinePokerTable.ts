@@ -558,10 +558,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   const pingTimeout = useCallback(async () => {
     if (!hand) return;
-    await callEdge('poker-timeout-ping', {
-      table_id: tableId,
-      hand_id: hand.hand_id,
-    });
+    try {
+      await callEdge('poker-timeout-ping', {
+        table_id: tableId,
+        hand_id: hand.hand_id,
+      });
+    } catch {
+      // Expected when hand completes between pings — safe to ignore
+    }
   }, [tableId, hand]);
 
   // Auto-deal
