@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
+import { useVoiceChat } from '@/hooks/useVoiceChat';
+import { VoiceChatControls } from './VoiceChatControls';
 import { WinnerOverlay } from './WinnerOverlay';
 import { XPLevelUpOverlay } from './XPLevelUpOverlay';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { PokerErrorBoundary } from './PokerErrorBoundary';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DoorOpen, LogOut, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff } from 'lucide-react';
+import { DoorOpen, LogOut, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff, Headphones, HeadphoneOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
@@ -120,6 +122,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
   const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
+  const voiceChat = useVoiceChat(tableId);
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
   const prevActiveCountRef = useRef<number>(0);
   const firstHandRef = useRef(true);
@@ -874,6 +877,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     try {
       // Save XP before leaving
       const result = await saveXpAndStats(false);
+      voiceChat.disconnect();
       if (result === 'show_overlay') {
         // Overlay will call leaveTable + onLeave via its Continue button
         return;
@@ -1004,6 +1008,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
           </button>
 
+          {/* Voice Chat Controls */}
+          <VoiceChatControls
+            connected={voiceChat.connected}
+            connecting={voiceChat.connecting}
+            micMuted={voiceChat.micMuted}
+            deafened={voiceChat.deafened}
+            onConnect={voiceChat.connect}
+            onDisconnect={voiceChat.disconnect}
+            onToggleMic={voiceChat.toggleMic}
+            onToggleDeafen={voiceChat.toggleDeafen}
+          />
+
           {/* QuickChat — always visible in header */}
           <QuickChat onSend={trackedSendChat} />
 
@@ -1033,6 +1049,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   {voiceEnabled ? <Mic className="h-3.5 w-3.5 mr-2" /> : <MicOff className="h-3.5 w-3.5 mr-2" />}
                   {voiceEnabled ? 'Voice On' : 'Voice Off'}
                 </DropdownMenuItem>
+                {voiceChat.connected && (
+                  <>
+                    <DropdownMenuItem onClick={voiceChat.toggleMic}>
+                      {voiceChat.micMuted ? <MicOff className="h-3.5 w-3.5 mr-2" /> : <Mic className="h-3.5 w-3.5 mr-2" />}
+                      {voiceChat.micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={voiceChat.toggleDeafen}>
+                      {voiceChat.deafened ? <HeadphoneOff className="h-3.5 w-3.5 mr-2" /> : <Headphones className="h-3.5 w-3.5 mr-2" />}
+                      {voiceChat.deafened ? 'Undeafen' : 'Mute All'}
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {isCreator && canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
                   <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
                     <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
@@ -1361,6 +1389,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
+                  isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
                 />
               </SeatAnchor>
             );

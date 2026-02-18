@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.poker-heartbeat]
 verify_jwt = false
+
+[functions.livekit-token]
+verify_jwt = false
