@@ -1,44 +1,53 @@
 
 
-# Fix: Table Card Shrinks When Tapping Delete Button
+# Fix: Community Tables Deleted When Last Player Leaves
 
 ## Problem
-The table card is a `<button>` element with `active:scale-[0.98]`. The trash icon is a child button inside it. When you tap the trash icon, the browser applies `:active` to the parent first, causing the whole card to visually shrink -- making the trash icon shift and feel broken.
-
-CSS `:active` propagates to all ancestors automatically. There is no way to stop it with JavaScript.
+In `supabase/functions/poker-leave-table/index.ts` (lines 387-408), when `remainingAfterLeave === 0`, the function cascade-deletes the table and all its data. This happens for ALL table types, including community/persistent tables that should remain open permanently.
 
 ## Solution
-Change the table card from a `<button>` to a `<div>`. Keep the `onClick` for joining and add `cursor-pointer` + `role="button"`. Remove `active:scale-[0.98]` from the card entirely (or replace it with a JS-driven approach that only fires when the card itself is the click target).
-
-This way, tapping the trash icon no longer triggers a parent `:active` scale effect.
+Add a check for `is_persistent` before deleting. If the table is persistent (community), skip the deletion and just reset the table status to `"waiting"` instead.
 
 ## Technical Detail
 
-**File:** `src/components/poker/OnlinePokerLobby.tsx`
+**File:** `supabase/functions/poker-leave-table/index.ts`
 
-**Line 420-423:** Change:
-```tsx
-<button
-  className="... active:scale-[0.98] ..."
-  onClick={() => onJoinTable(t.id)}
->
-```
-To:
-```tsx
-<div
-  role="button"
-  className="... cursor-pointer ..."
-  onClick={() => onJoinTable(t.id)}
->
+**Lines 387-408** -- wrap the deletion block in a conditional:
+
+Before:
+```typescript
+if (remainingAfterLeave === 0) {
+  // broadcast close then cascade-delete
+  ...
+}
 ```
 
-And close with `</div>` instead of `</button>` (line 465).
+After:
+```typescript
+if (remainingAfterLeave === 0) {
+  // Fetch table to check if persistent
+  const { data: tableInfo } = await admin
+    .from("poker_tables")
+    .select("is_persistent")
+    .eq("id", table_id)
+    .single();
 
-The `active:scale-[0.98]` is removed. The card still looks and behaves the same (clickable, hover shadow) but no longer shrinks on press, so the trash icon stays perfectly stable.
+  if (tableInfo?.is_persistent) {
+    // Community table: reset to waiting, do NOT delete
+    await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
+  } else {
+    // Non-persistent: broadcast close and cascade-delete (existing logic)
+    await channel.send({ ... table_closed ... });
+    // ... delete hands, seats, table ...
+  }
+}
+```
+
+This is the only change needed. The community table stays in the database and remains visible in the lobby for new players to join.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerLobby.tsx` | Change card `<button>` to `<div>`, remove `active:scale-[0.98]` |
+| `supabase/functions/poker-leave-table/index.ts` | Skip deletion for persistent/community tables when last player leaves |
 
