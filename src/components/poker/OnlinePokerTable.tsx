@@ -644,8 +644,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const sXp = startXpRef.current ?? 0;
     const totalGained = xpEvents.reduce((s, e) => s + e.xp_amount, 0);
 
-    const calcLevel = (xp: number) => Math.floor(Math.sqrt(xp / 100)) + 1;
-    if (calcLevel(endXp) > calcLevel(sXp)) {
+    if (totalGained > 0) {
       setXpOverlay({ startXp: sXp, endXp, xpGained: totalGained });
       return 'show_overlay';
     }
