@@ -515,11 +515,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   }, [tableState?.current_hand?.current_bet, preAction]);
 
   useEffect(() => {
-    if (!tableState && !loading && !error) {
+    if (!tableState && !loading && !error && !gameOver) {
       toast({ title: 'Table closed', description: 'This table has been closed.' });
       onLeave();
     }
-  }, [error, tableState, loading, onLeave]);
+  }, [error, tableState, loading, onLeave, gameOver]);
 
   // Game over detection — loser (stack=0) OR winner (last player standing)
   useEffect(() => {
