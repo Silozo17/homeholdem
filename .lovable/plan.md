@@ -1,33 +1,38 @@
 
 
-# Fix Learn Poker Header Overlap -- Match PokerHub Pattern Exactly
+# Fix Learn Poker Header Overlap — Correct Spacer Height
 
-## Problem
-The last edit changed `h-14` to `pt-14`, but both `pt-14` and `safe-area-top` set `padding-top`, so Tailwind's `pt-14` overrides the safe-area value entirely. This made the spacer ignore the notch inset.
+## Root Cause (for real this time)
+
+Tailwind uses `box-sizing: border-box` by default. When the spacer has `h-14 safe-area-top`:
+- `h-14` = total height locked to 56px
+- `safe-area-top` = `padding-top: env(safe-area-inset-top)` — this padding is **inside** the 56px, not added on top
+
+So the spacer is always 56px. But the fixed header is 56px (content) + safe-area-inset-top (padding) = taller than 56px. Content slides behind the header by exactly the safe-area-inset amount.
+
+(PokerHub likely has the same subtle overlap but it's less visible because the CardFan hero element has built-in top spacing.)
 
 ## Fix
-Revert the spacer to match PokerHub's exact working pattern on line 35 of `PokerHub.tsx`:
+
+Replace the CSS class-based spacer with an inline style that correctly sums both values:
 
 **File: `src/pages/LearnPoker.tsx` (line 167)**
 
-Change:
 ```html
-<div className="pt-14 safe-area-top shrink-0" aria-hidden="true" />
-```
-
-To:
-```html
+<!-- Before -->
 <div className="h-14 safe-area-top shrink-0" />
+
+<!-- After -->
+<div className="shrink-0" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} />
 ```
 
-This is character-for-character identical to PokerHub line 35, which works correctly on mobile. `h-14` sets the height (does not conflict with padding-top from `safe-area-top`), and `shrink-0` prevents flex compression.
+This makes the spacer height = 56px + safe-area-inset-top, exactly matching the header's total visual height. No CSS conflicts, no overrides.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/LearnPoker.tsx` | Line 167: revert spacer to exact PokerHub pattern `h-14 safe-area-top shrink-0` |
+| `src/pages/LearnPoker.tsx` | Line 167: use inline calc() for spacer height |
 
 ## Not Changed
-- No other files touched
-
+- No other files, navigation, layout, or styles touched.
