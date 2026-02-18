@@ -436,11 +436,65 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 3. Sweep tables past closing_at ──
+    const closingResults: any[] = [];
+    const { data: closingTables } = await admin
+      .from("poker_tables")
+      .select("id")
+      .not("closing_at", "is", null)
+      .lte("closing_at", new Date().toISOString());
+
+    for (const ct of closingTables || []) {
+      try {
+        console.log(`[CHECK-TIMEOUTS] Sweeping expired closing table ${ct.id}`);
+
+        // Force-complete any active hand
+        const { data: activeHand } = await admin
+          .from("poker_hands")
+          .select("id")
+          .eq("table_id", ct.id)
+          .is("completed_at", null)
+          .single();
+
+        if (activeHand) {
+          await admin.from("poker_hands").update({
+            completed_at: new Date().toISOString(),
+            phase: "complete",
+          }).eq("id", activeHand.id);
+        }
+
+        // Broadcast table_closed
+        const closingChannel = admin.channel(`poker:table:${ct.id}`);
+        await closingChannel.send({
+          type: "broadcast",
+          event: "seat_change",
+          payload: { action: "table_closed" },
+        });
+
+        // Cascade delete
+        const { data: ctHands } = await admin.from("poker_hands").select("id").eq("table_id", ct.id);
+        const ctHandIds = (ctHands || []).map((h: any) => h.id);
+        if (ctHandIds.length > 0) {
+          await admin.from("poker_hole_cards").delete().in("hand_id", ctHandIds);
+          await admin.from("poker_actions").delete().in("hand_id", ctHandIds);
+          await admin.from("poker_hands").delete().eq("table_id", ct.id);
+        }
+        await admin.from("poker_seats").delete().eq("table_id", ct.id);
+        await admin.from("poker_tables").delete().eq("id", ct.id);
+
+        closingResults.push({ table_id: ct.id, status: "deleted" });
+      } catch (closingErr: any) {
+        console.error(`Error sweeping closing table ${ct.id}:`, closingErr);
+        closingResults.push({ table_id: ct.id, status: 500, error: closingErr.message });
+      }
+    }
+
     return new Response(
       JSON.stringify({
-        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s)`,
+        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s), swept ${closingResults.length} closing table(s)`,
         results,
         kickResults,
+        closingResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

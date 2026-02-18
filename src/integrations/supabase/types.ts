@@ -1396,11 +1396,14 @@ export type Database = {
           big_blind: number
           blind_level: number
           blind_timer_minutes: number
+          closing_at: string | null
           club_id: string | null
           created_at: string
           created_by: string
+          description: string | null
           id: string
           invite_code: string | null
+          is_persistent: boolean
           last_blind_increase_at: string | null
           max_buy_in: number
           max_seats: number
@@ -1419,11 +1422,14 @@ export type Database = {
           big_blind?: number
           blind_level?: number
           blind_timer_minutes?: number
+          closing_at?: string | null
           club_id?: string | null
           created_at?: string
           created_by?: string
+          description?: string | null
           id?: string
           invite_code?: string | null
+          is_persistent?: boolean
           last_blind_increase_at?: string | null
           max_buy_in?: number
           max_seats?: number
@@ -1442,11 +1448,14 @@ export type Database = {
           big_blind?: number
           blind_level?: number
           blind_timer_minutes?: number
+          closing_at?: string | null
           club_id?: string | null
           created_at?: string
           created_by?: string
+          description?: string | null
           id?: string
           invite_code?: string | null
+          is_persistent?: boolean
           last_blind_increase_at?: string | null
           max_buy_in?: number
           max_seats?: number
@@ -2170,7 +2179,7 @@ export type Database = {
         | "complete"
       poker_seat_status: "active" | "sitting_out" | "disconnected"
       poker_table_status: "waiting" | "playing" | "paused" | "closed"
-      poker_table_type: "friends" | "club" | "public"
+      poker_table_type: "friends" | "club" | "public" | "private" | "community"
       poker_tournament_status:
         | "registering"
         | "running"
@@ -2326,7 +2335,7 @@ export const Constants = {
       ],
       poker_seat_status: ["active", "sitting_out", "disconnected"],
       poker_table_status: ["waiting", "playing", "paused", "closed"],
-      poker_table_type: ["friends", "club", "public"],
+      poker_table_type: ["friends", "club", "public", "private", "community"],
       poker_tournament_status: [
         "registering",
         "running",

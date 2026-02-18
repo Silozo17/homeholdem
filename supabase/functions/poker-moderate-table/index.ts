@@ -131,6 +131,36 @@ Deno.serve(async (req) => {
     }
 
     if (action === "close") {
+      // Community/persistent tables with seated players: schedule 4h delayed close
+      if (table.is_persistent) {
+        const { data: seatedPlayers } = await admin
+          .from("poker_seats")
+          .select("id")
+          .eq("table_id", table_id)
+          .not("player_id", "is", null);
+
+        const hasPlayers = (seatedPlayers?.length || 0) > 0;
+
+        if (hasPlayers && !table.closing_at) {
+          // Schedule closure in 4 hours
+          const closingAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+          await admin.from("poker_tables").update({ closing_at: closingAt }).eq("id", table_id);
+
+          await channel.send({
+            type: "broadcast",
+            event: "seat_change",
+            payload: { action: "table_closing", closing_at: closingAt },
+          });
+
+          return new Response(
+            JSON.stringify({ message: "Table scheduled for closure in 4 hours", closing_at: closingAt }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // If already closing or no players, fall through to instant delete
+      }
+
+      // Instant delete (non-community, or community with no players)
       // Force-complete any active hand so the table can be closed
       const { data: activeHand } = await admin
         .from("poker_hands")
@@ -170,6 +200,28 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ message: "Table deleted" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "cancel_close") {
+      if (!table.closing_at) {
+        return new Response(
+          JSON.stringify({ error: "Table is not scheduled for closure" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await admin.from("poker_tables").update({ closing_at: null }).eq("id", table_id);
+
+      await channel.send({
+        type: "broadcast",
+        event: "seat_change",
+        payload: { action: "table_closing_cancelled" },
+      });
+
+      return new Response(
+        JSON.stringify({ message: "Table closure cancelled" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
