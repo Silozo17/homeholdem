@@ -104,7 +104,7 @@ export function usePokerVoiceAnnouncements() {
 
   // Pre-built announcement functions
   const announceBlindUp = useCallback((small: number, big: number) => {
-    enqueue(`Blinds are now ${small} ${big}`);
+    enqueue(`Blinds are now ${small} and ${big}`);
   }, [enqueue]);
 
   const announceWinner = useCallback((name: string, amount: number, handName?: string) => {
