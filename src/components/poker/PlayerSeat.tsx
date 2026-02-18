@@ -84,12 +84,17 @@ export const PlayerSeat = memo(function PlayerSeat({
   const [revealedIndices, setRevealedIndices] = useState<Set<number>>(new Set());
   const cardKey = player.holeCards.map(c => `${c.suit}-${c.rank}`).join(',');
 
+  // Use refs so the effect reads latest values without re-triggering on seat changes
+  const totalActiveRef = useRef(totalActivePlayers);
+  totalActiveRef.current = totalActivePlayers;
+  const seatDealOrderRef = useRef(seatDealOrder);
+  seatDealOrderRef.current = seatDealOrder;
+
   useEffect(() => {
     if (!isHuman || player.holeCards.length === 0) {
       setRevealedIndices(new Set());
       return;
     }
-    // If deal animation is disabled (mid-hand joiner), reveal all cards immediately
     if (disableDealAnim) {
       setRevealedIndices(new Set(player.holeCards.map((_, i) => i)));
       return;
@@ -97,14 +102,14 @@ export const PlayerSeat = memo(function PlayerSeat({
     setRevealedIndices(new Set());
     const timers: ReturnType<typeof setTimeout>[] = [];
     player.holeCards.forEach((_, i) => {
-      const dealDelay = (i * totalActivePlayers + seatDealOrder) * 0.15 + 0.05;
+      const dealDelay = (i * totalActiveRef.current + seatDealOrderRef.current) * 0.15 + 0.05;
       const revealMs = (dealDelay + 0.45) * 1000;
       timers.push(setTimeout(() => {
         setRevealedIndices(prev => new Set(prev).add(i));
       }, revealMs));
     });
     return () => timers.forEach(clearTimeout);
-  }, [cardKey, isHuman, totalActivePlayers, seatDealOrder, disableDealAnim]);
+  }, [cardKey, isHuman, disableDealAnim]);
 
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
