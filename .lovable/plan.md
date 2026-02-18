@@ -1,61 +1,111 @@
 
-# Fix Learn Poker Issues + Multiplayer Menu + Tutorial Intro
 
-## Issues Identified
+# Overhaul: Learn Poker Tutorial System
 
-1. **Learn Poker page - header cut off**: The BookOpen icon at the top of the lesson list is partially hidden behind the fixed header. The spacer div only accounts for h-14 but the safe-area-top class adds extra padding that isn't matched.
-
-2. **Bottom nav visible during Learn gameplay**: The route `/learn-poker` is not in any of AppLayout's hidden/fullscreen route lists, so the BottomNav renders on top of the poker table during lessons.
-
-3. **Multiplayer button goes directly to online-poker**: Dashboard's GameModesGrid sends users straight to `/online-poker`. It should go to `/poker` (PokerHub) where they can choose between Online Multiplayer and Paid Tournaments.
-
-4. **Tutorial needs intro + control explanations**: Lesson 1 should start with a welcome popup explaining the UI controls (betting buttons, chip display, etc.) before any cards are dealt. Each game action should pause for the user with clear coach tips.
+A complete redesign of the tutorial engine, coaching UI, bot behavior, and lesson structure to create a guided, step-by-step learning experience where nothing is left to chance.
 
 ---
 
-## Changes
+## Current Problems
 
-### 1. Fix Learn Poker page layout (LearnPoker.tsx)
+1. **Bots act freely** -- They use `decideBotAction()` as fallback when scripted actions run out, making gameplay unpredictable
+2. **User can click any button** -- No action blocking; user can fold when asked to raise
+3. **Coach overlay blurs background** -- Backdrop blur prevents seeing what the coach refers to
+4. **Incomplete control explanations** -- Timer, audio toggle, exit button, chat, seat selection never explained
+5. **No directional pointing** -- Overlays don't visually point at specific UI elements
+6. **Intro steps are too brief** -- Only 5 generic messages before Lesson 1; no per-control walkthroughs
+7. **Pacing too fast** -- Bot actions and phase transitions happen without waiting for user acknowledgment
 
-- The lesson select screen has `fixed inset-0` which bypasses AppLayout's padding, but the content area needs proper spacing.
-- The BookOpen icon area is overlapping with the header. Fix by ensuring the spacer correctly matches the header height including safe-area.
+---
 
-### 2. Hide bottom nav during Learn Poker (AppLayout.tsx)
+## Solution Overview
 
-- Add `/learn-poker` to the `hiddenNavRoutes` array (or `fullscreenRoutes`). This ensures the BottomNav is hidden when the user is on the learn page (both lesson select and gameplay).
-- Since LearnPoker uses `fixed inset-0`, hiding the nav is correct for both states.
+### A. Fully Scripted Bots (No Free Will)
 
-### 3. Multiplayer goes to PokerHub (GameModesGrid.tsx)
+Every bot action in every lesson will be pre-programmed. Remove the `decideBotAction()` fallback entirely from the tutorial engine. If a bot has no scripted action left, it defaults to `fold` (safe, predictable). This guarantees the exact game flow the lesson expects.
 
-- Change the `path` for the "Multiplayer" mode from `/online-poker` to `/poker` so users see the full poker hub with Online MP, Paid Tournaments, and other options.
+**Changes in `useTutorialGame.ts`:**
+- Remove the `decideBotAction` import and fallback branch
+- When `scriptedActions[actionIdx]` is undefined, default to `{ type: 'fold' }`
+- All 10 lessons get complete `botActions` mappings covering every betting round
 
-### 4. Tutorial intro overlay + control explainers (tutorial-lessons.ts, useTutorialGame.ts, LearnPoker.tsx)
+### B. Action Blocking (Force Correct User Input)
 
-**New intro system:**
+When a `TutorialStep` has a `requiredAction`, disable all other buttons. The user can ONLY click the action the coach is asking for.
 
-- Add a new `introSteps` array to the `TutorialLesson` interface. These are shown BEFORE the game starts (before cards are dealt).
-- For Lesson 1, add 3-4 intro steps:
-  1. "Welcome to your first poker lesson! Let's start by learning the table layout."
-  2. "At the bottom you'll see your action buttons: Fold, Check/Call, and Raise. These are how you play."
-  3. "Your cards appear face-up at your seat. The shared cards appear in the center."
-  4. "Ready? Let's deal your first hand!"
+**Changes:**
+- `useTutorialGame.ts` exports a new `allowedAction: PlayerAction | null` derived from the current step
+- `LearnPoker.tsx` passes `allowedAction` down to `PokerTablePro` (or wraps `onAction` to filter)
+- The `onAction` wrapper ignores any action that doesn't match `allowedAction` when set
+- `BettingControls` receives an optional `disabledActions` prop to visually grey out blocked buttons (or `PokerTablePro` gets a wrapper `onAction` that simply no-ops wrong actions -- simpler, no changes to BettingControls needed)
 
-**Implementation in useTutorialGame.ts:**
+**Implementation approach (minimal changes):** Wrap `onAction` in `LearnPoker.tsx`:
+```typescript
+const guardedAction = useCallback((action) => {
+  if (allowedAction && action.type !== allowedAction) return; // blocked
+  playerAction(action);
+}, [allowedAction, playerAction]);
+```
+Pass `guardedAction` to `PokerTablePro` instead of `playerAction`.
 
-- Add a new state `introPhase` that runs before the dealing phase.
-- When `introPhase` is active, the game is paused and shows intro CoachOverlay steps one by one.
-- Only after all intro steps are dismissed does the game proceed to dealing.
+### C. Coach Overlay Redesign
 
-**CoachOverlay enhancements:**
+**Remove backdrop blur** -- Replace `bg-background/40 backdrop-blur-[2px]` with a semi-transparent dark overlay that does NOT blur, so the game table stays visible.
 
-- Add support for a `position` prop (e.g., `'bottom'`, `'center'`, `'top'`) so intro messages can appear in different locations.
-- Add a small directional arrow indicator (CSS triangle) when the step references a UI area.
-- Ensure the overlay never overflows the screen -- use `max-h` and safe-area-aware positioning.
+**Add directional pointing:**
+- New `IntroStep` fields: `highlight?: 'actions' | 'cards' | 'community' | 'timer' | 'audio' | 'exit' | 'pot'`
+- When `highlight` is set, render a pulsing ring/glow effect at the target area using fixed CSS positions (not CSS selectors, which are fragile)
+- The coach bubble repositions itself to avoid overlapping the highlighted area
 
-**Pacing improvements in useTutorialGame.ts:**
+**Animated coach character:**
+- Reuse the existing `DealerCharacter` component (poker dealer) as the coach avatar inside the overlay
+- Or use a small circular avatar with the dealer image from `src/assets/dealer/dealer-main.png`
+- Add a subtle bounce animation when new messages appear
 
-- After each bot action, add a longer delay (1200ms instead of 600ms) so users can observe what happened.
-- After each phase transition (flop/turn/river), ensure the coach step fires reliably before any bot actions.
+**Overflow prevention:**
+- Use `max-h-[50vh]` and `overflow-y-auto` on the message container
+- Position with safe-area-aware padding
+- Ensure the bubble never goes off-screen by using `bottom` positioning with `min()` calculations
+
+### D. Expanded Lesson 1 Intro Sequence
+
+Lesson 1's `introSteps` will be expanded from 5 to ~12 steps, covering every UI element:
+
+1. "Welcome to Learn Poker! I'm your coach. I'll walk you through everything step by step."
+2. "First, let's look at the table. This is a Texas Hold'em poker table with 4 seats." (highlight: table)
+3. "Your seat is at the bottom. Your private cards ('hole cards') will appear here." (highlight: cards, arrow: down)
+4. "The shared cards ('community cards') appear in the center of the table." (highlight: community, arrow: up)
+5. "The pot (total chips bet) is shown above the community cards." (highlight: pot)
+6. "At the top-left, the back arrow lets you leave the table." (highlight: exit, arrow: up)
+7. "At the top-right, the speaker icon toggles game sounds on/off." (highlight: audio, arrow: up)
+8. "The hand number and blind levels are shown at the top." (highlight: timer, arrow: up)
+9. "When it's your turn, action buttons appear at the bottom: Fold, Check/Call, and Raise." (highlight: actions, arrow: down)
+10. "Fold = give up your hand. Check = pass (when no bet). Call = match a bet. Raise = increase the bet." (position: center)
+11. "I'll pause at every important moment to explain. Take your time -- there's no rush!" (position: center)
+12. "Ready? Let's deal your first hand!" (position: center)
+
+### E. Per-Step Pausing with User Acknowledgment
+
+The current system shows a coach step, user clicks "Got it", and the game immediately continues. The problem is bots act instantly after unpause.
+
+**Improved pacing in `useTutorialGame.ts`:**
+- After dismissing a coach step, add a 1500ms delay before bots start acting
+- After each community card phase transition (flop/turn/river), auto-trigger the next coach step BEFORE any bot acts
+- Bot action delay increased to ~1500ms with visual "thinking" state
+
+### F. Complete Bot Action Scripts for All 10 Lessons
+
+Every lesson will have complete `botActions` entries. No bot will ever fall through to `decideBotAction()`. Example for Lesson 1:
+
+```typescript
+botActions: {
+  'bot-0': ['fold'],           // folds preflop
+  'bot-1': ['fold'],           // folds preflop  
+  'bot-2': ['call', 'check', 'check', 'fold'],  // calls pre, checks flop/turn, folds river
+}
+```
+
+Each lesson's bot scripts will be designed to create the exact scenario the lesson teaches.
 
 ---
 
@@ -63,15 +113,89 @@
 
 | File | Change |
 |------|--------|
-| `src/components/layout/AppLayout.tsx` | Add `/learn-poker` to `hiddenNavRoutes` |
-| `src/components/home/GameModesGrid.tsx` | Change Multiplayer path from `/online-poker` to `/poker` |
-| `src/pages/LearnPoker.tsx` | Fix layout/spacing for lesson select screen |
-| `src/lib/poker/tutorial-lessons.ts` | Add `introSteps` to TutorialLesson interface; add intro steps to Lesson 1 |
-| `src/hooks/useTutorialGame.ts` | Support intro phase before dealing; slower bot action pacing |
-| `src/components/poker/CoachOverlay.tsx` | Add position variants and arrow indicators; ensure no overflow |
+| `src/hooks/useTutorialGame.ts` | Remove `decideBotAction` fallback; add `allowedAction` export; increase bot delay; add post-dismiss delay |
+| `src/lib/poker/tutorial-lessons.ts` | Expand Lesson 1 intro to ~12 steps with `highlight` fields; add complete `botActions` to ALL lessons; add `highlight` field to `IntroStep` interface |
+| `src/components/poker/CoachOverlay.tsx` | Remove backdrop blur; add highlight ring rendering; add dealer avatar; add bounce animation; fix overflow |
+| `src/pages/LearnPoker.tsx` | Wrap `onAction` with action guard using `allowedAction`; pass guarded handler to `PokerTablePro` |
 
 ## NOT Changed
 
-- Bottom navigation component itself
-- PokerTablePro, PokerHub, OnlinePoker, or any other pages
-- Styles, themes, edge functions, database
+- `PokerTablePro.tsx` -- no modifications
+- `BettingControls.tsx` -- no modifications  
+- Bottom navigation, layout, styles, other pages
+- Edge functions, database, existing poker game
+
+---
+
+## Technical Details
+
+### New `IntroStep` Interface
+
+```typescript
+export interface IntroStep {
+  message: string;
+  position?: 'top' | 'center' | 'bottom';
+  arrowDirection?: 'down' | 'up' | 'none';
+  highlight?: 'actions' | 'cards' | 'community' | 'timer' | 'audio' | 'exit' | 'pot' | 'table';
+}
+```
+
+### Action Guard (LearnPoker.tsx)
+
+```typescript
+const allowedAction = isPaused ? null : currentStep?.requiredAction || null;
+
+const guardedAction = useCallback((action) => {
+  if (allowedAction && action.type !== allowedAction) return;
+  playerAction(action);
+}, [allowedAction, playerAction]);
+
+// Pass guardedAction to PokerTablePro's onAction prop
+```
+
+### Bot Fallback (useTutorialGame.ts)
+
+```typescript
+// BEFORE (current):
+if (scriptedActions && actionIdx < scriptedActions.length) {
+  botAction = { type: scriptedActions[actionIdx] };
+} else {
+  botAction = decideBotAction(...); // FREE WILL - REMOVE THIS
+}
+
+// AFTER:
+if (scriptedActions && actionIdx < scriptedActions.length) {
+  botAction = { type: scriptedActions[actionIdx] };
+} else {
+  botAction = { type: 'fold' }; // Safe default, no free will
+}
+```
+
+### Coach Overlay Backdrop (CoachOverlay.tsx)
+
+```typescript
+// BEFORE:
+<div className="fixed inset-0 bg-background/40 backdrop-blur-[2px] ..." />
+
+// AFTER:
+<div className="fixed inset-0 bg-black/20 ..." />  // Subtle dim, NO blur
+```
+
+### Highlight Ring
+
+When `highlight` is set on an intro step, render a pulsing ring at a predefined screen position:
+
+```typescript
+const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
+  actions: { bottom: '8%', left: '50%', transform: 'translateX(-50%)', width: '80%', height: '60px' },
+  exit: { top: 'calc(env(safe-area-inset-top) + 10px)', left: '12px', width: '32px', height: '32px' },
+  audio: { top: 'calc(env(safe-area-inset-top) + 10px)', right: '12px', width: '32px', height: '32px' },
+  community: { top: '45%', left: '50%', transform: 'translate(-50%, -50%)', width: '240px', height: '70px' },
+  pot: { top: '20%', left: '50%', transform: 'translateX(-50%)', width: '80px', height: '30px' },
+  cards: { bottom: '18%', left: '50%', transform: 'translateX(-50%)', width: '100px', height: '70px' },
+  timer: { top: 'calc(env(safe-area-inset-top) + 10px)', left: '50%', transform: 'translateX(-50%)', width: '120px', height: '24px' },
+};
+```
+
+Each highlight renders as a rounded div with `ring-2 ring-primary animate-pulse` over the target area.
+
