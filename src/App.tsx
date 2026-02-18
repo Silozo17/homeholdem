@@ -29,6 +29,7 @@ import OnlinePoker from "./pages/OnlinePoker";
 import PokerTournament from "./pages/PokerTournament";
 import PokerHub from "./pages/PokerHub";
 import PaidTournaments from "./pages/PaidTournaments";
+import LearnPoker from "./pages/LearnPoker";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,7 @@ const App = () => (
                   <Route path="/poker-tournament" element={<PokerTournament />} />
                   <Route path="/club/:clubId/tournament" element={<PokerTournament />} />
                   <Route path="/tournaments" element={<PaidTournaments />} />
+                  <Route path="/learn-poker" element={<LearnPoker />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Users, ArrowRight, Crown } from 'lucide-react';
+import { Bot, Users, ArrowRight, Crown, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 
 const modes = [
+  {
+    title: 'Learn',
+    subtitle: 'Tutorial',
+    description: 'Step-by-step poker lessons',
+    icon: BookOpen,
+    path: '/learn-poker',
+    accentClass: 'from-sky-500/20 to-sky-500/5',
+    iconColor: 'text-sky-400',
+    premium: false,
+  },
   {
     title: 'VS Bots',
     subtitle: 'Practice Mode',
@@ -43,7 +53,7 @@ export function GameModesGrid() {
 
   return (
     <>
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-2.5">
       {modes.map((mode) => {
         const Icon = mode.icon;
         return (
