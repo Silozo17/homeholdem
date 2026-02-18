@@ -1116,7 +1116,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         >
           <TableFelt />
 
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 27px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
@@ -1127,7 +1127,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '44%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
+          <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: isMobileLandscape ? '44%' : 'calc(44% + 12px)', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
             {visibleCommunityCards.map((card, i) => {
               const isFlop = i < 3;
               const dealDelay = isFlop ? i * 0.18 : 0.1;
@@ -1333,7 +1333,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* YOUR TURN badge */}
       {showActions && (
-        <div className="absolute pointer-events-none" style={{ bottom: isLandscape ? 'calc(18% + 65px)' : 'calc(22% + 65px)', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS }}>
+        <div className="absolute pointer-events-none" style={{ bottom: isMobileLandscape ? 'calc(18% + 65px)' : isLandscape ? 'calc(18% + 100px)' : 'calc(22% + 65px)', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{ background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))', color: 'hsl(43 74% 60%)', border: '1px solid hsl(43 74% 49% / 0.4)', textShadow: '0 0 8px hsl(43 74% 49% / 0.5)' }}>
             YOUR TURN
