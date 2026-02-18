@@ -1,40 +1,35 @@
 
 
-# Fix: Turn Timer Duration Mismatch
+# Fix: Dealer Character Scales with Table Image
 
 ## Problem
 
-The server sets a **45-second** action deadline (confirmed in both `poker-start-hand/index.ts` line 445 and `poker-action/index.ts` line 539). However, the visual timer in `PlayerSeat.tsx` is hardcoded to **20 seconds** on line 48:
-
-```typescript
-const TIMER_DURATION = 20; // <-- wrong, should be 45
-```
-
-This means the ring around the active player's avatar drains in 20 seconds, but the server does not actually fold the player until 45 seconds. Players see the timer "expire" visually, then nothing happens for another 25 seconds.
-
-Note: `TurnTimer.tsx` correctly defaults to 45s, but it is not used anywhere -- `PlayerSeat.tsx` has its own self-contained timer.
+The dealer's `top` position uses `calc(-4% - 32px)` / `calc(-4% - 62px)` — the percentage part scales with the table, but the pixel offset does **not**. On larger or smaller screens the dealer drifts away from the table edge.
 
 ## Fix
 
-**File:** `src/components/poker/PlayerSeat.tsx`, line 48
+**File:** `src/components/poker/PokerTablePro.tsx`, line 347
 
-Change:
+Change the dealer's `top` from a calc with pixels to a pure percentage value, so it scales proportionally with the 16:9 table wrapper on all devices.
+
+Current:
 ```typescript
-const TIMER_DURATION = 20;
-```
-To:
-```typescript
-const TIMER_DURATION = 45;
+style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)', zIndex: Z.DEALER }}
 ```
 
-One line change. Nothing else.
+New:
+```typescript
+style={{ top: isMobileLandscape ? '-14%' : '-22%', zIndex: Z.DEALER }}
+```
+
+The percentages are calculated to match the current visual position on mobile (the reference device), and will now scale proportionally on tablets, desktops, and other screen sizes.
 
 ## What Changes
-- `src/components/poker/PlayerSeat.tsx` -- line 48: `TIMER_DURATION` from `20` to `45`
+- `src/components/poker/PokerTablePro.tsx` line 347 — dealer `top` value changed from `calc()` with pixels to pure percentage
 
 ## What Does NOT Change
-- No other files
-- No UI layout, styling, navigation, or spacing changes
-- No server-side changes
+- No seat positions, card layouts, or other element positions
+- No styling, spacing, or navigation changes
+- DealerCharacter component itself is untouched
 - Bottom nav untouched
 
