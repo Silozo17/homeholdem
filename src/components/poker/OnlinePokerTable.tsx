@@ -440,11 +440,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!lastActions) return;
     const handId = tableState?.current_hand?.hand_id ?? '';
     for (const [playerId, actionStr] of Object.entries(lastActions)) {
-      if (actionStr === 'all_in' || actionStr === 'all-in') {
-        const key = `voice:${playerId}:${actionStr}:${handId}`;
+      const lower = actionStr.toLowerCase();
+      if (lower === 'all_in' || lower === 'all-in') {
+        const key = `voice:${playerId}:${lower}:${handId}`;
         if (!processedActionsRef.current.has(key)) {
           processedActionsRef.current.add(key);
-          announceCustom("All in! We have an all in!");
+          const seat = tableState?.seats.find(s => s.player_id === playerId);
+          const playerName = seat?.display_name || 'A player';
+          announceCustom(`All in! ${playerName} is all in!`);
           break;
         }
       }
@@ -1306,7 +1309,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const isSingleEmoji = /^\p{Emoji}$/u.test(bubble.text);
             return (
               <div key={bubble.id} className="absolute pointer-events-none"
-                style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: 'translateX(-50%)', zIndex: Z.EFFECTS + 5 }}>
+                style={{ left: `${pos.xPct}%`, top: `${pos.yPct - 12}%`, transform: `translateX(${pos.xPct < 30 ? '-10%' : pos.xPct > 70 ? '-90%' : '-50%'})`, zIndex: Z.EFFECTS + 5 }}>
                 <div className={isSingleEmoji ? 'animate-emote-pop' : 'animate-float-up'}>
                   {isSingleEmoji ? (
                     <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>{bubble.text}</span>
