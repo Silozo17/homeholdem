@@ -102,7 +102,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     setRevealedIndices(new Set());
     const timers: ReturnType<typeof setTimeout>[] = [];
     player.holeCards.forEach((_, i) => {
-      const dealDelay = (i * totalActiveRef.current + seatDealOrderRef.current) * 0.15 + 0.05;
+      const dealDelay = (i * totalActiveRef.current + seatDealOrderRef.current) * 0.30 + 0.05;
       const revealMs = (dealDelay + 0.45) * 1000;
       timers.push(setTimeout(() => {
         setRevealedIndices(prev => new Set(prev).add(i));
@@ -119,7 +119,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
       style={{ zIndex: 3, top: 'calc(-28% + 40px)' }}>
       {cards.map((card, i) => {
-        const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.15 + 0.05 : i * 0.1;
+        const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.30 + 0.05 : i * 0.1;
         const isRevealed = useReveal ? revealedIndices.has(i) : true;
         const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
         return (

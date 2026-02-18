@@ -112,6 +112,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
     spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp, onlinePlayerIds,
+    kickedForInactivity,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -231,6 +232,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       announceBlindUp(payload.new_small, payload.new_big);
     });
   }, [onBlindsUp, announceBlindUp]);
+
+  // Handle server-side inactivity kick
+  useEffect(() => {
+    if (kickedForInactivity) {
+      toast({
+        title: '⚠️ Removed for inactivity',
+        description: 'You were removed from the table due to inactivity.',
+        variant: 'destructive',
+      });
+      onLeave();
+    }
+  }, [kickedForInactivity, onLeave]);
 
   // Track starting stack when first seated
   useEffect(() => {

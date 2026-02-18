@@ -29,7 +29,7 @@ export interface ChatBubble {
 
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
-interface UseOnlinePokerTableReturn {
+interface UseOnlinePokerTableReturn extends Record<string, any> {
   tableState: OnlineTableState | null;
   myCards: Card[] | null;
   loading: boolean;
@@ -97,6 +97,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const lastBroadcastRef = useRef<number>(Date.now());
   const [onlinePlayerIds, setOnlinePlayerIds] = useState<Set<string>>(new Set());
   const timeoutPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [kickedForInactivity, setKickedForInactivity] = useState(false);
 
   // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
   useEffect(() => {
@@ -267,7 +268,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setTableState(null);
           return;
         }
-        if (payload?.action === 'leave' && payload?.seat != null) {
+        if ((payload?.action === 'leave' || payload?.action === 'kicked') && payload?.seat != null) {
           setTableState(prev => {
             if (!prev) return prev;
             return {
@@ -279,7 +280,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
               ),
             };
           });
-          // Don't refreshState for leaves — local update is sufficient
+          // If this player was kicked for inactivity, flag it
+          if (payload.action === 'kicked' && payload.player_id === userId) {
+            setKickedForInactivity(true);
+          }
           return;
         }
         if (payload?.action === 'join') {
@@ -697,6 +701,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     lastKnownPhase,
     lastKnownStack,
     onlinePlayerIds,
+    kickedForInactivity,
     joinTable,
     leaveTable,
     startHand,

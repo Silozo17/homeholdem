@@ -404,11 +404,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 2. Auto-kick players with 3+ consecutive timeouts (FIX SV-6: was 1, too aggressive) ──
+  // ── 2. Auto-kick players with 2+ consecutive timeouts ──
     const { data: timeoutSeats } = await admin
       .from("poker_seats")
       .select("id, table_id, player_id, seat_number, consecutive_timeouts")
-      .gte("consecutive_timeouts", 3)
+      .gte("consecutive_timeouts", 2)
       .not("player_id", "is", null);
 
     const kickResults: any[] = [];
@@ -428,7 +428,7 @@ Deno.serve(async (req) => {
         await channel.send({
           type: "broadcast",
           event: "seat_change",
-          payload: { action: "leave", seat: seat.seat_number, player_id: seat.player_id },
+          payload: { action: "kicked", seat: seat.seat_number, player_id: seat.player_id },
         });
       } catch (kickErr: any) {
         console.error(`Error kicking player ${seat.player_id}:`, kickErr);
