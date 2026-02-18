@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import tableBase from '@/assets/poker/table/poker-table.webp';
+import tableBase from '@/assets/poker/table/poker_table_2.webp';
 
 interface TableFeltProps {
   children?: ReactNode;

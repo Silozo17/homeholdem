@@ -1148,11 +1148,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               )} style={{ textShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
                 {hand.phase === 'preflop' ? 'Pre-Flop' : hand.phase === 'complete' ? 'Showdown' : hand.phase}
               </span>
-            ) : (
-              <span className="text-[9px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
-              </span>
-            )}
+            ) : null}
           </div>
 
           {isSeated && !hand && !autoStartAttempted && !handHasEverStarted && activeSeats.length >= 2 && (
@@ -1377,17 +1373,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
       {/* Spectator overlay */}
       {isSpectator && (
-        <div className="absolute bottom-0 left-0 right-0 px-4 py-3"
-          style={{ zIndex: Z.ACTIONS, paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)', background: 'linear-gradient(180deg, transparent, hsl(0 0% 0% / 0.8))' }}>
-          <p className="text-xs text-center font-bold mb-2" style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
-            Tap a glowing seat to join
-          </p>
+        <>
+          <div className="absolute left-0 right-0 text-center pointer-events-none"
+            style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 85px)' }}>
+            <p className="text-xs font-bold" style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
+              Tap a glowing seat to join
+            </p>
+          </div>
           <button onClick={onLeave}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold transition-all active:scale-95 max-w-xs mx-auto"
-            style={{ background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))', color: 'hsl(0 0% 60%)', border: '1px solid hsl(0 0% 20%)' }}>
+            className="absolute flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
+            style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 12px)', background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))', color: 'hsl(0 0% 60%)', border: '1px solid hsl(0 0% 20%)' }}>
             <ArrowLeft className="h-3.5 w-3.5" /> Leave
           </button>
-        </div>
+        </>
       )}
 
       {/* Kick confirmation dialog */}

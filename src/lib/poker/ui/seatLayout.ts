@@ -48,14 +48,14 @@ export const LANDSCAPE_ELLIPSE: Ellipse = { cx: 50, cy: 50, rx: 44, ry: 38 };
 // Coordinates place avatar circles ON the brown rail edge
 const SEATS_LANDSCAPE: Record<SeatKey, { xPct: number; yPct: number }> = {
   Y: { xPct: 50, yPct: 92 },   // bottom center (hero)
-  A: { xPct: 16, yPct: 78 },   // bottom-left
+  A: { xPct: 14, yPct: 79.5 }, // bottom-left (shifted left 10px, down 5px)
   B: { xPct: 6,  yPct: 48 },   // left middle
-  C: { xPct: 16, yPct: 18 },   // upper-left
-  D: { xPct: 34, yPct: 4 },    // top-left
-  E: { xPct: 84, yPct: 78 },   // bottom-right (mirror of A)
+  C: { xPct: 12, yPct: 18 },   // upper-left (shifted left 25px)
+  D: { xPct: 30, yPct: 6 },    // top-left (shifted left 25px, down 8px)
+  E: { xPct: 86, yPct: 79.5 }, // bottom-right (shifted right 10px, down 5px)
   F: { xPct: 94, yPct: 48 },   // right middle (mirror of B)
-  G: { xPct: 84, yPct: 18 },   // upper-right (mirror of C)
-  H: { xPct: 66, yPct: 4 },    // top-right (mirror of D)
+  G: { xPct: 88, yPct: 18 },   // upper-right (shifted right 25px)
+  H: { xPct: 70, yPct: 6 },    // top-right (shifted right 25px, down 8px)
 };
 
 // Portrait uses tighter positions
