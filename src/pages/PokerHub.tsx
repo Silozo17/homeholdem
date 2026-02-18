@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Users, ArrowLeft, Trophy, Crown, Coins } from 'lucide-react';
+import { Bot, Users, ArrowLeft, Crown, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
@@ -68,23 +68,6 @@ export default function PokerHub() {
               accentClass="bg-emerald-500/15"
               ctaLabel="Find Table"
               onClick={() => handlePremiumMode('/online-poker')}
-              compact
-            />
-          </div>
-          <div className="relative">
-            {!isActive && (
-              <Badge className="absolute -top-1 -right-1 z-10 bg-primary/90 text-primary-foreground text-[9px] px-1.5 py-0 gap-0.5">
-                <Crown className="h-2.5 w-2.5" /> PRO
-              </Badge>
-            )}
-            <GameModeCard
-              icon={Trophy}
-              title="Tournaments"
-              description="Structured competitions with blind schedules"
-              hint="Multi-table • Payouts"
-              accentClass="bg-purple-500/15"
-              ctaLabel="Browse Tournaments"
-              onClick={() => handlePremiumMode('/poker-tournament')}
               compact
             />
           </div>
