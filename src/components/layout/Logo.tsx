@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { CardSuit } from '@/components/common/CardSuits';
+import hhLogo from '@/assets/poker/hh-logo.webp';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
@@ -13,23 +13,29 @@ export function Logo({ size = 'md', className }: LogoProps) {
     lg: 'text-4xl',
   };
 
-  const iconSize = size === 'lg' ? 'lg' : size === 'md' ? 'md' : 'sm';
+  const imgSize = size === 'lg' ? 48 : size === 'md' ? 32 : 24;
 
   return (
-    <div className={cn('flex flex-col items-center', className)}>
-      <div className="flex items-center gap-2">
-        <CardSuit suit="heart" size={iconSize} />
-        <h1 className={cn('font-bold text-gold-gradient tracking-tight', sizeClasses[size])}>
+    <div className={cn('flex items-center gap-2', className)}>
+      <img
+        src={hhLogo}
+        alt="Home Hold'em Club"
+        width={imgSize}
+        height={imgSize}
+        className="object-contain"
+        draggable={false}
+      />
+      <div className="flex flex-col">
+        <h1 className={cn('font-bold text-gold-gradient tracking-tight leading-tight', sizeClasses[size])}>
           Home Hold'em
         </h1>
-        <CardSuit suit="spade" size={iconSize} className="opacity-60" />
+        <span className={cn(
+          'text-muted-foreground uppercase tracking-[0.3em] font-medium leading-tight',
+          size === 'lg' ? 'text-sm' : 'text-xs'
+        )}>
+          Club
+        </span>
       </div>
-      <span className={cn(
-        'text-muted-foreground uppercase tracking-[0.3em] font-medium',
-        size === 'lg' ? 'text-sm' : 'text-xs'
-      )}>
-        Club
-      </span>
     </div>
   );
 }
