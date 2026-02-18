@@ -509,12 +509,18 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
     await callEdge('poker-join-table', { table_id: tableId, seat_number: seatNumber, buy_in_amount: buyIn });
     await refreshState();
+    if (channelRef.current && userId) {
+      await channelRef.current.track({ user_id: userId, role: 'player' });
+    }
   }, [tableId, refreshState]);
 
   const leaveSeat = useCallback(async () => {
     if (mySeatNumber === null) return;
     await callEdge('poker-leave-table', { table_id: tableId });
     await refreshState();
+    if (channelRef.current && userId) {
+      await channelRef.current.track({ user_id: userId, role: 'spectator' });
+    }
   }, [tableId, refreshState, mySeatNumber]);
 
   const leaveTable = useCallback(async () => {
