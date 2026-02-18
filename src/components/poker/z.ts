@@ -6,6 +6,8 @@ export const Z = {
   TABLE: 1,
   /** Gold trim glow overlay */
   TRIM_GLOW: 2,
+  /** Club logo watermark on felt */
+  LOGO: 3,
   /** Community cards + pot display + phase text */
   CARDS: 5,
   /** Chip animations (fly to pot, etc.) */

@@ -13,6 +13,7 @@ import { PlayerSeat } from './PlayerSeat';
 import { SeatAnchor } from './SeatAnchor';
 import { DealerCharacter } from './DealerCharacter';
 import { TableFelt } from './TableFelt';
+import hhLogo from '@/assets/poker/hh-logo.webp';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { ChipAnimation } from './ChipAnimation';
 import { QuickChat } from './QuickChat';
@@ -1117,6 +1118,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           }}
         >
           <TableFelt />
+          <img
+            src={hhLogo}
+            alt=""
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-auto pointer-events-none select-none"
+            style={{ zIndex: Z.LOGO, opacity: 0.75 }}
+            draggable={false}
+          />
 
           <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : isLargeDesktop ? 'calc(-4% - 31px)' : 'calc(-4% - 27px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
