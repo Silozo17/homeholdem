@@ -1,41 +1,42 @@
 
 
-# Fix: Active Player Count Always Reflects True Players
+# Fix: Lobby Can't See Player Count for Community Tables
 
 ## Problem
-The lobby counts ALL rows in `poker_seats` for each table, including seats with status `sitting_out`, `left`, or other non-active states. This shows incorrect (stale) player counts, especially after players leave.
+The `poker_seats` SELECT RLS policy only allows viewing seats at tables with `table_type = 'public'`. Community tables have `table_type = 'community'`, so the lobby's seat count query is blocked by RLS and always returns 0 players for those tables.
 
 ## Solution
-Add a status filter to the seat count query so it only counts seats where the player is actively playing.
+Update the `poker_seats` SELECT policy to also allow viewing seats at `community` tables.
 
 ## Technical Detail
 
-**File:** `src/components/poker/OnlinePokerLobby.tsx`
+**Database migration only -- no frontend changes.**
 
-**Lines 86-89** -- add `.in('status', ['active', 'sitting_out'])` to the seats query to only count players who are actually present at the table (both active and sitting-out players are "at" the table; players who busted or left are not).
+Drop and recreate the `poker_seats` SELECT policy to include `'community'` alongside `'public'`:
 
-Before:
-```typescript
-const { data: seats } = await supabase
-  .from('poker_seats')
-  .select('table_id')
-  .in('table_id', tableIds.length > 0 ? tableIds : ['none']);
+```sql
+DROP POLICY IF EXISTS "View seats at accessible tables" ON poker_seats;
+
+CREATE POLICY "View seats at accessible tables" ON poker_seats
+  FOR SELECT USING (
+    player_id = auth.uid()
+    OR (EXISTS (
+      SELECT 1 FROM poker_tables t
+      WHERE t.id = poker_seats.table_id
+      AND (
+        t.table_type IN ('public', 'community')
+        OR t.created_by = auth.uid()
+        OR (t.club_id IS NOT NULL AND is_club_member(auth.uid(), t.club_id))
+      )
+    ))
+  );
 ```
 
-After:
-```typescript
-const { data: seats } = await supabase
-  .from('poker_seats')
-  .select('table_id')
-  .in('table_id', tableIds.length > 0 ? tableIds : ['none'])
-  .in('status', ['active', 'sitting_out']);
-```
-
-The realtime subscription already triggers `fetchTables()` on any `poker_seats` change (line 113), so live updates and refresh both work -- they just need the correct filter.
+The only difference is changing `t.table_type = 'public'` to `t.table_type IN ('public', 'community')`.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerLobby.tsx` | Add status filter to seat count query |
+| Database migration (SQL) | Update `poker_seats` SELECT policy to include `community` table type |
 
