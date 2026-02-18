@@ -1,38 +1,100 @@
 
 
-# Increase Betting Button Size and Spacing
+# Fix: Player Stays After Losing All-In + Disconnect Blocking Controls
 
-## What Changes
+## Issue 1: Player with 0 chips stays seated after losing
 
-In `src/components/poker/BettingControls.tsx`:
+**Root cause:** When a player goes all-in and loses, the hand completes and their stack is set to 0. But nobody removes them from their seat. The next hand simply skips them (`activePlayers = seats.filter(s => s.stack > 0)`), so they sit at the table as a ghost -- visible but never dealt in.
 
-### Portrait mode (bottom bar)
-- Button height: `h-11` (44px) -> `h-[51px]` (44 * 1.15 = ~51px, 15% larger)
-- Gap between buttons: `gap-2` (8px) -> `gap-[11px]` (8 + 3 = 11px)
+**Fix:** Add a cleanup step in `poker-start-hand` that auto-removes any seated player with 0 chips before the new hand begins. This happens after the `sitting_out` activation step and before fetching active seats.
 
-Affected lines: the portrait `<div className="flex gap-2 w-full">` container (appears once for the main button row) and the three buttons (Fold, Call/Check, Raise) which all use `h-11`.
+**File: `supabase/functions/poker-start-hand/index.ts`** (after line 237, before line 240)
 
-### Landscape mode (vertical panel)
-- Button height: `h-8` (32px) -> `h-[37px]` (32 * 1.15 = ~37px, 15% larger)
-- Gap between buttons: `gap-1.5` (6px) -> `gap-[9px]` (6 + 3 = 9px)
+Add:
+```typescript
+// Auto-kick players with 0 chips (busted)
+const { data: bustedSeats } = await admin
+  .from("poker_seats")
+  .select("id, seat_number, player_id")
+  .eq("table_id", table_id)
+  .eq("stack", 0)
+  .not("player_id", "is", null);
 
-Affected lines: the landscape outer `<div className="flex flex-col gap-1.5">` container and the Fold, Call/Check, Raise buttons which use `h-8`.
+for (const busted of bustedSeats || []) {
+  await admin.from("poker_seats").delete().eq("id", busted.id);
+  const ch = admin.channel(`poker:table:${table_id}`);
+  await ch.send({
+    type: "broadcast",
+    event: "seat_change",
+    payload: { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" },
+  });
+}
+```
 
-### Specific lines to edit
+This ensures busted players are removed and all clients see the seat empty before a new hand starts.
 
-**Portrait button row (line ~189):** `gap-2` -> `gap-[11px]`
+---
 
-**Portrait buttons (lines ~192, ~206, ~222):** `h-11` -> `h-[51px]` (Fold, Call/Check, Raise)
+## Issue 2: Disconnect removes player mid-hand without folding
 
-**Landscape outer container (line ~76):** `gap-1.5` -> `gap-[9px]`
+**Root cause:** When a player disconnects (heartbeat stale for 90s), the cleanup in `poker-check-timeouts` section 4 (line 493-523) sets `player_id = null` on the seat immediately, regardless of whether a hand is active. If the disconnected player was the current actor, the next timeout check finds an empty actor seat and force-completes the hand. If they were NOT the actor but still in the hand, the game continues with their seat data wiped -- which can cause errors or stuck states for other players.
 
-**Landscape buttons (lines ~115, ~123, ~133, ~149):** `h-8` -> `h-[37px]` (Cancel, Fold, Call/Check, Raise)
+**Fix:** Before kicking a stale-heartbeat player, check if there's an active hand at that table. If so, mark the seat as `disconnected` instead of clearing it, which lets the existing timeout-fold logic handle them gracefully (they get auto-folded on their turn, and the hand continues normally).
 
-### What is NOT changed
-- Button colors, gradients, borders, shadows
-- Icon sizes, label text
-- Quick bet buttons, slider, raise panel
-- Cancel button in portrait mode (slider dismiss)
-- No layout, navigation, or positioning changes
-- No other files
+**File: `supabase/functions/poker-check-timeouts/index.ts`** (section 4, lines 493-523)
+
+Replace the heartbeat kick logic with:
+```typescript
+for (const seat of staleSeats || []) {
+  try {
+    // Check if there's an active hand at this table
+    const { data: activeHand } = await admin
+      .from("poker_hands")
+      .select("id")
+      .eq("table_id", seat.table_id)
+      .is("completed_at", null)
+      .maybeSingle();
+
+    if (activeHand) {
+      // Mid-hand: mark as disconnected, let timeout-fold handle it
+      await admin
+        .from("poker_seats")
+        .update({ status: "disconnected" })
+        .eq("id", seat.id);
+    } else {
+      // No active hand: safe to remove entirely
+      await admin
+        .from("poker_seats")
+        .delete()
+        .eq("id", seat.id);
+    }
+
+    const hbChannel = admin.channel(`poker:table:${seat.table_id}`);
+    await hbChannel.send({
+      type: "broadcast",
+      event: "seat_change",
+      payload: { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id },
+    });
+
+    heartbeatKicks.push({ ... });
+  } catch (hbErr) { ... }
+}
+```
+
+This prevents the race condition where clearing the seat mid-hand causes the current actor to vanish and blocks other players' controls.
+
+---
+
+## Summary
+
+| File | Change | Impact |
+|------|--------|--------|
+| `supabase/functions/poker-start-hand/index.ts` | Auto-remove 0-stack players before new hand | Busted players no longer sit as ghosts |
+| `supabase/functions/poker-check-timeouts/index.ts` | Mark disconnected players as "disconnected" during active hand instead of removing | Prevents mid-hand seat wipe that blocks other players |
+
+## What Is NOT Changed
+- Bottom navigation, UI components, styles, spacing
+- Betting controls, seat layout, game logic
+- No new tables or schema changes
+- No client-side code changes
 
