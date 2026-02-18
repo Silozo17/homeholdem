@@ -60,7 +60,7 @@ export default function PaidTournaments() {
 
   async function handleRegister(tournamentId: string) {
     if (!user) { toast({ title: "Login required", variant: "destructive" }); return; }
-    if (playerLevel < 5) { toast({ title: "Level 5 required", description: `You are level ${playerLevel}`, variant: "destructive" }); return; }
+    if (!isAdmin && playerLevel < 5) { toast({ title: "Level 5 required", description: `You are level ${playerLevel}`, variant: "destructive" }); return; }
 
     try {
       const { data, error } = await supabase.functions.invoke('paid-tournament-register', {
@@ -127,7 +127,7 @@ export default function PaidTournaments() {
           )}
         </div>
 
-        {playerLevel < 5 && (
+        {playerLevel < 5 && !isAdmin && (
           <Card className="p-3 border-amber-500/30 bg-amber-500/10">
             <p className="text-xs text-amber-300">
               🔒 Level 5 required to register. You are level {playerLevel}. Keep playing to level up!

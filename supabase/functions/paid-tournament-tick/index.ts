@@ -13,29 +13,113 @@ Deno.serve(async (req) => {
     const now = new Date();
     const results: any[] = [];
 
-    // 1. Auto-start scheduled tournaments past start_at
+    // 1a. Early table creation: create tables 15 min before start_at (but don't start blinds)
+    const fifteenMinFromNow = new Date(now.getTime() + 15 * 60 * 1000);
+    const { data: toCreateTables } = await admin.from("paid_tournaments")
+      .select("*")
+      .eq("status", "scheduled")
+      .is("tables_created_at", null)
+      .lte("start_at", fifteenMinFromNow.toISOString());
+
+    for (const tournament of (toCreateTables || [])) {
+      try {
+        // Get paid registrations
+        const { data: regs } = await admin.from("paid_tournament_registrations")
+          .select("user_id")
+          .eq("tournament_id", tournament.id)
+          .eq("status", "paid");
+
+        const players = regs || [];
+        if (players.length < 2) {
+          results.push({ action: "early_tables_skipped", tournament_id: tournament.id, reason: "Not enough players", count: players.length });
+          continue;
+        }
+
+        // Calculate tables needed (max 9 per table)
+        const playersPerTable = 9;
+        const numTables = Math.ceil(players.length / playersPerTable);
+
+        // Create tables
+        const tableIds: string[] = [];
+        for (let t = 0; t < numTables; t++) {
+          const { data: table, error: tableErr } = await admin.from("poker_tables").insert({
+            name: `${tournament.name} - Table ${t + 1}`,
+            created_by: tournament.created_by,
+            max_seats: 9,
+            small_blind: tournament.starting_sb,
+            big_blind: tournament.starting_bb,
+            ante: tournament.starting_ante,
+            original_small_blind: tournament.starting_sb,
+            original_big_blind: tournament.starting_bb,
+            blind_timer_minutes: tournament.blind_interval_minutes,
+            table_type: "private",
+            status: "active",
+            paid_tournament_id: tournament.id,
+            is_persistent: false,
+          }).select("id").single();
+
+          if (tableErr) { console.error("Table creation error:", tableErr); continue; }
+          tableIds.push(table.id);
+
+          // Create 9 empty seats
+          const seats = Array.from({ length: 9 }, (_, i) => ({
+            table_id: table.id,
+            seat_number: i + 1,
+            player_id: null,
+            stack: 0,
+            status: "active" as const,
+          }));
+          await admin.from("poker_seats").insert(seats);
+        }
+
+        // Round-robin seat players (random)
+        const shuffled = players.sort(() => Math.random() - 0.5);
+        for (let i = 0; i < shuffled.length; i++) {
+          const tableIdx = i % numTables;
+          const seatNum = Math.floor(i / numTables) + 1;
+          const tableId = tableIds[tableIdx];
+
+          await admin.from("poker_seats").update({
+            player_id: shuffled[i].user_id,
+            stack: tournament.starting_stack,
+            status: "active",
+          }).eq("table_id", tableId).eq("seat_number", seatNum);
+        }
+
+        // Mark tables_created_at but keep status as scheduled
+        await admin.from("paid_tournaments").update({
+          tables_created_at: now.toISOString(),
+        }).eq("id", tournament.id);
+
+        results.push({
+          action: "early_tables_created",
+          tournament_id: tournament.id,
+          tables_created: numTables,
+          players_seated: shuffled.length,
+          table_ids: tableIds,
+        });
+      } catch (e) {
+        results.push({ action: "early_tables_error", tournament_id: tournament.id, error: e.message });
+      }
+    }
+
+    // 1b. Auto-start scheduled tournaments past start_at (tables already created)
     const { data: toStart } = await admin.from("paid_tournaments")
       .select("id")
       .eq("status", "scheduled")
+      .not("tables_created_at", "is", null)
       .lte("start_at", now.toISOString());
 
     if (toStart && toStart.length > 0) {
-      // Call paid-tournament-start for each
       for (const t of toStart) {
-        try {
-          const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/paid-tournament-start`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            },
-            body: JSON.stringify({ tournament_id: t.id }),
-          });
-          const data = await res.json();
-          results.push({ action: "auto_start", tournament_id: t.id, result: data });
-        } catch (e) {
-          results.push({ action: "auto_start", tournament_id: t.id, error: e.message });
-        }
+        // Set tournament to running, start blind clock
+        await admin.from("paid_tournaments").update({
+          status: "running",
+          started_at: now.toISOString(),
+          current_blind_level: 1,
+          level_started_at: now.toISOString(),
+        }).eq("id", t.id);
+        results.push({ action: "auto_start", tournament_id: t.id });
       }
     }
 
