@@ -1,53 +1,63 @@
 
+# Fix: Infinite Recursion in poker_tables RLS Policy
 
-# Fix: Community Tables Deleted When Last Player Leaves
+## Root Cause
 
-## Problem
-In `supabase/functions/poker-leave-table/index.ts` (lines 387-408), when `remainingAfterLeave === 0`, the function cascade-deletes the table and all its data. This happens for ALL table types, including community/persistent tables that should remain open permanently.
+The lobby query returns **HTTP 500** with error: `infinite recursion detected in policy for relation "poker_tables"`.
+
+This happens because:
+- The `poker_tables` SELECT policy checks `poker_seats` (to see if user is seated for private/friends tables)
+- The `poker_seats` SELECT policy checks `poker_tables` (to see if the table is public/club)
+- Postgres detects the circular dependency and throws an error
+
+This means **no tables are ever visible** in the lobby.
 
 ## Solution
-Add a check for `is_persistent` before deleting. If the table is persistent (community), skip the deletion and just reset the table status to `"waiting"` instead.
+
+Create a `SECURITY DEFINER` helper function that bypasses RLS to check if a user has a seat at a table. Then rewrite the `poker_tables` SELECT policy to call that function instead of directly querying `poker_seats`.
+
+This breaks the cycle because the function runs with elevated privileges and skips the `poker_seats` RLS check.
 
 ## Technical Detail
 
-**File:** `supabase/functions/poker-leave-table/index.ts`
+### 1. Database migration
 
-**Lines 387-408** -- wrap the deletion block in a conditional:
-
-Before:
-```typescript
-if (remainingAfterLeave === 0) {
-  // broadcast close then cascade-delete
-  ...
-}
+Create a new function:
+```sql
+CREATE OR REPLACE FUNCTION public.is_seated_at_table(_user_id uuid, _table_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM poker_seats
+    WHERE table_id = _table_id AND player_id = _user_id
+  )
+$$;
 ```
 
-After:
-```typescript
-if (remainingAfterLeave === 0) {
-  // Fetch table to check if persistent
-  const { data: tableInfo } = await admin
-    .from("poker_tables")
-    .select("is_persistent")
-    .eq("id", table_id)
-    .single();
+Then drop and recreate the `poker_tables` SELECT policy using this function instead of a subquery on `poker_seats`:
 
-  if (tableInfo?.is_persistent) {
-    // Community table: reset to waiting, do NOT delete
-    await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
-  } else {
-    // Non-persistent: broadcast close and cascade-delete (existing logic)
-    await channel.send({ ... table_closed ... });
-    // ... delete hands, seats, table ...
-  }
-}
+```sql
+DROP POLICY IF EXISTS "Users can view relevant tables" ON poker_tables;
+
+CREATE POLICY "Users can view relevant tables" ON poker_tables
+  FOR SELECT USING (
+    table_type IN ('public', 'community')
+    OR created_by = auth.uid()
+    OR (table_type = 'friends' AND is_seated_at_table(auth.uid(), id))
+    OR (table_type = 'private' AND is_seated_at_table(auth.uid(), id))
+    OR (table_type = 'club' AND club_id IS NOT NULL AND is_club_member(auth.uid(), club_id))
+  );
 ```
 
-This is the only change needed. The community table stays in the database and remains visible in the lobby for new players to join.
+### No frontend changes needed
+
+The lobby code is correct. Once the RLS policy stops causing infinite recursion, the community tables (and all other tables) will appear.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/poker-leave-table/index.ts` | Skip deletion for persistent/community tables when last player leaves |
-
+| Database migration (SQL) | Add `is_seated_at_table` function, recreate `poker_tables` SELECT policy |
