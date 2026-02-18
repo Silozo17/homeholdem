@@ -164,7 +164,7 @@ export default function LearnPoker() {
           <NotificationBell className="absolute right-4" />
         </div>
       </header>
-      <div className="h-14 safe-area-top shrink-0" />
+      <div className="shrink-0" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} />
 
       <div className="flex-1 overflow-auto px-4 py-6 space-y-5 pb-8">
         {/* Header */}
