@@ -92,6 +92,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
   const prevCommunityAtResultRef = useRef(0);
   const lastAppliedVersionRef = useRef(0);
+  const lastActedVersionRef = useRef<number | null>(null);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -117,7 +118,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const currentActorId = hand?.current_actor_id ??
     tableState?.seats.find(s => s.seat === hand?.current_actor_seat)?.player_id ?? null;
   const rawIsMyTurn = !!userId && currentActorId === userId && !!hand && hand.phase !== 'complete' && hand.phase !== 'showdown';
-  const isMyTurn = rawIsMyTurn && !actionPending;
+  const isMyTurn = rawIsMyTurn && !actionPending && (lastActedVersionRef.current === null || (hand?.state_version ?? 0) > lastActedVersionRef.current);
 
   const mySeat = tableState?.seats.find(s => s.player_id === userId);
   const myCurrentBet = mySeat?.current_bet ?? 0;
@@ -131,6 +132,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (currentHandId !== prevHandIdRef.current) {
       if (currentHandId && currentHandId !== prevHandIdRef.current) {
         setLastActions({});
+        lastActedVersionRef.current = null;
       }
       prevHandIdRef.current = currentHandId;
       prevCommunityAtResultRef.current = 0;
@@ -530,6 +532,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   const sendAction = useCallback(async (action: string, amount?: number) => {
     if (!hand || actionPending) return;
+    lastActedVersionRef.current = hand.state_version ?? 0;
     setActionPending(true);
     if (actionPendingFallbackRef.current) clearTimeout(actionPendingFallbackRef.current);
     actionPendingFallbackRef.current = setTimeout(() => {
