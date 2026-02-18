@@ -1,56 +1,43 @@
 
 
-# Visual Fixes for iPad/Tablet/Desktop Screens Only
+# Add Home Hold'em Logo to Center of Poker Table
 
-These 3 changes apply only to screens 900px+ wide (iPads and larger). Mobile layout stays untouched.
+Place the uploaded HH logo image at the center of the table felt, at 75% opacity, layered below the community cards so cards appear on top when dealt.
 
-## 1. Dealer Avatar — Move Down 35px (iPad+ only)
+## Steps
 
-**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1119)
+1. **Copy the uploaded image** into the project at `src/assets/poker/hh-logo.webp`.
 
-The dealer position currently uses:
-- Mobile landscape: `calc(-4% - 32px)` 
-- Everything else (including iPad): `calc(-4% - 62px)`
+2. **Add a LOGO z-index** to `src/components/poker/z.ts` with value `3` (between TRIM_GLOW at 2 and CARDS at 5), so the logo sits above the table but below cards.
 
-Change the non-mobile branch to `calc(-4% - 27px)` (62 - 35 = 27, moving it 35px lower).
+3. **Add the logo element** in `src/components/poker/OnlinePokerTable.tsx`, right after the `<TableFelt />` line (~line 1119). It will be an absolutely positioned `<img>` centered on the table at 75% opacity using `zIndex: Z.LOGO`.
 
-**Before:** `top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)'`
-**After:** `top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 27px)'`
+## Technical Details
 
-## 2. YOUR TURN Badge — Move Up 35px (iPad+ only)
+**File: `src/components/poker/z.ts`**
+- Add `LOGO: 3` entry between TRIM_GLOW and CARDS.
 
-**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1336)
-
-Current: `bottom: isLandscape ? 'calc(18% + 65px)' : 'calc(22% + 65px)'`
-
-Add a third condition using `isMobileLandscape` to differentiate mobile from iPad landscape:
-- Mobile landscape (under 900px): keep `calc(18% + 65px)`
-- iPad/desktop landscape: `calc(18% + 100px)` (65 + 35 = 100)
-- Portrait: keep `calc(22% + 65px)`
-
-**After:** `bottom: isMobileLandscape ? 'calc(18% + 65px)' : isLandscape ? 'calc(18% + 100px)' : 'calc(22% + 65px)'`
-
-## 3. Community Cards — Move Down 12px (iPad+ only)
-
-**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1130)
-
-Current: `top: '44%'`
-
-Change to use `isMobileLandscape` to keep mobile at 44% but shift iPad/desktop to `calc(44% + 12px)`.
-
-**After:** `top: isMobileLandscape ? '44%' : 'calc(44% + 12px)'`
-
----
+**File: `src/components/poker/OnlinePokerTable.tsx`**
+- Import the logo: `import hhLogo from '@/assets/poker/hh-logo.webp';`
+- After `<TableFelt />`, add:
+```tsx
+<img
+  src={hhLogo}
+  alt=""
+  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-auto pointer-events-none select-none"
+  style={{ zIndex: Z.LOGO, opacity: 0.75 }}
+  draggable={false}
+/>
+```
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | 3 style tweaks (dealer top, YOUR TURN bottom, cards top) -- all gated to 900px+ screens |
+| `src/assets/poker/hh-logo.webp` | New file (copied from upload) |
+| `src/components/poker/z.ts` | Add `LOGO: 3` |
+| `src/components/poker/OnlinePokerTable.tsx` | Add centered logo image below cards |
 
 ## NOT Changed
-- Mobile layout (gated behind `isMobileLandscape`)
-- Bottom navigation
-- Seat positions
-- Any other files or components
+- Mobile layout, seat positions, bottom navigation, dealer position, card positions
 
