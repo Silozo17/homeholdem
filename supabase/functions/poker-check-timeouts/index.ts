@@ -277,7 +277,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 20_000).toISOString() : null;
+        const actionDeadline = nextActorSeat !== null ? new Date(Date.now() + 45_000).toISOString() : null;
 
         const dbSeatUpdates = seatStates.map((s) => {
           const originalSeat = seats.find((dbSeat: any) => dbSeat.id === s.seat_id);
