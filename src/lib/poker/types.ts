@@ -121,6 +121,7 @@ export interface GameState {
     handName: string;
     chipsWon: number;
   }>;
+  dealAnimDone?: boolean;
 }
 
 export const BLIND_LEVELS = [

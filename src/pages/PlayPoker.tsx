@@ -45,12 +45,7 @@ export default function PlayPoker() {
       duration_seconds: duration,
     }).then(() => {});
 
-    // Award XP
-    const xpEvents: Array<{ user_id: string; reason: string; xp_amount: number }> = [];
-    xpEvents.push({ user_id: user.id, reason: 'game_complete', xp_amount: 25 });
-    if (isWinner) xpEvents.push({ user_id: user.id, reason: 'game_win', xp_amount: 100 });
-    if (state.handsWon > 0) xpEvents.push({ user_id: user.id, reason: 'hands_won', xp_amount: state.handsWon * 10 });
-    supabase.from('xp_events').insert(xpEvents).then(() => {});
+    // No XP for bot games
   }, [state.phase, user?.id]);
 
   // Reset saved flag when returning to lobby
