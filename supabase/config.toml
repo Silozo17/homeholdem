@@ -20,3 +20,12 @@ verify_jwt = false
 
 [functions.poker-check-timeouts]
 verify_jwt = false
+
+[functions.paid-tournament-webhook]
+verify_jwt = false
+
+[functions.paid-tournament-tick]
+verify_jwt = false
+
+[functions.paid-tournament-start]
+verify_jwt = false

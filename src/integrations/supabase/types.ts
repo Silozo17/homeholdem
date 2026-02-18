@@ -947,6 +947,163 @@ export type Database = {
           },
         ]
       }
+      paid_tournament_payouts: {
+        Row: {
+          amount_pence: number
+          created_at: string
+          due_at: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          position: number
+          status: string
+          tournament_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_pence: number
+          created_at?: string
+          due_at: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          position: number
+          status?: string
+          tournament_id: string
+          user_id: string
+        }
+        Update: {
+          amount_pence?: number
+          created_at?: string
+          due_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          position?: number
+          status?: string
+          tournament_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_tournament_payouts_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "paid_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paid_tournament_registrations: {
+        Row: {
+          created_at: string
+          id: string
+          paid_amount_pence: number
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          tournament_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          paid_amount_pence?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          tournament_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          paid_amount_pence?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          tournament_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_tournament_registrations_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "paid_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paid_tournaments: {
+        Row: {
+          blind_interval_minutes: number
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          current_blind_level: number
+          entry_fee_pence: number
+          id: string
+          level_started_at: string | null
+          max_players: number
+          name: string
+          payout_preset: string
+          payout_structure: Json
+          start_at: string
+          started_at: string | null
+          starting_ante: number
+          starting_bb: number
+          starting_sb: number
+          starting_stack: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          blind_interval_minutes?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_blind_level?: number
+          entry_fee_pence: number
+          id?: string
+          level_started_at?: string | null
+          max_players: number
+          name: string
+          payout_preset?: string
+          payout_structure?: Json
+          start_at: string
+          started_at?: string | null
+          starting_ante?: number
+          starting_bb?: number
+          starting_sb?: number
+          starting_stack?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          blind_interval_minutes?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_blind_level?: number
+          entry_fee_pence?: number
+          id?: string
+          level_started_at?: string | null
+          max_players?: number
+          name?: string
+          payout_preset?: string
+          payout_structure?: Json
+          start_at?: string
+          started_at?: string | null
+          starting_ante?: number
+          starting_bb?: number
+          starting_sb?: number
+          starting_stack?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payout_structures: {
         Row: {
           amount: number | null
@@ -1411,6 +1568,7 @@ export type Database = {
           name: string
           original_big_blind: number | null
           original_small_blind: number | null
+          paid_tournament_id: string | null
           small_blind: number
           status: Database["public"]["Enums"]["poker_table_status"]
           table_type: Database["public"]["Enums"]["poker_table_type"]
@@ -1437,6 +1595,7 @@ export type Database = {
           name: string
           original_big_blind?: number | null
           original_small_blind?: number | null
+          paid_tournament_id?: string | null
           small_blind?: number
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]
@@ -1463,6 +1622,7 @@ export type Database = {
           name?: string
           original_big_blind?: number | null
           original_small_blind?: number | null
+          paid_tournament_id?: string | null
           small_blind?: number
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]
@@ -1475,6 +1635,13 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poker_tables_paid_tournament_id_fkey"
+            columns: ["paid_tournament_id"]
+            isOneToOne: false
+            referencedRelation: "paid_tournaments"
             referencedColumns: ["id"]
           },
           {
@@ -2081,6 +2248,10 @@ export type Database = {
       }
     }
     Functions: {
+      check_tournament_capacity: {
+        Args: { _tournament_id: string }
+        Returns: number
+      }
       cleanup_expired_verifications: { Args: never; Returns: undefined }
       commit_poker_state: {
         Args: {
