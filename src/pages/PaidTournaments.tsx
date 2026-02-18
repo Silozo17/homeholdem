@@ -85,7 +85,7 @@ export default function PaidTournaments() {
 
   function estimatePrize(entryPence: number, maxPlayers: number) {
     const totalPence = entryPence * maxPlayers;
-    const prize = Math.floor(totalPence * 5 / 9);
+    const prize = Math.ceil(totalPence * 5 / 9);
     return `£${(prize / 100).toFixed(2)}`;
   }
 

@@ -110,7 +110,7 @@ export function PaidTournamentDetail({ tournamentId, onBack, isAdmin, playerLeve
   if (loading || !tournament) return <div className="flex items-center justify-center h-screen text-muted-foreground">Loading...</div>;
 
   const totalPaidPence = regCount * tournament.entry_fee_pence;
-  const prizePool = Math.floor(totalPaidPence * 5 / 9);
+  const prizePool = Math.ceil(totalPaidPence * 5 / 9);
   const presetLabels: Record<string, string> = {
     winner_takes_all: 'Winner Takes All (100%)',
     top_2: 'Top 2 (70% / 30%)',

@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
             .eq("status", "paid");
 
           const totalPaid = (regs || []).reduce((sum: number, r: any) => sum + r.paid_amount_pence, 0);
-          const prizePool = Math.floor(totalPaid * 5 / 9);
+          const prizePool = Math.ceil(totalPaid * 5 / 9);
 
           // Get payout structure
           const payoutStructure = tournament.payout_structure as any[];

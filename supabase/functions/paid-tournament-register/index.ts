@@ -61,18 +61,27 @@ Deno.serve(async (req) => {
     // Create Stripe Checkout Session
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
 
+    const entryDisplay = `£${(tournament.entry_fee_pence / 100).toFixed(2)}`;
     const session = await stripe.checkout.sessions.create({
       customer_email: user.email,
       line_items: [{
         price_data: {
           currency: "gbp",
-          product_data: { name: `Tournament: ${tournament.name}` },
+          product_data: {
+            name: `Home Hold'em: ${tournament.name}`,
+            description: `Tournament entry (${entryDisplay}) · Max ${tournament.max_players} players`,
+          },
           unit_amount: tournament.entry_fee_pence,
         },
         quantity: 1,
       }],
       mode: "payment",
+      payment_method_types: ['card'],
+      locale: 'auto',
       metadata: { tournament_id, user_id: user.id },
+      custom_text: {
+        submit: { message: `You're entering "${tournament.name}". Good luck! 🃏` },
+      },
       success_url: `${req.headers.get("origin")}/tournaments?registered=${tournament_id}`,
       cancel_url: `${req.headers.get("origin")}/tournaments`,
     });
