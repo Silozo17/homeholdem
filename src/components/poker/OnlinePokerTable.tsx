@@ -129,7 +129,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
   const prevPhaseRef = useRef<string | null>(null);
-  const [communityDealSprites, setCommunityDealSprites] = useState<Array<{ id: number; delay: number }>>([]);
+  const [communityCardPhaseKey, setCommunityCardPhaseKey] = useState<string | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   
@@ -296,19 +296,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!currentPhase) setPrevPhase(null);
   }, [currentPhase, prevPhase, play, haptic]);
 
-  // Community card deal sprites on phase change
+  // Track phase changes for community card deal animation keys
   useEffect(() => {
     const prev = prevPhaseRef.current;
     prevPhaseRef.current = currentPhase;
     if (!currentPhase || currentPhase === prev) return;
-    let count = 0;
-    if (currentPhase === 'flop' && prev === 'preflop') count = 3;
-    else if (currentPhase === 'turn' && prev === 'flop') count = 1;
-    else if (currentPhase === 'river' && prev === 'turn') count = 1;
-    if (count > 0) {
-      const sprites = Array.from({ length: count }, (_, i) => ({ id: Date.now() + i, delay: i * 0.18 }));
-      setCommunityDealSprites(sprites);
-      setTimeout(() => setCommunityDealSprites([]), 1200);
+    if ((currentPhase === 'flop' && prev === 'preflop') ||
+        (currentPhase === 'turn' && prev === 'flop') ||
+        (currentPhase === 'river' && prev === 'turn')) {
+      setCommunityCardPhaseKey(`${currentPhase}-${Date.now()}`);
     }
   }, [currentPhase]);
 
@@ -1156,13 +1152,38 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
+          {/* 5-slot community card layout */}
           <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: isMobileLandscape ? '44%' : 'calc(44% + 12px)', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
-            {visibleCommunityCards.map((card, i) => {
-              const isFlop = i < 3;
-              const dealDelay = isFlop ? i * 0.18 : 0.1;
-              return <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="xl" dealDelay={dealDelay} />;
+            {[0, 1, 2, 3, 4].map(slotIdx => {
+              const card = visibleCommunityCards[slotIdx];
+              // Determine if this card was just dealt (new in current phase)
+              const isNewInPhase = (() => {
+                if (!communityCardPhaseKey) return false;
+                const phase = communityCardPhaseKey.split('-')[0];
+                if (phase === 'flop' && slotIdx < 3) return true;
+                if (phase === 'turn' && slotIdx === 3) return true;
+                if (phase === 'river' && slotIdx === 4) return true;
+                return false;
+              })();
+              const staggerIdx = (() => {
+                const phase = communityCardPhaseKey?.split('-')[0];
+                if (phase === 'flop') return slotIdx;
+                return 0;
+              })();
+              return (
+                <div key={slotIdx} className="w-[44px] h-[62px] rounded-lg border border-white/15 flex items-center justify-center"
+                  style={{ background: card ? 'transparent' : 'hsl(160 30% 8% / 0.3)' }}>
+                  {card && (
+                    <CardDisplay
+                      card={card}
+                      size="xl"
+                      dealDelay={0}
+                      dealFromDealer={isNewInPhase ? staggerIdx * 0.2 : undefined}
+                    />
+                  )}
+                </div>
+              );
             })}
-            {visibleCommunityCards.length === 0 && hand && <></>}
           </div>
 
           {(!hand || visibleCommunityCards.length === 0) && (
@@ -1274,12 +1295,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             });
           })()}
 
-          {communityDealSprites.map(sprite => (
-            <div key={sprite.id} className="absolute pointer-events-none"
-              style={{ left: '50%', top: '2%', zIndex: Z.EFFECTS, animation: `deal-card-fly-center 0.55s ease-out ${sprite.delay}s both`, ['--deal-center-dy' as any]: '44cqh' }}>
-              <div className="w-8 h-11 rounded card-back-premium border border-white/10" />
-            </div>
-          ))}
+          {/* communityDealSprites removed — actual cards animate via dealFromDealer */}
 
           {chatBubbles.map(bubble => {
             const seatInfo = tableState.seats.find(s => s.player_id === bubble.player_id);
