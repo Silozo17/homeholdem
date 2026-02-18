@@ -1,63 +1,41 @@
 
-# Fix: Infinite Recursion in poker_tables RLS Policy
 
-## Root Cause
+# Fix: Active Player Count Always Reflects True Players
 
-The lobby query returns **HTTP 500** with error: `infinite recursion detected in policy for relation "poker_tables"`.
-
-This happens because:
-- The `poker_tables` SELECT policy checks `poker_seats` (to see if user is seated for private/friends tables)
-- The `poker_seats` SELECT policy checks `poker_tables` (to see if the table is public/club)
-- Postgres detects the circular dependency and throws an error
-
-This means **no tables are ever visible** in the lobby.
+## Problem
+The lobby counts ALL rows in `poker_seats` for each table, including seats with status `sitting_out`, `left`, or other non-active states. This shows incorrect (stale) player counts, especially after players leave.
 
 ## Solution
-
-Create a `SECURITY DEFINER` helper function that bypasses RLS to check if a user has a seat at a table. Then rewrite the `poker_tables` SELECT policy to call that function instead of directly querying `poker_seats`.
-
-This breaks the cycle because the function runs with elevated privileges and skips the `poker_seats` RLS check.
+Add a status filter to the seat count query so it only counts seats where the player is actively playing.
 
 ## Technical Detail
 
-### 1. Database migration
+**File:** `src/components/poker/OnlinePokerLobby.tsx`
 
-Create a new function:
-```sql
-CREATE OR REPLACE FUNCTION public.is_seated_at_table(_user_id uuid, _table_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM poker_seats
-    WHERE table_id = _table_id AND player_id = _user_id
-  )
-$$;
+**Lines 86-89** -- add `.in('status', ['active', 'sitting_out'])` to the seats query to only count players who are actually present at the table (both active and sitting-out players are "at" the table; players who busted or left are not).
+
+Before:
+```typescript
+const { data: seats } = await supabase
+  .from('poker_seats')
+  .select('table_id')
+  .in('table_id', tableIds.length > 0 ? tableIds : ['none']);
 ```
 
-Then drop and recreate the `poker_tables` SELECT policy using this function instead of a subquery on `poker_seats`:
-
-```sql
-DROP POLICY IF EXISTS "Users can view relevant tables" ON poker_tables;
-
-CREATE POLICY "Users can view relevant tables" ON poker_tables
-  FOR SELECT USING (
-    table_type IN ('public', 'community')
-    OR created_by = auth.uid()
-    OR (table_type = 'friends' AND is_seated_at_table(auth.uid(), id))
-    OR (table_type = 'private' AND is_seated_at_table(auth.uid(), id))
-    OR (table_type = 'club' AND club_id IS NOT NULL AND is_club_member(auth.uid(), club_id))
-  );
+After:
+```typescript
+const { data: seats } = await supabase
+  .from('poker_seats')
+  .select('table_id')
+  .in('table_id', tableIds.length > 0 ? tableIds : ['none'])
+  .in('status', ['active', 'sitting_out']);
 ```
 
-### No frontend changes needed
-
-The lobby code is correct. Once the RLS policy stops causing infinite recursion, the community tables (and all other tables) will appear.
+The realtime subscription already triggers `fetchTables()` on any `poker_seats` change (line 113), so live updates and refresh both work -- they just need the correct filter.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| Database migration (SQL) | Add `is_seated_at_table` function, recreate `poker_tables` SELECT policy |
+| `src/components/poker/OnlinePokerLobby.tsx` | Add status filter to seat count query |
+
