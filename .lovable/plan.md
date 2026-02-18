@@ -1,134 +1,32 @@
 
 
-# Fix Tutorial Action Blocking + Visual Control Display
+# Fix Learn Poker Page Header Overlap on Mobile
 
-## Root Causes Found
+## Problem
+The content (BookOpen icon) is cut off behind the fixed header on mobile. The spacer div has `h-14 safe-area-top`, but `h-14` sets an explicit height of 56px. The `safe-area-top` class adds `padding-top`, which does NOT increase the element beyond its fixed 56px height. Meanwhile, the header is 56px + safe-area-inset-top tall, so the spacer is too short.
 
-### Bug 1: Action guard silently blocks but buttons look fully active
-The `guardedAction` wrapper in `LearnPoker.tsx` does block incorrect actions, but `BettingControls` has no visual indication that buttons are disabled. Users see a fully styled, clickable Fold button and assume the guard isn't working. The buttons need to be visually greyed out / disabled when blocked.
+## Fix
+Change the spacer from a fixed-height div to one that accommodates both the header height and safe area inset. Replace `h-14` with `pt-14` so the safe-area padding stacks on top of the 56px.
 
-### Bug 2: "raise" guard blocks "all-in" variant
-When `allowedAction = 'raise'` and the user slides to max chips, `BettingControls` sends `{ type: 'all-in' }` instead of `{ type: 'raise' }`. Since `'all-in' !== 'raise'`, the guard rejects it. The guard must treat `'all-in'` as a valid match for `'raise'` (raising all your chips is still a raise).
+**File: `src/pages/LearnPoker.tsx` (line 167)**
 
-### Bug 3: Coach says "here are your controls" but only shows outline, not the actual buttons
-When the coach highlights the action area during intro steps, the betting controls aren't visible because `showActions` requires `isHumanTurn` to be true, but during intro steps `isPaused = true` so `isHumanTurn = false`. The controls need to be force-shown (read-only) during relevant intro steps.
-
----
-
-## Changes
-
-### File 1: `src/pages/LearnPoker.tsx`
-
-**Fix the action guard to handle raise/all-in equivalence and pass visual blocking info:**
-
-```typescript
-const guardedAction = useCallback((action: GameAction) => {
-  if (allowedAction) {
-    // Treat all-in as valid when raise is required (sliding to max)
-    const actionMatches = 
-      action.type === allowedAction ||
-      (allowedAction === 'raise' && action.type === 'all-in');
-    if (!actionMatches) return; // blocked
-  }
-  playerAction(action);
-}, [allowedAction, playerAction]);
+Change:
+```html
+<div className="h-14 safe-area-top shrink-0" aria-hidden="true" />
 ```
 
-**Pass `allowedAction` to PokerTablePro so BettingControls can visually disable blocked buttons:**
-
-Add a new prop `tutorialAllowedAction` to the PokerTablePro call:
-
-```tsx
-<PokerTablePro
-  state={state}
-  isHumanTurn={isHumanTurn}
-  amountToCall={amountToCall}
-  canCheck={canCheck}
-  maxBet={maxBet}
-  onAction={guardedAction}
-  onNextHand={nextHand}
-  onQuit={handleQuit}
-  tutorialAllowedAction={allowedAction}
-  forceShowControls={!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions'}
-/>
+To:
+```html
+<div className="pt-14 safe-area-top shrink-0" aria-hidden="true" />
 ```
 
-### File 2: `src/components/poker/PokerTablePro.tsx`
-
-**Accept new props and pass to BettingControls:**
-
-Add to the interface:
-```typescript
-tutorialAllowedAction?: string | null;
-forceShowControls?: boolean;
-```
-
-Update `showActions` to include force-show:
-```typescript
-const showActions = (isHumanTurn && humanPlayer && humanPlayer.status === 'active' && dealAnimDone) || forceShowControls;
-```
-
-Pass `tutorialAllowedAction` to BettingControls:
-```tsx
-<BettingControls
-  ...existing props...
-  tutorialAllowedAction={tutorialAllowedAction}
-/>
-```
-
-### File 3: `src/components/poker/BettingControls.tsx`
-
-**Accept `tutorialAllowedAction` prop and visually disable blocked buttons:**
-
-Add to interface:
-```typescript
-tutorialAllowedAction?: string | null;
-```
-
-When `tutorialAllowedAction` is set:
-- Fold button: if `tutorialAllowedAction !== 'fold'`, add `opacity-30 pointer-events-none` classes
-- Check/Call button: if `tutorialAllowedAction !== 'check' && tutorialAllowedAction !== 'call'`, add `opacity-30 pointer-events-none`  
-- Raise button: if `tutorialAllowedAction !== 'raise'`, add `opacity-30 pointer-events-none`
-
-The allowed button gets a pulsing glow effect to draw attention:
-```typescript
-const isAllowed = (type: string) => !tutorialAllowedAction || tutorialAllowedAction === type || 
-  (tutorialAllowedAction === 'raise' && type === 'all-in');
-const blockedClass = 'opacity-30 pointer-events-none grayscale';
-const glowClass = 'ring-2 ring-primary/60 animate-pulse';
-```
-
-Apply to both landscape and portrait button variants.
-
-### File 4: `src/hooks/useTutorialGame.ts`
-
-**Fix the guard logic for raise/all-in in playerAction too:**
-
-```typescript
-const playerAction = useCallback((action: GameAction) => {
-  if (pendingRequiredAction) {
-    const matches = action.type === pendingRequiredAction ||
-      (pendingRequiredAction === 'raise' && action.type === 'all-in');
-    if (matches) setPendingRequiredAction(null);
-  }
-  dispatch({ type: 'PLAYER_ACTION', action });
-}, [pendingRequiredAction]);
-```
-
----
+Using `pt-14` (padding-top: 3.5rem) combined with `safe-area-top` (padding-top: env(safe-area-inset-top)) means the element's total size = 56px + safe-area-inset, correctly matching the header.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/LearnPoker.tsx` | Fix raise/all-in equivalence in guard; pass `tutorialAllowedAction` and `forceShowControls` props |
-| `src/components/poker/PokerTablePro.tsx` | Accept new props; pass to BettingControls; support force-showing controls |
-| `src/components/poker/BettingControls.tsx` | Accept `tutorialAllowedAction`; visually disable blocked buttons with opacity+pointer-events; add glow to allowed button |
-| `src/hooks/useTutorialGame.ts` | Fix raise/all-in equivalence in `playerAction` pending action clearing |
+| `src/pages/LearnPoker.tsx` | Line 167: change spacer from `h-14` to `pt-14` |
 
-## NOT Changed
-- Tutorial lessons content, bot scripts
-- CoachOverlay component
-- Bottom navigation, layout, other pages
-- Database, edge functions
-
+## Not Changed
+- No other files, styles, navigation, or layout affected.
