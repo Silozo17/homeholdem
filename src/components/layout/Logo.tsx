@@ -13,7 +13,7 @@ export function Logo({ size = 'md', className }: LogoProps) {
     lg: 'text-4xl',
   };
 
-  const imgSize = size === 'lg' ? 48 : size === 'md' ? 32 : 24;
+  const imgSize = size === 'lg' ? 56 : size === 'md' ? 40 : 30;
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
