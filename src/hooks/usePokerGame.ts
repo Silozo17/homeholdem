@@ -15,6 +15,7 @@ const ALL_PERSONALITIES: BotPersonality[] = ['shark', 'maniac', 'rock', 'fish', 
 type Action =
   | { type: 'START_GAME'; settings: LobbySettings }
   | { type: 'DEAL_HAND' }
+  | { type: 'DEAL_ANIM_DONE' }
   | { type: 'PLAYER_ACTION'; action: GameAction }
   | { type: 'BOT_ACTION' }
   | { type: 'ADVANCE_PHASE' }
@@ -200,6 +201,7 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         phase: 'preflop',
+        dealAnimDone: false,
         players,
         deck,
         communityCards: [],
@@ -460,6 +462,9 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...state, phase: 'game_over', lastHandWinners: gameOverWinners };
     }
 
+    case 'DEAL_ANIM_DONE':
+      return { ...state, dealAnimDone: true };
+
     case 'RESET':
       return createInitialState();
 
@@ -548,12 +553,16 @@ export function usePokerGame() {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'DEAL_HAND' });
         // Calculate deal animation duration and store the end timestamp
-        // Formula matches PlayerSeat reveal: (cardIndex * totalActive + seatDealOrder) * 0.35 + 0.8
+        // Formula matches PlayerSeat reveal: (cardIndex * totalActive + seatDealOrder) * 0.18 + 0.4
         // Last card = card index 1, last seat = activePlayers - 1
         const activePlayers = state.players.filter(p => p.status !== 'eliminated').length;
-        const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.35 + 0.8;
+        const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.18 + 0.4;
         dealAnimEndRef.current = Date.now() + lastCardDelay * 1000;
-      }, 1800);
+        // Dispatch DEAL_ANIM_DONE after animation completes
+        setTimeout(() => {
+          dispatch({ type: 'DEAL_ANIM_DONE' });
+        }, lastCardDelay * 1000);
+      }, 800);
       return;
     }
 
@@ -561,7 +570,7 @@ export function usePokerGame() {
     if (state.phase === 'showdown') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'SHOWDOWN' });
-      }, 2500);
+      }, 1500);
       return;
     }
 
@@ -569,7 +578,7 @@ export function usePokerGame() {
     if (state.phase === 'hand_complete') {
       botTimeoutRef.current = setTimeout(() => {
         dispatch({ type: 'NEXT_HAND' });
-      }, 4500);
+      }, 3000);
       return;
     }
 
@@ -586,18 +595,17 @@ export function usePokerGame() {
       return;
     }
 
-    // Bot's turn — realistic thinking delay
+    // Bot's turn — realistic thinking delay (gated on dealAnimDone)
     if (
       (state.phase === 'preflop' || state.phase === 'flop' ||
        state.phase === 'turn' || state.phase === 'river') &&
+      state.dealAnimDone !== false &&
       state.players[state.currentPlayerIndex]?.isBot &&
       state.players[state.currentPlayerIndex]?.status === 'active'
     ) {
       const player = state.players[state.currentPlayerIndex];
       const maxBet = Math.max(...state.players.map(p => p.currentBet));
 
-      // Wait for deal animation to finish before bots act
-      const dealWait = Math.max(0, dealAnimEndRef.current - Date.now());
       botTimeoutRef.current = setTimeout(() => {
         const botAction = decideBotAction(
           player,
@@ -610,7 +618,7 @@ export function usePokerGame() {
           state.players.filter(p => p.status !== 'eliminated').length,
         );
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, dealWait + 1500 + Math.random() * 1500); // wait for deal anim + 1.5-3.0s thinking
+      }, 800 + Math.random() * 700);
     }
   }, [state.phase, state.currentPlayerIndex, state.handNumber, state.players.map(p => p.status).join()]);
 
@@ -637,6 +645,7 @@ export function usePokerGame() {
   const isHumanTurn = 
     (state.phase === 'preflop' || state.phase === 'flop' ||
      state.phase === 'turn' || state.phase === 'river') &&
+    state.dealAnimDone !== false &&
     !state.players[state.currentPlayerIndex]?.isBot &&
     state.players[state.currentPlayerIndex]?.status === 'active';
 
