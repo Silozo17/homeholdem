@@ -41,7 +41,12 @@ export default function LearnPoker() {
 
   // Action guard: only allow the required action when coach step demands it
   const guardedAction = useCallback((action: import('@/lib/poker/types').GameAction) => {
-    if (allowedAction && action.type !== allowedAction) return; // blocked
+    if (allowedAction) {
+      const actionMatches =
+        action.type === allowedAction ||
+        (allowedAction === 'raise' && action.type === 'all-in');
+      if (!actionMatches) return;
+    }
     playerAction(action);
   }, [allowedAction, playerAction]);
 
@@ -116,6 +121,8 @@ export default function LearnPoker() {
             onAction={guardedAction}
             onNextHand={nextHand}
             onQuit={handleQuit}
+            tutorialAllowedAction={allowedAction}
+            forceShowControls={!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions'}
           />
         </div>
         {isPaused && currentIntroStep && (
