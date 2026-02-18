@@ -279,7 +279,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setTableState(prev => prev ? { ...prev, table: { ...prev.table, closing_at: null } } : prev);
           return;
         }
-        if ((payload?.action === 'leave' || payload?.action === 'kicked') && payload?.seat != null) {
+        if ((payload?.action === 'leave' || payload?.action === 'kicked' || payload?.action === 'disconnected') && payload?.seat != null) {
           setTableState(prev => {
             if (!prev) return prev;
             return {
@@ -455,6 +455,17 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       chatBubbleTimers.current.clear();
     };
   }, [tableId, refreshState, scheduleBubbleRemoval]);
+
+  // ── Heartbeat: send every 30s while seated ──
+  useEffect(() => {
+    if (!tableId || mySeatNumber === null) return;
+    // Send one immediately on mount / seat change
+    callEdge('poker-heartbeat', { table_id: tableId }).catch(() => {});
+    const interval = setInterval(() => {
+      callEdge('poker-heartbeat', { table_id: tableId }).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [tableId, mySeatNumber]);
 
   // Fetch my cards when a new hand starts
   useEffect(() => {

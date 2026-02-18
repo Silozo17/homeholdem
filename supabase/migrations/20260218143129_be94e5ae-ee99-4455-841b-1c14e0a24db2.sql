@@ -1,0 +1,1 @@
+ALTER TABLE public.poker_seats ADD COLUMN last_heartbeat TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now();

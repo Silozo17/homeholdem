@@ -489,12 +489,45 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 4. Kick players with stale heartbeats (90s+) ──
+    const heartbeatCutoff = new Date(Date.now() - 90_000).toISOString();
+    const { data: staleSeats } = await admin
+      .from("poker_seats")
+      .select("id, table_id, player_id, seat_number")
+      .not("player_id", "is", null)
+      .lt("last_heartbeat", heartbeatCutoff);
+
+    const heartbeatKicks: any[] = [];
+    for (const seat of staleSeats || []) {
+      try {
+        console.log(`[HEARTBEAT] Kicking stale player ${seat.player_id} from table ${seat.table_id}`);
+
+        await admin
+          .from("poker_seats")
+          .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
+          .eq("id", seat.id);
+
+        const hbChannel = admin.channel(`poker:table:${seat.table_id}`);
+        await hbChannel.send({
+          type: "broadcast",
+          event: "seat_change",
+          payload: { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id },
+        });
+
+        heartbeatKicks.push({ player_id: seat.player_id, table_id: seat.table_id, status: "disconnected" });
+      } catch (hbErr: any) {
+        console.error(`Error kicking stale player ${seat.player_id}:`, hbErr);
+        heartbeatKicks.push({ player_id: seat.player_id, status: 500, error: hbErr.message });
+      }
+    }
+
     return new Response(
       JSON.stringify({
-        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s), swept ${closingResults.length} closing table(s)`,
+        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s), swept ${closingResults.length} closing table(s), heartbeat-kicked ${heartbeatKicks.length} stale player(s)`,
         results,
         kickResults,
         closingResults,
+        heartbeatKicks,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

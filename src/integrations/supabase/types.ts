@@ -1512,6 +1512,7 @@ export type Database = {
           id: string
           joined_at: string
           last_action_at: string | null
+          last_heartbeat: string
           player_id: string | null
           seat_number: number
           stack: number
@@ -1523,6 +1524,7 @@ export type Database = {
           id?: string
           joined_at?: string
           last_action_at?: string | null
+          last_heartbeat?: string
           player_id?: string | null
           seat_number: number
           stack?: number
@@ -1534,6 +1536,7 @@ export type Database = {
           id?: string
           joined_at?: string
           last_action_at?: string | null
+          last_heartbeat?: string
           player_id?: string | null
           seat_number?: number
           stack?: number
