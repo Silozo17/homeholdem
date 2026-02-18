@@ -9,6 +9,7 @@ import {
   ConnectionState,
 } from 'livekit-client';
 import { callEdge } from '@/lib/poker/callEdge';
+import { toast } from '@/hooks/use-toast';
 
 export interface VoiceChatParticipant {
   identity: string;
@@ -111,6 +112,11 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
       updateParticipants(room);
     } catch (err) {
       console.error('[VoiceChat] connect error:', err);
+      toast({
+        title: 'Voice Chat Error',
+        description: 'Could not connect to voice chat. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setConnecting(false);
     }
