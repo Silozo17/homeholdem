@@ -184,7 +184,16 @@ export function PaidTournamentDetail({ tournamentId, onBack, isAdmin, playerLeve
                 )}
               </div>
             ) : myReg?.status === 'pending' ? (
-              <div className="text-amber-400 text-sm">Payment pending...</div>
+              <div className="space-y-2">
+                <div className="text-amber-400 text-sm">Payment not completed</div>
+                <Button
+                  className="w-full"
+                  onClick={() => onRegister(tournamentId)}
+                >
+                  Try Again — £{(tournament.entry_fee_pence / 100).toFixed(2)}
+                </Button>
+                <p className="text-[10px] text-muted-foreground">Didn't finish checkout? Tap above to try again.</p>
+              </div>
             ) : (
               <>
                 {registrationClosed && (

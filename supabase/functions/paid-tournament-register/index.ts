@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     // Check not already registered
     const { data: existingReg } = await admin.from("paid_tournament_registrations")
       .select("id, status").eq("tournament_id", tournament_id).eq("user_id", user.id).maybeSingle();
-    if (existingReg && existingReg.status !== "cancelled") {
+    if (existingReg && !["cancelled", "pending"].includes(existingReg.status)) {
       return new Response(JSON.stringify({ error: "Already registered" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
