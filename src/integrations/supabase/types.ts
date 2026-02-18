@@ -1056,6 +1056,7 @@ export type Database = {
           starting_sb: number
           starting_stack: number
           status: string
+          tables_created_at: string | null
           updated_at: string
         }
         Insert: {
@@ -1078,6 +1079,7 @@ export type Database = {
           starting_sb?: number
           starting_stack?: number
           status?: string
+          tables_created_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -1100,6 +1102,7 @@ export type Database = {
           starting_sb?: number
           starting_stack?: number
           status?: string
+          tables_created_at?: string | null
           updated_at?: string
         }
         Relationships: []

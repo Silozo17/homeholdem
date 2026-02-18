@@ -29,10 +29,21 @@ Deno.serve(async (req) => {
     if (!tournament) return new Response(JSON.stringify({ error: "Tournament not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (tournament.status !== "scheduled") return new Response(JSON.stringify({ error: "Registration not open" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Level 5 gate
-    const { data: xpRow } = await admin.from("player_xp").select("level").eq("user_id", user.id).maybeSingle();
-    const playerLevel = xpRow?.level || 1;
-    if (playerLevel < 5) return new Response(JSON.stringify({ error: "Level 5 required to register", current_level: playerLevel }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Registration closes 1 minute before start
+    const startAt = new Date(tournament.start_at).getTime();
+    const nowMs = Date.now();
+    if (startAt - nowMs < 60 * 1000) return new Response(JSON.stringify({ error: "Registration closed (less than 1 minute before start)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // Check if user is app admin (bypasses Level 5 gate)
+    const { data: adminRow } = await admin.from("app_admins").select("id").eq("user_id", user.id).maybeSingle();
+    const isAppAdmin = !!adminRow;
+
+    // Level 5 gate (skip for admins)
+    if (!isAppAdmin) {
+      const { data: xpRow } = await admin.from("player_xp").select("level").eq("user_id", user.id).maybeSingle();
+      const playerLevel = xpRow?.level || 1;
+      if (playerLevel < 5) return new Response(JSON.stringify({ error: "Level 5 required to register", current_level: playerLevel }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Check not already registered
     const { data: existingReg } = await admin.from("paid_tournament_registrations")

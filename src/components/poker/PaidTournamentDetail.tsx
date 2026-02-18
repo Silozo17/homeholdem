@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Clock, Coins, Check, X, Play } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, Trophy, Users, Clock, Coins, Check, X, Play, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,14 +20,50 @@ interface Props {
 
 export function PaidTournamentDetail({ tournamentId, onBack, isAdmin, playerLevel, onRegister }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [tournament, setTournament] = useState<any>(null);
   const [regCount, setRegCount] = useState(0);
   const [myReg, setMyReg] = useState<any>(null);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [payoutNotes, setPayoutNotes] = useState('');
   const [loading, setLoading] = useState(true);
+  const [myTableId, setMyTableId] = useState<string | null>(null);
+  const [registrationClosed, setRegistrationClosed] = useState(false);
 
   useEffect(() => { fetchData(); }, [tournamentId]);
+
+  // Check registration countdown (closes 1 min before start)
+  useEffect(() => {
+    if (!tournament || tournament.status !== 'scheduled') return;
+    const checkCutoff = () => {
+      const timeLeft = new Date(tournament.start_at).getTime() - Date.now();
+      setRegistrationClosed(timeLeft < 60 * 1000);
+    };
+    checkCutoff();
+    const interval = setInterval(checkCutoff, 5000);
+    return () => clearInterval(interval);
+  }, [tournament]);
+
+  // Find my table if tables are created
+  useEffect(() => {
+    if (!user || !tournament?.tables_created_at) return;
+    async function findMyTable() {
+      const { data: tables } = await supabase.from('poker_tables')
+        .select('id')
+        .eq('paid_tournament_id', tournamentId)
+        .neq('status', 'closed');
+      if (!tables || tables.length === 0) return;
+      for (const table of tables) {
+        const { data: seat } = await supabase.from('poker_seats')
+          .select('id')
+          .eq('table_id', table.id)
+          .eq('player_id', user!.id)
+          .maybeSingle();
+        if (seat) { setMyTableId(table.id); return; }
+      }
+    }
+    findMyTable();
+  }, [user, tournament?.tables_created_at, tournamentId]);
 
   async function fetchData() {
     const [tRes, regRes, myRegRes, payRes] = await Promise.all([
@@ -134,24 +171,46 @@ export function PaidTournamentDetail({ tournamentId, onBack, isAdmin, playerLeve
 
         {/* Registration */}
         {tournament.status === 'scheduled' && (
-          <Card className="p-4">
+          <Card className="p-4 space-y-3">
             {myReg?.status === 'paid' ? (
-              <div className="flex items-center gap-2 text-emerald-400 text-sm">
-                <Check className="h-4 w-4" /> You are registered!
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                  <Check className="h-4 w-4" /> You are registered!
+                </div>
+                {myTableId && (
+                  <Button className="w-full gap-2" onClick={() => navigate(`/poker/table/${myTableId}`)}>
+                    <LogIn className="h-4 w-4" /> Join Table
+                  </Button>
+                )}
               </div>
             ) : myReg?.status === 'pending' ? (
               <div className="text-amber-400 text-sm">Payment pending...</div>
             ) : (
-              <Button
-                className="w-full"
-                onClick={() => onRegister(tournamentId)}
-                disabled={playerLevel < 5 || regCount >= tournament.max_players}
-              >
-                {playerLevel < 5 ? `Level 5 Required (Lvl ${playerLevel})` :
-                  regCount >= tournament.max_players ? 'Tournament Full' :
-                    `Register — £${(tournament.entry_fee_pence / 100).toFixed(2)}`}
-              </Button>
+              <>
+                {registrationClosed && (
+                  <div className="text-xs text-destructive">Registration closed (less than 1 min before start)</div>
+                )}
+                <Button
+                  className="w-full"
+                  onClick={() => onRegister(tournamentId)}
+                  disabled={(!isAdmin && playerLevel < 5) || regCount >= tournament.max_players || registrationClosed}
+                >
+                  {registrationClosed ? 'Registration Closed' :
+                    (!isAdmin && playerLevel < 5) ? `Level 5 Required (Lvl ${playerLevel})` :
+                      regCount >= tournament.max_players ? 'Tournament Full' :
+                        `Register — £${(tournament.entry_fee_pence / 100).toFixed(2)}`}
+                </Button>
+              </>
             )}
+          </Card>
+        )}
+
+        {/* Running tournament - Join Table */}
+        {tournament.status === 'running' && myTableId && (
+          <Card className="p-4">
+            <Button className="w-full gap-2" onClick={() => navigate(`/poker/table/${myTableId}`)}>
+              <LogIn className="h-4 w-4" /> Go to My Table
+            </Button>
           </Card>
         )}
 

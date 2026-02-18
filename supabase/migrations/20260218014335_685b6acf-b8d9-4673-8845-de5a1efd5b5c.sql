@@ -1,0 +1,1 @@
+ALTER TABLE public.paid_tournaments ADD COLUMN tables_created_at timestamptz;
