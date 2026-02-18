@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.paid-tournament-start]
 verify_jwt = false
+
+[functions.poker-heartbeat]
+verify_jwt = false
