@@ -2145,6 +2145,10 @@ export type Database = {
         Args: { _game_session_id: string; _user_id: string }
         Returns: boolean
       }
+      is_seated_at_table: {
+        Args: { _table_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_user_banned: { Args: { _user_id: string }; Returns: boolean }
       lookup_club_by_invite_code: {
         Args: { _invite_code: string }
