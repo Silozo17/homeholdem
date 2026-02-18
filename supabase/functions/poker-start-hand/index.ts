@@ -236,6 +236,25 @@ Deno.serve(async (req) => {
       .gt("stack", 0)
       .lt("joined_at", joinCutoff);
 
+    // Auto-kick players with 0 chips (busted from previous hand)
+    const { data: bustedSeats } = await admin
+      .from("poker_seats")
+      .select("id, seat_number, player_id")
+      .eq("table_id", table_id)
+      .eq("stack", 0)
+      .not("player_id", "is", null);
+
+    for (const busted of bustedSeats || []) {
+      console.log(`[START-HAND] Auto-removing busted player ${busted.player_id} from seat ${busted.seat_number}`);
+      await admin.from("poker_seats").delete().eq("id", busted.id);
+      const bustedCh = admin.channel(`poker:table:${table_id}`);
+      await bustedCh.send({
+        type: "broadcast",
+        event: "seat_change",
+        payload: { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" },
+      });
+    }
+
     // Get active seats — defence-in-depth: exclude players who joined < 3s ago
     const { data: seats } = await admin
       .from("poker_seats")
