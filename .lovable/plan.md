@@ -1,39 +1,35 @@
 
-# Make Stripe Checkout Mobile-Friendly + Round Prize Up
 
-## 1. Stripe Checkout Branding & Mobile UX
+# Fix: Allow Retry After Abandoned Stripe Checkout
 
-**File:** `supabase/functions/paid-tournament-register/index.ts`
+## Problem
+When a user clicks "Register", a `pending` registration is created and they're redirected to Stripe Checkout. If they close the checkout without paying, the registration stays `pending` forever. The UI shows "Payment pending..." with no way to retry.
 
-Update the `stripe.checkout.sessions.create()` call to add mobile-friendly and on-brand options:
+## Solution
 
-- Add `ui_mode` and `custom_text` for a cleaner mobile experience
-- Add `payment_method_types: ['card']` for simplicity on mobile
-- Set `locale: 'auto'` so Stripe auto-detects the user's language
-- Add a tournament description to the line item for clarity on the checkout page
+### 1. Edge function fix (`supabase/functions/paid-tournament-register/index.ts`)
+Update the "already registered" check to allow re-registration when status is `pending` (not just `cancelled`):
+- Change: `if (existingReg && existingReg.status !== "cancelled")` 
+- To: `if (existingReg && !["cancelled", "pending"].includes(existingReg.status))`
 
-These are Stripe Checkout Session API options that improve the mobile experience without needing custom UI.
+This way, if the user abandoned checkout, clicking Register again creates a new Stripe session and updates the existing pending row.
 
-## 2. Prize Rounded Up (Math.floor to Math.ceil)
+### 2. UI fix (`src/components/poker/PaidTournamentDetail.tsx`)
+Replace the static "Payment pending..." text (line 187) with a retry button that calls `onRegister` again, plus a note explaining they can try again.
 
-Change `Math.floor(... * 5 / 9)` to `Math.ceil(... * 5 / 9)` in three places:
-
-| File | Line | Change |
-|------|------|--------|
-| `src/pages/PaidTournaments.tsx` | 88 | `Math.floor` to `Math.ceil` |
-| `src/components/poker/PaidTournamentDetail.tsx` | 113 | `Math.floor` to `Math.ceil` |
-| `supabase/functions/paid-tournament-tick/index.ts` | 220 | `Math.floor` to `Math.ceil` |
+### 3. Fix existing data (SQL)
+Reset the stuck pending registration so the user can retry immediately:
+- `UPDATE paid_tournament_registrations SET status = 'cancelled' WHERE id = '0022a98f-dc41-4154-94cc-4aa5d1726e19' AND status = 'pending';`
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/paid-tournament-register/index.ts` | Add Stripe checkout branding and mobile options |
-| `src/pages/PaidTournaments.tsx` | Prize rounding: floor to ceil |
-| `src/components/poker/PaidTournamentDetail.tsx` | Prize rounding: floor to ceil |
-| `supabase/functions/paid-tournament-tick/index.ts` | Prize rounding: floor to ceil |
+| `supabase/functions/paid-tournament-register/index.ts` | Allow re-register when status is `pending` |
+| `src/components/poker/PaidTournamentDetail.tsx` | Add "Try Again" button for pending registrations |
+| SQL migration | Reset stuck pending registration |
 
 ## NOT Changed
 - Bottom navigation
 - Styles, layout, spacing
-- Any other files
+- Any other files or components
