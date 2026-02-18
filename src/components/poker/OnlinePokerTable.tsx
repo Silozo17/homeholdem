@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button';
 import { PokerErrorBoundary } from './PokerErrorBoundary';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff } from 'lucide-react';
+import { DoorOpen, LogOut, Play, Users, Copy, Check, Volume2, VolumeX, Eye, UserX, XCircle, MoreVertical, UserPlus, History, Mic, MicOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { cn } from '@/lib/utils';
@@ -110,7 +110,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const { user } = useAuth();
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
-    amountToCall, canCheck, joinTable, leaveTable, startHand, sendAction, revealedCards,
+    amountToCall, canCheck, joinTable, leaveSeat, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
     spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp, onlinePlayerIds,
     kickedForInactivity,
@@ -135,6 +135,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [showLeaveSeatConfirm, setShowLeaveSeatConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverWinners, setGameOverWinners] = useState<HandWinner[]>([]);
   
@@ -886,6 +887,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
+  const handleLeaveSeat = async () => {
+    try {
+      await leaveSeat();
+      toast({ title: 'You are now spectating' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const copyInviteCode = () => {
     if (table.invite_code) {
       navigator.clipboard.writeText(table.invite_code);
@@ -950,12 +960,21 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           background: 'linear-gradient(180deg, hsl(0 0% 0% / 0.6), transparent)',
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button onClick={() => setShowQuitConfirm(true)}
             className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+            title="Leave Table"
           >
-            <ArrowLeft className="h-3.5 w-3.5 text-foreground/80" />
+            <DoorOpen className="h-3.5 w-3.5 text-foreground/80" />
           </button>
+          {isSeated && (
+            <button onClick={() => setShowLeaveSeatConfirm(true)}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+              title="Leave Seat"
+            >
+              <LogOut className="h-3.5 w-3.5 text-foreground/80" />
+            </button>
+          )}
           <span className="text-[10px] font-bold text-foreground/80 truncate max-w-[120px]">{table.name}</span>
           <span className="text-[10px] text-foreground/60 font-medium">{table.small_blind}/{table.big_blind}</span>
           {table.blind_timer_minutes > 0 && table.last_blind_increase_at && (
@@ -1395,7 +1414,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           <button onClick={onLeave}
             className="absolute flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
             style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 12px)', background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))', color: 'hsl(0 0% 60%)', border: '1px solid hsl(0 0% 20%)' }}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Leave
+            <DoorOpen className="h-3.5 w-3.5" /> Leave
           </button>
         </>
       )}
@@ -1457,7 +1476,20 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Debug panel for Testing tables */}
+      {/* Leave Seat confirmation dialog */}
+      <AlertDialog open={showLeaveSeatConfirm} onOpenChange={setShowLeaveSeatConfirm}>
+        <AlertDialogContent className="z-[70]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Seat?</AlertDialogTitle>
+            <AlertDialogDescription>You will become a spectator. You can rejoin an empty seat later.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLeaveSeat}>Leave Seat</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {tableState?.table?.name === 'Testing' && (
         <GameStateDebugPanel
           tableState={tableState}

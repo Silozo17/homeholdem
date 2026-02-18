@@ -65,7 +65,7 @@ export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onEx
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side={isLandscape ? 'right' : 'bottom'}
         className={isLandscape ? 'w-[320px] h-full' : 'max-h-[70vh] rounded-t-2xl pb-safe'}

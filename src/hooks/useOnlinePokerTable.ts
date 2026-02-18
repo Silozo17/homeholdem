@@ -50,6 +50,7 @@ interface UseOnlinePokerTableReturn extends Record<string, any> {
   onlinePlayerIds: Set<string>;
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
+  leaveSeat: () => Promise<void>;
   leaveTable: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (action: string, amount?: number) => Promise<void>;
@@ -494,11 +495,15 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     await refreshState();
   }, [tableId, refreshState]);
 
-  const leaveTable = useCallback(async () => {
+  const leaveSeat = useCallback(async () => {
     if (mySeatNumber === null) return;
     await callEdge('poker-leave-table', { table_id: tableId });
     await refreshState();
   }, [tableId, refreshState, mySeatNumber]);
+
+  const leaveTable = useCallback(async () => {
+    await leaveSeat();
+  }, [leaveSeat]);
 
   const startHand = useCallback(async () => {
     const data = await callEdge('poker-start-hand', { table_id: tableId });
@@ -718,6 +723,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     onlinePlayerIds,
     kickedForInactivity,
     joinTable,
+    leaveSeat,
     leaveTable,
     startHand,
     sendAction,
