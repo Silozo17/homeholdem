@@ -356,29 +356,27 @@ export function PokerTablePro({
             <PotDisplay pot={state.pot} />
           </div>
 
-          {/* Community cards */}
+          {/* Community cards - 5-slot layout */}
           <div
             className="absolute left-1/2 flex gap-1.5 items-center"
             style={{ top: '48%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}
           >
-            {state.communityCards.map((card, i) => {
-              const isFlop = i < 3;
-              const dealDelay = isFlop ? i * 0.18 : 0.1;
+            {[0, 1, 2, 3, 4].map(slotIdx => {
+              const card = state.communityCards[slotIdx];
               return (
-                <CardDisplay
-                  key={`${card.suit}-${card.rank}-${i}`}
-                  card={card}
-                  size="xl"
-                  dealDelay={dealDelay}
-                  isWinner={false}
-                />
+                <div key={slotIdx} className="w-[44px] h-[62px] rounded-lg border border-white/15 flex items-center justify-center"
+                  style={{ background: card ? 'transparent' : 'hsl(160 30% 8% / 0.3)' }}>
+                  {card && (
+                    <CardDisplay
+                      card={card}
+                      size="xl"
+                      dealDelay={slotIdx < 3 ? slotIdx * 0.18 : 0.1}
+                      isWinner={false}
+                    />
+                  )}
+                </div>
               );
             })}
-            {state.communityCards.length === 0 && (
-              <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                Waiting for cards...
-              </div>
-            )}
           </div>
 
           {/* Hand name at showdown */}

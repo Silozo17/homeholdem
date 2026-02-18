@@ -65,10 +65,13 @@ export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onEx
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+  <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={isLandscape ? 'right' : 'bottom'}
-        className={isLandscape ? 'w-[320px] h-full' : 'max-h-[70vh] rounded-t-2xl pb-safe'}
+        className={cn(
+          isLandscape ? 'w-[320px] h-full' : 'max-h-[70vh] rounded-t-2xl pb-safe',
+          'z-[80]'
+        )}
       >
         <SheetHeader className="pb-2">
           <SheetTitle className="text-sm flex items-center gap-2">
