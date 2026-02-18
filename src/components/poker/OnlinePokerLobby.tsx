@@ -86,7 +86,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       const { data: seats } = await supabase
         .from('poker_seats')
         .select('table_id')
-        .in('table_id', tableIds.length > 0 ? tableIds : ['none']);
+        .in('table_id', tableIds.length > 0 ? tableIds : ['none'])
+        .in('status', ['active', 'sitting_out']);
 
       const countMap = new Map<string, number>();
       (seats || []).forEach(s => { countMap.set(s.table_id, (countMap.get(s.table_id) || 0) + 1); });
