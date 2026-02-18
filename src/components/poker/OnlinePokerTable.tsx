@@ -551,6 +551,35 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [tableState, user, handWinners]);
 
+  // Game over: last player standing when opponent LEFT (no hand result)
+  useEffect(() => {
+    if (gameOver || !tableState || !user) return;
+    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+    if (!mySeatInfo || mySeatInfo.stack <= 0) return;
+
+    const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+    if (activePlayers.length !== 1 || activePlayers[0].player_id !== user.id) return;
+
+    // Don't trigger if handWinners already handled it (avoids double-fire)
+    if (handWinners.length > 0) return;
+
+    // Only trigger if no hand is in progress
+    const handPhase = tableState.current_hand?.phase;
+    if (handPhase && handPhase !== 'complete') return;
+
+    announceGameOver('You', true);
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners([{
+        player_id: user.id,
+        display_name: 'You',
+        amount: mySeatInfo.stack,
+        hand_name: 'Last Standing',
+      }]);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [tableState?.seats, user, gameOver, handWinners]);
+
   // Shared XP + stats save helper (called on game over AND on leave)
   const saveXpAndStats = useCallback(async (isWinnerOverride?: boolean) => {
     if (xpSavedRef.current || !user) return;
@@ -1166,7 +1195,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           )}
 
-          {handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id) && (
+          {((handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id)) || (gameOver && gameOverWinners.some(w => w.player_id === user?.id))) && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
               {confettiPositions.map((c, i) => (
                 <div key={i} className="absolute animate-confetti-drift"
