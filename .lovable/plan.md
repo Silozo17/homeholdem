@@ -1,71 +1,64 @@
 
 
-# Reduce Multiplayer Poker Freezes
+# Fix Chat Bubble Clipping and All-In Voice Announcement
 
-## Root Cause Analysis
+## Issue 1: Chat messages cut off for edge seats (seat 8 and others near edges)
 
-From the logs and code, the freezes stem from **three overlapping issues**:
+Chat bubbles are positioned with `transform: translateX(-50%)` which centers them on the seat's X coordinate. For seats near the left or right edges (e.g., seat B at xPct=4-6%, seat F at xPct=94-96%, seat G at xPct=88-90%), half the bubble extends beyond the table container and gets clipped.
 
-### 1. Redundant polling storms (client-side)
-The client runs **three overlapping timers** that all hit the server simultaneously:
-- **Heartbeat**: every 30s (`poker-heartbeat`)
-- **Stale hand recovery**: every 5s checks if no broadcast in 12s, then calls `poker-check-timeouts` + `refreshState` sequentially
-- **Leader timeout poll**: every 8s calls `poker-check-timeouts` + `refreshState`
+**Fix in `src/components/poker/OnlinePokerTable.tsx` (line 1309):**
+- For seats on the right side (xPct > 70%), align the bubble to the right instead of centering: use `transform: translateX(-90%)` so the bubble extends leftward.
+- For seats on the left side (xPct < 30%), align the bubble to the left: use `transform: translateX(-10%)`.
+- For center seats, keep `translateX(-50%)`.
 
-When the stale recovery and leader poll overlap (which they do frequently), the client fires 2x `check-timeouts` + 2x `refreshState` = 4 HTTP requests in rapid succession. Each causes a React state update, leading to a visible freeze.
+This ensures bubbles always extend inward toward the table center.
 
-### 2. Broadcast REST fallback (server-side)
-Every edge function logs: `"Realtime send() is automatically falling back to REST API"`. The Supabase SDK's `channel.send()` is falling back to a slower REST delivery path. This adds latency between a player acting and others seeing the update.
+## Issue 2: All-in voice announcement not firing
 
-### 3. Sequential DB queries in edge functions (server-side)
-After each action, `poker-action` runs 3 sequential queries before broadcasting: `commit_poker_state` RPC, then `profiles` fetch, then `poker_hole_cards` fetch. These run one after another, adding ~100-200ms total.
+The all-in detection code in `OnlinePokerTable.tsx` (line 443) checks:
+```
+actionStr === 'all_in' || actionStr === 'all-in'
+```
 
-## Fixes
+But `lastActions` values are capitalized on ingestion (line 223 of `useOnlinePokerTable.ts`):
+```
+next[s.player_id] = raw.charAt(0).toUpperCase() + raw.slice(1);
+```
 
-### Fix 1: Merge redundant client polling into one timer
-Replace the two overlapping poll intervals (stale hand recovery at 5s + leader timeout poll at 8s) with a **single 8s interval** that handles both cases. This halves the number of background HTTP calls.
+This means the actual value is `"All_in"` or `"All-in"`, which never matches the lowercase check.
 
-**File: `src/hooks/useOnlinePokerTable.ts`**
-- Remove the standalone stale hand recovery interval (lines 665-678)
-- Expand the leader timeout poll (lines 694-714) to also cover the stale broadcast detection
-- Non-leaders keep a single 15s fallback `refreshState` instead of the aggressive 5s poll
+**Fix in `src/components/poker/OnlinePokerTable.tsx` (line 443):**
+- Compare using `.toLowerCase()`: `actionStr.toLowerCase() === 'all_in' || actionStr.toLowerCase() === 'all-in'`
 
-### Fix 2: Debounce `refreshState` calls
-Add a debounce guard so multiple rapid `refreshState` calls (e.g. from seat_change + timeout poll) collapse into one.
+Additionally, the announcement should include the player's name for more excitement:
+```
+"All in! [PlayerName] is all in!"
+```
 
-**File: `src/hooks/useOnlinePokerTable.ts`**
-- Add a `lastRefreshRef` timestamp
-- Skip `refreshState` if called within 2s of the last one
+## Files Changed
 
-### Fix 3: Parallelize post-commit queries in edge functions
-Run the `profiles` fetch and `poker_hole_cards` fetch in parallel using `Promise.all` instead of sequentially.
-
-**Files:**
-- `supabase/functions/poker-action/index.ts` (lines 622-629)
-- `supabase/functions/poker-start-hand/index.ts` (profile fetch section)
-- `supabase/functions/poker-check-timeouts/index.ts` (profile + hole card fetches)
-
-### Fix 4: Use `httpSend()` for broadcasts
-Replace `channel.send()` with `channel.send()` using the REST-explicit path to avoid the deprecation warning and potential future breakage. The SDK recommends `httpSend()`.
-
-**Files:**
-- `supabase/functions/poker-action/index.ts`
-- `supabase/functions/poker-start-hand/index.ts`
-- `supabase/functions/poker-check-timeouts/index.ts`
-
----
-
-## Summary of Changes
-
-| File | Change | Impact |
-|------|--------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Merge 2 polling intervals into 1; add refreshState debounce | Halves background HTTP calls, reduces React re-render storms |
-| `supabase/functions/poker-action/index.ts` | Parallelize profile + hole card queries | ~100ms faster broadcasts |
-| `supabase/functions/poker-start-hand/index.ts` | Parallelize profile fetch | ~50ms faster hand start |
-| `supabase/functions/poker-check-timeouts/index.ts` | Parallelize profile + hole card queries | ~100ms faster timeout resolution |
+| File | Change |
+|------|--------|
+| `src/components/poker/OnlinePokerTable.tsx` | Fix case-sensitive all-in detection; adjust chat bubble transform based on seat xPct |
 
 ## What Is NOT Changed
-- Bottom navigation, UI components, game logic, RLS policies
-- No new tables or schema changes
-- No changes to betting controls, seat layout, or visual components
+- Bottom navigation, seat layout positions, betting controls, game logic
+- No new files, no schema changes
+- Voice announcement hook unchanged (already has "All in! We have an all in!" pre-cached)
 
+## Technical Detail
+
+Chat bubble transform logic:
+```text
+xPct < 30%  -> translateX(-10%)   (bubble extends rightward)
+xPct > 70%  -> translateX(-90%)   (bubble extends leftward)
+otherwise   -> translateX(-50%)   (centered)
+```
+
+All-in detection fix:
+```typescript
+const lower = actionStr.toLowerCase();
+if (lower === 'all_in' || lower === 'all-in') {
+  // ... announce
+}
+```
