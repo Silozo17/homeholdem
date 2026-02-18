@@ -515,9 +515,10 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   }, [introStepIdx, lesson, coachStep]);
 
   const playerAction = useCallback((action: GameAction) => {
-    // Clear pending required action when the user performs the correct action
-    if (pendingRequiredAction && action.type === pendingRequiredAction) {
-      setPendingRequiredAction(null);
+    if (pendingRequiredAction) {
+      const matches = action.type === pendingRequiredAction ||
+        (pendingRequiredAction === 'raise' && action.type === 'all-in');
+      if (matches) setPendingRequiredAction(null);
     }
     dispatch({ type: 'PLAYER_ACTION', action });
   }, [pendingRequiredAction]);

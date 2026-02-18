@@ -14,10 +14,11 @@ interface BettingControlsProps {
   landscape?: boolean;
   panelWidth?: number;
   onAction: (action: { type: 'fold' | 'check' | 'call' | 'raise' | 'all-in'; amount?: number }) => void;
+  tutorialAllowedAction?: string | null;
 }
 
 export function BettingControls({
-  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, panelWidth, onAction,
+  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, panelWidth, onAction, tutorialAllowedAction,
 }: BettingControlsProps) {
   const minRaiseTotal = maxBet + minRaise;
   const maxRaiseTotal = maxBet + playerChips;
@@ -25,6 +26,14 @@ export function BettingControls({
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
 
   const canRaise = playerChips > amountToCall && minRaiseTotal <= maxRaiseTotal;
+
+  // Tutorial visual blocking helpers
+  const isAllowed = (type: string) => !tutorialAllowedAction || tutorialAllowedAction === type ||
+    (tutorialAllowedAction === 'raise' && type === 'all-in') ||
+    (tutorialAllowedAction === 'call' && type === 'check') ||
+    (tutorialAllowedAction === 'check' && type === 'call');
+  const blockedStyle = 'opacity-30 pointer-events-none grayscale';
+  const glowStyle = tutorialAllowedAction ? 'ring-2 ring-primary/60 animate-pulse' : '';
 
   const handleRaiseTap = () => {
     if (!showRaiseSlider) {
@@ -125,7 +134,12 @@ export function BettingControls({
           </button>
         )}
         <button
-          className={`h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all ${showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92]'}`}
+          className={cn(
+            `h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all`,
+            showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92]',
+            !isAllowed('fold') && blockedStyle,
+            isAllowed('fold') && glowStyle,
+          )}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             'hsl(0 40% 40%)',
@@ -136,7 +150,11 @@ export function BettingControls({
           <X size={12} /> Fold
         </button>
         <button
-          className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
+          className={cn(
+            "h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
+            !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
+            isAllowed(canCheck ? 'check' : 'call') && glowStyle,
+          )}
           style={btnStyle(
             canCheck
               ? 'linear-gradient(180deg, hsl(160 45% 30%), hsl(160 50% 22%))'
@@ -155,7 +173,11 @@ export function BettingControls({
         </button>
         {canRaise && (
           <button
-            className="h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all"
+            className={cn(
+              "h-8 rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
+              !isAllowed('raise') && blockedStyle,
+              isAllowed('raise') && glowStyle,
+            )}
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
                 ? 'linear-gradient(180deg, hsl(0 70% 45%), hsl(0 70% 35%))'
@@ -234,7 +256,12 @@ export function BettingControls({
       )}
       <div className="flex gap-2 w-full">
         <button
-          className={`flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 ${showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92] active:shadow-none'}`}
+          className={cn(
+            'flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1',
+            showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92] active:shadow-none',
+            !isAllowed('fold') && blockedStyle,
+            isAllowed('fold') && glowStyle,
+          )}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
             'hsl(0 40% 40%)',
@@ -245,7 +272,11 @@ export function BettingControls({
           <X size={14} /> Fold
         </button>
         <button
-          className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
+          className={cn(
+            "flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
+            !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
+            isAllowed(canCheck ? 'check' : 'call') && glowStyle,
+          )}
           style={btnStyle(
             canCheck
               ? 'linear-gradient(180deg, hsl(160 45% 30%), hsl(160 50% 22%))'
@@ -264,7 +295,11 @@ export function BettingControls({
         </button>
         {canRaise && (
           <button
-            className="flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none"
+            className={cn(
+              "flex-1 h-11 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
+              !isAllowed('raise') && blockedStyle,
+              isAllowed('raise') && glowStyle,
+            )}
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
                 ? 'linear-gradient(180deg, hsl(0 70% 45%), hsl(0 70% 35%))'
