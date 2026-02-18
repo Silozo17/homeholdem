@@ -352,7 +352,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           return {
             ...prev,
             current_hand: prev.current_hand ? { ...prev.current_hand, phase: 'complete' } : null,
-            seats: payload.seats || prev.seats,
+            seats: prev.seats.map(existingSeat => {
+              const updated = (payload.seats || []).find((s: any) => s.seat === existingSeat.seat);
+              return updated ? { ...existingSeat, ...updated } : existingSeat;
+            }),
           };
         });
 

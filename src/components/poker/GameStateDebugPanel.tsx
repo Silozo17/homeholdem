@@ -109,7 +109,7 @@ export function GameStateDebugPanel({
             <Row k="phase" v={hand.phase} highlight />
             <Row k="state_v" v={hand.state_version} />
             <Row k="D/SB/BB" v={`${hand.dealer_seat}/${hand.sb_seat}/${hand.bb_seat}`} />
-            <Row k="community" v={hand.community_cards.length > 0 ? hand.community_cards.map(c => `${c.rank}${c.suit}`).join(' ') : '—'} />
+            <Row k="community" v={(hand.community_cards ?? []).length > 0 ? (hand.community_cards ?? []).map(c => `${c.rank}${c.suit}`).join(' ') : '—'} />
           </>
         ) : (
           <div style={{ color: 'hsl(0 0% 50%)' }}>No active hand</div>
@@ -127,10 +127,10 @@ export function GameStateDebugPanel({
       )}
 
       {/* Pots */}
-      {hand && hand.pots.length > 0 && (
+      {hand && (hand.pots ?? []).length > 0 && (
         <Section title="POTS">
-          {hand.pots.map((p, i) => (
-            <Row key={i} k={`pot${i}`} v={`${p.amount} (${p.eligible_player_ids.length}p)`} />
+          {(hand.pots ?? []).map((p, i) => (
+            <Row key={i} k={`pot${i}`} v={`${p.amount} (${(p.eligible_player_ids ?? []).length}p)`} />
           ))}
         </Section>
       )}
