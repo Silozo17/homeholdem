@@ -1,12 +1,12 @@
 
 
-# Speed Up Card Reveal Animation by 2x
+# Slow Down Card Dealing Animation by 2x
 
 ## Change
 
-**File:** `src/index.css` (line 583)
+**File:** `src/index.css` (line 568)
 
-- **card-reveal duration**: `0.3s` --> `0.15s`
+- **card-arrive duration**: `0.25s` --> `0.5s`
 
-That is the only change. No dealing stagger, no card-arrive, no other timing affected.
+That is the only change. No card-reveal, no stagger timing, no other animation affected.
 
