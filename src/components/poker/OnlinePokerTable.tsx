@@ -835,6 +835,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const canModerate = isCreator && !hand;
   const isMobileLandscape = isLandscape && typeof window !== 'undefined' && window.innerWidth < 900;
   const isTablet = typeof window !== 'undefined' && window.innerWidth >= 900 && window.innerWidth < 1200;
+  const isLargeDesktop = typeof window !== 'undefined' && window.innerWidth >= 1920;
 
   const handleKickPlayer = async (playerId: string) => {
     try {
@@ -1117,7 +1118,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         >
           <TableFelt />
 
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : 'calc(-4% - 27px)', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : isLargeDesktop ? 'calc(-4% - 31px)' : 'calc(-4% - 27px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
