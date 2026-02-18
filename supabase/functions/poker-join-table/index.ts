@@ -71,6 +71,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Block joins on tables that are scheduled for closure
+    if (table.closing_at) {
+      return new Response(JSON.stringify({ error: "Table is closing and no longer accepting players" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Validate buy-in range
     if (buy_in_amount < table.min_buy_in || buy_in_amount > table.max_buy_in) {
       return new Response(

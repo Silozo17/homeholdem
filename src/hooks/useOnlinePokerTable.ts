@@ -268,6 +268,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setTableState(null);
           return;
         }
+        if (payload?.action === 'table_closing' && payload?.closing_at) {
+          setTableState(prev => prev ? { ...prev, table: { ...prev.table, closing_at: payload.closing_at } } : prev);
+          return;
+        }
+        if (payload?.action === 'table_closing_cancelled') {
+          setTableState(prev => prev ? { ...prev, table: { ...prev.table, closing_at: null } } : prev);
+          return;
+        }
         if ((payload?.action === 'leave' || payload?.action === 'kicked') && payload?.seat != null) {
           setTableState(prev => {
             if (!prev) return prev;

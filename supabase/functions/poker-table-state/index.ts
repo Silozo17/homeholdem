@@ -197,6 +197,9 @@ Deno.serve(async (req) => {
         original_small_blind: table.original_small_blind || table.small_blind,
         original_big_blind: table.original_big_blind || table.big_blind,
         last_blind_increase_at: table.last_blind_increase_at || null,
+        description: table.description || null,
+        is_persistent: table.is_persistent || false,
+        closing_at: table.closing_at || null,
       },
       seats: seatInfo,
       current_hand: currentHand

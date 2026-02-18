@@ -5,7 +5,7 @@ import { Card } from './types';
 export interface OnlineTableInfo {
   id: string;
   name: string;
-  table_type: 'public' | 'friends' | 'club';
+  table_type: 'public' | 'friends' | 'club' | 'private' | 'community';
   max_seats: number;
   small_blind: number;
   big_blind: number;
@@ -21,6 +21,9 @@ export interface OnlineTableInfo {
   original_small_blind: number;
   original_big_blind: number;
   last_blind_increase_at: string | null;
+  description: string | null;
+  is_persistent: boolean;
+  closing_at: string | null;
 }
 
 export interface OnlineSeatInfo {
@@ -65,12 +68,12 @@ export interface OnlineTableState {
 
 export interface CreateTableParams {
   name: string;
-  table_type?: 'public' | 'friends' | 'club';
-  max_seats?: number;
+  table_type?: 'public' | 'friends' | 'club' | 'private' | 'community';
   small_blind?: number;
   big_blind?: number;
   ante?: number;
   min_buy_in?: number;
   max_buy_in?: number;
   club_id?: string;
+  description?: string;
 }

@@ -51,7 +51,6 @@ Deno.serve(async (req) => {
     const {
       name,
       table_type = "friends",
-      max_seats = 9,
       small_blind = 50,
       big_blind = 100,
       ante = 0,
@@ -59,7 +58,11 @@ Deno.serve(async (req) => {
       max_buy_in = 10000,
       club_id = null,
       blind_timer_minutes = 0,
+      description = null,
     } = body;
+
+    // All tables are 9 seats
+    const max_seats = 9;
 
     if (!name || name.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Name is required" }), {
@@ -92,6 +95,8 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const is_persistent = table_type === "community";
+
     const { data: table, error: insertError } = await admin
       .from("poker_tables")
       .insert({
@@ -111,6 +116,8 @@ Deno.serve(async (req) => {
         original_big_blind: big_blind,
         blind_level: 0,
         last_blind_increase_at: null,
+        description: description ? String(description).slice(0, 200) : null,
+        is_persistent,
       })
       .select()
       .single();
@@ -119,17 +126,19 @@ Deno.serve(async (req) => {
       throw insertError;
     }
 
-    // Auto-seat the creator at seat 0
-    const { error: seatError } = await admin.from("poker_seats").insert({
-      table_id: table.id,
-      seat_number: 0,
-      player_id: user.id,
-      stack: max_buy_in,
-      status: "active",
-    });
+    // Auto-seat the creator at seat 0 (skip for community tables — they join like anyone else)
+    if (table_type !== "community") {
+      const { error: seatError } = await admin.from("poker_seats").insert({
+        table_id: table.id,
+        seat_number: 0,
+        player_id: user.id,
+        stack: max_buy_in,
+        status: "active",
+      });
 
-    if (seatError) {
-      console.error("Failed to auto-seat creator:", seatError);
+      if (seatError) {
+        console.error("Failed to auto-seat creator:", seatError);
+      }
     }
 
     return new Response(JSON.stringify({ table }), {

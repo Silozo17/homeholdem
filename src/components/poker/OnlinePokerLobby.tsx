@@ -3,11 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus, Trash2, Shield, Globe2, XCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { toast } from '@/hooks/use-toast';
@@ -31,6 +33,9 @@ interface TableSummary {
   created_by: string;
   club_id: string | null;
   invite_code: string | null;
+  description: string | null;
+  is_persistent: boolean;
+  closing_at: string | null;
 }
 
 interface OnlinePokerLobbyProps {
@@ -55,8 +60,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const [deleting, setDeleting] = useState(false);
 
   const [tableName, setTableName] = useState('');
-  const [tableType, setTableType] = useState<'public' | 'friends' | 'club'>(clubId ? 'club' : 'friends');
-  const [maxSeats, setMaxSeats] = useState(6);
+  const [tableType, setTableType] = useState<'public' | 'friends' | 'club' | 'private' | 'community'>(clubId ? 'club' : 'friends');
+  const [tableDescription, setTableDescription] = useState('');
   const [bigBlind, setBigBlind] = useState(100);
   const [maxBuyIn, setMaxBuyIn] = useState(10000);
   const [blindTimer, setBlindTimer] = useState(0);
@@ -65,7 +70,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
     try {
       let query = supabase
         .from('poker_tables')
-        .select('id, name, table_type, max_seats, small_blind, big_blind, status, created_by, club_id, invite_code')
+        .select('id, name, table_type, max_seats, small_blind, big_blind, status, created_by, club_id, invite_code, description, is_persistent, closing_at')
         .neq('status', 'closed')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -86,7 +91,13 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       const countMap = new Map<string, number>();
       (seats || []).forEach(s => { countMap.set(s.table_id, (countMap.get(s.table_id) || 0) + 1); });
 
-      setTables(allTables.map(t => ({ ...t, player_count: countMap.get(t.id) || 0 })));
+      setTables(allTables.map(t => ({
+        ...t,
+        player_count: countMap.get(t.id) || 0,
+        description: (t as any).description ?? null,
+        is_persistent: (t as any).is_persistent ?? false,
+        closing_at: (t as any).closing_at ?? null,
+      })));
     } catch { /* RLS filter */ } finally { setLoading(false); }
   }, [clubId]);
 
@@ -113,18 +124,20 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       const data = await callEdge('poker-create-table', {
         name: tableName.trim(),
         table_type: clubId ? 'club' : tableType,
-        max_seats: maxSeats,
+        max_seats: 9,
         small_blind: bigBlind / 2,
         big_blind: bigBlind,
         min_buy_in: Math.round(maxBuyIn / 10),
         max_buy_in: maxBuyIn,
         club_id: clubId || null,
         blind_timer_minutes: blindTimer,
+        description: tableDescription.trim() || null,
       });
       setCreateOpen(false);
       setTableName('');
+      setTableDescription('');
       setLastCreatedTable({ id: data.table.id, name: tableName.trim() });
-      setInviteOpen(true); // Auto-open invite dialog after creating
+      setInviteOpen(true);
       onJoinTable(data.table.id);
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -175,6 +188,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
     if (activeFilter === 'all') return true;
     if (activeFilter === 'public') return t.table_type === 'public';
     if (activeFilter === 'friends') return t.table_type === 'friends';
+    if (activeFilter === 'private') return t.table_type === 'private';
+    if (activeFilter === 'community') return t.table_type === 'community';
     if (activeFilter === 'mine') return t.created_by === user?.id;
     return true;
   });
@@ -195,12 +210,16 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const typeIcon = (type: string) => {
     if (type === 'public') return <Globe className="h-3 w-3 text-emerald-400" />;
     if (type === 'club') return <Users className="h-3 w-3 text-blue-400" />;
+    if (type === 'private') return <Shield className="h-3 w-3 text-purple-400" />;
+    if (type === 'community') return <Globe2 className="h-3 w-3 text-cyan-400" />;
     return <Lock className="h-3 w-3 text-amber-400" />;
   };
 
   const typeLabel = (type: string) => {
     if (type === 'public') return 'Public';
     if (type === 'club') return 'Club';
+    if (type === 'private') return 'Private';
+    if (type === 'community') return 'Community';
     return 'Invite Only';
   };
 
@@ -263,16 +282,22 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                       <SelectContent>
                         <SelectItem value="friends">Friends (Invite Only)</SelectItem>
                         <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="private">Private (Hidden)</SelectItem>
+                        <SelectItem value="community">Community (Permanent)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 )}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Max Seats</span>
-                    <span className="font-bold text-primary">{maxSeats}</span>
-                  </div>
-                  <Slider value={[maxSeats]} min={2} max={9} step={1} onValueChange={([v]) => setMaxSeats(v)} />
+                  <label className="text-sm text-muted-foreground">Description (optional)</label>
+                  <Textarea
+                    placeholder="Short description for your table..."
+                    value={tableDescription}
+                    onChange={(e) => setTableDescription(e.target.value.slice(0, 200))}
+                    maxLength={200}
+                    className="min-h-[60px] resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground text-right">{tableDescription.length}/200</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -368,11 +393,12 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         {/* Filter tabs (not for club view) */}
         {!clubId && (
           <Tabs value={activeFilter} onValueChange={setActiveFilter} className="animate-slide-up-fade stagger-2">
-            <TabsList className="grid w-full grid-cols-4 h-8">
+            <TabsList className="grid w-full grid-cols-5 h-8">
               <TabsTrigger value="all" className="text-[10px] py-1">All</TabsTrigger>
               <TabsTrigger value="public" className="text-[10px] py-1">Public</TabsTrigger>
+              <TabsTrigger value="community" className="text-[10px] py-1">Community</TabsTrigger>
               <TabsTrigger value="friends" className="text-[10px] py-1">Friends</TabsTrigger>
-              <TabsTrigger value="mine" className="text-[10px] py-1">My Tables</TabsTrigger>
+              <TabsTrigger value="mine" className="text-[10px] py-1">Mine</TabsTrigger>
             </TabsList>
           </Tabs>
         )}
@@ -396,8 +422,15 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                 className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group active:scale-[0.98] transition-all hover:shadow-lg"
                 onClick={() => onJoinTable(t.id)}
               >
-                <div className="space-y-1.5">
-                  <p className="font-bold text-foreground text-sm">{t.name}</p>
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-foreground text-sm truncate">{t.name}</p>
+                    {t.is_persistent && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0">Permanent</Badge>}
+                    {t.closing_at && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">Closing</Badge>}
+                  </div>
+                  {t.description && (
+                    <p className="text-[10px] text-muted-foreground truncate">{t.description}</p>
+                  )}
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     {typeIcon(t.table_type)}
                     <span>{typeLabel(t.table_type)}</span>
@@ -406,7 +439,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                   </div>
                   <SeatDots filled={t.player_count} total={t.max_seats} />
                 </div>
-                <div className="flex flex-col items-end gap-1.5">
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <div className="flex items-center gap-1">
                     {t.created_by === user?.id && (
                       <button
@@ -441,7 +474,10 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           <AlertDialogHeader>
             <AlertDialogTitle>Delete table?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will close "{deleteTarget?.name}" and remove all players. This cannot be undone.
+              {tables.find(t => t.id === deleteTarget?.id)?.is_persistent
+                ? `This will schedule "${deleteTarget?.name}" for closure in 4 hours if players are inside. No new players will be able to join during this time.`
+                : `This will close "${deleteTarget?.name}" and remove all players. This cannot be undone.`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
