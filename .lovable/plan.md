@@ -1,100 +1,86 @@
 
 
-# Fix: Player Stays After Losing All-In + Disconnect Blocking Controls
+# Fix: Ghost Seat Counts + Presence Role Sync
 
-## Issue 1: Player with 0 chips stays seated after losing
+## Problem 1: Lobby shows wrong player count (ghost seats)
 
-**Root cause:** When a player goes all-in and loses, the hand completes and their stack is set to 0. But nobody removes them from their seat. The next hand simply skips them (`activePlayers = seats.filter(s => s.stack > 0)`), so they sit at the table as a ghost -- visible but never dealt in.
+The no-active-hand disconnect branch in `poker-check-timeouts` currently nulls `player_id` but leaves the row. The lobby query counts all seats with `status IN ('active', 'sitting_out')` including these ghost rows.
 
-**Fix:** Add a cleanup step in `poker-start-hand` that auto-removes any seated player with 0 chips before the new hand begins. This happens after the `sitting_out` activation step and before fetching active seats.
+**Two fixes:**
 
-**File: `supabase/functions/poker-start-hand/index.ts`** (after line 237, before line 240)
-
-Add:
+### 1a. `supabase/functions/poker-check-timeouts/index.ts` (lines 519-525)
+Change the no-active-hand branch from updating to deleting:
 ```typescript
-// Auto-kick players with 0 chips (busted)
-const { data: bustedSeats } = await admin
-  .from("poker_seats")
-  .select("id, seat_number, player_id")
-  .eq("table_id", table_id)
-  .eq("stack", 0)
-  .not("player_id", "is", null);
+// Before:
+await admin.from("poker_seats")
+  .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
+  .eq("id", seat.id);
 
-for (const busted of bustedSeats || []) {
-  await admin.from("poker_seats").delete().eq("id", busted.id);
-  const ch = admin.channel(`poker:table:${table_id}`);
-  await ch.send({
-    type: "broadcast",
-    event: "seat_change",
-    payload: { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" },
-  });
-}
+// After:
+await admin.from("poker_seats")
+  .delete()
+  .eq("id", seat.id);
 ```
 
-This ensures busted players are removed and all clients see the seat empty before a new hand starts.
+### 1b. `src/components/poker/OnlinePokerLobby.tsx` (line 90)
+Add a filter to exclude any lingering ghost rows:
+```typescript
+// Before:
+.in('status', ['active', 'sitting_out']);
+
+// After:
+.in('status', ['active', 'sitting_out'])
+.not('player_id', 'is', null);
+```
+
+### 1c. One-time data cleanup
+Delete existing ghost seat rows via SQL so the lobby immediately shows correct counts.
 
 ---
 
-## Issue 2: Disconnect removes player mid-hand without folding
+## Problem 2: Spectator/player presence not updating after join/leave
 
-**Root cause:** When a player disconnects (heartbeat stale for 90s), the cleanup in `poker-check-timeouts` section 4 (line 493-523) sets `player_id = null` on the seat immediately, regardless of whether a hand is active. If the disconnected player was the current actor, the next timeout check finds an empty actor seat and force-completes the hand. If they were NOT the actor but still in the hand, the game continues with their seat data wiped -- which can cause errors or stuck states for other players.
+Presence role is only set once on channel subscribe. When a user takes a seat or leaves, their role stays stale.
 
-**Fix:** Before kicking a stale-heartbeat player, check if there's an active hand at that table. If so, mark the seat as `disconnected` instead of clearing it, which lets the existing timeout-fold logic handle them gracefully (they get auto-folded on their turn, and the hand continues normally).
+### `src/hooks/useOnlinePokerTable.ts`
 
-**File: `supabase/functions/poker-check-timeouts/index.ts`** (section 4, lines 493-523)
-
-Replace the heartbeat kick logic with:
+**After `joinTable` (line 511):** Re-track as player
 ```typescript
-for (const seat of staleSeats || []) {
-  try {
-    // Check if there's an active hand at this table
-    const { data: activeHand } = await admin
-      .from("poker_hands")
-      .select("id")
-      .eq("table_id", seat.table_id)
-      .is("completed_at", null)
-      .maybeSingle();
-
-    if (activeHand) {
-      // Mid-hand: mark as disconnected, let timeout-fold handle it
-      await admin
-        .from("poker_seats")
-        .update({ status: "disconnected" })
-        .eq("id", seat.id);
-    } else {
-      // No active hand: safe to remove entirely
-      await admin
-        .from("poker_seats")
-        .delete()
-        .eq("id", seat.id);
-    }
-
-    const hbChannel = admin.channel(`poker:table:${seat.table_id}`);
-    await hbChannel.send({
-      type: "broadcast",
-      event: "seat_change",
-      payload: { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id },
-    });
-
-    heartbeatKicks.push({ ... });
-  } catch (hbErr) { ... }
-}
+const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
+  await callEdge('poker-join-table', { ... });
+  await refreshState();
+  // Update presence role to player
+  if (channelRef.current) {
+    await channelRef.current.track({ user_id: userId, role: 'player' });
+  }
+}, [...]);
 ```
 
-This prevents the race condition where clearing the seat mid-hand causes the current actor to vanish and blocks other players' controls.
+**After `leaveSeat` (line 516):** Re-track as spectator
+```typescript
+const leaveSeat = useCallback(async () => {
+  if (mySeatNumber === null) return;
+  await callEdge('poker-leave-table', { ... });
+  await refreshState();
+  // Update presence role to spectator
+  if (channelRef.current) {
+    await channelRef.current.track({ user_id: userId, role: 'spectator' });
+  }
+}, [...]);
+```
 
 ---
 
 ## Summary
 
-| File | Change | Impact |
-|------|--------|--------|
-| `supabase/functions/poker-start-hand/index.ts` | Auto-remove 0-stack players before new hand | Busted players no longer sit as ghosts |
-| `supabase/functions/poker-check-timeouts/index.ts` | Mark disconnected players as "disconnected" during active hand instead of removing | Prevents mid-hand seat wipe that blocks other players |
+| File | Change |
+|------|--------|
+| `supabase/functions/poker-check-timeouts/index.ts` | Delete seat row on no-hand disconnect instead of nulling player_id |
+| `src/components/poker/OnlinePokerLobby.tsx` | Filter out null player_id seats from count query |
+| `src/hooks/useOnlinePokerTable.ts` | Re-track presence role after join/leave seat |
+| Database | One-time cleanup of ghost rows where player_id IS NULL |
 
 ## What Is NOT Changed
-- Bottom navigation, UI components, styles, spacing
-- Betting controls, seat layout, game logic
+- Table header UI, icons, labels, eye icon -- all untouched
+- Bottom navigation, seat layout, betting controls
 - No new tables or schema changes
-- No client-side code changes
-
