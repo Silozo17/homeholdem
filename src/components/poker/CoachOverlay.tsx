@@ -1,15 +1,27 @@
-import { TutorialStep } from '@/lib/poker/tutorial-lessons';
 import { IntroStep } from '@/lib/poker/tutorial-lessons';
+import { PlayerAction } from '@/lib/poker/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import dealerImg from '@/assets/dealer/dealer-main.png';
 import { useState } from 'react';
 
+/** Generic coach step info (not tied to ScriptedStep type) */
+export interface CoachStepInfo {
+  message: string;
+  highlightElement?: string;
+  requiredAction?: PlayerAction;
+  highlight?: string;
+}
+
 interface CoachOverlayProps {
-  step?: TutorialStep | null;
+  step?: CoachStepInfo | null;
   introStep?: IntroStep | null;
   onDismiss: () => void;
   requiredAction?: string;
+  /** Current step number (1-based) */
+  currentStepNum?: number;
+  /** Total steps in this lesson */
+  totalSteps?: number;
 }
 
 const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
@@ -51,17 +63,17 @@ const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
   },
 };
 
-export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: CoachOverlayProps) {
+export function CoachOverlay({ step, introStep, onDismiss, requiredAction, currentStepNum, totalSteps }: CoachOverlayProps) {
   const message = introStep?.message || step?.message || '';
   const fallbackPosition = introStep?.position || 'bottom';
   const arrowDirection = introStep?.arrowDirection || 'none';
-  const highlight = introStep?.highlight;
+  const highlight = introStep?.highlight || step?.highlightElement || step?.highlight;
   const isIntro = !!introStep;
+  const isRequireAction = !!step?.requiredAction;
   const [imgFailed, setImgFailed] = useState(false);
 
   const highlightStyle = highlight ? HIGHLIGHT_POSITIONS[highlight] : null;
 
-  // Dynamic positioning: move dialog near the highlighted element
   const dialogPosition = (() => {
     if (!highlight) return fallbackPosition || 'center';
     switch (highlight) {
@@ -72,10 +84,17 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: Coa
     }
   })();
 
+  // Button text depends on step type
+  const buttonText = isIntro
+    ? 'Continue →'
+    : isRequireAction
+      ? `Tap ${step!.requiredAction!.charAt(0).toUpperCase() + step!.requiredAction!.slice(1)} below 👇`
+      : 'Got it →';
+
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* Dim overlay — NO blur so table stays visible */}
-      <div className="fixed inset-0 bg-black/25 pointer-events-auto" onClick={onDismiss} />
+      {/* Dim overlay */}
+      <div className="fixed inset-0 bg-black/25 pointer-events-auto" onClick={isRequireAction ? undefined : onDismiss} />
 
       {/* Highlight ring */}
       {highlightStyle && (
@@ -87,6 +106,19 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: Coa
             border: '2px solid hsl(var(--primary) / 0.5)',
           }}
         />
+      )}
+
+      {/* Pointing hand near highlighted element */}
+      {highlightStyle && highlight === 'actions' && (
+        <div
+          className="fixed z-[51] pointer-events-none text-2xl animate-bounce"
+          style={{
+            right: 'calc(env(safe-area-inset-right, 0px) + 80px)',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 170px)',
+          }}
+        >
+          👇
+        </div>
       )}
 
       {/* Speech bubble */}
@@ -113,6 +145,15 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: Coa
           )}
 
           <div className="bg-card/95 border border-primary/30 rounded-2xl p-3.5 shadow-xl shadow-primary/10 max-h-[45vh] overflow-y-auto backdrop-blur-sm">
+            {/* Step progress indicator */}
+            {!isIntro && currentStepNum != null && totalSteps != null && totalSteps > 0 && (
+              <div className="flex justify-end mb-1">
+                <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
+                  Step {currentStepNum}/{totalSteps}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-start gap-3">
               {/* Coach avatar */}
               <div className="shrink-0 w-11 h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden coach-bounce">
@@ -131,20 +172,21 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: Coa
 
               <div className="flex-1 min-w-0 space-y-2.5">
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{message}</p>
-                
-                {!isIntro && step?.requiredAction ? (
-                  <p className="text-xs text-primary font-medium">
-                    👆 Tap below, then use the <span className="uppercase font-bold">{step.requiredAction}</span> button
-                  </p>
-                ) : null}
 
-                <Button
-                  size="sm"
-                  onClick={onDismiss}
-                  className="w-full"
-                >
-                  {isIntro ? 'Continue →' : 'Got it →'}
-                </Button>
+                {/* For require_action: don't show a button, user must tap the game action */}
+                {isRequireAction ? (
+                  <p className="text-xs text-primary font-medium animate-pulse">
+                    👆 {buttonText}
+                  </p>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={onDismiss}
+                    className="w-full"
+                  >
+                    {buttonText}
+                  </Button>
+                )}
               </div>
             </div>
           </div>

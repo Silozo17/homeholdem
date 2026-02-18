@@ -1,24 +1,21 @@
 import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import {
-  Card, PokerPlayer, GameState, GamePhase, GameAction,
-  HAND_RANK_NAMES, BotPersonality, PlayerAction,
+  Card, PokerPlayer, GameState, GamePhase, GameAction, PlayerAction,
 } from '@/lib/poker/types';
 import { deal } from '@/lib/poker/deck';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
 import { getBotPersona } from '@/lib/poker/bot-personas';
-import { TutorialLesson, IntroStep } from '@/lib/poker/tutorial-lessons';
-
-const ALL_PERSONALITIES: BotPersonality[] = ['rock', 'fish', 'rock'];
+import { TutorialLesson, IntroStep, ScriptedStep } from '@/lib/poker/tutorial-lessons';
 
 type Action =
   | { type: 'START_GAME'; lesson: TutorialLesson }
   | { type: 'DEAL_HAND' }
   | { type: 'DEAL_ANIM_DONE' }
   | { type: 'PLAYER_ACTION'; action: GameAction }
+  | { type: 'BOT_ACTION'; botId: string; action: GameAction }
   | { type: 'ADVANCE_PHASE' }
   | { type: 'SHOWDOWN' }
-  | { type: 'NEXT_HAND' }
   | { type: 'QUIT' }
   | { type: 'RESET' };
 
@@ -54,10 +51,6 @@ function getActivePlayers(players: PokerPlayer[]): PokerPlayer[] {
   return players.filter(p => p.status === 'active' || p.status === 'all-in');
 }
 
-function getActionablePlayers(players: PokerPlayer[]): PokerPlayer[] {
-  return players.filter(p => p.status === 'active');
-}
-
 function nextActivePlayerIndex(players: PokerPlayer[], fromIndex: number): number {
   let idx = (fromIndex + 1) % players.length;
   let attempts = 0;
@@ -74,68 +67,34 @@ function reducer(state: GameState, action: Action): GameState {
     case 'START_GAME': {
       const lesson = action.lesson;
       const players: PokerPlayer[] = [];
-
       players.push({
-        id: 'human',
-        name: 'You',
-        chips: lesson.startingChips,
-        holeCards: [],
-        status: 'active',
-        currentBet: 0,
-        totalBetThisHand: 0,
-        isBot: false,
-        isDealer: false,
-        seatIndex: 0,
+        id: 'human', name: 'You', chips: lesson.startingChips,
+        holeCards: [], status: 'active', currentBet: 0, totalBetThisHand: 0,
+        isBot: false, isDealer: false, seatIndex: 0,
       });
-
       for (let i = 0; i < lesson.botCount; i++) {
-        const personality = ALL_PERSONALITIES[i % ALL_PERSONALITIES.length];
         const persona = getBotPersona(i);
         players.push({
-          id: `bot-${i}`,
-          name: persona.name,
-          chips: lesson.startingChips,
-          holeCards: [],
-          status: 'active',
-          currentBet: 0,
-          totalBetThisHand: 0,
-          isBot: true,
-          isDealer: false,
-          seatIndex: i + 1,
-          personality,
+          id: `bot-${i}`, name: persona.name, chips: lesson.startingChips,
+          holeCards: [], status: 'active', currentBet: 0, totalBetThisHand: 0,
+          isBot: true, isDealer: false, seatIndex: i + 1, personality: 'rock',
         });
       }
-
       players[0].isDealer = true;
-
       return {
-        ...state,
-        phase: 'dealing',
-        players,
-        deck: lesson.presetDeck,
-        dealerIndex: 0,
-        smallBlind: lesson.smallBlind,
-        bigBlind: lesson.bigBlind,
-        minRaise: lesson.bigBlind,
-        startingChips: lesson.startingChips,
-        startTime: Date.now(),
-        blindLevel: 0,
-        blindTimer: 0,
-        lastBlindIncrease: Date.now(),
+        ...state, phase: 'dealing', players, deck: lesson.presetDeck,
+        dealerIndex: 0, smallBlind: lesson.smallBlind, bigBlind: lesson.bigBlind,
+        minRaise: lesson.bigBlind, startingChips: lesson.startingChips,
+        startTime: Date.now(), blindLevel: 0, blindTimer: 0, lastBlindIncrease: Date.now(),
       };
     }
 
     case 'DEAL_HAND': {
       let deck = [...state.deck];
       const players: PokerPlayer[] = state.players.map(p => ({
-        ...p,
-        holeCards: [] as Card[],
-        status: (p.chips > 0 ? 'active' : 'eliminated') as PokerPlayer['status'],
-        currentBet: 0,
-        totalBetThisHand: 0,
-        lastAction: undefined,
+        ...p, holeCards: [] as Card[], status: (p.chips > 0 ? 'active' : 'eliminated') as PokerPlayer['status'],
+        currentBet: 0, totalBetThisHand: 0, lastAction: undefined,
       }));
-
       for (const p of players) {
         if (p.status === 'active') {
           const [cards, remaining] = deal(deck, 2);
@@ -143,43 +102,24 @@ function reducer(state: GameState, action: Action): GameState {
           deck = remaining;
         }
       }
-
-      const activePlayers = players.filter(p => p.status === 'active');
-      if (activePlayers.length < 2) {
-        return { ...state, phase: 'game_over', players };
-      }
-
       const sbIndex = nextActivePlayerIndex(players, state.dealerIndex);
       const bbIndex = nextActivePlayerIndex(players, sbIndex);
-
       const sbAmount = Math.min(state.smallBlind, players[sbIndex].chips);
       players[sbIndex].chips -= sbAmount;
       players[sbIndex].currentBet = sbAmount;
       players[sbIndex].totalBetThisHand = sbAmount;
-
       const bbAmount = Math.min(state.bigBlind, players[bbIndex].chips);
       players[bbIndex].chips -= bbAmount;
       players[bbIndex].currentBet = bbAmount;
       players[bbIndex].totalBetThisHand = bbAmount;
-
       if (players[sbIndex].chips === 0) (players[sbIndex] as any).status = 'all-in';
       if (players[bbIndex].chips === 0) (players[bbIndex] as any).status = 'all-in';
-
       const pot = sbAmount + bbAmount;
       const firstToAct = nextActivePlayerIndex(players, bbIndex);
-
       return {
-        ...state,
-        phase: 'preflop',
-        dealAnimDone: false,
-        players,
-        deck,
-        communityCards: [],
-        pot,
-        currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
-        minRaise: state.bigBlind,
-        handNumber: state.handNumber + 1,
-        lastRaiserIndex: bbIndex,
+        ...state, phase: 'preflop', dealAnimDone: false, players, deck,
+        communityCards: [], pot, currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
+        minRaise: state.bigBlind, handNumber: state.handNumber + 1, lastRaiserIndex: bbIndex,
       };
     }
 
@@ -190,7 +130,6 @@ function reducer(state: GameState, action: Action): GameState {
       let pot = state.pot;
       let minRaise = state.minRaise;
       let lastRaiserIndex = state.lastRaiserIndex;
-
       const maxBet = Math.max(...players.map(p => p.currentBet));
       const amountToCall = maxBet - player.currentBet;
 
@@ -241,35 +180,60 @@ function reducer(state: GameState, action: Action): GameState {
         }
       }
 
+      // In tutorial mode, we don't auto-advance phases — the step controller handles it
+      // Just move the current player index forward for tracking
       const nextIdx = nextActivePlayerIndex(players, state.currentPlayerIndex);
-      const currentMaxBet = Math.max(...players.map(p => p.currentBet));
-      const allEqualBets = getActivePlayers(players).every(
-        p => p.currentBet === currentMaxBet || p.status === 'all-in' || p.status === 'folded'
-      );
-      const foldedOut = players.filter(p => p.status !== 'folded' && p.status !== 'eliminated').length <= 1;
-
-      if (foldedOut) {
-        return { ...state, phase: 'showdown', players, pot, deck: state.deck, minRaise, lastRaiserIndex };
-      }
-
-      const raiserIsAllIn = lastRaiserIndex !== null && players[lastRaiserIndex]?.status === 'all-in';
-      const allActiveActed = getActionablePlayers(players).every(p => p.lastAction !== undefined);
-
-      const roundComplete = allEqualBets && (
-        (lastRaiserIndex !== null && players[lastRaiserIndex]?.status === 'active' && nextIdx === lastRaiserIndex) ||
-        (raiserIsAllIn && allActiveActed) ||
-        (lastRaiserIndex === null && allActiveActed)
-      );
-
-      if (getActionablePlayers(players).length === 0 || roundComplete) {
-        return advancePhase({ ...state, players, pot, minRaise, lastRaiserIndex });
-      }
-
       return { ...state, players, pot, currentPlayerIndex: nextIdx === -1 ? 0 : nextIdx, minRaise, lastRaiserIndex };
     }
 
-    case 'ADVANCE_PHASE':
-      return advancePhase(state);
+    case 'BOT_ACTION': {
+      const { botId, action: gameAction } = action;
+      const botIdx = state.players.findIndex(p => p.id === botId);
+      if (botIdx === -1) return state;
+      // Temporarily set currentPlayerIndex to the bot, then process like PLAYER_ACTION
+      const stateWithBot = { ...state, currentPlayerIndex: botIdx };
+      return reducer(stateWithBot, { type: 'PLAYER_ACTION', action: gameAction });
+    }
+
+    case 'ADVANCE_PHASE': {
+      let deck = [...state.deck];
+      let communityCards = [...state.communityCards];
+      let nextPhase: GamePhase;
+      const players = state.players.map(p => ({ ...p, currentBet: 0, lastAction: undefined }));
+
+      switch (state.phase) {
+        case 'preflop': {
+          const [flop, remaining] = deal(deck, 3);
+          communityCards = flop;
+          deck = remaining;
+          nextPhase = 'flop';
+          break;
+        }
+        case 'flop': {
+          const [turn, remaining] = deal(deck, 1);
+          communityCards = [...communityCards, ...turn];
+          deck = remaining;
+          nextPhase = 'turn';
+          break;
+        }
+        case 'turn': {
+          const [river, remaining] = deal(deck, 1);
+          communityCards = [...communityCards, ...river];
+          deck = remaining;
+          nextPhase = 'river';
+          break;
+        }
+        default:
+          return state;
+      }
+
+      const firstToAct = nextActivePlayerIndex(players, state.dealerIndex);
+      return {
+        ...state, phase: nextPhase, players, deck, communityCards,
+        currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
+        minRaise: state.bigBlind, lastRaiserIndex: null,
+      };
+    }
 
     case 'SHOWDOWN': {
       const players = [...state.players.map(p => ({ ...p }))];
@@ -306,12 +270,8 @@ function reducer(state: GameState, action: Action): GameState {
           }
         }
       }
-
       return { ...state, phase: 'hand_complete', players, pot: 0, handsPlayed: state.handsPlayed + 1, handsWon, lastHandWinners };
     }
-
-    case 'NEXT_HAND':
-      return { ...state, phase: 'game_over' };
 
     case 'QUIT':
       return { ...state, phase: 'game_over' };
@@ -327,158 +287,147 @@ function reducer(state: GameState, action: Action): GameState {
   }
 }
 
-function advancePhase(state: GameState): GameState {
-  let deck = [...state.deck];
-  let communityCards = [...state.communityCards];
-  let nextPhase: GamePhase;
-  const players = state.players.map(p => ({ ...p, currentBet: 0, lastAction: undefined }));
+// ──────────────────────────────────────────────
+// Step-Driven Tutorial Controller
+// ──────────────────────────────────────────────
 
-  switch (state.phase) {
-    case 'preflop': {
-      const [flop, remaining] = deal(deck, 3);
-      communityCards = flop;
-      deck = remaining;
-      nextPhase = 'flop';
-      break;
-    }
-    case 'flop': {
-      const [turn, remaining] = deal(deck, 1);
-      communityCards = [...communityCards, ...turn];
-      deck = remaining;
-      nextPhase = 'turn';
-      break;
-    }
-    case 'turn': {
-      const [river, remaining] = deal(deck, 1);
-      communityCards = [...communityCards, ...river];
-      deck = remaining;
-      nextPhase = 'river';
-      break;
-    }
-    case 'river':
-      nextPhase = 'showdown';
-      return { ...state, phase: nextPhase, players, deck, communityCards };
-    default:
-      return state;
-  }
-
-  const firstToAct = nextActivePlayerIndex(players, state.dealerIndex);
-  return { ...state, phase: nextPhase, players, deck, communityCards, currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct, minRaise: state.bigBlind, lastRaiserIndex: null };
-}
+type StepPhase = 'idle' | 'delay' | 'animating' | 'showing_coach' | 'waiting_action' | 'done';
 
 export function useTutorialGame(lesson: TutorialLesson | null) {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
-  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [coachStep, setCoachStep] = useState<number>(-1);
-  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Intro steps (table tour)
   const [introStepIdx, setIntroStepIdx] = useState<number>(-1);
   const [introComplete, setIntroComplete] = useState(false);
-  const [postDismissDelay, setPostDismissDelay] = useState(false);
-  const [pendingRequiredAction, setPendingRequiredAction] = useState<PlayerAction | null>(null);
-  const shownStepsRef = useRef<Set<string>>(new Set());
-  const botActionCountRef = useRef<Record<string, number>>({});
 
+  // Scripted step state
+  const [stepIndex, setStepIndex] = useState(-1);
+  const [stepPhase, setStepPhase] = useState<StepPhase>('idle');
+  const [coachMessage, setCoachMessage] = useState('');
+  const [coachHighlight, setCoachHighlight] = useState<string | undefined>();
+  const [requiredAction, setRequiredAction] = useState<PlayerAction | null>(null);
+
+  const lessonRef = useRef<TutorialLesson | null>(null);
+
+  // Cleanup
   useEffect(() => {
-    return () => {
-      if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current);
-    };
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
 
-  // Coach step management — show steps when the game reaches the right phase
-  useEffect(() => {
-    if (!lesson || isPaused || postDismissDelay) return;
-    
-    const steps = lesson.steps;
-    for (let i = 0; i < steps.length; i++) {
-      const stepKey = `${i}`;
-      if (shownStepsRef.current.has(stepKey)) continue;
-      const step = steps[i];
-      if (step.phase === state.phase && state.dealAnimDone !== false) {
-        shownStepsRef.current.add(stepKey);
-        setCoachStep(i);
-        setIsPaused(true);
-        return;
-      }
-    }
-  }, [state.phase, state.dealAnimDone, lesson, isPaused, postDismissDelay]);
+  const currentScriptedStep: ScriptedStep | null =
+    lesson?.scriptedSteps && stepIndex >= 0 && stepIndex < lesson.scriptedSteps.length
+      ? lesson.scriptedSteps[stepIndex]
+      : null;
 
-  // Auto-handle bot actions and phase transitions (respects pause + post-dismiss delay)
-  useEffect(() => {
-    if (isPaused || postDismissDelay) return;
-    if (botTimeoutRef.current) {
-      clearTimeout(botTimeoutRef.current);
-      botTimeoutRef.current = null;
+  const totalSteps = lesson?.scriptedSteps?.length ?? 0;
+
+  // ──── Execute a scripted step ────
+  const executeStep = useCallback((idx: number) => {
+    const l = lessonRef.current;
+    if (!l?.scriptedSteps || idx >= l.scriptedSteps.length) {
+      // All steps done — go to hand_complete for LessonCompleteOverlay
+      setStepPhase('done');
+      return;
     }
 
-    if (state.phase === 'dealing' && lesson) {
-      if (lesson.introSteps && lesson.introSteps.length > 0 && !introComplete) {
-        if (introStepIdx === -1) {
-          setIntroStepIdx(0);
-          setIsPaused(true);
-        }
-        return;
+    const step = l.scriptedSteps[idx];
+    setStepIndex(idx);
+
+    switch (step.type) {
+      case 'coach_message': {
+        setCoachMessage(step.message);
+        setCoachHighlight(step.highlight);
+        setRequiredAction(null);
+        setStepPhase('showing_coach');
+        break;
       }
-      botTimeoutRef.current = setTimeout(() => {
+
+      case 'deal_hole_cards': {
+        setStepPhase('animating');
+        setCoachMessage('');
+        // Dispatch deal
         dispatch({ type: 'DEAL_HAND' });
-        const activePlayers = state.players.filter(p => p.status !== 'eliminated').length;
-        const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.18 + 0.4;
-        setTimeout(() => dispatch({ type: 'DEAL_ANIM_DONE' }), lastCardDelay * 1000);
-      }, 800);
-      return;
+        // Wait for deal animation, then show coach
+        const animDelay = step.delay ?? 1800;
+        timerRef.current = setTimeout(() => {
+          dispatch({ type: 'DEAL_ANIM_DONE' });
+          setCoachMessage(step.message);
+          setCoachHighlight(step.highlight);
+          setRequiredAction(null);
+          setStepPhase('showing_coach');
+        }, animDelay);
+        break;
+      }
+
+      case 'deal_community': {
+        setStepPhase('animating');
+        setCoachMessage('');
+        // Advance the phase in the reducer to deal community cards
+        dispatch({ type: 'ADVANCE_PHASE' });
+        const animDelay = step.delay ?? 1200;
+        timerRef.current = setTimeout(() => {
+          setCoachMessage(step.message);
+          setCoachHighlight(step.highlight);
+          setRequiredAction(null);
+          setStepPhase('showing_coach');
+        }, animDelay);
+        break;
+      }
+
+      case 'bot_action': {
+        setStepPhase('delay');
+        setCoachMessage('');
+        const delay = step.delay ?? 1500;
+        timerRef.current = setTimeout(() => {
+          // Find bot player index and set currentPlayerIndex to it, then dispatch action
+          if (step.botId && step.botAction) {
+            dispatch({ type: 'BOT_ACTION', botId: step.botId, action: step.botAction });
+          }
+          // Show coach after bot acts
+          timerRef.current = setTimeout(() => {
+            setCoachMessage(step.message);
+            setCoachHighlight(step.highlight);
+            setRequiredAction(null);
+            setStepPhase('showing_coach');
+          }, 500);
+        }, delay);
+        break;
+      }
+
+      case 'require_action': {
+        setCoachMessage(step.message);
+        setCoachHighlight(step.highlight);
+        setRequiredAction(step.requiredAction || null);
+        setStepPhase('waiting_action');
+        break;
+      }
+
+      case 'show_result': {
+        setStepPhase('animating');
+        setCoachMessage('');
+        // Trigger showdown
+        dispatch({ type: 'SHOWDOWN' });
+        timerRef.current = setTimeout(() => {
+          setCoachMessage(step.message);
+          setCoachHighlight(step.highlight);
+          setRequiredAction(null);
+          setStepPhase('showing_coach');
+        }, 1500);
+        break;
+      }
     }
+  }, []);
 
-    if (state.phase === 'showdown') {
-      botTimeoutRef.current = setTimeout(() => dispatch({ type: 'SHOWDOWN' }), 1500);
-      return;
-    }
-
-    if (state.phase === 'hand_complete') {
-      return;
-    }
-
-    // All-in runout
-    if (
-      (state.phase === 'preflop' || state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') &&
-      getActionablePlayers(state.players).length <= 1
-    ) {
-      const delay = state.phase === 'flop' ? 2200 : 1800;
-      botTimeoutRef.current = setTimeout(() => dispatch({ type: 'ADVANCE_PHASE' }), delay);
-      return;
-    }
-
-    // Bot's turn — fully scripted, no decideBotAction fallback
-    if (
-      (state.phase === 'preflop' || state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') &&
-      state.dealAnimDone !== false &&
-      state.players[state.currentPlayerIndex]?.isBot &&
-      state.players[state.currentPlayerIndex]?.status === 'active'
-    ) {
-      const player = state.players[state.currentPlayerIndex];
-
-      botTimeoutRef.current = setTimeout(() => {
-        let botAction: GameAction;
-        const scriptedActions = lesson?.botActions?.[player.id];
-        const actionIdx = botActionCountRef.current[player.id] || 0;
-        
-        if (scriptedActions && actionIdx < scriptedActions.length) {
-          botAction = { type: scriptedActions[actionIdx] };
-          botActionCountRef.current[player.id] = actionIdx + 1;
-        } else {
-          // No free will — default to fold
-          botAction = { type: 'fold' };
-        }
-        dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, 1200 + Math.random() * 400);
-    }
-  }, [state.phase, state.currentPlayerIndex, state.handNumber, isPaused, postDismissDelay, lesson, introComplete, introStepIdx, state.players.map(p => p.status).join()]);
-
+  // ──── Start lesson ────
   const startLesson = useCallback((l: TutorialLesson) => {
-    shownStepsRef.current = new Set();
-    botActionCountRef.current = {};
-    setCoachStep(-1);
-    setIsPaused(false);
-    setPostDismissDelay(false);
-    setPendingRequiredAction(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    lessonRef.current = l;
+    setStepIndex(-1);
+    setStepPhase('idle');
+    setCoachMessage('');
+    setCoachHighlight(undefined);
+    setRequiredAction(null);
     setIntroStepIdx(-1);
     setIntroComplete(!l.introSteps || l.introSteps.length === 0);
     dispatch({ type: 'RESET' });
@@ -487,69 +436,87 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     }, 50);
   }, []);
 
-  const dismissCoach = useCallback(() => {
-    // If we're in intro phase, advance to next intro step
-    if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx < lesson.introSteps.length - 1) {
-      setIntroStepIdx(prev => prev + 1);
-      return;
+  // ──── After START_GAME dispatches (phase=dealing), begin intro or first step ────
+  useEffect(() => {
+    if (state.phase !== 'dealing' || !lesson) return;
+    if (lesson.introSteps && lesson.introSteps.length > 0 && !introComplete) {
+      if (introStepIdx === -1) {
+        setIntroStepIdx(0);
+      }
+    } else if (stepPhase === 'idle') {
+      // No intro, start first scripted step
+      executeStep(0);
     }
-    // If finishing last intro step, mark intro complete and unpause with delay
-    if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx >= lesson.introSteps.length - 1) {
+  }, [state.phase, lesson, introComplete, introStepIdx, stepPhase, executeStep]);
+
+  // ──── Dismiss coach / advance ────
+  const dismissCoach = useCallback(() => {
+    // If in intro phase
+    if (introStepIdx >= 0 && lesson?.introSteps) {
+      if (introStepIdx < lesson.introSteps.length - 1) {
+        setIntroStepIdx(prev => prev + 1);
+        return;
+      }
+      // Finishing last intro step
       setIntroStepIdx(-1);
       setIntroComplete(true);
-      setIsPaused(false);
-      // Add post-dismiss delay so bots don't immediately act
-      setPostDismissDelay(true);
-      setTimeout(() => setPostDismissDelay(false), 1200);
+      // Start first scripted step
+      executeStep(0);
       return;
     }
-    // Normal coach step dismiss — persist requiredAction, then add delay before bots act
-    const step = lesson?.steps[coachStep];
-    if (step?.requiredAction) {
-      setPendingRequiredAction(step.requiredAction);
-    }
-    setIsPaused(false);
-    setCoachStep(-1);
-    setPostDismissDelay(true);
-    setTimeout(() => setPostDismissDelay(false), 1200);
-  }, [introStepIdx, lesson, coachStep]);
 
-  const playerAction = useCallback((action: GameAction) => {
-    if (pendingRequiredAction) {
-      const matches = action.type === pendingRequiredAction ||
-        (pendingRequiredAction === 'raise' && action.type === 'all-in');
-      if (matches) setPendingRequiredAction(null);
+    // In step-driven mode
+    if (stepPhase === 'showing_coach') {
+      // Advance to next step
+      executeStep(stepIndex + 1);
     }
+  }, [introStepIdx, lesson, stepPhase, stepIndex, executeStep]);
+
+  // ──── Handle player action (for require_action steps) ────
+  const playerAction = useCallback((action: GameAction) => {
+    if (stepPhase !== 'waiting_action') return;
+    if (requiredAction) {
+      const matches = action.type === requiredAction ||
+        (requiredAction === 'raise' && action.type === 'all-in');
+      if (!matches) return; // Block wrong actions
+    }
+    // Dispatch the player's action to the reducer
     dispatch({ type: 'PLAYER_ACTION', action });
-  }, [pendingRequiredAction]);
+    // Advance to next step after a brief delay
+    setRequiredAction(null);
+    timerRef.current = setTimeout(() => {
+      executeStep(stepIndex + 1);
+    }, 600);
+  }, [stepPhase, requiredAction, stepIndex, executeStep]);
 
   const nextHand = useCallback(() => {
-    dispatch({ type: 'NEXT_HAND' });
-  }, []);
-
-  const quitGame = useCallback(() => {
+    // In tutorial, this triggers game_over for LessonCompleteOverlay
     dispatch({ type: 'QUIT' });
   }, []);
 
-  const isHumanTurn =
-    !isPaused &&
-    !postDismissDelay &&
-    (state.phase === 'preflop' || state.phase === 'flop' ||
-     state.phase === 'turn' || state.phase === 'river') &&
-    state.dealAnimDone !== false &&
-    !state.players[state.currentPlayerIndex]?.isBot &&
-    state.players[state.currentPlayerIndex]?.status === 'active';
+  const quitGame = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    dispatch({ type: 'QUIT' });
+  }, []);
+
+  // ──── Derived values ────
+  const isPaused = stepPhase === 'showing_coach' || stepPhase === 'waiting_action' || introStepIdx >= 0;
+  const isHumanTurn = stepPhase === 'waiting_action';
 
   const humanPlayer = state.players.find(p => p.id === 'human');
   const maxBet = Math.max(0, ...state.players.map(p => p.currentBet));
   const amountToCall = humanPlayer ? maxBet - humanPlayer.currentBet : 0;
   const canCheck = amountToCall === 0;
 
-  const currentStep = coachStep >= 0 && lesson ? lesson.steps[coachStep] : null;
-  const currentIntroStep = introStepIdx >= 0 && lesson?.introSteps ? lesson.introSteps[introStepIdx] : null;
+  const currentIntroStep: IntroStep | null =
+    introStepIdx >= 0 && lesson?.introSteps ? lesson.introSteps[introStepIdx] : null;
 
-  // Derive allowed action: pendingRequiredAction persists after coach dismiss
-  const allowedAction: PlayerAction | null = pendingRequiredAction || currentStep?.requiredAction || null;
+  // Build a "currentStep" object for CoachOverlay compatibility
+  const currentStep = (stepPhase === 'showing_coach' || stepPhase === 'waiting_action') && coachMessage
+    ? { phase: state.phase, message: coachMessage, highlight: coachHighlight, requiredAction: requiredAction || undefined }
+    : null;
+
+  const allowedAction: PlayerAction | null = stepPhase === 'waiting_action' ? requiredAction : null;
 
   return {
     state,
@@ -566,7 +533,10 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     currentStep,
     currentIntroStep,
     dismissCoach,
-    coachStep,
     allowedAction,
+    // New: step progress info
+    stepIndex,
+    totalSteps,
+    stepPhase,
   };
 }
