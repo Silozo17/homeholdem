@@ -313,7 +313,7 @@ Deno.serve(async (req) => {
             }
 
             if (nextActorSeat !== null) {
-              const deadline = new Date(Date.now() + 20_000).toISOString();
+              const deadline = new Date(Date.now() + 45_000).toISOString();
               const { data: commitResult } = await admin.rpc("commit_poker_state", {
                 _hand_id: activeHand.id,
                 _expected_version: handData.state_version,
