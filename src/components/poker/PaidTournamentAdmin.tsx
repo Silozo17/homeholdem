@@ -112,11 +112,8 @@ export function PaidTournamentAdmin({ onClose }: Props) {
         </div>
 
         <Button className="w-full" onClick={handleCreate} disabled={saving}>
-          {saving ? 'Creating...' : 'Create Tournament (Draft)'}
+          {saving ? 'Creating...' : 'Create Tournament'}
         </Button>
-        <p className="text-[10px] text-muted-foreground text-center">
-          Tournament will be created as draft. Publish it to open registration.
-        </p>
       </div>
     </div>
   );

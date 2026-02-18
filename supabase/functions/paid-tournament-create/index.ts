@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       payout_structure: structure,
       start_at,
       created_by: user.id,
-      status: "draft",
+      status: "scheduled",
     }).select().single();
 
     if (error) throw error;
