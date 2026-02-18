@@ -417,9 +417,10 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
             </div>
           ) : (
             filteredTables.map(t => (
-              <button
+              <div
                 key={t.id}
-                className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group active:scale-[0.98] transition-all hover:shadow-lg"
+                role="button"
+                className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group cursor-pointer transition-all hover:shadow-lg"
                 onClick={() => onJoinTable(t.id)}
               >
                 <div className="space-y-1.5 flex-1 min-w-0">
@@ -462,7 +463,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                     <span>{t.player_count}/{t.max_seats}</span>
                   </div>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>
