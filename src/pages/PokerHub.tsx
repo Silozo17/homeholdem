@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Users, ArrowLeft, Trophy, Crown } from 'lucide-react';
+import { Bot, Users, ArrowLeft, Trophy, Crown, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
@@ -88,6 +88,16 @@ export default function PokerHub() {
               compact
             />
           </div>
+          <GameModeCard
+            icon={Coins}
+            title="Paid Tournaments"
+            description="Compete for real cash prizes"
+            hint="Entry fee • Prize pool"
+            accentClass="bg-yellow-500/15"
+            ctaLabel="View Tournaments"
+            onClick={() => navigate('/tournaments')}
+            compact
+          />
         </div>
       </div>
 
