@@ -501,12 +501,29 @@ Deno.serve(async (req) => {
     const heartbeatKicks: any[] = [];
     for (const seat of staleSeats || []) {
       try {
-        console.log(`[HEARTBEAT] Kicking stale player ${seat.player_id} from table ${seat.table_id}`);
+        // Check if there's an active hand at this table
+        const { data: activeHand } = await admin
+          .from("poker_hands")
+          .select("id")
+          .eq("table_id", seat.table_id)
+          .is("completed_at", null)
+          .maybeSingle();
 
-        await admin
-          .from("poker_seats")
-          .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
-          .eq("id", seat.id);
+        if (activeHand) {
+          // Mid-hand: mark as disconnected so timeout-fold handles them gracefully
+          console.log(`[HEARTBEAT] Marking stale player ${seat.player_id} as disconnected (active hand ${activeHand.id})`);
+          await admin
+            .from("poker_seats")
+            .update({ status: "disconnected" })
+            .eq("id", seat.id);
+        } else {
+          // No active hand: safe to remove entirely
+          console.log(`[HEARTBEAT] Kicking stale player ${seat.player_id} from table ${seat.table_id} (no active hand)`);
+          await admin
+            .from("poker_seats")
+            .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
+            .eq("id", seat.id);
+        }
 
         const hbChannel = admin.channel(`poker:table:${seat.table_id}`);
         await hbChannel.send({
@@ -515,9 +532,9 @@ Deno.serve(async (req) => {
           payload: { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id },
         });
 
-        heartbeatKicks.push({ player_id: seat.player_id, table_id: seat.table_id, status: "disconnected" });
+        heartbeatKicks.push({ player_id: seat.player_id, table_id: seat.table_id, status: activeHand ? "marked_disconnected" : "removed" });
       } catch (hbErr: any) {
-        console.error(`Error kicking stale player ${seat.player_id}:`, hbErr);
+        console.error(`Error handling stale player ${seat.player_id}:`, hbErr);
         heartbeatKicks.push({ player_id: seat.player_id, status: 500, error: hbErr.message });
       }
     }
