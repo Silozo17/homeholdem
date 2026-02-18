@@ -1,47 +1,56 @@
 
 
-# Fix: Prevent Double-Action After Check/Call
+# Visual Fixes for iPad/Tablet/Desktop Screens Only
 
-## Problem
-After a player checks or calls, there's a brief window where the action buttons reappear before the server state update arrives. If the player taps again, they get a "not your turn" error from the backend.
+These 3 changes apply only to screens 900px+ wide (iPads and larger). Mobile layout stays untouched.
 
-This happens because:
-1. Player acts -- `actionPending` is set to true (buttons hidden)
-2. The realtime broadcast arrives and clears `actionPending`
-3. But if the broadcast still shows the same `current_actor_seat` (intermediate state), `isMyTurn` briefly evaluates to true again
-4. Buttons flash back, player taps, backend rejects
+## 1. Dealer Avatar — Move Down 35px (iPad+ only)
 
-## Solution
+**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1119)
 
-Track the `state_version` at which the user last acted. Suppress `isMyTurn` until the state version advances past the one where the action was taken.
+The dealer position currently uses:
+- Mobile landscape: `calc(-4% - 32px)` 
+- Everything else (including iPad): `calc(-4% - 62px)`
 
-### Technical Details
+Change the non-mobile branch to `calc(-4% - 27px)` (62 - 35 = 27, moving it 35px lower).
 
-**File:** `src/hooks/useOnlinePokerTable.ts`
+**Before:** `top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 62px)'`
+**After:** `top: isMobileLandscape ? 'calc(-4% - 32px)' : 'calc(-4% - 27px)'`
 
-1. Add a new ref to track the version the user last acted on:
-   - `const lastActedVersionRef = useRef<number | null>(null);`
+## 2. YOUR TURN Badge — Move Up 35px (iPad+ only)
 
-2. In `sendAction`, record the current state version before sending:
-   - `lastActedVersionRef.current = hand.state_version ?? 0;`
+**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1336)
 
-3. In the `isMyTurn` derivation (line 119-120), add an extra guard:
-   - Before: `const isMyTurn = rawIsMyTurn && !actionPending;`
-   - After: `const isMyTurn = rawIsMyTurn && !actionPending && (lastActedVersionRef.current === null || (hand?.state_version ?? 0) > lastActedVersionRef.current);`
+Current: `bottom: isLandscape ? 'calc(18% + 65px)' : 'calc(22% + 65px)'`
 
-4. Clear `lastActedVersionRef` when the hand changes (in the existing `hand_id` change effect) so it doesn't carry over between hands.
+Add a third condition using `isMobileLandscape` to differentiate mobile from iPad landscape:
+- Mobile landscape (under 900px): keep `calc(18% + 65px)`
+- iPad/desktop landscape: `calc(18% + 100px)` (65 + 35 = 100)
+- Portrait: keep `calc(22% + 65px)`
 
-This is a minimal, robust fix -- the buttons will only reappear when the server confirms the turn has genuinely advanced to the user again (state version incremented past their action).
+**After:** `bottom: isMobileLandscape ? 'calc(18% + 65px)' : isLandscape ? 'calc(18% + 100px)' : 'calc(22% + 65px)'`
+
+## 3. Community Cards — Move Down 12px (iPad+ only)
+
+**File:** `src/components/poker/OnlinePokerTable.tsx` (line 1130)
+
+Current: `top: '44%'`
+
+Change to use `isMobileLandscape` to keep mobile at 44% but shift iPad/desktop to `calc(44% + 12px)`.
+
+**After:** `top: isMobileLandscape ? '44%' : 'calc(44% + 12px)'`
+
+---
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Add `lastActedVersionRef` guard to prevent stale `isMyTurn` |
+| `src/components/poker/OnlinePokerTable.tsx` | 3 style tweaks (dealer top, YOUR TURN bottom, cards top) -- all gated to 900px+ screens |
 
 ## NOT Changed
+- Mobile layout (gated behind `isMobileLandscape`)
 - Bottom navigation
-- BettingControls component
-- OnlinePokerTable component
-- Styles, layout, spacing
-- Backend logic
+- Seat positions
+- Any other files or components
+
