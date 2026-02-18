@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -12,22 +12,43 @@ const REACTIONS = [
   { emoji: '🤯', label: 'Mind Blown' },
   { emoji: '😎', label: 'GG' },
   { emoji: '🙌', label: 'Nice Hand' },
+  { emoji: '💀', label: 'Dead' },
+  { emoji: '🤑', label: 'Money' },
+  { emoji: '🫣', label: 'Peeking' },
+  { emoji: '🤡', label: 'Clown' },
 ];
 
-const MESSAGES = ['Nice hand!', 'Good luck!', 'Bluff!', 'Oops!', 'GG', "Let's go!"];
-const RECENT_KEY = 'poker-recent-emotes';
+const MESSAGES = [
+  'Nice hand!', 'Good luck!', 'Bluff!', 'Oops!', 'GG', "Let's go!",
+  'Ship it!', "You're bluffing!", 'I knew it!', 'Slow roll much?',
+  'Donkey!', 'Fish on!', 'Run it twice?', "That's poker baby",
+  'All day!', 'Come at me', 'Easy game', 'Pay me',
+  'Wow', 'Brutal',
+];
 
-function getRecentEmotes(): string[] {
+const ALL_ITEMS = [...REACTIONS.map(r => r.emoji), ...MESSAGES];
+
+const FREQ_KEY = 'poker-chat-freq';
+
+function getFrequencies(): Record<string, number> {
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    const raw = localStorage.getItem(FREQ_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
 }
 
-function addRecentEmote(emoji: string) {
-  const recent = getRecentEmotes().filter(e => e !== emoji);
-  recent.unshift(emoji);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 3)));
+function incrementFreq(item: string) {
+  const freq = getFrequencies();
+  freq[item] = (freq[item] || 0) + 1;
+  localStorage.setItem(FREQ_KEY, JSON.stringify(freq));
+}
+
+function getTop5(): string[] {
+  const freq = getFrequencies();
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([item]) => item);
 }
 
 interface QuickChatProps {
@@ -36,20 +57,19 @@ interface QuickChatProps {
 
 export function QuickChat({ onSend }: QuickChatProps) {
   const [open, setOpen] = useState(false);
-  const [recentEmotes, setRecentEmotes] = useState<string[]>([]);
+  const [topItems, setTopItems] = useState<string[]>([]);
 
   useEffect(() => {
-    if (open) setRecentEmotes(getRecentEmotes());
+    if (open) setTopItems(getTop5());
   }, [open]);
 
   const handleSend = useCallback((text: string) => {
-    // Track recently used emojis
-    if (REACTIONS.some(r => r.emoji === text)) {
-      addRecentEmote(text);
-    }
+    incrementFreq(text);
     onSend(text);
     setOpen(false);
   }, [onSend]);
+
+  const isEmoji = (text: string) => REACTIONS.some(r => r.emoji === text);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -63,58 +83,64 @@ export function QuickChat({ onSend }: QuickChatProps) {
       <PopoverContent
         side="bottom"
         align="end"
-        className="w-64 p-2 z-[70]"
+        className="w-64 p-0 z-[70]"
         style={{ background: 'hsl(160 25% 10% / 0.95)', backdropFilter: 'blur(12px)', border: '1px solid hsl(0 0% 100% / 0.1)' }}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        {/* Recently used */}
-        {recentEmotes.length > 0 && (
-          <>
-            <p className="text-[8px] text-foreground/30 font-bold uppercase tracking-wider px-1 mb-0.5">Recent</p>
-            <div className="flex gap-1 mb-1.5">
-              {recentEmotes.map(emoji => (
+        {/* Top 5 most used — pinned outside scroll */}
+        {topItems.length > 0 && (
+          <div className="px-2 pt-2 pb-1 border-b border-white/5">
+            <p className="text-[8px] text-foreground/30 font-bold uppercase tracking-wider px-1 mb-0.5">Most Used</p>
+            <div className="flex gap-1 flex-wrap">
+              {topItems.map(item => (
                 <button
-                  key={`recent-${emoji}`}
-                  onClick={() => handleSend(emoji)}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-lg hover:bg-white/10 active:scale-90 transition-all"
+                  key={`top-${item}`}
+                  onClick={() => handleSend(item)}
+                  className={cn(
+                    'rounded-lg flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all',
+                    isEmoji(item) ? 'w-9 h-9 text-lg' : 'text-[10px] font-bold text-foreground/80 py-1 px-2',
+                  )}
                   style={{ border: '1px solid hsl(43 74% 49% / 0.2)' }}
                 >
-                  {emoji}
+                  {item}
                 </button>
               ))}
             </div>
-          </>
+          </div>
         )}
 
-        {/* Reaction grid */}
-        <div className="grid grid-cols-4 gap-1 mb-2">
-          {REACTIONS.map(({ emoji, label }) => (
-            <button
-              key={emoji}
-              onClick={() => handleSend(emoji)}
-              className="w-full aspect-square rounded-lg flex flex-col items-center justify-center gap-0 hover:bg-white/10 active:scale-90 transition-all"
-              title={label}
-            >
-              <span className="text-lg leading-none">{emoji}</span>
-              <span className="text-[7px] text-foreground/30 font-medium leading-tight mt-0.5">{label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Scrollable content */}
+        <div className="max-h-[280px] overflow-y-auto p-2 scrollbar-hide">
+          {/* Reaction grid */}
+          <div className="grid grid-cols-4 gap-1 mb-2">
+            {REACTIONS.map(({ emoji, label }) => (
+              <button
+                key={emoji}
+                onClick={() => handleSend(emoji)}
+                className="w-full aspect-square rounded-lg flex flex-col items-center justify-center gap-0 hover:bg-white/10 active:scale-90 transition-all"
+                title={label}
+              >
+                <span className="text-lg leading-none">{emoji}</span>
+                <span className="text-[7px] text-foreground/30 font-medium leading-tight mt-0.5">{label}</span>
+              </button>
+            ))}
+          </div>
 
-        {/* Quick messages */}
-        <div className="flex flex-col gap-0.5 border-t border-white/5 pt-1">
-          {MESSAGES.map(msg => (
-            <button
-              key={msg}
-              onClick={() => handleSend(msg)}
-              className={cn(
-                'text-[10px] font-bold text-foreground/80 py-1 px-2 rounded-md text-left',
-                'hover:bg-white/10 active:scale-[0.98] transition-all',
-              )}
-            >
-              {msg}
-            </button>
-          ))}
+          {/* Quick messages */}
+          <div className="flex flex-col gap-0.5 border-t border-white/5 pt-1">
+            {MESSAGES.map(msg => (
+              <button
+                key={msg}
+                onClick={() => handleSend(msg)}
+                className={cn(
+                  'text-[10px] font-bold text-foreground/80 py-1 px-2 rounded-md text-left',
+                  'hover:bg-white/10 active:scale-[0.98] transition-all',
+                )}
+              >
+                {msg}
+              </button>
+            ))}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
