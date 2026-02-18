@@ -87,7 +87,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         .from('poker_seats')
         .select('table_id')
         .in('table_id', tableIds.length > 0 ? tableIds : ['none'])
-        .in('status', ['active', 'sitting_out']);
+        .in('status', ['active', 'sitting_out'])
+        .not('player_id', 'is', null);
 
       const countMap = new Map<string, number>();
       (seats || []).forEach(s => { countMap.set(s.table_id, (countMap.get(s.table_id) || 0) + 1); });

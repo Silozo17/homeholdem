@@ -521,7 +521,7 @@ Deno.serve(async (req) => {
           console.log(`[HEARTBEAT] Kicking stale player ${seat.player_id} from table ${seat.table_id} (no active hand)`);
           await admin
             .from("poker_seats")
-            .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
+            .delete()
             .eq("id", seat.id);
         }
 
