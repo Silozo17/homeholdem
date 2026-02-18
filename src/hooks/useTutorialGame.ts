@@ -1,11 +1,10 @@
 import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import {
   Card, PokerPlayer, GameState, GamePhase, GameAction,
-  HAND_RANK_NAMES, BotPersonality,
+  HAND_RANK_NAMES, BotPersonality, PlayerAction,
 } from '@/lib/poker/types';
 import { deal } from '@/lib/poker/deck';
 import { evaluateHand } from '@/lib/poker/hand-evaluator';
-import { decideBotAction } from '@/lib/poker/bot-ai';
 import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
 import { getBotPersona } from '@/lib/poker/bot-personas';
 import { TutorialLesson, IntroStep } from '@/lib/poker/tutorial-lessons';
@@ -113,7 +112,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         phase: 'dealing',
         players,
-        deck: lesson.presetDeck, // Inject preset deck
+        deck: lesson.presetDeck,
         dealerIndex: 0,
         smallBlind: lesson.smallBlind,
         bigBlind: lesson.bigBlind,
@@ -127,7 +126,6 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'DEAL_HAND': {
-      // Use preset deck from lesson (stored externally, passed via state.deck)
       let deck = [...state.deck];
       const players: PokerPlayer[] = state.players.map(p => ({
         ...p,
@@ -375,6 +373,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   const [isPaused, setIsPaused] = useState(false);
   const [introStepIdx, setIntroStepIdx] = useState<number>(-1);
   const [introComplete, setIntroComplete] = useState(false);
+  const [postDismissDelay, setPostDismissDelay] = useState(false);
   const shownStepsRef = useRef<Set<string>>(new Set());
   const botActionCountRef = useRef<Record<string, number>>({});
 
@@ -386,10 +385,9 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
 
   // Coach step management — show steps when the game reaches the right phase
   useEffect(() => {
-    if (!lesson || isPaused) return;
+    if (!lesson || isPaused || postDismissDelay) return;
     
     const steps = lesson.steps;
-    // Find the next unshown step that matches the current phase
     for (let i = 0; i < steps.length; i++) {
       const stepKey = `${i}`;
       if (shownStepsRef.current.has(stepKey)) continue;
@@ -401,18 +399,17 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
         return;
       }
     }
-  }, [state.phase, state.dealAnimDone, lesson, isPaused]);
+  }, [state.phase, state.dealAnimDone, lesson, isPaused, postDismissDelay]);
 
-  // Auto-handle bot actions and phase transitions (same as usePokerGame but respects pause)
+  // Auto-handle bot actions and phase transitions (respects pause + post-dismiss delay)
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || postDismissDelay) return;
     if (botTimeoutRef.current) {
       clearTimeout(botTimeoutRef.current);
       botTimeoutRef.current = null;
     }
 
     if (state.phase === 'dealing' && lesson) {
-      // If lesson has intro steps and intro isn't complete, don't deal yet
       if (lesson.introSteps && lesson.introSteps.length > 0 && !introComplete) {
         if (introStepIdx === -1) {
           setIntroStepIdx(0);
@@ -435,7 +432,6 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     }
 
     if (state.phase === 'hand_complete') {
-      // Don't auto-advance in tutorial — wait for lesson complete screen
       return;
     }
 
@@ -449,7 +445,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
       return;
     }
 
-    // Bot's turn
+    // Bot's turn — fully scripted, no decideBotAction fallback
     if (
       (state.phase === 'preflop' || state.phase === 'flop' || state.phase === 'turn' || state.phase === 'river') &&
       state.dealAnimDone !== false &&
@@ -457,10 +453,8 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
       state.players[state.currentPlayerIndex]?.status === 'active'
     ) {
       const player = state.players[state.currentPlayerIndex];
-      const maxBet = Math.max(...state.players.map(p => p.currentBet));
 
       botTimeoutRef.current = setTimeout(() => {
-        // Check for scripted bot actions
         let botAction: GameAction;
         const scriptedActions = lesson?.botActions?.[player.id];
         const actionIdx = botActionCountRef.current[player.id] || 0;
@@ -469,22 +463,20 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
           botAction = { type: scriptedActions[actionIdx] };
           botActionCountRef.current[player.id] = actionIdx + 1;
         } else {
-          botAction = decideBotAction(
-            player, state.communityCards, state.pot, maxBet,
-            state.minRaise, state.bigBlind, state.dealerIndex,
-            state.players.filter(p => p.status !== 'eliminated').length,
-          );
+          // No free will — default to fold
+          botAction = { type: 'fold' };
         }
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
       }, 1200 + Math.random() * 400);
     }
-  }, [state.phase, state.currentPlayerIndex, state.handNumber, isPaused, lesson, introComplete, introStepIdx, state.players.map(p => p.status).join()]);
+  }, [state.phase, state.currentPlayerIndex, state.handNumber, isPaused, postDismissDelay, lesson, introComplete, introStepIdx, state.players.map(p => p.status).join()]);
 
   const startLesson = useCallback((l: TutorialLesson) => {
     shownStepsRef.current = new Set();
     botActionCountRef.current = {};
     setCoachStep(-1);
     setIsPaused(false);
+    setPostDismissDelay(false);
     setIntroStepIdx(-1);
     setIntroComplete(!l.introSteps || l.introSteps.length === 0);
     dispatch({ type: 'RESET' });
@@ -493,23 +485,27 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     }, 50);
   }, []);
 
-
   const dismissCoach = useCallback(() => {
     // If we're in intro phase, advance to next intro step
     if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx < lesson.introSteps.length - 1) {
       setIntroStepIdx(prev => prev + 1);
       return;
     }
-    // If finishing last intro step, mark intro complete and unpause
+    // If finishing last intro step, mark intro complete and unpause with delay
     if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx >= lesson.introSteps.length - 1) {
       setIntroStepIdx(-1);
       setIntroComplete(true);
       setIsPaused(false);
+      // Add post-dismiss delay so bots don't immediately act
+      setPostDismissDelay(true);
+      setTimeout(() => setPostDismissDelay(false), 1200);
       return;
     }
-    // Normal coach step dismiss
+    // Normal coach step dismiss — add delay before bots act
     setIsPaused(false);
     setCoachStep(-1);
+    setPostDismissDelay(true);
+    setTimeout(() => setPostDismissDelay(false), 1200);
   }, [introStepIdx, lesson]);
 
   const playerAction = useCallback((action: GameAction) => {
@@ -526,6 +522,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
 
   const isHumanTurn =
     !isPaused &&
+    !postDismissDelay &&
     (state.phase === 'preflop' || state.phase === 'flop' ||
      state.phase === 'turn' || state.phase === 'river') &&
     state.dealAnimDone !== false &&
@@ -539,6 +536,9 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
 
   const currentStep = coachStep >= 0 && lesson ? lesson.steps[coachStep] : null;
   const currentIntroStep = introStepIdx >= 0 && lesson?.introSteps ? lesson.introSteps[introStepIdx] : null;
+
+  // Derive allowed action from the current coach step
+  const allowedAction: PlayerAction | null = currentStep?.requiredAction || null;
 
   return {
     state,
@@ -556,5 +556,6 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     currentIntroStep,
     dismissCoach,
     coachStep,
+    allowedAction,
   };
 }

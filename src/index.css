@@ -592,6 +592,13 @@
 }
 .dealer-breathe { animation: dealer-breathe 4s ease-in-out infinite; }
 
+/* Coach avatar bounce */
+@keyframes coach-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.coach-bounce { animation: coach-bounce 2s ease-in-out infinite; }
+
 /* Hand name reveal at showdown */
 @keyframes hand-name-reveal {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
