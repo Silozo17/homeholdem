@@ -31,7 +31,7 @@ const modes = [
     subtitle: 'Real Players',
     description: 'Play Texas Hold\'em with friends online',
     icon: Users,
-    path: '/online-poker',
+    path: '/poker',
     accentClass: 'from-emerald-500/20 to-emerald-500/5',
     iconColor: 'text-emerald-400',
     premium: true,

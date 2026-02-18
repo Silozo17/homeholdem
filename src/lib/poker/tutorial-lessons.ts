@@ -14,6 +14,12 @@ export interface TutorialStep {
   waitForPhase?: boolean; // Wait until the game reaches this phase before showing
 }
 
+export interface IntroStep {
+  message: string;
+  position?: 'top' | 'center' | 'bottom';
+  arrowDirection?: 'down' | 'up' | 'none';
+}
+
 export interface TutorialLesson {
   id: string;
   title: string;
@@ -26,6 +32,7 @@ export interface TutorialLesson {
   bigBlind: number;
   steps: TutorialStep[];
   summary: string[];
+  introSteps?: IntroStep[];
   botActions?: Record<string, PlayerAction[]>; // bot-id -> ordered actions they should take
 }
 
@@ -79,6 +86,13 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
     title: 'The Basics',
     subtitle: 'How a Hand Works',
     description: 'Learn about blinds, dealing, and the four betting rounds.',
+    introSteps: [
+      { message: "Welcome to your first poker lesson! 🎉 Let's learn the basics of Texas Hold'em together. I'll guide you step by step.", position: 'center', arrowDirection: 'none' },
+      { message: "You'll see the poker table with your seat at the bottom. Your hole cards (private cards) will appear face-up at your position.", position: 'bottom', arrowDirection: 'down' },
+      { message: "At the bottom of the screen are your action buttons: Fold, Check/Call, and Raise. These are how you play each turn.", position: 'bottom', arrowDirection: 'down' },
+      { message: "The shared community cards appear in the center of the table. Use them together with your hole cards to make the best 5-card hand.", position: 'center', arrowDirection: 'none' },
+      { message: "Ready? Let's deal your first hand! I'll pause at each step to explain what's happening. 🃏", position: 'center', arrowDirection: 'none' },
+    ],
     presetDeck: buildDeck(
       [c(14, 'spades'), c(13, 'spades')],   // Human: A♠ K♠
       [c(7, 'hearts'), c(2, 'diamonds')],     // Bot 0: 7♥ 2♦ (weak, will fold)
