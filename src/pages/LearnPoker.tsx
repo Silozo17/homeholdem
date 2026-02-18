@@ -36,7 +36,7 @@ export default function LearnPoker() {
   const {
     state, startLesson, playerAction, nextHand, quitGame,
     isHumanTurn, humanPlayer, amountToCall, canCheck, maxBet,
-    isPaused, currentStep, dismissCoach,
+    isPaused, currentStep, currentIntroStep, dismissCoach,
   } = useTutorialGame(activeLesson);
 
   // Detect hand completion → show overlay
@@ -99,18 +99,26 @@ export default function LearnPoker() {
   if (isPlaying) {
     const isLastLesson = activeLessonIdx >= TUTORIAL_LESSONS.length - 1;
     return (
-      <div className="fixed inset-0 z-10 bg-background">
-        <PokerTablePro
-          state={state}
-          isHumanTurn={isHumanTurn}
-          amountToCall={amountToCall}
-          canCheck={canCheck}
-          maxBet={maxBet}
-          onAction={playerAction}
-          onNextHand={nextHand}
-          onQuit={handleQuit}
-        />
-        {isPaused && currentStep && (
+      <>
+        <div className="fixed inset-0 z-10 bg-background">
+          <PokerTablePro
+            state={state}
+            isHumanTurn={isHumanTurn}
+            amountToCall={amountToCall}
+            canCheck={canCheck}
+            maxBet={maxBet}
+            onAction={playerAction}
+            onNextHand={nextHand}
+            onQuit={handleQuit}
+          />
+        </div>
+        {isPaused && currentIntroStep && (
+          <CoachOverlay
+            introStep={currentIntroStep}
+            onDismiss={dismissCoach}
+          />
+        )}
+        {isPaused && currentStep && !currentIntroStep && (
           <CoachOverlay
             step={currentStep}
             onDismiss={dismissCoach}
@@ -125,7 +133,7 @@ export default function LearnPoker() {
             onBackToLessons={handleBackToLessons}
           />
         )}
-      </div>
+      </>
     );
   }
 
@@ -143,9 +151,9 @@ export default function LearnPoker() {
           <NotificationBell className="absolute right-4" />
         </div>
       </header>
-      <div className="h-14 safe-area-top shrink-0" />
+      <div className="h-14 safe-area-top shrink-0" aria-hidden="true" />
 
-      <div className="flex-1 overflow-auto px-4 py-6 space-y-5" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="flex-1 overflow-auto px-4 py-6 space-y-5 pb-8">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto">

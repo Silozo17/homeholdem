@@ -8,7 +8,7 @@ import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import { decideBotAction } from '@/lib/poker/bot-ai';
 import { calculateSidePots, distributeSidePots, PotContributor } from '@/lib/poker/side-pots';
 import { getBotPersona } from '@/lib/poker/bot-personas';
-import { TutorialLesson } from '@/lib/poker/tutorial-lessons';
+import { TutorialLesson, IntroStep } from '@/lib/poker/tutorial-lessons';
 
 const ALL_PERSONALITIES: BotPersonality[] = ['rock', 'fish', 'rock'];
 
@@ -373,6 +373,8 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coachStep, setCoachStep] = useState<number>(-1);
   const [isPaused, setIsPaused] = useState(false);
+  const [introStepIdx, setIntroStepIdx] = useState<number>(-1);
+  const [introComplete, setIntroComplete] = useState(false);
   const shownStepsRef = useRef<Set<string>>(new Set());
   const botActionCountRef = useRef<Record<string, number>>({});
 
@@ -410,10 +412,15 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     }
 
     if (state.phase === 'dealing' && lesson) {
+      // If lesson has intro steps and intro isn't complete, don't deal yet
+      if (lesson.introSteps && lesson.introSteps.length > 0 && !introComplete) {
+        if (introStepIdx === -1) {
+          setIntroStepIdx(0);
+          setIsPaused(true);
+        }
+        return;
+      }
       botTimeoutRef.current = setTimeout(() => {
-        // Inject preset deck before dealing
-        // We dispatch DEAL_HAND — but we need the deck set first
-        // Hack: set deck in state via a custom path
         dispatch({ type: 'DEAL_HAND' });
         const activePlayers = state.players.filter(p => p.status !== 'eliminated').length;
         const lastCardDelay = (1 * activePlayers + (activePlayers - 1)) * 0.18 + 0.4;
@@ -469,19 +476,18 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
           );
         }
         dispatch({ type: 'PLAYER_ACTION', action: botAction });
-      }, 600 + Math.random() * 400);
+      }, 1200 + Math.random() * 400);
     }
-  }, [state.phase, state.currentPlayerIndex, state.handNumber, isPaused, lesson, state.players.map(p => p.status).join()]);
+  }, [state.phase, state.currentPlayerIndex, state.handNumber, isPaused, lesson, introComplete, introStepIdx, state.players.map(p => p.status).join()]);
 
   const startLesson = useCallback((l: TutorialLesson) => {
     shownStepsRef.current = new Set();
     botActionCountRef.current = {};
     setCoachStep(-1);
     setIsPaused(false);
-    // We need to set the deck. The reducer's DEAL_HAND reads from state.deck.
-    // So we first START_GAME to create players, then inject deck.
+    setIntroStepIdx(-1);
+    setIntroComplete(!l.introSteps || l.introSteps.length === 0);
     dispatch({ type: 'RESET' });
-    // Small delay to ensure reset completes
     setTimeout(() => {
       dispatch({ type: 'START_GAME', lesson: l });
     }, 50);
@@ -489,9 +495,22 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
 
 
   const dismissCoach = useCallback(() => {
+    // If we're in intro phase, advance to next intro step
+    if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx < lesson.introSteps.length - 1) {
+      setIntroStepIdx(prev => prev + 1);
+      return;
+    }
+    // If finishing last intro step, mark intro complete and unpause
+    if (introStepIdx >= 0 && lesson?.introSteps && introStepIdx >= lesson.introSteps.length - 1) {
+      setIntroStepIdx(-1);
+      setIntroComplete(true);
+      setIsPaused(false);
+      return;
+    }
+    // Normal coach step dismiss
     setIsPaused(false);
     setCoachStep(-1);
-  }, []);
+  }, [introStepIdx, lesson]);
 
   const playerAction = useCallback((action: GameAction) => {
     dispatch({ type: 'PLAYER_ACTION', action });
@@ -519,6 +538,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
   const canCheck = amountToCall === 0;
 
   const currentStep = coachStep >= 0 && lesson ? lesson.steps[coachStep] : null;
+  const currentIntroStep = introStepIdx >= 0 && lesson?.introSteps ? lesson.introSteps[introStepIdx] : null;
 
   return {
     state,
@@ -533,6 +553,7 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     maxBet,
     isPaused,
     currentStep,
+    currentIntroStep,
     dismissCoach,
     coachStep,
   };

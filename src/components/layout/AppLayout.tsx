@@ -10,7 +10,7 @@ interface AppLayoutProps {
 }
 
 // Routes where bottom nav should be hidden
-const hiddenNavRoutes = ['/', '/auth'];
+const hiddenNavRoutes = ['/', '/auth', '/learn-poker'];
 // Routes where nav should always be hidden (active gameplay)
 const gameplayRoutes = ['/event/'];
 const conditionalNavRoutes = ['/game'];
