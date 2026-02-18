@@ -580,7 +580,7 @@
   60% { opacity: 1; transform: translateY(2px) scale(1.08); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-card-reveal { animation: card-reveal 0.3s ease-out both; }
+.animate-card-reveal { animation: card-reveal 0.15s ease-out both; }
 
 /* ===== AAA Premium Poker Animations ===== */
 
