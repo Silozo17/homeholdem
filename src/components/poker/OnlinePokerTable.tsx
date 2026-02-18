@@ -1143,12 +1143,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               const dealDelay = isFlop ? i * 0.18 : 0.1;
               return <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="xl" dealDelay={dealDelay} />;
             })}
-            {(!hand || visibleCommunityCards.length === 0) && (
-              <div className="text-[10px] text-foreground/20 italic font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
-              </div>
-            )}
+            {visibleCommunityCards.length === 0 && hand && <></>}
           </div>
+
+          {(!hand || visibleCommunityCards.length === 0) && (
+            <div className="absolute left-1/2 -translate-x-1/2 text-[10px] text-foreground/20 italic font-medium" style={{ top: 'calc(50% + 28px)', zIndex: Z.LOGO, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+              {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
+            </div>
+          )}
 
           <div className="absolute left-1/2 -translate-x-1/2" style={{ top: '68%', zIndex: Z.CARDS }}>
             {hand ? (
