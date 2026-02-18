@@ -1,58 +1,77 @@
 
+# Fix Learn Poker Issues + Multiplayer Menu + Tutorial Intro
 
-# Use Real Poker Table + Seamless Lesson Flow
+## Issues Identified
 
-Two changes: (1) swap the simple `PokerTable` for the premium `PokerTablePro` so tutorial players get the real table experience, and (2) make lessons flow continuously without leaving the table view.
+1. **Learn Poker page - header cut off**: The BookOpen icon at the top of the lesson list is partially hidden behind the fixed header. The spacer div only accounts for h-14 but the safe-area-top class adds extra padding that isn't matched.
 
-## 1. Replace PokerTable with PokerTablePro
+2. **Bottom nav visible during Learn gameplay**: The route `/learn-poker` is not in any of AppLayout's hidden/fullscreen route lists, so the BottomNav renders on top of the poker table during lessons.
 
-In `src/pages/LearnPoker.tsx`:
-- Replace the `PokerTable` import with `PokerTablePro`
-- `PokerTablePro` accepts the same props (`state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit`)
-- This gives the tutorial the same premium visuals: felt table image, dealer character, seat anchors with elliptical layout, card deal animations, sounds, landscape mode, etc.
+3. **Multiplayer button goes directly to online-poker**: Dashboard's GameModesGrid sends users straight to `/online-poker`. It should go to `/poker` (PokerHub) where they can choose between Online Multiplayer and Paid Tournaments.
 
-## 2. Seamless Lesson Transitions (No Exit to Menu)
+4. **Tutorial needs intro + control explanations**: Lesson 1 should start with a welcome popup explaining the UI controls (betting buttons, chip display, etc.) before any cards are dealt. Each game action should pause for the user with clear coach tips.
 
-Currently after a hand completes, the page shows a full-screen "summary" view, then the player taps "Next Lesson" which goes to another full-screen "intro" view. Instead:
+---
 
-- **Remove the `intro` and `summary` views entirely** from the lesson flow (keep `select` for initial entry only)
-- **After hand_complete**: show a compact overlay *on top of the poker table* (not a full-screen replacement) with the lesson summary and a "Next Lesson" button
-- **When "Next Lesson" is tapped**: immediately call `startLesson(nextLesson)` which resets the game state and deals new cards -- the table stays rendered underneath the whole time, so visually it just transitions to the next hand seamlessly
-- The first lesson starts directly from the select screen without an intro screen (the coach overlay already explains the concept)
+## Changes
 
-### New Component: `LessonCompleteOverlay`
+### 1. Fix Learn Poker page layout (LearnPoker.tsx)
 
-A compact overlay rendered inside the playing view (similar to `WinnerOverlay`), containing:
-- Lesson title + checkmark
-- 2-3 key takeaway bullet points
-- "Next Lesson" button (or "All Done" on the last lesson)
-- Semi-transparent backdrop so the table is still visible behind it
+- The lesson select screen has `fixed inset-0` which bypasses AppLayout's padding, but the content area needs proper spacing.
+- The BookOpen icon area is overlapping with the header. Fix by ensuring the spacer correctly matches the header height including safe-area.
 
-### Updated Flow
+### 2. Hide bottom nav during Learn Poker (AppLayout.tsx)
 
-```text
-Lesson Select --> tap lesson --> table loads, lesson starts immediately
-  --> hand plays out with coach tips
-  --> hand_complete: LessonCompleteOverlay appears ON TOP of table
-  --> tap "Next Lesson": overlay dismisses, next lesson starts on same table
-  --> ... repeats until all lessons done
-  --> final lesson: "Back to Lessons" returns to select screen
-```
+- Add `/learn-poker` to the `hiddenNavRoutes` array (or `fullscreenRoutes`). This ensures the BottomNav is hidden when the user is on the learn page (both lesson select and gameplay).
+- Since LearnPoker uses `fixed inset-0`, hiding the nav is correct for both states.
 
-## 3. Hook Changes (`useTutorialGame`)
+### 3. Multiplayer goes to PokerHub (GameModesGrid.tsx)
 
-- The `NEXT_HAND` action currently sets `phase: 'game_over'`. Change it so it can accept a new lesson and restart seamlessly (or just call `startLesson` from the page level, which already does `RESET` then `START_GAME`)
-- No other hook changes needed -- `startLesson` already handles resetting state
+- Change the `path` for the "Multiplayer" mode from `/online-poker` to `/poker` so users see the full poker hub with Online MP, Paid Tournaments, and other options.
+
+### 4. Tutorial intro overlay + control explainers (tutorial-lessons.ts, useTutorialGame.ts, LearnPoker.tsx)
+
+**New intro system:**
+
+- Add a new `introSteps` array to the `TutorialLesson` interface. These are shown BEFORE the game starts (before cards are dealt).
+- For Lesson 1, add 3-4 intro steps:
+  1. "Welcome to your first poker lesson! Let's start by learning the table layout."
+  2. "At the bottom you'll see your action buttons: Fold, Check/Call, and Raise. These are how you play."
+  3. "Your cards appear face-up at your seat. The shared cards appear in the center."
+  4. "Ready? Let's deal your first hand!"
+
+**Implementation in useTutorialGame.ts:**
+
+- Add a new state `introPhase` that runs before the dealing phase.
+- When `introPhase` is active, the game is paused and shows intro CoachOverlay steps one by one.
+- Only after all intro steps are dismissed does the game proceed to dealing.
+
+**CoachOverlay enhancements:**
+
+- Add support for a `position` prop (e.g., `'bottom'`, `'center'`, `'top'`) so intro messages can appear in different locations.
+- Add a small directional arrow indicator (CSS triangle) when the step references a UI area.
+- Ensure the overlay never overflows the screen -- use `max-h` and safe-area-aware positioning.
+
+**Pacing improvements in useTutorialGame.ts:**
+
+- After each bot action, add a longer delay (1200ms instead of 600ms) so users can observe what happened.
+- After each phase transition (flop/turn/river), ensure the coach step fires reliably before any bot actions.
+
+---
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/LearnPoker.tsx` | Replace `PokerTable` with `PokerTablePro`; remove `intro`/`summary` views; add inline `LessonCompleteOverlay`; wire "Next Lesson" to call `startLesson` directly |
-| `src/components/poker/CoachOverlay.tsx` | No changes needed (already overlays on top) |
-| `src/hooks/useTutorialGame.ts` | No changes needed (`startLesson` already resets and restarts) |
+| `src/components/layout/AppLayout.tsx` | Add `/learn-poker` to `hiddenNavRoutes` |
+| `src/components/home/GameModesGrid.tsx` | Change Multiplayer path from `/online-poker` to `/poker` |
+| `src/pages/LearnPoker.tsx` | Fix layout/spacing for lesson select screen |
+| `src/lib/poker/tutorial-lessons.ts` | Add `introSteps` to TutorialLesson interface; add intro steps to Lesson 1 |
+| `src/hooks/useTutorialGame.ts` | Support intro phase before dealing; slower bot action pacing |
+| `src/components/poker/CoachOverlay.tsx` | Add position variants and arrow indicators; ensure no overflow |
 
 ## NOT Changed
-- `PokerTablePro.tsx` -- no modifications
-- Bottom navigation, layout, styles, other pages, edge functions, database
 
+- Bottom navigation component itself
+- PokerTablePro, PokerHub, OnlinePoker, or any other pages
+- Styles, themes, edge functions, database
