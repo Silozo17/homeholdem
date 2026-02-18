@@ -13,25 +13,64 @@ interface CoachOverlayProps {
 }
 
 const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
-  actions: { bottom: '6%', left: '10%', right: '10%', height: '56px', borderRadius: '16px' },
-  exit: { top: 'calc(env(safe-area-inset-top, 0px) + 8px)', left: '8px', width: '40px', height: '40px', borderRadius: '50%' },
-  audio: { top: 'calc(env(safe-area-inset-top, 0px) + 8px)', right: '8px', width: '40px', height: '40px', borderRadius: '50%' },
-  community: { top: '38%', left: '15%', right: '15%', height: '72px', borderRadius: '12px' },
-  pot: { top: '28%', left: '30%', right: '30%', height: '32px', borderRadius: '8px' },
-  cards: { bottom: '16%', left: '30%', right: '30%', height: '72px', borderRadius: '12px' },
-  timer: { top: 'calc(env(safe-area-inset-top, 0px) + 8px)', left: '25%', right: '25%', height: '28px', borderRadius: '8px' },
-  table: { top: '20%', left: '8%', right: '8%', bottom: '20%', borderRadius: '50%' },
+  actions: {
+    right: 'calc(env(safe-area-inset-right, 0px) + 6px)',
+    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+    width: '140px', height: '160px', borderRadius: '16px',
+  },
+  exit: {
+    top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+    left: 'calc(env(safe-area-inset-left, 0px) + 8px)',
+    width: '32px', height: '32px', borderRadius: '50%',
+  },
+  audio: {
+    top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+    right: 'calc(env(safe-area-inset-right, 0px) + 8px)',
+    width: '32px', height: '32px', borderRadius: '50%',
+  },
+  community: {
+    top: '42%', left: '25%', right: '25%',
+    height: '70px', borderRadius: '12px',
+  },
+  pot: {
+    top: '25%', left: '38%', right: '38%',
+    height: '30px', borderRadius: '8px',
+  },
+  cards: {
+    bottom: '8%', left: '38%', right: '38%',
+    height: '70px', borderRadius: '12px',
+  },
+  timer: {
+    top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
+    left: 'calc(env(safe-area-inset-left, 0px) + 50px)',
+    width: '120px', height: '24px', borderRadius: '8px',
+  },
+  table: {
+    top: '12%', left: '10%', right: '22%',
+    bottom: '10%', borderRadius: '50%',
+  },
 };
 
 export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: CoachOverlayProps) {
   const message = introStep?.message || step?.message || '';
-  const position = introStep?.position || 'bottom';
+  const fallbackPosition = introStep?.position || 'bottom';
   const arrowDirection = introStep?.arrowDirection || 'none';
   const highlight = introStep?.highlight;
   const isIntro = !!introStep;
   const [imgFailed, setImgFailed] = useState(false);
 
   const highlightStyle = highlight ? HIGHLIGHT_POSITIONS[highlight] : null;
+
+  // Dynamic positioning: move dialog near the highlighted element
+  const dialogPosition = (() => {
+    if (!highlight) return fallbackPosition || 'center';
+    switch (highlight) {
+      case 'exit': case 'audio': case 'timer': return 'bottom';
+      case 'actions': return 'center-left';
+      case 'cards': return 'top';
+      default: return 'bottom';
+    }
+  })();
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
@@ -53,14 +92,16 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction }: Coa
       {/* Speech bubble */}
       <div
         className={cn(
-          'fixed z-[52] left-0 right-0 flex px-4 pointer-events-none',
-          position === 'top' && 'top-0 pt-20',
-          position === 'center' && 'top-0 bottom-0 items-center justify-center',
-          position === 'bottom' && 'bottom-0 pb-28',
+          'fixed z-[52] flex px-4 pointer-events-none',
+          dialogPosition === 'top' && 'top-0 left-0 right-0 pt-20',
+          dialogPosition === 'center' && 'inset-0 items-center justify-center',
+          dialogPosition === 'bottom' && 'bottom-0 left-0 right-0 pb-28',
+          dialogPosition === 'center-left' && 'top-0 bottom-0 left-0 items-center',
         )}
         style={{
           paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
-          paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+          paddingRight: dialogPosition === 'center-left' ? undefined : 'max(1rem, env(safe-area-inset-right, 0px))',
+          maxWidth: dialogPosition === 'center-left' ? '55vw' : undefined,
         }}
       >
         <div className="w-full max-w-sm mx-auto pointer-events-auto animate-in slide-in-from-bottom-4 duration-300">
