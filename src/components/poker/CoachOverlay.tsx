@@ -94,7 +94,10 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
       {/* Dim overlay */}
-      <div className="fixed inset-0 bg-black/25 pointer-events-auto" onClick={isRequireAction ? undefined : onDismiss} />
+      <div
+        className={cn("fixed inset-0 bg-black/25", isRequireAction ? "pointer-events-none" : "pointer-events-auto")}
+        onClick={isRequireAction ? undefined : onDismiss}
+      />
 
       {/* Highlight ring */}
       {highlightStyle && (

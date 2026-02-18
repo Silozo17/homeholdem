@@ -131,7 +131,10 @@ export default function LearnPoker() {
             onNextHand={nextHand}
             onQuit={handleQuit}
             tutorialAllowedAction={allowedAction}
-            forceShowControls={!!currentStep?.highlight && currentStep.highlight === 'actions'}
+            forceShowControls={
+              (!!currentStep?.highlight && currentStep.highlight === 'actions') ||
+              (!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions')
+            }
           />
         </div>
         {showIntro && (
