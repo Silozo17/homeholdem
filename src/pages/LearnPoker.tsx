@@ -36,8 +36,14 @@ export default function LearnPoker() {
   const {
     state, startLesson, playerAction, nextHand, quitGame,
     isHumanTurn, humanPlayer, amountToCall, canCheck, maxBet,
-    isPaused, currentStep, currentIntroStep, dismissCoach,
+    isPaused, currentStep, currentIntroStep, dismissCoach, allowedAction,
   } = useTutorialGame(activeLesson);
+
+  // Action guard: only allow the required action when coach step demands it
+  const guardedAction = useCallback((action: import('@/lib/poker/types').GameAction) => {
+    if (allowedAction && action.type !== allowedAction) return; // blocked
+    playerAction(action);
+  }, [allowedAction, playerAction]);
 
   // Detect hand completion → show overlay
   useEffect(() => {
@@ -107,7 +113,7 @@ export default function LearnPoker() {
             amountToCall={amountToCall}
             canCheck={canCheck}
             maxBet={maxBet}
-            onAction={playerAction}
+            onAction={guardedAction}
             onNextHand={nextHand}
             onQuit={handleQuit}
           />
