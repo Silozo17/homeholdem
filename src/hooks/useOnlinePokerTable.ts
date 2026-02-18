@@ -149,9 +149,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     chatBubbleTimers.current.add(timer);
   }, []);
 
-  // Fetch full state from HTTP endpoint
+  const lastRefreshRef = useRef<number>(0);
+
+  // Fetch full state from HTTP endpoint (debounced: skip if called within 2s)
   const refreshState = useCallback(async () => {
     if (!tableId) return;
+    const now = Date.now();
+    if (now - lastRefreshRef.current < 2000) return;
+    lastRefreshRef.current = now;
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
       setTableState(data);
@@ -661,22 +666,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [seatedCount, hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
-   // Stale hand recovery: if hand is active but no broadcast in 12s, trigger timeout check + poll server
-  useEffect(() => {
-    if (!hasActiveHand || !tableId) return;
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - lastBroadcastRef.current;
-      if (elapsed > 12000) {
-        lastBroadcastRef.current = Date.now();
-        // FIX CL-4: Await check-timeouts before refreshState to avoid race
-        callEdge('poker-check-timeouts', { table_id: tableId })
-          .catch(() => {})
-          .finally(() => refreshState());
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [hasActiveHand, tableId, refreshState]);
-
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;
     channelRef.current.send({
@@ -690,21 +679,36 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     scheduleBubbleRemoval(id);
   }, [userId, scheduleBubbleRemoval]);
 
-  // Leader-only timeout polling (8s interval)
+  // Unified timeout polling: leaders check every 8s, non-leaders do a stale recovery every 15s
   useEffect(() => {
-    if (!isAutoStartLeader || !tableId) return;
+    if (!tableId) return;
+
+    const pollInterval = isAutoStartLeader ? 8000 : 15000;
+
     timeoutPollRef.current = setInterval(async () => {
       const currentState = tableStateRef.current;
       const currentHand = currentState?.current_hand;
-      if (!currentHand?.action_deadline) return;
-      const deadline = new Date(currentHand.action_deadline).getTime();
-      if (Date.now() > deadline + 3000) {
-        try {
-          await callEdge('poker-check-timeouts', { table_id: tableId });
+
+      if (isAutoStartLeader && currentHand?.action_deadline) {
+        // Leader: check if deadline passed, then call check-timeouts
+        const deadline = new Date(currentHand.action_deadline).getTime();
+        if (Date.now() > deadline + 3000) {
+          try {
+            await callEdge('poker-check-timeouts', { table_id: tableId });
+          } catch {}
           refreshState();
-        } catch {}
+        }
+      } else if (!isAutoStartLeader && currentHand) {
+        // Non-leader: stale broadcast recovery (no broadcast in 12s)
+        const elapsed = Date.now() - lastBroadcastRef.current;
+        if (elapsed > 12000) {
+          lastBroadcastRef.current = Date.now();
+          callEdge('poker-check-timeouts', { table_id: tableId }).catch(() => {});
+          refreshState();
+        }
       }
-    }, 8000);
+    }, pollInterval);
+
     return () => {
       if (timeoutPollRef.current) {
         clearInterval(timeoutPollRef.current);

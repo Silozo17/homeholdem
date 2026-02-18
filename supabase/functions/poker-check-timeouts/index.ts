@@ -181,13 +181,14 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Broadcast
-            const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", seatStates.filter(s => s.player_id).map(s => s.player_id!));
-            const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-            // FIX MH-2: Check actual hole cards to set has_cards accurately
-            const { data: hcRows1 } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
-            const hcSet1 = new Set((hcRows1 || []).map((r: any) => r.player_id));
+        // Broadcast (parallel fetch)
+        const pids1 = seatStates.filter(s => s.player_id).map(s => s.player_id!);
+        const [profilesRes1, hcRes1] = await Promise.all([
+          admin.from("profiles").select("id, display_name, avatar_url").in("id", pids1),
+          admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id),
+        ]);
+        const profileMap = new Map(((profilesRes1.data || []) as any[]).map((p: any) => [p.id, p]));
+            const hcSet1 = new Set(((hcRes1.data || []) as any[]).map((r: any) => r.player_id));
 
             const channel = admin.channel(`poker:table:${hand.table_id}`);
             await channel.send({
@@ -338,12 +339,12 @@ Deno.serve(async (req) => {
 
         // Broadcast updated game state
         const playerIds = seatStates.filter(s => s.player_id).map(s => s.player_id!);
-        const { data: profiles } = await admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds);
-        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-        // FIX MH-2: Check actual hole cards for accurate has_cards
-        const { data: hcRows2 } = await admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id);
-        const hcSet2 = new Set((hcRows2 || []).map((r: any) => r.player_id));
+        const [profilesRes2, hcRes2] = await Promise.all([
+          admin.from("profiles").select("id, display_name, avatar_url").in("id", playerIds),
+          admin.from("poker_hole_cards").select("player_id").eq("hand_id", hand.id),
+        ]);
+        const profileMap = new Map(((profilesRes2.data || []) as any[]).map((p: any) => [p.id, p]));
+        const hcSet2 = new Set(((hcRes2.data || []) as any[]).map((r: any) => r.player_id));
 
         const publicState = {
           hand_id: hand.id,
