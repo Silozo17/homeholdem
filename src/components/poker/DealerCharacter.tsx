@@ -28,7 +28,7 @@ export function DealerCharacter({ className, expression = 'neutral' }: DealerCha
           expression === 'surprise' && 'scale-110',
         )}
         style={{
-          width: 'min(9vw, 140px)',
+          width: '100%',
           transition: 'transform 0.5s ease',
           filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))',
         }}
