@@ -1,22 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Trophy, Target, Flame, Clock, Zap, Crown } from 'lucide-react';
 
 function xpForLevel(n: number) {
   return (n - 1) ** 2 * 100;
+}
+
+export interface GameStats {
+  handsPlayed: number;
+  handsWon: number;
+  bestHandName: string;
+  biggestPot: number;
+  duration: number; // seconds
 }
 
 interface XPLevelUpOverlayProps {
   startXp: number;
   endXp: number;
   xpGained: number;
-  onContinue: () => void;
+  stats?: GameStats;
+  onPlayAgain?: () => void;
+  onClose?: () => void;
+  /** @deprecated use onClose instead */
+  onContinue?: () => void;
 }
 
 interface LevelSegment {
   level: number;
-  startPct: number; // 0-1 within this level
-  endPct: number;   // 0-1 within this level
+  startPct: number;
+  endPct: number;
   levelUp: boolean;
 }
 
@@ -41,13 +54,48 @@ function buildSegments(startXp: number, endXp: number): LevelSegment[] {
   return segments;
 }
 
-export function XPLevelUpOverlay({ startXp, endXp, xpGained, onContinue }: XPLevelUpOverlayProps) {
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+/** Mini donut chart for win rate */
+function WinRateRing({ played, won }: { played: number; won: number }) {
+  const pct = played > 0 ? (won / played) * 100 : 0;
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const dashoffset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="relative w-16 h-16 flex items-center justify-center">
+      <svg width="64" height="64" viewBox="0 0 64 64" className="absolute inset-0 -rotate-90">
+        <circle cx="32" cy="32" r={radius} fill="none" stroke="hsl(0 0% 20%)" strokeWidth="5" />
+        <circle
+          cx="32" cy="32" r={radius} fill="none"
+          stroke="hsl(43 74% 49%)" strokeWidth="5" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={dashoffset}
+          className="transition-all duration-[1.5s] ease-out"
+        />
+      </svg>
+      <span className="text-sm font-black" style={{ color: 'hsl(43 74% 55%)' }}>
+        {Math.round(pct)}%
+      </span>
+    </div>
+  );
+}
+
+export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain, onClose, onContinue }: XPLevelUpOverlayProps) {
   const segments = useRef(buildSegments(startXp, endXp)).current;
   const [activeIdx, setActiveIdx] = useState(0);
   const [barPct, setBarPct] = useState(0);
   const [flashLevel, setFlashLevel] = useState<number | null>(null);
-  const [showContinue, setShowContinue] = useState(false);
+  const [showContent, setShowContent] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+
+  const handleClose = onClose ?? onContinue ?? (() => {});
 
   // Fade in
   useEffect(() => {
@@ -58,25 +106,22 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, onContinue }: XPLev
   // Animate segments sequentially
   useEffect(() => {
     if (segments.length === 0) {
-      setShowContinue(true);
+      setShowContent(true);
       return;
     }
 
     const seg = segments[activeIdx];
     if (!seg) {
-      setShowContinue(true);
+      setShowContent(true);
       return;
     }
 
-    // Start bar at segment start position
     setBarPct(seg.startPct * 100);
 
-    // Animate to end
     const fillTimer = setTimeout(() => {
       setBarPct(seg.endPct * 100);
     }, 100);
 
-    // After fill animation, check for level-up
     const durationMs = Math.min(1200, Math.max(600, (seg.endPct - seg.startPct) * 1200));
     const nextTimer = setTimeout(() => {
       if (seg.levelUp) {
@@ -87,7 +132,10 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, onContinue }: XPLev
       if (activeIdx < segments.length - 1) {
         setTimeout(() => setActiveIdx(activeIdx + 1), seg.levelUp ? 500 : 200);
       } else {
-        setTimeout(() => setShowContinue(true), 400);
+        setTimeout(() => {
+          setShowContent(true);
+          setTimeout(() => setShowStats(true), 300);
+        }, 400);
       }
     }, durationMs + 150);
 
@@ -100,10 +148,12 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, onContinue }: XPLev
   const currentSeg = segments[activeIdx];
   const displayLevel = currentSeg?.level ?? (Math.floor(Math.sqrt(endXp / 100)) + 1);
 
+  const winRate = stats && stats.handsPlayed > 0 ? Math.round((stats.handsWon / stats.handsPlayed) * 100) : 0;
+
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-500',
+        'fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-y-auto transition-opacity duration-500',
         visible ? 'opacity-100' : 'opacity-0',
       )}
       style={{
@@ -111,86 +161,158 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, onContinue }: XPLev
         backdropFilter: 'blur(8px)',
       }}
     >
-      {/* XP Earned Header */}
-      <div className="text-center mb-8 animate-fade-in">
-        <p className="text-xs uppercase tracking-[0.3em] text-amber-500/60 mb-1">Match Complete</p>
-        <p className="text-4xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
-          +{xpGained} XP
-        </p>
-      </div>
-
-      {/* Level Progress Area */}
-      <div className="w-[85%] max-w-sm space-y-6">
-        {/* Current Level Display */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div
-              className={cn('w-10 h-10 rounded-full flex items-center justify-center font-black text-lg transition-all duration-300',
-                flashLevel ? 'scale-125' : 'scale-100'
-              )}
-              style={{
-                background: 'hsl(0 0% 10%)',
-                border: '2px solid hsl(43 74% 49%)',
-                color: 'white',
-                boxShadow: flashLevel ? '0 0 20px hsl(43 74% 49% / 0.6)' : '0 0 6px hsl(43 74% 49% / 0.2)',
-              }}
-            >
-              {flashLevel ?? displayLevel}
-            </div>
-            <span className="text-sm font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
-          </div>
-          <span className="text-xs text-white/40">Lv {displayLevel + 1}</span>
+      <div className="w-full max-w-sm px-6 py-8 flex flex-col items-center">
+        {/* XP Earned Header */}
+        <div className="text-center mb-6 animate-fade-in">
+          <p className="text-xs uppercase tracking-[0.3em] mb-1" style={{ color: 'hsl(43 74% 49% / 0.6)' }}>Match Complete</p>
+          <p className="text-4xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
+            +{xpGained} XP
+          </p>
         </div>
 
-        {/* Progress Bar */}
-        <div className="relative h-4 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
-          <div
-            className="absolute inset-y-0 left-0 rounded-full"
-            style={{
-              width: `${barPct}%`,
-              background: 'linear-gradient(90deg, hsl(43 74% 40%), hsl(43 74% 55%))',
-              boxShadow: '0 0 12px hsl(43 74% 49% / 0.5)',
-              transition: 'width 1s ease-out',
-            }}
-          />
-          {/* Flash effect on level up */}
-          {flashLevel && (
-            <div className="absolute inset-0 animate-pulse" style={{ background: 'hsl(43 74% 80% / 0.3)' }} />
+        {/* Level Progress Area */}
+        <div className="w-full space-y-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className={cn('w-10 h-10 rounded-full flex items-center justify-center font-black text-lg transition-all duration-300',
+                  flashLevel ? 'scale-125' : 'scale-100'
+                )}
+                style={{
+                  background: 'hsl(0 0% 10%)',
+                  border: '2px solid hsl(43 74% 49%)',
+                  color: 'white',
+                  boxShadow: flashLevel ? '0 0 20px hsl(43 74% 49% / 0.6)' : '0 0 6px hsl(43 74% 49% / 0.2)',
+                }}
+              >
+                {flashLevel ?? displayLevel}
+              </div>
+              <span className="text-sm font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
+            </div>
+            <span className="text-xs text-white/40">Lv {displayLevel + 1}</span>
+          </div>
+
+          <div className="relative h-4 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                width: `${barPct}%`,
+                background: 'linear-gradient(90deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+                boxShadow: '0 0 12px hsl(43 74% 49% / 0.5)',
+                transition: 'width 1s ease-out',
+              }}
+            />
+            {flashLevel && (
+              <div className="absolute inset-0 animate-pulse" style={{ background: 'hsl(43 74% 80% / 0.3)' }} />
+            )}
+          </div>
+
+          {segments.length > 1 && (
+            <div className="space-y-1.5">
+              {segments.filter(s => s.levelUp).map((s, i) => (
+                <div key={i} className={cn(
+                  'flex items-center gap-2 text-xs transition-opacity duration-500',
+                  i <= activeIdx - 1 ? 'opacity-100' : 'opacity-30',
+                )}>
+                  <span style={{ color: 'hsl(43 74% 49%)' }}>★</span>
+                  <span className="text-white/70">Level {s.level} → Level {s.level + 1}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Segments summary - show levels traversed */}
-        {segments.length > 1 && (
-          <div className="space-y-1.5">
-            {segments.filter(s => s.levelUp).map((s, i) => (
-              <div key={i} className={cn(
-                'flex items-center gap-2 text-xs transition-opacity duration-500',
-                i <= activeIdx - 1 ? 'opacity-100' : 'opacity-30',
-              )}>
-                <span className="text-amber-400">★</span>
-                <span className="text-white/70">Level {s.level} → Level {s.level + 1}</span>
+        {/* Stats Section */}
+        {stats && showStats && (
+          <div className="w-full animate-fade-in space-y-4">
+            {/* Win rate ring + key stat */}
+            <div className="flex items-center gap-4 justify-center mb-2">
+              <WinRateRing played={stats.handsPlayed} won={stats.handsWon} />
+              <div className="text-left">
+                <p className="text-xs text-white/40 uppercase tracking-wider">Win Rate</p>
+                <p className="text-xl font-black text-white">{winRate}%</p>
+                <p className="text-[10px] text-white/30">{stats.handsWon} / {stats.handsPlayed} hands</p>
               </div>
-            ))}
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <StatCard icon={<Target className="h-4 w-4" />} label="Hands Played" value={String(stats.handsPlayed)} color="hsl(210 80% 55%)" />
+              <StatCard icon={<Trophy className="h-4 w-4" />} label="Hands Won" value={String(stats.handsWon)} color="hsl(142 70% 45%)" />
+              <StatCard icon={<Crown className="h-4 w-4" />} label="Best Hand" value={stats.bestHandName || '—'} color="hsl(43 74% 49%)" />
+              <StatCard icon={<Flame className="h-4 w-4" />} label="Biggest Pot" value={stats.biggestPot > 0 ? stats.biggestPot.toLocaleString() : '—'} color="hsl(0 70% 50%)" />
+              <StatCard icon={<Clock className="h-4 w-4" />} label="Duration" value={formatDuration(stats.duration)} color="hsl(280 60% 55%)" colSpan />
+            </div>
+          </div>
+        )}
+
+        {/* Buttons */}
+        {showContent && (
+          <div className="mt-8 flex gap-3 animate-fade-in w-full">
+            {onPlayAgain ? (
+              <>
+                <Button
+                  onClick={handleClose}
+                  variant="outline"
+                  className="flex-1 py-3 font-bold text-sm"
+                  style={{
+                    background: 'hsl(0 0% 12%)',
+                    borderColor: 'hsl(0 0% 25%)',
+                    color: 'hsl(0 0% 60%)',
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={onPlayAgain}
+                  className="flex-1 py-3 font-bold text-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+                    color: 'hsl(0 0% 5%)',
+                    boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
+                  }}
+                >
+                  <Zap className="h-4 w-4 mr-1" /> Play Again
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={handleClose}
+                className="flex-1 py-3 font-bold text-base"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+                  color: 'hsl(0 0% 5%)',
+                  boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
+                }}
+              >
+                Continue
+              </Button>
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Continue Button */}
-      {showContinue && (
-        <div className="mt-10 animate-fade-in">
-          <Button
-            onClick={onContinue}
-            className="px-8 py-3 font-bold text-base"
-            style={{
-              background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
-              color: 'hsl(0 0% 5%)',
-              boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
-            }}
-          >
-            Continue
-          </Button>
-        </div>
-      )}
+function StatCard({ icon, label, value, color, colSpan }: {
+  icon: React.ReactNode; label: string; value: string; color: string; colSpan?: boolean;
+}) {
+  return (
+    <div
+      className={cn('rounded-xl p-3 flex items-center gap-3', colSpan && 'col-span-2')}
+      style={{
+        background: 'hsl(0 0% 10%)',
+        border: '1px solid hsl(0 0% 18%)',
+      }}
+    >
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}20`, color }}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] text-white/40 uppercase tracking-wider leading-tight">{label}</p>
+        <p className="text-sm font-bold text-white truncate">{value}</p>
+      </div>
     </div>
   );
 }
