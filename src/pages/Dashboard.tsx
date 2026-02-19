@@ -120,7 +120,7 @@ export default function Dashboard() {
         .select('hands_won, hands_played, final_chips, starting_chips')
         .eq('user_id', user.id);
       if (data?.length) {
-        const wins = data.reduce((s, r) => s + (r.hands_won || 0), 0);
+        const wins = data.filter(r => (r.final_chips || 0) > (r.starting_chips || 0)).length;
         const games = data.length;
         const net = data.reduce((s, r) => s + ((r.final_chips || 0) - (r.starting_chips || 0)), 0);
         setPlayerStats({ wins, gamesPlayed: games, netProfit: net >= 0 ? `+${net.toLocaleString()}` : net.toLocaleString() });
