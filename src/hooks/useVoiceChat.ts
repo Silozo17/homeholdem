@@ -21,6 +21,7 @@ export interface VoiceChatParticipant {
 interface UseVoiceChatReturn {
   connected: boolean;
   connecting: boolean;
+  failed: boolean;
   micMuted: boolean;
   deafened: boolean;
   participants: VoiceChatParticipant[];
@@ -35,6 +36,8 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
   const roomRef = useRef<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const failedRef = useRef(false);
   const [micMuted, setMicMuted] = useState(true); // start muted
   const [deafened, setDeafened] = useState(false);
   const [participants, setParticipants] = useState<VoiceChatParticipant[]>([]);
@@ -62,8 +65,9 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
     setSpeakingMap(speaking);
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (manual?: boolean) => {
     if (roomRef.current || connecting) return;
+    if (manual) { failedRef.current = false; setFailed(false); }
     setConnecting(true);
 
     try {
@@ -112,11 +116,9 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
       updateParticipants(room);
     } catch (err) {
       console.error('[VoiceChat] connect error:', err);
-      toast({
-        title: 'Voice Chat Error',
-        description: 'Could not connect to voice chat. Please try again.',
-        variant: 'destructive',
-      });
+      failedRef.current = true;
+      setFailed(true);
+      // Silent failure — no toast for auto-connect. Manual retry via phone button.
     } finally {
       setConnecting(false);
     }
@@ -174,6 +176,7 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
   return {
     connected,
     connecting,
+    failed,
     micMuted,
     deafened,
     participants,

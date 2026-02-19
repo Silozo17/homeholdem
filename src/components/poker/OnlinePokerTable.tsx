@@ -175,12 +175,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
 
-  // Auto-connect voice chat when seated
+  // Auto-connect voice chat when seated (only once, skip if failed)
   useEffect(() => {
-    if (mySeatNumber !== null && !voiceChat.connected && !voiceChat.connecting) {
+    if (mySeatNumber !== null && !voiceChat.connected && !voiceChat.connecting && !voiceChat.failed) {
       voiceChat.connect();
     }
-  }, [mySeatNumber, voiceChat.connected, voiceChat.connecting]);
+  }, [mySeatNumber, voiceChat.connected, voiceChat.connecting, voiceChat.failed]);
 
   // Capture starting XP on mount for level-up animation
   useEffect(() => {
@@ -664,13 +664,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return 'no_overlay';
   }, [user, tableState]);
 
-  // Save XP on game over
+  // Save XP on game over + leave seat (but stay at table)
   useEffect(() => {
     if (!gameOver || !user || xpSavedRef.current) return;
     const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
     const isWinner = (mySeatInfo?.stack ?? 0) > 0;
+    // Leave seat immediately so player is removed from seat but stays at table
+    leaveSeat().catch(() => {});
     saveXpAndStats(isWinner);
-  }, [gameOver, user, tableState, saveXpAndStats]);
+  }, [gameOver, user, tableState, saveXpAndStats, leaveSeat]);
 
   // Staged community card reveal for all-in runouts
   useEffect(() => {
@@ -1267,10 +1269,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           )}
 
-          {gameOver && (
-            <WinnerOverlay
-              winners={gameOverWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
-              isGameOver={true}
+          {/* Game-over WinnerOverlay removed — stats merged into XP overlay */}
+
+          {/* XP Level-Up Overlay with stats */}
+          {xpOverlay && (
+            <XPLevelUpOverlay
+              startXp={xpOverlay.startXp}
+              endXp={xpOverlay.endXp}
+              xpGained={xpOverlay.xpGained}
               stats={{
                 handsPlayed: handsPlayedRef.current,
                 handsWon: handsWonRef.current,
@@ -1278,17 +1284,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 biggestPot: biggestPotRef.current,
                 duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
               }}
-              onNextHand={() => { leaveTable().then(onLeave).catch(onLeave); }} onQuit={() => { leaveTable().then(onLeave).catch(onLeave); }}
-            />
-          )}
-
-          {/* XP Level-Up Overlay */}
-          {xpOverlay && (
-            <XPLevelUpOverlay
-              startXp={xpOverlay.startXp}
-              endXp={xpOverlay.endXp}
-              xpGained={xpOverlay.xpGained}
-              onContinue={() => {
+              onPlayAgain={() => {
+                setXpOverlay(null);
+                setGameOver(false);
+                // Player already left seat via game-over effect, stays at table as spectator
+              }}
+              onClose={() => {
                 setXpOverlay(null);
                 leaveTable().then(onLeave).catch(onLeave);
               }}
