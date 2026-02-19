@@ -1,56 +1,64 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HandRecord } from '@/hooks/useHandHistory';
 import { CardDisplay } from './CardDisplay';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, List, Trophy, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trophy, Download, Coins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HandReplayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  hand: HandRecord | null;
+  handHistory: HandRecord[];
+  initialHandIndex?: number;
   isLandscape?: boolean;
   onExportCSV?: () => string;
 }
 
-const PHASE_COLORS: Record<string, string> = {
-  preflop: 'bg-blue-500/20 text-blue-300',
-  flop: 'bg-green-500/20 text-green-300',
-  turn: 'bg-yellow-500/20 text-yellow-300',
-  river: 'bg-red-500/20 text-red-300',
-};
+export function HandReplay({ open, onOpenChange, handHistory, initialHandIndex, isLandscape = false, onExportCSV }: HandReplayProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const navScrollRef = useRef<HTMLDivElement>(null);
 
-export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onExportCSV }: HandReplayProps) {
-  const [step, setStep] = useState(0);
-  const [showAll, setShowAll] = useState(false);
-
-  // Reset on open
+  // Reset to latest hand on open
   useEffect(() => {
-    if (open) {
-      setStep(0);
-      setShowAll(false);
+    if (open && handHistory.length > 0) {
+      setCurrentIndex(initialHandIndex ?? handHistory.length - 1);
     }
-  }, [open]);
+  }, [open, handHistory.length, initialHandIndex]);
 
+  // Scroll active hand badge into view
+  useEffect(() => {
+    if (navScrollRef.current) {
+      const active = navScrollRef.current.querySelector('[data-active="true"]');
+      active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  }, [currentIndex]);
+
+  if (handHistory.length === 0) return null;
+
+  const hand = handHistory[currentIndex];
   if (!hand) return null;
 
-  const actions = hand.actions;
-  const totalSteps = actions.length;
+  // Determine which players folded: anyone NOT in revealedCards and NOT a winner
+  const revealedPlayerIds = new Set(hand.revealedCards.map(rc => rc.player_id));
+  const winnerPlayerIds = new Set(hand.winners.map(w => w.player_id));
 
-  const phasesUpToStep = showAll
-    ? actions.map(a => a.phase)
-    : actions.slice(0, step + 1).map(a => a.phase);
-  const uniquePhases = [...new Set(phasesUpToStep)];
+  // Showdown players = players whose cards were revealed (didn't fold)
+  const showdownPlayers = hand.revealedCards.map(rc => {
+    const winner = hand.winners.find(w => w.player_id === rc.player_id);
+    const playerSnapshot = hand.players.find(p => p.playerId === rc.player_id);
+    const winnerName = hand.winners.find(w => w.player_id === rc.player_id)?.display_name;
+    return {
+      playerId: rc.player_id,
+      name: playerSnapshot?.name || winnerName || 'Unknown',
+      cards: rc.cards,
+      handName: winner?.hand_name || null,
+      isWinner: winnerPlayerIds.has(rc.player_id),
+      winAmount: winner?.amount || 0,
+    };
+  });
 
-  const communityCardsToShow = (() => {
-    if (uniquePhases.includes('river')) return hand.communityCards.slice(0, 5);
-    if (uniquePhases.includes('turn')) return hand.communityCards.slice(0, 4);
-    if (uniquePhases.includes('flop')) return hand.communityCards.slice(0, 3);
-    return [];
-  })();
-
-  const displayActions = showAll ? actions : actions.slice(0, step + 1);
+  const totalPot = hand.pots.reduce((s, p) => s + p.amount, 0);
 
   const handleExportCSV = () => {
     if (!onExportCSV) return;
@@ -65,17 +73,19 @@ export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onEx
   };
 
   return (
-  <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={isLandscape ? 'right' : 'bottom'}
         className={cn(
-          isLandscape ? 'w-[320px] h-full' : 'max-h-[70vh] rounded-t-2xl pb-safe',
+          isLandscape
+            ? 'w-[320px] h-full pr-[calc(5px+env(safe-area-inset-right,0px))]'
+            : 'max-h-[70vh] rounded-t-2xl pb-safe',
           'z-[80]'
         )}
       >
         <SheetHeader className="pb-2">
           <SheetTitle className="text-sm flex items-center gap-2">
-            Hand #{hand.handNumber} Replay
+            Hand #{hand.handNumber}
             {onExportCSV && (
               <Button variant="ghost" size="sm" onClick={handleExportCSV} className="ml-auto h-7 text-[10px]">
                 <Download className="h-3 w-3 mr-1" /> CSV
@@ -86,12 +96,12 @@ export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onEx
 
         {/* Community cards */}
         <div className="flex items-center justify-center gap-1.5 py-2">
-          {communityCardsToShow.length > 0 ? (
-            communityCardsToShow.map((card, i) => (
+          {hand.communityCards.length > 0 ? (
+            hand.communityCards.map((card, i) => (
               <CardDisplay key={`${card.suit}-${card.rank}-${i}`} card={card} size="sm" />
             ))
           ) : (
-            <span className="text-xs text-muted-foreground italic">No community cards yet</span>
+            <span className="text-xs text-muted-foreground italic">No community cards</span>
           )}
         </div>
 
@@ -105,75 +115,89 @@ export function HandReplay({ open, onOpenChange, hand, isLandscape = false, onEx
           </div>
         )}
 
-        {/* Action timeline */}
-        <div className="max-h-[30vh] overflow-y-auto space-y-1 px-1 scrollbar-hide">
-          {displayActions.map((action, i) => {
-            const isActive = !showAll && i === step;
-            return (
-              <div
-                key={i}
-                className={cn(
-                  'flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all',
-                  isActive ? 'bg-primary/10 ring-1 ring-primary/30' : 'opacity-70',
-                )}
-              >
-                <span className={cn('px-1.5 py-0.5 rounded text-[9px] font-bold uppercase', PHASE_COLORS[action.phase] ?? 'bg-muted text-muted-foreground')}>
-                  {action.phase}
-                </span>
-                <span className="font-bold text-foreground truncate">{action.playerName}</span>
-                <span className="text-muted-foreground capitalize">{action.action}</span>
-                {action.amount > 0 && (
-                  <span className="text-primary font-bold ml-auto">{action.amount}</span>
-                )}
-              </div>
-            );
-          })}
+        {/* Showdown */}
+        <div className="max-h-[28vh] overflow-y-auto space-y-1.5 px-1 scrollbar-hide">
+          {showdownPlayers.length > 0 ? (
+            <>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold px-1">Showdown</div>
+              {showdownPlayers.map((p) => (
+                <div
+                  key={p.playerId}
+                  className={cn(
+                    'flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs',
+                    p.isWinner ? 'bg-primary/10 ring-1 ring-primary/30' : 'bg-muted/30'
+                  )}
+                >
+                  <div className="flex items-center gap-1 shrink-0">
+                    {p.cards.map((card, i) => (
+                      <CardDisplay key={`${p.playerId}-${i}`} card={card} size="xs" />
+                    ))}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className={cn('font-bold truncate', p.isWinner && 'text-primary')}>
+                      {p.isWinner && <Trophy className="h-3 w-3 inline mr-0.5 -mt-0.5" />}
+                      {p.name}
+                    </span>
+                    {p.handName && (
+                      <span className="text-[10px] text-muted-foreground">{p.handName}</span>
+                    )}
+                  </div>
+                  {p.isWinner && p.winAmount > 0 && (
+                    <span className="ml-auto text-primary font-bold text-xs whitespace-nowrap">+{p.winAmount}</span>
+                  )}
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground italic text-center py-2">No showdown data</div>
+          )}
         </div>
 
-        {/* Winners */}
-        {(showAll || step >= totalSteps - 1) && hand.winners.length > 0 && (
-          <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-              <Trophy className="h-3.5 w-3.5" />
-              Winner{hand.winners.length > 1 ? 's' : ''}
-            </div>
-            {hand.winners.map((w, i) => (
-              <div key={i} className="text-xs text-foreground/80 mt-0.5">
-                {w.display_name} — {w.hand_name} (+{w.amount})
-              </div>
-            ))}
+        {/* Pot */}
+        {totalPot > 0 && (
+          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mt-2">
+            <Coins className="h-3.5 w-3.5" /> Pot: <span className="font-bold text-foreground">{totalPot}</span>
           </div>
         )}
 
-        {/* Controls */}
-        <div className="flex items-center justify-between pt-3 gap-2">
+        {/* Hand navigation */}
+        <div className="flex items-center gap-1.5 pt-3">
           <Button
             variant="outline"
-            size="sm"
-            onClick={() => setStep(Math.max(0, step - 1))}
-            disabled={showAll || step === 0}
-            className="text-xs"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+            disabled={currentIndex === 0}
           >
-            <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
 
-          <Button
-            variant={showAll ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => { setShowAll(!showAll); setStep(totalSteps - 1); }}
-            className="text-xs"
-          >
-            <List className="h-3.5 w-3.5 mr-1" /> {showAll ? 'Step Mode' : 'Show All'}
-          </Button>
+          <div ref={navScrollRef} className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1 px-0.5">
+            {handHistory.map((h, i) => (
+              <button
+                key={h.handId}
+                data-active={i === currentIndex}
+                onClick={() => setCurrentIndex(i)}
+                className={cn(
+                  'shrink-0 px-2 py-1 rounded-full text-[10px] font-bold transition-colors',
+                  i === currentIndex
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                )}
+              >
+                #{h.handNumber}
+              </button>
+            ))}
+          </div>
 
           <Button
             variant="outline"
-            size="sm"
-            onClick={() => setStep(Math.min(totalSteps - 1, step + 1))}
-            disabled={showAll || step >= totalSteps - 1}
-            className="text-xs"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={() => setCurrentIndex(Math.min(handHistory.length - 1, currentIndex + 1))}
+            disabled={currentIndex >= handHistory.length - 1}
           >
-            Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </SheetContent>
