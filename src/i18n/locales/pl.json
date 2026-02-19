@@ -1234,5 +1234,11 @@
     "back_to_lessons": "Wróć do lekcji",
     "next_lesson": "Następna lekcja",
     "back_to_lesson_list": "Wróć do listy lekcji"
+  },
+  "coach": {
+    "continue": "Kontynuuj →",
+    "got_it": "Rozumiem →",
+    "tap_action": "Dotknij {{action}} poniżej 👇",
+    "step_of": "Krok {{current}}/{{total}}"
   }
 }

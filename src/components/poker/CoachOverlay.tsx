@@ -63,6 +63,38 @@ const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
   },
 };
 
+/** Map highlight target → pointer hand emoji + offset style */
+const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties }> = {
+  actions: {
+    emoji: '👇',
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 80px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 170px)' },
+  },
+  cards: {
+    emoji: '👇',
+    style: { left: '50%', bottom: 'calc(8% + 75px)', transform: 'translateX(-50%)' },
+  },
+  community: {
+    emoji: '👆',
+    style: { left: '50%', top: 'calc(42% - 28px)', transform: 'translateX(-50%)' },
+  },
+  pot: {
+    emoji: '👆',
+    style: { left: '50%', top: 'calc(25% - 28px)', transform: 'translateX(-50%)' },
+  },
+  exit: {
+    emoji: '👈',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 44px)' },
+  },
+  audio: {
+    emoji: '👉',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 'calc(env(safe-area-inset-right, 0px) + 44px)' },
+  },
+  timer: {
+    emoji: '👆',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 32px)', left: 'calc(env(safe-area-inset-left, 0px) + 90px)' },
+  },
+};
+
 export function CoachOverlay({ step, introStep, onDismiss, requiredAction, currentStepNum, totalSteps }: CoachOverlayProps) {
   const message = introStep?.message || step?.message || '';
   const fallbackPosition = introStep?.position || 'bottom';
@@ -72,7 +104,12 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
   const isRequireAction = !!step?.requiredAction;
   const [imgFailed, setImgFailed] = useState(false);
 
-  const highlightStyle = highlight ? HIGHLIGHT_POSITIONS[highlight] : null;
+  // Only show highlight ring during intro steps (table tour), not during gameplay
+  const showHighlightRing = isIntro && !!highlight;
+  const highlightStyle = showHighlightRing ? HIGHLIGHT_POSITIONS[highlight!] : null;
+
+  // Always show pointer hands when a highlight target is set
+  const pointerHand = highlight ? POINTER_HANDS[highlight] : null;
 
   const dialogPosition = (() => {
     if (!highlight) return fallbackPosition || 'center';
@@ -99,7 +136,7 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
         onClick={isRequireAction ? undefined : onDismiss}
       />
 
-      {/* Highlight ring */}
+      {/* Highlight ring — only during intro tour */}
       {highlightStyle && (
         <div
           className="fixed z-[51] pointer-events-none animate-pulse"
@@ -111,20 +148,17 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
         />
       )}
 
-      {/* Pointing hand near highlighted element */}
-      {highlightStyle && highlight === 'actions' && (
+      {/* Floating pointer hand near highlighted element */}
+      {pointerHand && (
         <div
           className="fixed z-[51] pointer-events-none text-2xl animate-bounce"
-          style={{
-            right: 'calc(env(safe-area-inset-right, 0px) + 80px)',
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 170px)',
-          }}
+          style={pointerHand.style}
         >
-          👇
+          {pointerHand.emoji}
         </div>
       )}
 
-      {/* Speech bubble */}
+      {/* Coach bubble area */}
       <div
         className={cn(
           'fixed z-[52] flex px-4 pointer-events-none',
@@ -147,45 +181,52 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
             </div>
           )}
 
-          <div className="bg-card/95 border border-primary/30 rounded-2xl p-3.5 shadow-xl shadow-primary/10 max-h-[45vh] overflow-y-auto backdrop-blur-sm">
-            {/* Step progress indicator */}
-            {!isIntro && currentStepNum != null && totalSteps != null && totalSteps > 0 && (
-              <div className="flex justify-end mb-1">
-                <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
-                  Step {currentStepNum}/{totalSteps}
-                </span>
-              </div>
-            )}
+          {/* Coach avatar + speech bubble — separated */}
+          <div className="flex items-start gap-2.5">
+            {/* Standalone coach avatar circle */}
+            <div className="shrink-0 w-12 h-12 rounded-full bg-card/95 border-2 border-primary/30 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/10 coach-bounce">
+              {!imgFailed ? (
+                <img
+                  src={dealerImg}
+                  alt="Coach"
+                  className="w-10 h-10 object-cover rounded-full"
+                  draggable={false}
+                  onError={() => setImgFailed(true)}
+                />
+              ) : (
+                <span className="text-primary text-lg font-bold">🎓</span>
+              )}
+            </div>
 
-            <div className="flex items-start gap-3">
-              {/* Coach avatar */}
-              <div className="shrink-0 w-11 h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden coach-bounce">
-                {!imgFailed ? (
-                  <img
-                    src={dealerImg}
-                    alt="Coach"
-                    className="w-9 h-9 object-cover rounded-full"
-                    draggable={false}
-                    onError={() => setImgFailed(true)}
-                  />
-                ) : (
-                  <span className="text-primary text-lg font-bold">🎓</span>
+            {/* Speech bubble */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-card/95 border border-primary/30 rounded-2xl p-3 shadow-xl shadow-primary/10 max-h-[45vh] overflow-y-auto backdrop-blur-sm relative">
+                {/* Speech bubble tail */}
+                <div
+                  className="absolute left-[-6px] top-4 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[6px] border-r-primary/30"
+                />
+
+                {/* Step progress indicator */}
+                {!isIntro && currentStepNum != null && totalSteps != null && totalSteps > 0 && (
+                  <div className="flex justify-end mb-1">
+                    <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
+                      Step {currentStepNum}/{totalSteps}
+                    </span>
+                  </div>
                 )}
-              </div>
 
-              <div className="flex-1 min-w-0 space-y-2.5">
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{message}</p>
 
                 {/* For require_action: don't show a button, user must tap the game action */}
                 {isRequireAction ? (
-                  <p className="text-xs text-primary font-medium animate-pulse">
+                  <p className="text-xs text-primary font-medium animate-pulse mt-2">
                     👆 {buttonText}
                   </p>
                 ) : (
                   <Button
                     size="sm"
                     onClick={onDismiss}
-                    className="w-full"
+                    className="w-full mt-2"
                   >
                     {buttonText}
                   </Button>

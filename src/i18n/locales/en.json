@@ -1242,5 +1242,11 @@
     "back_to_lessons": "Back to Lessons",
     "next_lesson": "Next Lesson",
     "back_to_lesson_list": "Back to Lesson List"
+  },
+  "coach": {
+    "continue": "Continue →",
+    "got_it": "Got it →",
+    "tap_action": "Tap {{action}} below 👇",
+    "step_of": "Step {{current}}/{{total}}"
   }
 }
