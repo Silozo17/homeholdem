@@ -264,6 +264,7 @@ export default function GameMode() {
               currencySymbol={currencySymbol}
               chipToCashRatio={chipToCashRatio}
               displayMode={displayMode}
+              eventId={eventId}
             />
 
             {/* Stats Bar */}
@@ -344,6 +345,7 @@ export default function GameMode() {
               currencySymbol={currencySymbol}
               chipToCashRatio={chipToCashRatio}
               displayMode={displayMode}
+              eventId={eventId}
             />
 
             {/* Stats Bar */}

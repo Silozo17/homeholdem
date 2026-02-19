@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { notifyNewMemberJoined } from '@/lib/push-notifications';
+import { notifyNewMemberJoinedInApp } from '@/lib/in-app-notifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,10 +103,37 @@ export function JoinClubDialog({ open, onOpenChange, onSuccess }: JoinClubDialog
     // Send welcome email (fire and forget)
     sendWelcomeEmail(club.id, club.name, data.inviteCode.toUpperCase());
 
+    // Notify club owner/admins about new member (fire and forget)
+    notifyClubAdmins(club.id, club.name);
+
     toast.success(t('club.welcome', { name: club.name }));
     form.reset();
     onOpenChange(false);
     onSuccess();
+  };
+
+  const notifyClubAdmins = async (clubId: string, clubName: string) => {
+    if (!user) return;
+    try {
+      const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
+      const memberName = profile?.display_name ?? 'Someone';
+      
+      // Get owner and admin user IDs
+      const { data: admins } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', clubId)
+        .in('role', ['owner', 'admin'])
+        .neq('user_id', user.id);
+      
+      if (admins && admins.length > 0) {
+        const adminIds = admins.map(a => a.user_id);
+        notifyNewMemberJoined(adminIds, memberName, clubId).catch(console.error);
+        notifyNewMemberJoinedInApp(adminIds, memberName, clubId).catch(console.error);
+      }
+    } catch (error) {
+      console.error('Failed to notify admins about new member:', error);
+    }
   };
 
   const sendWelcomeEmail = async (clubId: string, clubName: string, inviteCode: string) => {

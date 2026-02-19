@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { notifyFriendRequest, notifyFriendAccepted } from '@/lib/push-notifications';
+import { notifyFriendRequestInApp, notifyFriendAcceptedInApp } from '@/lib/in-app-notifications';
 
 export type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted';
 
@@ -97,13 +99,27 @@ export function useFriendship() {
   const sendRequest = useCallback(async (targetUserId: string) => {
     if (!user) return;
     await supabase.from('friendships').insert({ requester_id: user.id, addressee_id: targetUserId });
+    // Get sender name for notification
+    const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
+    const senderName = profile?.display_name ?? 'Someone';
+    notifyFriendRequest(targetUserId, senderName).catch(console.error);
+    notifyFriendRequestInApp(targetUserId, senderName, user.id).catch(console.error);
     fetchFriendships();
   }, [user, fetchFriendships]);
 
   const acceptRequest = useCallback(async (friendshipId: string) => {
+    if (!user) return;
+    // Get the friendship to find the requester
+    const { data: friendship } = await supabase.from('friendships').select('requester_id').eq('id', friendshipId).single();
     await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+    if (friendship) {
+      const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
+      const accepterName = profile?.display_name ?? 'Someone';
+      notifyFriendAccepted(friendship.requester_id, accepterName).catch(console.error);
+      notifyFriendAcceptedInApp(friendship.requester_id, accepterName, user.id).catch(console.error);
+    }
     fetchFriendships();
-  }, [fetchFriendships]);
+  }, [user, fetchFriendships]);
 
   const declineRequest = useCallback(async (friendshipId: string) => {
     await supabase.from('friendships').delete().eq('id', friendshipId);

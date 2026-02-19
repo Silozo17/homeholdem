@@ -5,6 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTournamentSounds, AnnouncementType } from '@/hooks/useTournamentSounds';
+import { notifyBlindsUp } from '@/lib/push-notifications';
+import { notifyBlindsUpInApp } from '@/lib/in-app-notifications';
+import { getEventClubMemberIds } from '@/lib/club-members';
 
 interface BlindLevel {
   id: string;
@@ -35,6 +38,7 @@ export interface TournamentClockProps {
   currencySymbol?: string;
   chipToCashRatio?: number;
   displayMode?: 'cash' | 'chips';
+  eventId?: string;
 }
 
 export function TournamentClock({ 
@@ -47,7 +51,8 @@ export function TournamentClock({
   isFinalTable = false,
   currencySymbol = '£',
   chipToCashRatio = 0.01,
-  displayMode = 'cash'
+  displayMode = 'cash',
+  eventId
 }: TournamentClockProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -119,10 +124,22 @@ export function TournamentClock({
       } else {
         playAnnouncement('blinds_up');
       }
+
+      // Send blinds-up push + in-app notifications (non-break levels only)
+      if (currentLevel && !currentLevel.is_break && eventId) {
+        getEventClubMemberIds(eventId).then(({ memberIds, clubId: evClubId }) => {
+          if (memberIds.length > 0) {
+            notifyBlindsUp(memberIds, currentLevel.small_blind, currentLevel.big_blind, currentLevel.ante).catch(console.error);
+            if (evClubId) {
+              notifyBlindsUpInApp(memberIds, currentLevel.small_blind, currentLevel.big_blind, currentLevel.ante, eventId, evClubId).catch(console.error);
+            }
+          }
+        }).catch(console.error);
+      }
       
       prevLevelRef.current = session.current_level;
     }
-  }, [session.current_level, blindStructure, currentLevel, playAnnouncement]);
+  }, [session.current_level, blindStructure, currentLevel, playAnnouncement, eventId]);
 
   // Handle final table announcement
   useEffect(() => {

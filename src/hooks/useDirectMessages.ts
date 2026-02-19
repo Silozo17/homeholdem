@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { notifyDirectMessage } from '@/lib/push-notifications';
+import { notifyDirectMessageInApp } from '@/lib/in-app-notifications';
 
 interface Message {
   id: string;
@@ -124,6 +126,11 @@ export function useDirectMessages() {
       receiver_id: receiverId,
       message: text.trim(),
     });
+    // Notify receiver
+    const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
+    const senderName = profile?.display_name ?? 'Someone';
+    notifyDirectMessage(receiverId, senderName, user.id).catch(console.error);
+    notifyDirectMessageInApp(receiverId, senderName, user.id).catch(console.error);
   }, [user]);
 
   const markAsRead = useCallback(async (otherUserId: string) => {

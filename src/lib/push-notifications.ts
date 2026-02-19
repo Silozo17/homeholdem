@@ -9,7 +9,7 @@ interface SendPushParams {
   icon?: string;
   url?: string;
   tag?: string;
-  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'game_started' | 'player_eliminated' | 'rebuy_addon';
+  notificationType?: 'rsvp_updates' | 'date_finalized' | 'waitlist_promotion' | 'chat_messages' | 'blinds_up' | 'game_completed' | 'event_unlocked' | 'member_rsvp' | 'member_vote' | 'game_started' | 'player_eliminated' | 'rebuy_addon' | 'friend_requests' | 'direct_messages' | 'new_member';
 }
 
 export async function sendPushNotification({
@@ -258,6 +258,67 @@ export async function notifyPokerInvite(
     body: `${inviterName} invited you to play at ${tableName}`,
     url: `/online-poker?table=${tableId}`,
     tag: `poker-invite-${tableId}`,
+  });
+}
+
+// Friend request notifications
+export async function notifyFriendRequest(
+  targetUserId: string,
+  senderName: string
+) {
+  return sendPushNotification({
+    userIds: [targetUserId],
+    title: 'Friend Request',
+    body: `${senderName} wants to be your friend`,
+    url: '/friends',
+    tag: `friend-request-${targetUserId}`,
+    notificationType: 'friend_requests',
+  });
+}
+
+export async function notifyFriendAccepted(
+  requesterId: string,
+  accepterName: string
+) {
+  return sendPushNotification({
+    userIds: [requesterId],
+    title: 'Friend Added',
+    body: `${accepterName} accepted your friend request`,
+    url: '/friends',
+    tag: `friend-accepted-${requesterId}`,
+    notificationType: 'friend_requests',
+  });
+}
+
+// Direct message notification
+export async function notifyDirectMessage(
+  receiverId: string,
+  senderName: string,
+  senderId: string
+) {
+  return sendPushNotification({
+    userIds: [receiverId],
+    title: senderName,
+    body: 'Sent you a message',
+    url: '/inbox',
+    tag: `dm-${senderId}`,
+    notificationType: 'direct_messages',
+  });
+}
+
+// New member joined club notification
+export async function notifyNewMemberJoined(
+  adminUserIds: string[],
+  memberName: string,
+  clubId: string
+) {
+  return sendPushNotification({
+    userIds: adminUserIds,
+    title: 'New Member',
+    body: `${memberName} joined your club`,
+    url: `/club/${clubId}`,
+    tag: `new-member-${clubId}`,
+    notificationType: 'new_member',
   });
 }
 
