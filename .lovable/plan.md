@@ -1,93 +1,91 @@
 
 
-# Align Poker Table Layout + Fix All Missing Translations
+# Fix Learn Poker Tutorial: Correct Messages, Redesign Coach UI, Fix Highlights
 
-## Part 1: Align Table Layout (Bots/Learn to match Multiplayer)
+## Issues Found
 
-Both Bots (practice) and Learn (tutorial) modes use `PokerTablePro.tsx`. The multiplayer mode uses `OnlinePokerTable.tsx`. The table wrappers are nearly identical but have key differences:
+### 1. Factual poker errors in Lesson 2 (Hand Rankings)
 
-### Differences to fix in `PokerTablePro.tsx`
+The scripted messages contain wrong hand evaluations:
 
-| Property | PokerTablePro (current) | OnlinePokerTable (target) |
-|----------|------------------------|--------------------------|
-| Table wrapper `maxWidth` | missing | `'990px'` |
-| Table wrapper `containerType` | missing | `'size'` |
-| Dealer `top` | `isLandscape ? '-14%' : '-22%'` | Device-aware: `isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : isLargeDesktop ? 'calc(-4% - 31px)' : 'calc(-4% - 27px)'` |
-| Dealer `width` | `'11%'` | `'min(9vw, 140px)'` |
-| Missing device checks | No `isTablet` / `isLargeDesktop` | Has both |
+**After Flop (A-club K-heart 8-diamond) with Viktor holding K-spade K-club:**
+- Message says: "Viktor has Two Pair (K-K + A on board)" -- **WRONG**
+- Viktor has K-spade K-club + K-heart on the board = **Three of a Kind (Kings)**, not Two Pair
+- The recap step also says "Viktor: Two Pair (Kings + Aces)" -- **WRONG**, it's Three of a Kind Kings
 
-### Files changed
+**After Turn (A-spade added) with Viktor holding K-spade K-club:**
+- Message says: "Four of a Kind -- the 2nd best hand in poker! Only a Straight Flush beats this" -- should clarify Royal Flush is the absolute best (a type of Straight Flush)
+- Then says: "Viktor's best hand is a Full House (K-K-K-A-A... wait, no -- he has Two Pair K+A)" -- **DOUBLE WRONG and self-correcting**
+- Viktor actually has K-spade K-club + board K-heart A-club A-spade = **Full House (Kings full of Aces)**. The self-correction makes it worse.
 
-| File | Change |
-|------|--------|
-| `src/components/poker/PokerTablePro.tsx` | Add `maxWidth: '990px'` and `containerType: 'size'` to table wrapper. Add `isTablet` and `isLargeDesktop` variables. Update dealer positioning to match multiplayer formula. |
+### 2. Repeated action button highlighting
+
+Every single `require_action` step has `highlight: 'actions'` which re-highlights the buttons that were already introduced in the intro tour and shown multiple times. After the first time the user taps action buttons, the highlight ring should not appear again.
+
+**Fix:** Only set `highlight: 'actions'` on the FIRST `require_action` step per lesson. Remove it from all subsequent ones.
+
+### 3. Coach UI redesign -- separate avatar circle from text bubble with floating pointer hands
+
+Current: Avatar and text are inside one card together.
+Requested: Coach avatar as a standalone circle, a separate speech bubble with text, and floating pointing hand emojis that appear near highlighted elements (not just for actions).
 
 ---
 
-## Part 2: Fix All Missing Translations
+## Plan
 
-### 2a. Install page: mismatched translation keys
+### File 1: `src/lib/poker/tutorial-lessons.ts`
 
-The Install page (`src/pages/Install.tsx`) uses keys that don't exist in the JSON files. The JSON has different key names. Fix by updating Install.tsx to use the correct existing keys:
+**Fix Lesson 2 messages:**
 
-| Used in code (wrong) | Correct key in JSON |
-|----------------------|-------------------|
-| `install.already_installed_desc` | `install.installed_description` |
-| `install.ios_subtitle` | `install.ios_description` |
-| `install.ios_step1_desc` | `install.ios_step1_detail` |
-| `install.ios_step2_desc` | `install.ios_step2_detail` |
-| `install.ios_step3_desc` | `install.ios_step3_detail` |
-| `install.android_subtitle` | `install.android_description` |
-| `install.android_step1_desc` | `install.android_step1_detail` |
-| `install.android_step2_desc` | `install.android_step2_detail` |
-| `install.android_step3_desc` | `install.android_step3_detail` |
-| `install.benefit_offline` | `install.works_offline` |
-| `install.benefit_offline_desc` | `install.offline_description` |
-| `install.benefit_quick` | `install.quick_access` |
-| `install.benefit_quick_desc` | `install.quick_description` |
-| `install.benefit_push` | `install.push_notifications` |
-| `install.benefit_push_desc` | `install.push_description` |
-| `install.ready` | `install.ready_to_install` |
-| `install.ready_desc` | `install.one_tap` |
-| `install.confirm` | needs new key: `install.confirm` |
+| Line | Current (wrong) | Correct |
+|------|-----------------|---------|
+| 194 | "Viktor has Kings and pairs his K-heart for Two Pair (K-K + A on board)" | "Viktor has three Kings on the board -- Three of a Kind! But your Three Aces beat his Three Kings." |
+| 195 | "Viktor: Two Pair (Kings + Aces)" | "Viktor: Three of a Kind (Kings)" |
+| 198 | "Four of a Kind -- the 2nd best hand" | "FOUR OF A KIND -- only a Straight Flush (or Royal Flush) can beat this!" |
+| 199 | "his best hand is a Full House (K-K-K-A-A... wait, no -- he has Two Pair K+A)" | "Viktor now has a Full House (Kings full of Aces) -- but your Four Aces still crush it!" |
 
-### 2b. Raw English strings across poker components
+**Remove repeated `highlight: 'actions'`:**
+- In every lesson, keep `highlight: 'actions'` ONLY on the first `require_action` step
+- Remove it from all subsequent `require_action` steps in that lesson
+- This affects lessons 1-10 (approximately 30+ steps to update)
 
-Many poker components have hardcoded English strings that need to be wrapped with `t()` and added to both `en.json` and `pl.json`.
+### File 2: `src/components/poker/CoachOverlay.tsx`
 
-**Files with raw strings to translate:**
+**Redesign to separate avatar from speech bubble + floating pointer hands:**
 
-| File | Raw strings |
-|------|------------|
-| `PokerTablePro.tsx` | "Rotate Your Device", "The poker table works best in landscape...", "Sound Effects On/Off", "YOUR TURN", "Exit Game?", "Are you sure you want to exit?", "Cancel", "Exit Game" |
-| `OnlinePokerTable.tsx` | "Rotate Your Device", "The poker table works best in landscape...", "Sound Effects On/Off", "Voice Announcements On/Off", "YOUR TURN", "5 SEC LEFT!", "Loading table...", "Table not found", "Starting soon...", "Waiting for players...", "Deal Hand", "Are you still playing?", "You will be removed...", "I'm Still Here", "Kick {name}?", "Cancel", "Kick Player", "Close Table?", "Leave Table?", "Leave Seat?", "Open", "Tap a glowing seat to join", "Leave", many more |
-| `WinnerOverlay.tsx` | "Winner", "You Won!", "Game Over", "You busted out", "chips", "Hands", "Won", "Best Hand", "Biggest Pot", "Duration", "Close Game", "Play Again" |
-| `LessonCompleteOverlay.tsx` | "Lesson Complete", "Back to Lessons", "Next Lesson", "Back to Lesson List" |
-| `LearnPoker.tsx` | "Learn Poker", "Master Texas Hold'em step by step", "Lessons", "Reset Progress" |
-| `PlayPokerLobby.tsx` | "Play Poker", "Texas Hold'em vs AI...", "Start Game", "Casual", "Quick heads-up", "Standard", "Classic table", "Full Ring", "Tight play", "Opponents", "Starting Chips", "Blinds", "Blind Timer", "Off" |
+- Coach avatar: a standalone circle positioned at the left edge of the speech bubble area (not inside the card)
+- Speech bubble: a separate rounded card with the text, positioned adjacent to the avatar (like a chat message)
+- Floating pointer hand: when a `highlight` is active, render an appropriate hand emoji (pointing up/down/left/right) near the highlighted element, with a bounce animation. The hand direction is determined by the highlight position:
+  - `actions` (bottom-right): pointing down hand
+  - `cards` (bottom-center): pointing down hand
+  - `community` (center): pointing up hand
+  - `pot` (upper-center): pointing up hand
+  - `exit` (top-left): pointing left hand
+  - `audio` (top-right): pointing right hand
+  - `timer` (top-center): pointing up hand
+  - `table` (center): no hand (too large)
+- Remove the current combined card layout
+- Only show the highlight ring on intro steps (the table tour), not on gameplay steps that re-highlight actions
 
-### 2c. New translation keys to add
+### File 3: `src/i18n/locales/en.json` and `src/i18n/locales/pl.json`
 
-Add all the above raw strings as new keys in `poker_table` and `poker_lobby` namespaces in both `en.json` and `pl.json`.
+- Update the `"Continue"` and `"Got it"` button text keys if not already translated
+- Add translation for "Step X/Y" indicator text
 
-### Files changed summary
+---
+
+## Summary of changes
 
 | File | Change |
 |------|--------|
-| `src/components/poker/PokerTablePro.tsx` | Align table wrapper and dealer to match multiplayer. Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/components/poker/OnlinePokerTable.tsx` | Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/components/poker/WinnerOverlay.tsx` | Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/components/poker/LessonCompleteOverlay.tsx` | Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/components/poker/PlayPokerLobby.tsx` | Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/pages/LearnPoker.tsx` | Add `useTranslation`. Replace all raw strings with `t()`. |
-| `src/pages/Install.tsx` | Fix mismatched translation keys to use correct JSON keys. Add missing `install.confirm` key. |
-| `src/i18n/locales/en.json` | Add new `poker_table`, `poker_lobby`, `learn_poker` translation sections. Add `install.confirm`. |
-| `src/i18n/locales/pl.json` | Add Polish translations for all new keys. Add `install.confirm`. |
+| `src/lib/poker/tutorial-lessons.ts` | Fix 4 wrong poker hand descriptions in Lesson 2. Remove `highlight: 'actions'` from all but the first `require_action` per lesson. |
+| `src/components/poker/CoachOverlay.tsx` | Redesign: separate circle avatar from speech bubble. Add floating pointer hands near highlights. Only show highlight ring during intro steps. |
+| `src/i18n/locales/en.json` | Add/update coach UI translation keys |
+| `src/i18n/locales/pl.json` | Add/update Polish translations for coach UI |
 
 ## What does NOT change
+- Game logic, hooks, or reducer
+- Seat layout or table positioning
 - Bottom navigation
-- Seat positions / seat layout (`seatLayout.ts`)
-- Game logic / hooks
 - No database changes
-- No styling changes beyond the dealer repositioning
 
