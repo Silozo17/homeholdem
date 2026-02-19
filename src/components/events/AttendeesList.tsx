@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock, HelpCircle, X } from 'lucide-react';
 import { UserAvatar } from '@/components/common/UserAvatar';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 interface Attendee {
   user_id: string;
@@ -49,17 +50,18 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
             </div>
             <div className="flex flex-wrap gap-2">
               {going.map((attendee) => (
-                <div
-                  key={attendee.user_id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/30 rounded-full"
-                >
-                  <UserAvatar 
-                    name={attendee.profile.display_name} 
-                    avatarUrl={attendee.profile.avatar_url}
-                    size="xs"
-                  />
-                  <span className="text-sm font-medium">{attendee.profile.display_name}</span>
-                </div>
+                <TappablePlayer key={attendee.user_id} userId={attendee.user_id}>
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/30 rounded-full"
+                  >
+                    <UserAvatar 
+                      name={attendee.profile.display_name} 
+                      avatarUrl={attendee.profile.avatar_url}
+                      size="xs"
+                    />
+                    <span className="text-sm font-medium">{attendee.profile.display_name}</span>
+                  </div>
+                </TappablePlayer>
               ))}
             </div>
           </div>
@@ -74,13 +76,14 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
             </div>
             <div className="flex flex-wrap gap-2">
               {waitlist.map((attendee, index) => (
-                <div
-                  key={attendee.user_id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 border border-border/50 rounded-full"
-                >
-                  <span className="text-xs text-muted-foreground">#{index + 1}</span>
-                  <span className="text-sm">{attendee.profile.display_name}</span>
-                </div>
+                <TappablePlayer key={attendee.user_id} userId={attendee.user_id}>
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 border border-border/50 rounded-full"
+                  >
+                    <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                    <span className="text-sm">{attendee.profile.display_name}</span>
+                  </div>
+                </TappablePlayer>
               ))}
             </div>
           </div>
@@ -95,17 +98,18 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
             </div>
             <div className="flex flex-wrap gap-2">
               {maybe.map((attendee) => (
-                <div
-                  key={attendee.user_id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border border-border/30 rounded-full"
-                >
-                  <UserAvatar 
-                    name={attendee.profile.display_name} 
-                    avatarUrl={attendee.profile.avatar_url}
-                    size="xs"
-                  />
-                  <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
-                </div>
+                <TappablePlayer key={attendee.user_id} userId={attendee.user_id}>
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border border-border/30 rounded-full"
+                  >
+                    <UserAvatar 
+                      name={attendee.profile.display_name} 
+                      avatarUrl={attendee.profile.avatar_url}
+                      size="xs"
+                    />
+                    <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
+                  </div>
+                </TappablePlayer>
               ))}
             </div>
           </div>
@@ -120,17 +124,18 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
             </div>
             <div className="flex flex-wrap gap-2">
               {notGoing.map((attendee) => (
-                <div
-                  key={attendee.user_id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border border-destructive/30 rounded-full"
-                >
-                  <UserAvatar 
-                    name={attendee.profile.display_name} 
-                    avatarUrl={attendee.profile.avatar_url}
-                    size="xs"
-                  />
-                  <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
-                </div>
+                <TappablePlayer key={attendee.user_id} userId={attendee.user_id}>
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border border-destructive/30 rounded-full"
+                  >
+                    <UserAvatar 
+                      name={attendee.profile.display_name} 
+                      avatarUrl={attendee.profile.avatar_url}
+                      size="xs"
+                    />
+                    <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
+                  </div>
+                </TappablePlayer>
               ))}
             </div>
           </div>

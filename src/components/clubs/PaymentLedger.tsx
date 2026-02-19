@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Wallet, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 interface Settlement {
   id: string;
@@ -232,12 +233,14 @@ export function PaymentLedger({ clubId, isAdmin }: PaymentLedgerProps) {
               <p className="text-sm font-medium text-muted-foreground">{t('settlements_section.net_balances')}</p>
               <div className="space-y-1">
                 {balances.map(b => (
-                  <div key={b.userId} className="flex items-center justify-between py-2 px-3 bg-secondary/30 rounded-lg">
-                    <span className="font-medium">{b.name}</span>
-                    <Badge variant={b.balance > 0 ? 'default' : 'destructive'}>
-                      {b.balance > 0 ? `${t('settlements_section.owed')} ${symbol}${b.balance}` : `${t('settlements_section.owes')} ${symbol}${Math.abs(b.balance)}`}
-                    </Badge>
-                  </div>
+                  <TappablePlayer key={b.userId} userId={b.userId}>
+                    <div className="flex items-center justify-between py-2 px-3 bg-secondary/30 rounded-lg">
+                      <span className="font-medium">{b.name}</span>
+                      <Badge variant={b.balance > 0 ? 'default' : 'destructive'}>
+                        {b.balance > 0 ? `${t('settlements_section.owed')} ${symbol}${b.balance}` : `${t('settlements_section.owes')} ${symbol}${Math.abs(b.balance)}`}
+                      </Badge>
+                    </div>
+                  </TappablePlayer>
                 ))}
               </div>
             </div>

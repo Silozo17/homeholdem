@@ -40,6 +40,7 @@ import { UserAvatar } from '@/components/common/UserAvatar';
 import { getClubMemberIds, logGameActivity, getOrdinalSuffix } from '@/lib/club-members';
 import { notifyPlayerEliminated } from '@/lib/push-notifications';
 import { notifyPlayerEliminatedInApp } from '@/lib/in-app-notifications';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 interface GamePlayer {
   id: string;
@@ -333,14 +334,15 @@ export function PlayerList({ players, session, clubId, eventId, maxTables, isAdm
             </div>
             <div className="space-y-1">
               {table1Players.map((player) => (
-                <PlayerRow
-                  key={player.id}
-                  player={player}
-                  isAdmin={isAdmin}
-                  maxTables={maxTables}
-                  onEliminate={() => handleEliminatePlayer(player)}
-                  onAssignTable={(t) => handleAssignTable(player, t)}
-                />
+                <TappablePlayer key={player.id} userId={player.user_id} disabled={!player.user_id}>
+                  <PlayerRow
+                    player={player}
+                    isAdmin={isAdmin}
+                    maxTables={maxTables}
+                    onEliminate={() => handleEliminatePlayer(player)}
+                    onAssignTable={(t) => handleAssignTable(player, t)}
+                  />
+                </TappablePlayer>
               ))}
               {table1Players.length === 0 && (
                 <p className="text-sm text-muted-foreground py-2">No players at this table</p>
@@ -356,14 +358,15 @@ export function PlayerList({ players, session, clubId, eventId, maxTables, isAdm
               </div>
               <div className="space-y-1">
                 {table2Players.map((player) => (
-                  <PlayerRow
-                    key={player.id}
-                    player={player}
-                    isAdmin={isAdmin}
-                    maxTables={maxTables}
-                    onEliminate={() => handleEliminatePlayer(player)}
-                    onAssignTable={(t) => handleAssignTable(player, t)}
-                  />
+                  <TappablePlayer key={player.id} userId={player.user_id} disabled={!player.user_id}>
+                    <PlayerRow
+                      player={player}
+                      isAdmin={isAdmin}
+                      maxTables={maxTables}
+                      onEliminate={() => handleEliminatePlayer(player)}
+                      onAssignTable={(t) => handleAssignTable(player, t)}
+                    />
+                  </TappablePlayer>
                 ))}
                 {table2Players.length === 0 && (
                   <p className="text-sm text-muted-foreground py-2">No players at this table</p>
@@ -381,26 +384,27 @@ export function PlayerList({ players, session, clubId, eventId, maxTables, isAdm
               </div>
               <div className="space-y-1">
                 {eliminatedPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center justify-between py-2 px-3 bg-muted/20 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="font-mono">
-                        {player.finish_position}{localGetOrdinalSuffix(player.finish_position || 0)}
-                      </Badge>
-                      <span className="text-muted-foreground">{player.display_name}</span>
+                  <TappablePlayer key={player.id} userId={player.user_id} disabled={!player.user_id}>
+                    <div
+                      className="flex items-center justify-between py-2 px-3 bg-muted/20 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="font-mono">
+                          {player.finish_position}{localGetOrdinalSuffix(player.finish_position || 0)}
+                        </Badge>
+                        <span className="text-muted-foreground">{player.display_name}</span>
+                      </div>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReinstate(player)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleReinstate(player)}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  </TappablePlayer>
                 ))}
               </div>
             </div>

@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { BOT_PERSONAS } from '@/lib/poker/bot-personas';
 
 interface PlayPokerLobbyProps {
@@ -42,7 +43,10 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
+            <NotificationBell />
+          </div>
         </div>
       </header>
       <div className="shrink-0 safe-area-top">

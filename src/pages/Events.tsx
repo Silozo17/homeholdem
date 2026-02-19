@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, MapPin, Users, Clock, CheckCircle, Crown } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { pl, enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
@@ -233,7 +234,10 @@ export default function Events() {
             <Crown className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
+            <NotificationBell />
+          </div>
         </div>
       </header>
       {/* Header spacer */}
