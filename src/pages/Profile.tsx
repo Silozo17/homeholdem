@@ -14,7 +14,6 @@ import { COUNTRIES, isoToEmoji } from '@/lib/countries';
 import { CountrySelector } from '@/components/profile/CountrySelector';
 import { toast } from '@/hooks/use-toast';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
 import { usePlayerLevel } from '@/hooks/usePlayerLevel';
@@ -223,16 +222,7 @@ export default function Profile() {
           </Button>
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
-            <HeaderSocialIcons />
-            <NotificationBell />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/settings')}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
+            <HeaderSocialIcons showSettings />
           </div>
         </div>
       </header>

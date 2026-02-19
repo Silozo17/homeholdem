@@ -59,7 +59,6 @@ import { InviteByEmailDialog } from '@/components/clubs/InviteByEmailDialog';
 import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 import { ClubSettings } from '@/components/clubs/ClubSettings';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { TappablePlayer } from '@/components/common/TappablePlayer';
 import { notifyEventUnlocked } from '@/lib/push-notifications';
@@ -371,7 +370,6 @@ export default function ClubDetail() {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>

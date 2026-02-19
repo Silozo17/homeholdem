@@ -9,7 +9,6 @@ import { Logo } from '@/components/layout/Logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, MapPin, Users, Clock, CheckCircle, Crown } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { pl, enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -236,7 +235,6 @@ export default function Events() {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>

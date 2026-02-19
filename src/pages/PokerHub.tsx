@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
 import { GameModeCard } from '@/components/poker/GameModeCard';
 import { Logo } from '@/components/layout/Logo';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
@@ -32,7 +31,6 @@ export default function PokerHub() {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>
