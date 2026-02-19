@@ -175,6 +175,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
 
+  // Auto-connect voice chat when seated
+  useEffect(() => {
+    if (mySeatNumber !== null && !voiceChat.connected && !voiceChat.connecting) {
+      voiceChat.connect();
+    }
+  }, [mySeatNumber, voiceChat.connected, voiceChat.connecting]);
+
   // Capture starting XP on mount for level-up animation
   useEffect(() => {
     if (!user) return;
