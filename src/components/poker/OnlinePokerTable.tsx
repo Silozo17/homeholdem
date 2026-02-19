@@ -194,15 +194,51 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
   }, [user]);
 
-  // Fix 3: Inactivity kick — 2 min no touch → warning → auto-leave
+  // "Are you still playing?" popup state
+  const [showStillPlayingPopup, setShowStillPlayingPopup] = useState(false);
+  const [stillPlayingCountdown, setStillPlayingCountdown] = useState(30);
+  const stillPlayingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Start the 30s countdown when popup is shown
+  useEffect(() => {
+    if (!showStillPlayingPopup) {
+      if (stillPlayingIntervalRef.current) clearInterval(stillPlayingIntervalRef.current);
+      stillPlayingIntervalRef.current = null;
+      return;
+    }
+    setStillPlayingCountdown(30);
+    stillPlayingIntervalRef.current = setInterval(() => {
+      setStillPlayingCountdown(prev => {
+        if (prev <= 1) {
+          // Time's up — kick from seat
+          clearInterval(stillPlayingIntervalRef.current!);
+          stillPlayingIntervalRef.current = null;
+          setShowStillPlayingPopup(false);
+          leaveSeat().then(() => {
+            toast({ title: '⚠️ Removed from seat', description: 'You were removed for inactivity. You are now spectating.' });
+          }).catch(() => {});
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (stillPlayingIntervalRef.current) clearInterval(stillPlayingIntervalRef.current);
+    };
+  }, [showStillPlayingPopup, leaveSeat]);
+
+  const handleStillHere = useCallback(() => {
+    setShowStillPlayingPopup(false);
+  }, []);
+
+  // Inactivity kick — 90s no touch → warning → auto-leave table
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityWarningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inactivityWarning, setInactivityWarning] = useState(false);
 
   useEffect(() => {
-    if (!mySeatNumber) return; // only for seated players
-
-    const IDLE_MS = 120_000; // 2 minutes
+    // Apply to both seated players AND spectators who were just kicked from seat
+    const IDLE_MS = 90_000; // 90 seconds
     const WARNING_MS = 10_000; // 10 second warning before kick
 
     const resetInactivity = () => {
@@ -215,13 +251,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         toast({ title: '⚠️ Inactivity Warning', description: 'You will be removed in 10 seconds. Tap anywhere to stay.' });
 
         inactivityWarningRef.current = setTimeout(() => {
-          // FIX CL-9: Don't auto-kick during active hand — extend instead
-          const currentHand = tableState?.current_hand;
-          if (currentHand && currentHand.phase !== 'complete') {
-            setInactivityWarning(false);
-            resetInactivity();
-            return;
-          }
           leaveTable().then(onLeave).catch(onLeave);
         }, WARNING_MS);
       }, IDLE_MS);
@@ -237,7 +266,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
     };
-  }, [mySeatNumber, leaveTable, onLeave]);
+  }, [leaveTable, onLeave]);
 
   // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
@@ -1399,7 +1428,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
-                  onTimeout={isMe && isCurrentActor ? () => handleAction({ type: 'fold' }) : undefined}
+                  onTimeout={isMe && isCurrentActor ? () => {
+                    handleAction({ type: 'fold' });
+                    setShowStillPlayingPopup(true);
+                  } : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
@@ -1478,6 +1510,28 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </button>
         </>
       )}
+
+      {/* "Are you still playing?" popup */}
+      <AlertDialog open={showStillPlayingPopup} onOpenChange={(open) => { if (!open) handleStillHere(); }}>
+        <AlertDialogContent className="z-[80] max-w-sm text-center">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">Are you still playing?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              You will be removed from your seat in
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-center py-4">
+            <div className="w-20 h-20 rounded-full border-4 border-destructive flex items-center justify-center">
+              <span className="text-3xl font-black text-destructive">{stillPlayingCountdown}</span>
+            </div>
+          </div>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction onClick={handleStillHere} className="w-full text-base py-3">
+              I'm Still Here
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Kick confirmation dialog */}
       <AlertDialog open={!!kickTarget} onOpenChange={(open) => !open && setKickTarget(null)}>
