@@ -222,7 +222,7 @@ export default function Profile() {
           </Button>
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
-            <HeaderSocialIcons showSettings />
+            <HeaderSocialIcons />
           </div>
         </div>
       </header>

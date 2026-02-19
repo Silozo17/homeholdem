@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, User, Info, LogOut, Mail, Lock, BookOpen, Crown, Loader2, Globe } from 'lucide-react';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { CountrySelector } from '@/components/profile/CountrySelector';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings';
@@ -95,7 +96,8 @@ export default function Settings() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-bold text-gold-gradient">{t('settings.title')}</h1>
+          <h1 className="text-xl font-bold text-gold-gradient flex-1">{t('settings.title')}</h1>
+          <HeaderSocialIcons />
         </div>
       </header>
       {/* Header spacer */}

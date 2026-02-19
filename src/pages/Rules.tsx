@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { PokerHandRankings } from '@/components/clubs/PokerHandRankings';
 import { Logo } from '@/components/layout/Logo';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 
 export default function Rules() {
   const { t } = useTranslation();
@@ -23,6 +24,9 @@ export default function Rules() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
+          <div className="absolute right-4">
+            <HeaderSocialIcons />
+          </div>
         </div>
       </header>
       {/* Header spacer */}

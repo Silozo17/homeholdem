@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Send, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 
 interface ThreadMessage {
   id: string;
@@ -118,7 +119,8 @@ export default function Inbox() {
               <AvatarImage src={activeUserAvatar ?? undefined} />
               <AvatarFallback className="text-xs">{activeUserName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <span className="font-bold text-foreground truncate">{activeUserName}</span>
+            <span className="font-bold text-foreground truncate flex-1">{activeUserName}</span>
+            <HeaderSocialIcons />
           </div>
         </header>
         <div className="h-14 safe-area-top" />
@@ -172,7 +174,8 @@ export default function Inbox() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-bold text-foreground">Messages</h1>
+          <h1 className="text-lg font-bold text-foreground flex-1">Messages</h1>
+          <HeaderSocialIcons />
         </div>
       </header>
       <div className="h-14 safe-area-top" />

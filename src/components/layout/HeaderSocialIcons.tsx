@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, MessageSquare, Users, Bell, Settings } from 'lucide-react';
+import { Menu, MessageSquare, Users, Bell, Settings, BookOpen, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useDirectMessages } from '@/hooks/useDirectMessages';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationPanel } from '@/components/notifications/NotificationPanel';
 
 interface HeaderSocialIconsProps {
-  showSettings?: boolean;
   extraItems?: { icon: React.ReactNode; label: string; onClick: () => void }[];
 }
 
-export function HeaderSocialIcons({ showSettings, extraItems }: HeaderSocialIconsProps) {
+export function HeaderSocialIcons({ extraItems }: HeaderSocialIconsProps) {
   const navigate = useNavigate();
   const { unreadCount: msgUnread } = useDirectMessages();
   const { unreadCount: notifUnread } = useNotifications();
@@ -61,12 +61,19 @@ export function HeaderSocialIcons({ showSettings, extraItems }: HeaderSocialIcon
               </span>
             )}
           </DropdownMenuItem>
-          {showSettings && (
-            <DropdownMenuItem onClick={() => navigate('/settings')} className="gap-3 cursor-pointer">
-              <Settings className="h-4 w-4" />
-              <span className="flex-1">Settings</span>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate('/rules')} className="gap-3 cursor-pointer">
+            <BookOpen className="h-4 w-4" />
+            <span className="flex-1">Rules</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/install')} className="gap-3 cursor-pointer">
+            <Download className="h-4 w-4" />
+            <span className="flex-1">Install App</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/settings')} className="gap-3 cursor-pointer">
+            <Settings className="h-4 w-4" />
+            <span className="flex-1">Settings</span>
+          </DropdownMenuItem>
           {extraItems?.map((item, i) => (
             <DropdownMenuItem key={i} onClick={item.onClick} className="gap-3 cursor-pointer">
               {item.icon}
