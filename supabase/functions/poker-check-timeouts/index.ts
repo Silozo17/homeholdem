@@ -539,13 +539,43 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 5. Force-remove players disconnected for 3+ minutes ──
+    const disconnectCutoff = new Date(Date.now() - 180_000).toISOString();
+    const { data: longDisconnected } = await admin
+      .from("poker_seats")
+      .select("id, table_id, player_id, seat_number")
+      .eq("status", "disconnected")
+      .lt("last_heartbeat", disconnectCutoff)
+      .not("player_id", "is", null);
+
+    const forceRemoves: any[] = [];
+    for (const seat of longDisconnected || []) {
+      try {
+        console.log(`[FORCE-REMOVE] Removing long-disconnected player ${seat.player_id} from table ${seat.table_id} (3min+)`);
+        await admin.from("poker_seats").delete().eq("id", seat.id);
+
+        const frChannel = admin.channel(`poker:table:${seat.table_id}`);
+        await frChannel.send({
+          type: "broadcast",
+          event: "seat_change",
+          payload: { action: "force_removed", seat: seat.seat_number, player_id: seat.player_id },
+        });
+
+        forceRemoves.push({ player_id: seat.player_id, table_id: seat.table_id, status: "force_removed" });
+      } catch (frErr: any) {
+        console.error(`Error force-removing player ${seat.player_id}:`, frErr);
+        forceRemoves.push({ player_id: seat.player_id, status: 500, error: frErr.message });
+      }
+    }
+
     return new Response(
       JSON.stringify({
-        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s), swept ${closingResults.length} closing table(s), heartbeat-kicked ${heartbeatKicks.length} stale player(s)`,
+        message: `Processed ${results.length} stuck hand(s), kicked ${kickResults.length} inactive player(s), swept ${closingResults.length} closing table(s), heartbeat-kicked ${heartbeatKicks.length} stale player(s), force-removed ${forceRemoves.length} long-disconnected player(s)`,
         results,
         kickResults,
         closingResults,
         heartbeatKicks,
+        forceRemoves,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
