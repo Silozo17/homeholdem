@@ -1,35 +1,43 @@
 
+# Merge Wuzet Accounts
 
-# Fix "Wins" Stat to Show Game Wins, Not Hand Wins
+## Current State
 
-## Problem
+| Record | ID | Has Stats? | Has Avatar? |
+|---|---|---|---|
+| Registered user "Wuzet" | `f3bb9039-6586-4614-ac89-fe0feda4286f` | No game_players records | Yes (avatar + email) |
+| Placeholder "Wuzet" | `ccff627b-d8a3-4ccf-8931-5da2eb476d13` | 2 games, 1 win, 300 winnings | No linked_user_id |
+| Season standing | `8d30af27-...` | Points to placeholder only | user_id is NULL |
 
-The Quick Stats strip on the Dashboard shows **59 Wins**, but this counts individual **hands won** across all practice sessions (summing `hands_won` from `poker_play_results`). The user wants "Wins" to mean **games won** -- sessions where the player finished ahead.
+## Fix (same pattern as Breku merge)
 
-## Solution
+Two SQL updates via a database migration:
 
-Change one line in `src/pages/Dashboard.tsx` (line 123).
+1. **Link placeholder to registered user**
+   - Set `linked_user_id` on the placeholder_players row to the registered user's ID
 
-Currently:
-```js
-const wins = data.reduce((s, r) => s + (r.hands_won || 0), 0);
+2. **Update season standings**
+   - Set `user_id` on the season_standings row so leaderboard and profile stats aggregate correctly
+
+```sql
+UPDATE placeholder_players
+SET linked_user_id = 'f3bb9039-6586-4614-ac89-fe0feda4286f'
+WHERE id = 'ccff627b-d8a3-4ccf-8931-5da2eb476d13';
+
+UPDATE season_standings
+SET user_id = 'f3bb9039-6586-4614-ac89-fe0feda4286f'
+WHERE placeholder_player_id = 'ccff627b-d8a3-4ccf-8931-5da2eb476d13'
+  AND user_id IS NULL;
 ```
 
-Change to count games where `final_chips > starting_chips` (i.e., the player finished the session with a profit):
-```js
-const wins = data.filter(r => (r.final_chips || 0) > (r.starting_chips || 0)).length;
-```
+## Result
+- Profile page will show Wuzet's 2 games, 1 win, and 300 winnings
+- Leaderboard will display the avatar and registered name
+- No code file changes needed
+- No UI or navigation changes
 
 ## Files changed
 
 | File | Change |
-|------|--------|
-| `src/pages/Dashboard.tsx` | Line 123: change `wins` calculation from sum of `hands_won` to count of games where `final_chips > starting_chips` |
-
-## What does NOT change
-- `QuickStatsStrip` component -- untouched
-- `PokerCareerStats` component -- untouched (it correctly shows hand-level stats)
-- Bottom navigation -- untouched
-- No database changes
-- No styling changes
-
+|---|---|
+| Database migration only | Link placeholder + update season standings |
