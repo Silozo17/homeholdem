@@ -1,74 +1,183 @@
-# Plan: "Are You Still Playing?" Popup + Faster Inactivity Kicks
 
-## What Changes
 
-### New Flow After a Turn Timeout
+# Player Profile Drawer, Friends System, and Private Messaging
 
-Currently, when a player's 45-second turn expires, they are auto-folded and the game continues. There is no check to see if the player is actually still at their device.
+## Overview
 
-**New behaviour:**
-
-1. Player has **45 seconds** to act on their turn (unchanged)
-2. If they time out (auto-fold), a full-screen **"Are you still playing?"** popup appears with a **30-second countdown**
-3. If the player taps **"I'm Still Here"**, the popup closes and they continue playing normally
-4. If the 30 seconds expire without a tap, the player is **kicked from their seat** (but remains at the table as a spectator)
-5. From that moment, if the player does nothing for **90 seconds**, they are **kicked from the table entirely**
-
-### Server-Side Threshold Reductions
-
-The current server-side timers are too generous. They will be tightened:
-
-- **Heartbeat stale threshold**: 90s to mark as disconnected (stays the same -- already correct)
-- **Force-remove disconnected**: reduced from **3 minutes to 90 seconds** (matches the user's request)
-- Only applies to kicked seat players! Does not affect spectators!
+This plan adds three interconnected features:
+1. **Player Profile Drawer** -- tap any player at the poker table to see their stats, send a message, or add as friend
+2. **Friends List** -- add/accept/remove friends, with a dedicated UI on the Profile page
+3. **Private Messaging (Inbox)** -- direct messages between players, accessible from a new Inbox page
 
 ---
 
-## Technical Details
+## Database Changes (4 new tables)
 
-### 1. Client-side: "Are you still playing?" popup
+### Table: `friendships`
+Tracks friend relationships between users.
 
-**File: `src/components/poker/OnlinePokerTable.tsx**`
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | PK, default gen_random_uuid() |
+| requester_id | uuid | NOT NULL, references profiles(id) |
+| addressee_id | uuid | NOT NULL, references profiles(id) |
+| status | text | NOT NULL, default 'pending' ('pending', 'accepted', 'declined') |
+| created_at | timestamptz | default now() |
+| updated_at | timestamptz | default now() |
+| UNIQUE | (requester_id, addressee_id) | prevent duplicates |
 
-- Add new state: `showStillPlayingPopup` (boolean) and `stillPlayingCountdown` (number, starts at 30)
-- When the turn timer fires `onTimeout` and triggers an auto-fold, instead of just folding silently, also set `showStillPlayingPopup = true`
-- Start a 30-second countdown interval that decrements `stillPlayingCountdown` every second
-- If countdown reaches 0: call `leaveSeat()` to remove the player from their seat, close the popup
-- If the player taps "I'm Still Here": close the popup, reset countdown
-- Render the popup as a full-screen overlay (using AlertDialog) with a large countdown number and a "I'm Still Here" button
+RLS policies:
+- SELECT: user can see rows where they are requester or addressee
+- INSERT: requester_id = auth.uid()
+- UPDATE: addressee_id = auth.uid() (only the receiver can accept/decline)
+- DELETE: either party can remove the friendship
 
-**File: `src/components/poker/OnlinePokerTable.tsx**` (inactivity system)
+### Table: `direct_messages`
+Stores private messages between two users.
 
-- Reduce the general inactivity timer from **2 minutes to 90 seconds** (for the "kick from table" step after being removed from seat)
-- Remove the current workaround that skips the kick during an active hand (no longer needed since the popup handles in-hand timeouts)
-- The warning period stays at 10 seconds
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | PK, default gen_random_uuid() |
+| sender_id | uuid | NOT NULL, references profiles(id) |
+| receiver_id | uuid | NOT NULL, references profiles(id) |
+| message | text | NOT NULL |
+| read_at | timestamptz | nullable |
+| created_at | timestamptz | default now() |
 
-### 2. Server-side: Faster force-removal
+RLS policies:
+- SELECT: sender_id = auth.uid() OR receiver_id = auth.uid()
+- INSERT: sender_id = auth.uid()
+- UPDATE: receiver_id = auth.uid() (only receiver can mark as read)
+- DELETE: sender_id = auth.uid() (only sender can delete their own)
 
-**File: `supabase/functions/poker-check-timeouts/index.ts**`
+Enable realtime on `direct_messages` for live message delivery:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.direct_messages;
+```
 
-- Section 5: Change the force-remove threshold from 180,000ms (3 minutes) to **90,000ms (90 seconds)**
-- This means a disconnected player (grey avatar) will be fully removed after 90 seconds instead of 3 minutes
-
-### 3. Track consecutive timeouts for the popup trigger
-
-The popup should only appear after an **auto-fold timeout**, not just any fold. The `onTimeout` callback in `PlayerSeat` already fires only when the turn timer expires (not when the player manually folds). We hook into this existing callback.
+### Table: `conversations` (view/materialized helper -- optional, can compute client-side)
+Not a table -- we will compute conversation threads client-side by grouping `direct_messages` by the other user's ID and taking the latest message. This keeps things simple.
 
 ---
 
-## Summary of File Changes
+## New Files
 
+### 1. `src/components/poker/PlayerProfileDrawer.tsx`
+A Sheet (sliding from the left) that opens when tapping an opponent at the poker table.
 
-| File                                               | Change                                                                                                                                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/components/poker/OnlinePokerTable.tsx`        | Add "Are you still playing?" popup state + UI, trigger on auto-fold timeout, kick from seat after 30s, reduce general inactivity to 90s |
-| `supabase/functions/poker-check-timeouts/index.ts` | Reduce force-remove threshold from 3min to 90s                                                                                          |
+**Contents:**
+- Player avatar, display name, country flag, level badge
+- Quick stats: games played, wins, XP level (fetched from `profiles`, `player_xp`, `game_players`)
+- Three action buttons:
+  - **Send Message** -- opens inline message composer or navigates to inbox
+  - **Add Friend / Pending / Friends** -- contextual button based on friendship status
+  - **Kick** (if table creator, no active hand) -- existing kick functionality
 
+**Data fetched on open:**
+- Profile info from `profiles` table
+- Player XP from `player_xp` table
+- Game stats count from `game_players` table
+- Friendship status from `friendships` table
+
+### 2. `src/pages/Inbox.tsx`
+Full inbox page with conversation list and message thread view.
+
+**Layout:**
+- Header with back button and "Messages" title
+- List of conversations (grouped by other user), showing avatar, name, last message preview, unread indicator, timestamp
+- Tapping a conversation opens the thread (inline, not a separate route)
+- Thread view: scrollable message list + text input at bottom
+- Real-time updates via Supabase realtime subscription on `direct_messages`
+
+### 3. `src/pages/Friends.tsx`
+Friends list page accessible from Profile.
+
+**Layout:**
+- Tabs: "Friends" | "Requests"
+- Friends tab: list of accepted friends with avatar, name, level, "Message" and "Remove" actions
+- Requests tab: incoming friend requests with "Accept" and "Decline" buttons
+- Outgoing pending requests shown with "Cancel" option
+
+### 4. `src/hooks/useFriendship.ts`
+Hook to manage friendship state between two users.
+
+**Methods:**
+- `sendRequest(targetUserId)` -- INSERT into friendships
+- `acceptRequest(friendshipId)` -- UPDATE status to 'accepted'
+- `declineRequest(friendshipId)` -- UPDATE status to 'declined'
+- `removeFriend(friendshipId)` -- DELETE row
+- `getFriendshipStatus(targetUserId)` -- returns 'none' | 'pending_sent' | 'pending_received' | 'accepted'
+
+### 5. `src/hooks/useDirectMessages.ts`
+Hook for direct messaging.
+
+**Methods:**
+- `sendMessage(receiverId, text)` -- INSERT into direct_messages
+- `getConversations()` -- fetch all DMs grouped by other user, with latest message
+- `getThread(otherUserId)` -- fetch all messages between current user and target
+- `markAsRead(messageId)` -- UPDATE read_at
+- `unreadCount` -- count of unread messages (for badge display)
+
+Includes a realtime subscription for live message delivery.
+
+---
+
+## Modified Files
+
+### `src/components/poker/OnlinePokerTable.tsx`
+- Add state: `selectedPlayer` (player_id string or null)
+- Wrap each non-hero `PlayerSeat` inside `SeatAnchor` with an `onClick` handler that sets `selectedPlayer`
+- Render `PlayerProfileDrawer` when `selectedPlayer` is set
+- Import and use the new drawer component
+
+### `src/components/poker/PlayerSeat.tsx`
+- Add optional `onClick` prop to the component
+- Attach it to the root div so the entire seat area is tappable
+
+### `src/App.tsx`
+- Add routes: `/inbox` and `/friends`
+
+### `src/components/layout/BottomNav.tsx`
+- **Not changed** (per instructions). Inbox and Friends are accessed from Profile page links.
+
+### `src/pages/Profile.tsx`
+- Add two new navigation buttons (between "View Full Stats" and "Achievements"):
+  - "Messages" with unread badge count
+  - "Friends" with friend count
+
+---
+
+## Flow Summary
+
+```text
+Poker Table
+  |-- tap opponent avatar
+  |-- PlayerProfileDrawer slides from left
+      |-- View stats (name, level, country, games, wins)
+      |-- [Add Friend] / [Pending] / [Friends]
+      |-- [Send Message] --> navigates to /inbox?user=<id>
+      |-- [Kick] (if creator)
+
+Profile Page
+  |-- [Messages (3)] --> /inbox
+  |-- [Friends (12)] --> /friends
+
+/inbox
+  |-- conversation list
+  |-- tap conversation --> thread view
+  |-- compose new message
+
+/friends
+  |-- Friends tab (list of accepted friends)
+  |-- Requests tab (pending incoming/outgoing)
+```
+
+---
 
 ## What Does NOT Change
+- Bottom navigation -- untouched
+- Existing chat system (club chat, event chat) -- untouched
+- PlayerSeat styling, layout, animations -- untouched (only adds onClick prop)
+- No changes to any edge functions
+- No changes to existing tables
 
-- 45-second turn timer duration -- stays the same
-- Server heartbeat interval (30s pings) -- stays the same  
-- Heartbeat stale threshold (90s to mark disconnected) -- stays the same
-- Seat positions, dealer, bottom nav -- untouched
-- No layout or styling changes outside the new popup
