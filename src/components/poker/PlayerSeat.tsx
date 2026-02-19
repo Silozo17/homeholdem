@@ -28,6 +28,7 @@ interface PlayerSeatProps {
   onLowTime?: () => void;
   isDisconnected?: boolean;
   isSpeaking?: boolean;
+  onClick?: () => void;
 }
 
 /**
@@ -37,7 +38,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false, onClick,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -150,11 +151,15 @@ export const PlayerSeat = memo(function PlayerSeat({
     : null;
 
   return (
-    <div className={cn(
-      'relative flex flex-col items-center transition-all duration-300',
-      isOut && 'opacity-50',
-      isCurrentPlayer && !isOut && 'animate-spotlight-pulse',
-    )}>
+    <div
+      className={cn(
+        'relative flex flex-col items-center transition-all duration-300',
+        isOut && 'opacity-50',
+        isCurrentPlayer && !isOut && 'animate-spotlight-pulse',
+        onClick && 'cursor-pointer',
+      )}
+      onClick={onClick}
+    >
       {/* Avatar with ring + dealer */}
       <div className="relative">
         {/* Active player spotlight glow */}

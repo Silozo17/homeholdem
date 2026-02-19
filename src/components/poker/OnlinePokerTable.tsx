@@ -46,6 +46,7 @@ import { AchievementContext } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
 import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
 import { GameStateDebugPanel } from './GameStateDebugPanel';
+import { PlayerProfileDrawer } from './PlayerProfileDrawer';
 
 /** Blind timer countdown for multiplayer */
 function OnlineBlindTimer({ lastIncreaseAt, timerMinutes, currentSmall, currentBig }: {
@@ -134,6 +135,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const prevPhaseRef = useRef<string | null>(null);
   const [communityCardPhaseKey, setCommunityCardPhaseKey] = useState<string | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -1435,6 +1437,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
+                  onClick={!isMe && seatData!.player_id ? () => setSelectedPlayer(seatData!.player_id!) : undefined}
                 />
               </SeatAnchor>
             );
@@ -1603,6 +1606,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Player Profile Drawer */}
+      <PlayerProfileDrawer
+        playerId={selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        isCreator={isCreator}
+        canKick={canModerate}
+        onKick={(id) => {
+          const seat = activeSeats.find(s => s.player_id === id);
+          if (seat) setKickTarget({ id, name: seat.display_name });
+        }}
+      />
 
       {tableState?.table?.name === 'Testing' && (
         <GameStateDebugPanel

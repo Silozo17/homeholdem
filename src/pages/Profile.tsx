@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe, MessageSquare, UserPlus } from 'lucide-react';
 import { COUNTRIES, isoToEmoji } from '@/lib/countries';
 import { CountrySelector } from '@/components/profile/CountrySelector';
 import { toast } from '@/hooks/use-toast';
@@ -390,6 +390,26 @@ export default function Profile() {
           </div>
           <ChevronRight className="h-5 w-5" />
         </Button>
+
+        {/* Messages & Friends */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-3"
+            onClick={() => navigate('/inbox')}
+          >
+            <MessageSquare className="h-5 w-5 text-primary" />
+            <span>Messages</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="justify-start gap-2 h-auto py-3"
+            onClick={() => navigate('/friends')}
+          >
+            <UserPlus className="h-5 w-5 text-primary" />
+            <span>Friends</span>
+          </Button>
+        </div>
 
         {/* Achievements */}
         <Card className="bg-card/50 border-border/50">
