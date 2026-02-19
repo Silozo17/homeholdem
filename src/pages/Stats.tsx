@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/layout/Logo';
 import { Trophy, TrendingUp, TrendingDown, Target, Calendar, Crown, Medal, DollarSign, Percent, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { PokerCareerStats } from '@/components/poker/PokerCareerStats';
 
@@ -272,7 +272,9 @@ export default function Stats() {
             <Crown className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4">
+            <HeaderSocialIcons />
+          </div>
         </div>
       </header>
       {/* Header spacer */}

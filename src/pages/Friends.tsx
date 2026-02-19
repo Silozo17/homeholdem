@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, MessageSquare, UserMinus, Check, X, Clock, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { TappablePlayer } from '@/components/common/TappablePlayer';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 
 export default function Friends() {
   const { user, loading: authLoading } = useAuth();
@@ -25,7 +26,8 @@ export default function Friends() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-bold text-foreground">Friends</h1>
+          <h1 className="text-lg font-bold text-foreground flex-1">Friends</h1>
+          <HeaderSocialIcons />
         </div>
       </header>
       <div className="h-14 safe-area-top" />

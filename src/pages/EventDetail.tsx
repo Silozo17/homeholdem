@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -980,7 +981,7 @@ export default function EventDetail() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <div className="absolute right-4 flex items-center gap-2">
+          <div className="absolute right-4 flex items-center gap-1">
             <ShareEvent
               eventId={event.id}
               eventTitle={event.title}
@@ -989,6 +990,7 @@ export default function EventDetail() {
               goingCount={goingList.length}
               capacity={totalCapacity}
             />
+            <HeaderSocialIcons />
           </div>
         </div>
       </header>
