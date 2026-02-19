@@ -239,7 +239,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [inactivityWarning, setInactivityWarning] = useState(false);
 
   useEffect(() => {
-    // Apply to both seated players AND spectators who were just kicked from seat
+    // Only apply inactivity kick to seated players, not spectators
+    if (mySeatNumber === null) return;
+
     const IDLE_MS = 90_000; // 90 seconds
     const WARNING_MS = 10_000; // 10 second warning before kick
 
@@ -268,7 +270,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
     };
-  }, [leaveTable, onLeave]);
+  }, [leaveTable, onLeave, mySeatNumber]);
 
   // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
