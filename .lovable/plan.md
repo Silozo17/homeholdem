@@ -1,62 +1,79 @@
 
 
-# Plan: XP Screen Improvements + Voice Chat Fix
+# Fix: Voice Chat Connection Failures
 
-## 1. Voice Chat: Silent failure instead of error toast
+## Root Cause
 
-**Problem:** The auto-connect `useEffect` fires repeatedly because `voiceChat.connect` and `voiceChat.connecting` are recreated each render, causing a flood of calls to the livekit-token edge function. When the connection fails (e.g. browser blocks mic permission, or LiveKit credentials issue), it shows a disruptive red error toast.
+Two issues are causing connection failures:
 
-**Fix in `src/hooks/useVoiceChat.ts`:**
-- Add a `failedRef` flag so that after the first connection failure, auto-connect does not keep retrying in a loop. The manual phone button still works to retry.
-- Expose this `failed` state so the auto-connect effect can check it.
+1. **Mic permission crash**: After successfully connecting to the LiveKit room, the code calls `setMicrophoneEnabled(true)` then immediately `setMicrophoneEnabled(false)` (to "start muted"). If the browser blocks mic access, this throws an error and crashes the entire connection -- even though the room itself connected fine. This is likely what happened to Tomek.
 
-**Fix in `src/components/poker/OnlinePokerTable.tsx` (auto-connect effect, ~line 179):**
-- Check `voiceChat.failed` to avoid retrying after a failure. Only auto-connect once per session.
+2. **Retry loop not fully stopped**: The auto-connect `useEffect` depends on `voiceChat.connected`, `voiceChat.connecting`, and `voiceChat.failed` -- all of which change every render, re-triggering the effect. The `failed` flag helps but doesn't fully prevent rapid re-fires.
 
-## 2. Remove WinnerOverlay stats screen, merge stats into XPLevelUpOverlay
+## Fix
 
-**Problem:** After game over, WinnerOverlay shows a full stats screen, then XP overlay shows separately. User wants: remove the WinnerOverlay game-over stats screen entirely, and instead show stats inside the XP overlay with "Play Again" and "Close" buttons.
+### File: `src/hooks/useVoiceChat.ts`
 
-### Changes to `src/components/poker/XPLevelUpOverlay.tsx`:
-- Add new props: `stats` (handsPlayed, handsWon, bestHandName, biggestPot, duration), `onPlayAgain`, `onClose`
-- Replace the single "Continue" button with two buttons: "Close" (exits table) and "Play Again" (stays at table)
-- Add a stats section below the XP bar showing: Hands Played, Hands Won, Best Hand, Biggest Pot, Duration in a styled grid
+**Change 1 -- Wrap mic enable/disable in try-catch (lines 109-112)**
 
-### Changes to `src/components/poker/OnlinePokerTable.tsx`:
+Instead of crashing the whole connection when mic permission is denied, catch the error and continue connected (just without mic). The player can still hear others.
 
-**Remove WinnerOverlay for game over (lines 1270-1283):**
-- Remove the `{gameOver && <WinnerOverlay ...>}` block entirely. The hand-win inline banner (non-game-over WinnerOverlay) stays.
+```typescript
+// Current (crashes if mic denied):
+await room.localParticipant.setMicrophoneEnabled(true);
+await room.localParticipant.setMicrophoneEnabled(false);
+setMicMuted(true);
 
-**Update XPLevelUpOverlay rendering (lines 1286-1296):**
-- Pass `stats`, `onPlayAgain`, and `onClose` props
-- `onClose`: sets xpOverlay to null, then calls `leaveTable().then(onLeave)`
-- `onPlayAgain`: sets xpOverlay to null, leaves seat (so player is removed from seat) but stays at the table as a spectator who can re-join a seat
+// New (graceful fallback):
+try {
+  await room.localParticipant.setMicrophoneEnabled(true);
+  await room.localParticipant.setMicrophoneEnabled(false);
+} catch (micErr) {
+  console.warn('[VoiceChat] Mic permission denied, joining listen-only:', micErr);
+}
+setMicMuted(true);
+```
 
-**Seat removal during XP screen:**
-- When `gameOver` is set to true and XP overlay shows, call `leaveSeat()` (not `leaveTable()`) so the player is removed from the seat but remains at the table
-- "Play Again" dismisses the overlay (player is already a spectator, can tap an open seat)
-- "Close" calls `leaveTable().then(onLeave)` to fully exit
+**Change 2 -- Add a `connectAttemptedRef` guard (new ref)**
 
-### Changes to `src/components/poker/WinnerOverlay.tsx`:
-- No changes needed (the non-game-over hand-win banner is still used)
+Add a ref that tracks whether auto-connect has already been attempted for this session, preventing re-fires from useEffect dependency changes.
 
-## 3. Leave seat on game over (before XP screen)
+```typescript
+const connectAttemptedRef = useRef(false);
+```
 
-**In `src/components/poker/OnlinePokerTable.tsx`:**
-- In the `saveXpAndStats` callback or in the game-over useEffect, call `leaveSeat()` right when game over triggers (before XP overlay shows). This removes the player from their seat but keeps them at the table.
+In the `connect` function, set `connectAttemptedRef.current = true` at the start (before the try block). Reset it only on explicit manual retry.
 
-## Summary of file changes
+### File: `src/components/poker/OnlinePokerTable.tsx`
+
+**Change 3 -- Stabilise the auto-connect effect (line 178-183)**
+
+Use a one-shot ref to ensure auto-connect fires exactly once per seat assignment, regardless of how many times the effect re-runs.
+
+```typescript
+const voiceChatAttemptedRef = useRef(false);
+
+useEffect(() => {
+  if (mySeatNumber !== null && !voiceChatAttemptedRef.current) {
+    voiceChatAttemptedRef.current = true;
+    voiceChat.connect();
+  }
+}, [mySeatNumber]);
+```
+
+Reset the ref when the player leaves the table (so re-seating triggers a new auto-connect).
+
+## What Does NOT Change
+- VoiceChatControls component -- untouched
+- Manual connect/disconnect buttons -- still work
+- Seat positions, dealer, bottom nav -- untouched
+- No layout or styling changes
+
+## Summary
 
 | File | Change |
 |---|---|
-| `src/hooks/useVoiceChat.ts` | Add `failed` state + `failedRef` to prevent retry loops |
-| `src/components/poker/OnlinePokerTable.tsx` | Remove game-over WinnerOverlay, pass stats to XP overlay, call leaveSeat on game over, guard auto-connect with failed check |
-| `src/components/poker/XPLevelUpOverlay.tsx` | Add stats grid, "Play Again" + "Close" buttons, new props |
-
-## What does NOT change
-- Hand-win WinnerOverlay (inline banner) stays
-- Seat positions, dealer, bottom nav untouched
-- No layout/styling changes outside the XP overlay
-- VoiceChatControls component untouched
-- No navigation changes
+| `src/hooks/useVoiceChat.ts` | Wrap mic enable in try-catch so mic-denied doesn't crash the connection |
+| `src/hooks/useVoiceChat.ts` | Add `connectAttemptedRef` to prevent double-connect |
+| `src/components/poker/OnlinePokerTable.tsx` | Use one-shot ref for auto-connect effect, remove unstable dependencies |
 
