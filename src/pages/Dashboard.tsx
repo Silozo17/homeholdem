@@ -11,6 +11,7 @@ import { Logo } from '@/components/layout/Logo';
 import { Plus, Users, Crown } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
@@ -208,7 +209,10 @@ export default function Dashboard() {
             <Crown className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
+            <NotificationBell />
+          </div>
         </div>
       </header>
       <div className="h-16 safe-area-top" />

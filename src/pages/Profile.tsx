@@ -15,6 +15,7 @@ import { CountrySelector } from '@/components/profile/CountrySelector';
 import { toast } from '@/hooks/use-toast';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
 import { usePlayerLevel } from '@/hooks/usePlayerLevel';
 import { Progress } from '@/components/ui/progress';
@@ -222,6 +223,7 @@ export default function Profile() {
           </Button>
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
             <NotificationBell />
             <Button
               variant="ghost"

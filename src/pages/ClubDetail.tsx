@@ -60,6 +60,8 @@ import { DeleteClubDialog } from '@/components/clubs/DeleteClubDialog';
 import { ClubSettings } from '@/components/clubs/ClubSettings';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 import { notifyEventUnlocked } from '@/lib/push-notifications';
 import { notifyEventUnlockedInApp } from '@/lib/in-app-notifications';
 import { sendEventUnlockedEmails } from '@/lib/email-notifications';
@@ -367,7 +369,10 @@ export default function ClubDetail() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
+            <NotificationBell />
+          </div>
         </div>
       </header>
       {/* Header spacer */}
@@ -620,52 +625,52 @@ export default function ClubDetail() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {members.map((member) => (
-                  <div 
-                    key={member.id}
-                    className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                        {member.profile.avatar_url ? (
-                          <img 
-                            src={member.profile.avatar_url} 
-                            alt={member.profile.display_name}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-lg font-semibold text-muted-foreground">
-                            {member.profile.display_name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                  <TappablePlayer key={member.id} userId={member.user_id}>
+                    <div 
+                      className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                          {member.profile.avatar_url ? (
+                            <img 
+                              src={member.profile.avatar_url} 
+                              alt={member.profile.display_name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-lg font-semibold text-muted-foreground">
+                              {member.profile.display_name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{member.profile.display_name}</p>
+                          <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                            {getRoleIcon(member.role)}
+                            {t(`club.${member.role}`)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{member.profile.display_name}</p>
-                        <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
-                          {getRoleIcon(member.role)}
-                          {t(`club.${member.role}`)}
-                        </p>
-                      </div>
+                      {currentUserId && userRole && (
+                        <MemberActions
+                          memberId={member.id}
+                          memberUserId={member.user_id}
+                          memberName={member.profile.display_name}
+                          memberRole={member.role}
+                          currentUserRole={userRole}
+                          currentUserId={currentUserId}
+                          clubId={clubId!}
+                          onUpdate={() => {
+                            if (member.user_id === currentUserId && member.role !== 'owner') {
+                              navigate('/dashboard');
+                            } else {
+                              fetchClubData();
+                            }
+                          }}
+                        />
+                      )}
                     </div>
-                    {currentUserId && userRole && (
-                      <MemberActions
-                        memberId={member.id}
-                        memberUserId={member.user_id}
-                        memberName={member.profile.display_name}
-                        memberRole={member.role}
-                        currentUserRole={userRole}
-                        currentUserId={currentUserId}
-                        clubId={clubId!}
-                        onUpdate={() => {
-                          // If user left club, navigate away
-                          if (member.user_id === currentUserId && member.role !== 'owner') {
-                            navigate('/dashboard');
-                          } else {
-                            fetchClubData();
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
+                  </TappablePlayer>
                 ))}
               </CardContent>
             </Card>

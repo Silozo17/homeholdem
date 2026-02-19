@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Medal, Award, Download } from 'lucide-react';
 import { exportLeaderboardToCSV } from '@/lib/csv-export';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 interface PlayerStats {
   player_key: string; // canonical key (linked_user_id or placeholder_player_id or user_id)
@@ -306,49 +307,50 @@ export function Leaderboard({ clubId, clubName }: LeaderboardProps) {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {stats.map((player, index) => (
-              <div 
-                key={player.player_key}
-                className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0"
-              >
-                <div className="w-8 flex justify-center">
-                  {getRankIcon(index)}
-                </div>
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-                  {player.avatar_url ? (
-                    <img 
-                      src={player.avatar_url} 
-                      alt={player.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      {player.display_name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{player.display_name}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{player.games_played} {t('stats_section.games_suffix')}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-0.5">{player.wins} <Trophy className="h-3 w-3 text-yellow-500" /></span>
-                    {player.second_places > 0 && (
-                      <>
-                        <span>•</span>
-                        <span className="flex items-center gap-0.5">{player.second_places} <Medal className="h-3 w-3 text-gray-400" /></span>
-                      </>
+              <TappablePlayer key={player.player_key} userId={player.player_key} disabled={!player.player_key || player.player_key.length !== 36}>
+                <div 
+                  className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0"
+                >
+                  <div className="w-8 flex justify-center">
+                    {getRankIcon(index)}
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                    {player.avatar_url ? (
+                      <img 
+                        src={player.avatar_url} 
+                        alt={player.display_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {player.display_name.charAt(0).toUpperCase()}
+                      </span>
                     )}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{player.display_name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{player.games_played} {t('stats_section.games_suffix')}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-0.5">{player.wins} <Trophy className="h-3 w-3 text-yellow-500" /></span>
+                      {player.second_places > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-0.5">{player.second_places} <Medal className="h-3 w-3 text-gray-400" /></span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge 
+                      variant="default"
+                      className="font-mono"
+                    >
+                      {symbol}{Math.round(player.total_winnings / 10) * 10}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <Badge 
-                    variant="default"
-                    className="font-mono"
-                  >
-                    {symbol}{Math.round(player.total_winnings / 10) * 10}
-                  </Badge>
-                </div>
-              </div>
+              </TappablePlayer>
             ))}
           </div>
         )}

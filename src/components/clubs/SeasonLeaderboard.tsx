@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar, Trophy, Medal, Award, Star, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 interface Season {
   id: string;
@@ -279,35 +280,36 @@ export function SeasonLeaderboard({ clubId, isAdmin }: SeasonLeaderboardProps) {
               ) : (
                 <div className="space-y-2">
                   {standings.map((player, index) => (
-                    <div 
-                      key={player.user_id || player.placeholder_player_id}
-                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                        index < 3 ? 'bg-primary/10 border border-primary/20' : 'bg-secondary/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 flex justify-center">
-                          {getPositionIcon(index)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{player.display_name}</p>
-                            {player.placeholder_player_id && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">{t('stats_section.unlinked')}</Badge>
-                            )}
+                    <TappablePlayer key={player.user_id || player.placeholder_player_id || index} userId={player.user_id || ''} disabled={!player.user_id}>
+                      <div 
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          index < 3 ? 'bg-primary/10 border border-primary/20' : 'bg-secondary/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 flex justify-center">
+                            {getPositionIcon(index)}
                           </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{player.display_name}</p>
+                              {player.placeholder_player_id && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0">{t('stats_section.unlinked')}</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {player.games_played} {t('stats_section.games_suffix')} • {player.wins}{t('stats_section.wins_label')} • {player.second_places}{t('stats_section.second_label')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-primary">{player.total_points} {t('stats_section.points_suffix')}</p>
                           <p className="text-xs text-muted-foreground">
-                            {player.games_played} {t('stats_section.games_suffix')} • {player.wins}{t('stats_section.wins_label')} • {player.second_places}{t('stats_section.second_label')}
+                            {symbol}{player.total_winnings} {t('stats_section.won_suffix')}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-primary">{player.total_points} {t('stats_section.points_suffix')}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {symbol}{player.total_winnings} {t('stats_section.won_suffix')}
-                        </p>
-                      </div>
-                    </div>
+                    </TappablePlayer>
                   ))}
                 </div>
               )}

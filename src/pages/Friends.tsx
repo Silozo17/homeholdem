@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, MessageSquare, UserMinus, Check, X, Clock, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { TappablePlayer } from '@/components/common/TappablePlayer';
 
 export default function Friends() {
   const { user, loading: authLoading } = useAuth();
@@ -52,7 +53,8 @@ export default function Friends() {
             ) : (
               <div className="space-y-2">
                 {friends.map((friend) => (
-                  <div key={friend.friendship_id} className="flex items-center gap-3 p-3 rounded-xl bg-card/50 border border-border/50">
+                  <TappablePlayer key={friend.friendship_id} userId={friend.user_id}>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-card/50 border border-border/50">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={friend.avatar_url ?? undefined} />
                       <AvatarFallback>{friend.display_name.charAt(0).toUpperCase()}</AvatarFallback>
@@ -80,6 +82,7 @@ export default function Friends() {
                       </Button>
                     </div>
                   </div>
+                  </TappablePlayer>
                 ))}
               </div>
             )}

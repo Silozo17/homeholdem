@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
 import { supabase } from '@/integrations/supabase/client';
@@ -107,7 +108,10 @@ export default function PaidTournaments() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo size="sm" />
-          <NotificationBell className="absolute right-4" />
+          <div className="absolute right-4 flex items-center gap-1">
+            <HeaderSocialIcons />
+            <NotificationBell />
+          </div>
         </div>
       </header>
       <div className="h-14 safe-area-top shrink-0" />
