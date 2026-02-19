@@ -1,43 +1,48 @@
 
-# Merge Wuzet Accounts
 
-## Current State
+# Add Hamburger Menu to Every Screen + Enhance Menu Items
 
-| Record | ID | Has Stats? | Has Avatar? |
-|---|---|---|---|
-| Registered user "Wuzet" | `f3bb9039-6586-4614-ac89-fe0feda4286f` | No game_players records | Yes (avatar + email) |
-| Placeholder "Wuzet" | `ccff627b-d8a3-4ccf-8931-5da2eb476d13` | 2 games, 1 win, 300 winnings | No linked_user_id |
-| Season standing | `8d30af27-...` | Points to placeholder only | user_id is NULL |
+## What changes
 
-## Fix (same pattern as Breku merge)
+### 1. Make Settings permanent in the hamburger menu
+**File:** `src/components/layout/HeaderSocialIcons.tsx`
+- Remove the `showSettings` prop -- Settings menu item will always show
+- Add additional quick actions:
+  - **Rules** (BookOpen icon) -- navigates to `/rules`
+  - **Install App** (Download icon) -- navigates to `/install`
+  - **Settings** (Settings icon) -- always visible, navigates to `/settings`
 
-Two SQL updates via a database migration:
+### 2. Add hamburger menu to pages that are missing it
 
-1. **Link placeholder to registered user**
-   - Set `linked_user_id` on the placeholder_players row to the registered user's ID
+| Page | Current header | Change |
+|------|---------------|--------|
+| `src/pages/Stats.tsx` | Has `NotificationBell` only | Replace with `HeaderSocialIcons` |
+| `src/pages/Settings.tsx` | Back arrow + title only | Add `HeaderSocialIcons` to the right side |
+| `src/pages/Rules.tsx` | Back arrow + Logo only | Add `HeaderSocialIcons` to the right side |
+| `src/pages/EventDetail.tsx` | Back arrow + Logo only | Add `HeaderSocialIcons` to the right side |
+| `src/pages/Friends.tsx` | Back arrow + title only | Add `HeaderSocialIcons` to the right side |
+| `src/pages/Inbox.tsx` | Back arrow + title only | Add `HeaderSocialIcons` to the right side |
 
-2. **Update season standings**
-   - Set `user_id` on the season_standings row so leaderboard and profile stats aggregate correctly
+### 3. Clean up the `showSettings` prop usage
+**File:** `src/pages/Profile.tsx`
+- Remove the `showSettings` prop from the `<HeaderSocialIcons showSettings />` call since it's now always shown
 
-```sql
-UPDATE placeholder_players
-SET linked_user_id = 'f3bb9039-6586-4614-ac89-fe0feda4286f'
-WHERE id = 'ccff627b-d8a3-4ccf-8931-5da2eb476d13';
+## What does NOT change
+- Bottom navigation -- untouched
+- Page layouts, spacing, or styling -- untouched
+- Existing hamburger menu items (Messages, Friends, Notifications) -- untouched
+- No database changes
 
-UPDATE season_standings
-SET user_id = 'f3bb9039-6586-4614-ac89-fe0feda4286f'
-WHERE placeholder_player_id = 'ccff627b-d8a3-4ccf-8931-5da2eb476d13'
-  AND user_id IS NULL;
-```
-
-## Result
-- Profile page will show Wuzet's 2 games, 1 win, and 300 winnings
-- Leaderboard will display the avatar and registered name
-- No code file changes needed
-- No UI or navigation changes
-
-## Files changed
+## Files changed summary
 
 | File | Change |
-|---|---|
-| Database migration only | Link placeholder + update season standings |
+|------|--------|
+| `src/components/layout/HeaderSocialIcons.tsx` | Remove `showSettings` prop, always show Settings + add Rules and Install items |
+| `src/pages/Stats.tsx` | Replace `NotificationBell` with `HeaderSocialIcons` |
+| `src/pages/Settings.tsx` | Add `HeaderSocialIcons` to header |
+| `src/pages/Rules.tsx` | Add `HeaderSocialIcons` to header |
+| `src/pages/EventDetail.tsx` | Add `HeaderSocialIcons` to header |
+| `src/pages/Friends.tsx` | Add `HeaderSocialIcons` to header |
+| `src/pages/Inbox.tsx` | Add `HeaderSocialIcons` to header |
+| `src/pages/Profile.tsx` | Remove `showSettings` prop |
+
