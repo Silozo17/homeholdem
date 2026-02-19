@@ -539,8 +539,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 5. Force-remove players disconnected for 3+ minutes ──
-    const disconnectCutoff = new Date(Date.now() - 180_000).toISOString();
+    // ── 5. Force-remove players disconnected for 90s+ ──
+    const disconnectCutoff = new Date(Date.now() - 90_000).toISOString();
     const { data: longDisconnected } = await admin
       .from("poker_seats")
       .select("id, table_id, player_id, seat_number")
@@ -551,7 +551,7 @@ Deno.serve(async (req) => {
     const forceRemoves: any[] = [];
     for (const seat of longDisconnected || []) {
       try {
-        console.log(`[FORCE-REMOVE] Removing long-disconnected player ${seat.player_id} from table ${seat.table_id} (3min+)`);
+        console.log(`[FORCE-REMOVE] Removing long-disconnected player ${seat.player_id} from table ${seat.table_id} (90s+)`);
         await admin.from("poker_seats").delete().eq("id", seat.id);
 
         const frChannel = admin.channel(`poker:table:${seat.table_id}`);
