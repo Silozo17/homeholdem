@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/layout/Logo';
 import { Plus, Users, Crown } from 'lucide-react';
 import { CreateClubDialog } from '@/components/clubs/CreateClubDialog';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { JoinClubDialog } from '@/components/clubs/JoinClubDialog';
 import { ClubCard } from '@/components/clubs/ClubCard';
@@ -211,7 +210,6 @@ export default function Dashboard() {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>

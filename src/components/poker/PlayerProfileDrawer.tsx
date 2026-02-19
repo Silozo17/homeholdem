@@ -46,16 +46,35 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
     Promise.all([
       supabase.from('profiles').select('display_name, avatar_url, country_code').eq('id', playerId).single(),
       supabase.from('player_xp').select('level').eq('user_id', playerId).maybeSingle(),
+      supabase.from('placeholder_players').select('id').eq('linked_user_id', playerId),
       supabase.from('game_players').select('id, finish_position').eq('user_id', playerId),
       user ? supabase.from('friendships').select('*')
         .or(`and(requester_id.eq.${user.id},addressee_id.eq.${playerId}),and(requester_id.eq.${playerId},addressee_id.eq.${user.id})`)
         .maybeSingle() : Promise.resolve({ data: null }),
-    ]).then(([profileRes, xpRes, gamesRes, friendRes]) => {
+    ]).then(async ([profileRes, xpRes, placeholderRes, gamesRes, friendRes]) => {
       if (profileRes.data) setProfile(profileRes.data);
       setLevel(xpRes.data?.level ?? 0);
-      const games = gamesRes.data ?? [];
-      setGamesPlayed(games.length);
-      setWins(games.filter(g => g.finish_position === 1).length);
+      
+      let allGames = gamesRes.data ?? [];
+      
+      // Also fetch games played via linked placeholders
+      const placeholderIds = (placeholderRes.data ?? []).map((p: any) => p.id);
+      if (placeholderIds.length > 0) {
+        const { data: placeholderGames } = await supabase
+          .from('game_players')
+          .select('id, finish_position')
+          .in('placeholder_player_id', placeholderIds);
+        if (placeholderGames) {
+          // Merge, avoiding duplicates
+          const existingIds = new Set(allGames.map(g => g.id));
+          for (const g of placeholderGames) {
+            if (!existingIds.has(g.id)) allGames.push(g);
+          }
+        }
+      }
+      
+      setGamesPlayed(allGames.length);
+      setWins(allGames.filter(g => g.finish_position === 1).length);
 
       if (friendRes.data) {
         setFriendshipId(friendRes.data.id);
@@ -109,7 +128,7 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
         {profile && !loading ? (
           <div className="flex flex-col h-full">
             {/* Header with avatar */}
-            <div className="p-6 pb-4 border-b border-border/50">
+            <div className="p-6 pb-4 border-b border-border/50" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))' }}>
               <SheetHeader className="mb-4">
                 <SheetTitle className="sr-only">Player Profile</SheetTitle>
               </SheetHeader>

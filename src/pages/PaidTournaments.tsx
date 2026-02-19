@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/layout/Logo';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin';
@@ -110,7 +109,6 @@ export default function PaidTournaments() {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>

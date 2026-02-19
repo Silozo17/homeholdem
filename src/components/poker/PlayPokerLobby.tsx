@@ -8,7 +8,6 @@ import { ArrowLeft, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/layout/Logo';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { BOT_PERSONAS } from '@/lib/poker/bot-personas';
 
@@ -45,7 +44,6 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
           <Logo size="sm" />
           <div className="absolute right-4 flex items-center gap-1">
             <HeaderSocialIcons />
-            <NotificationBell />
           </div>
         </div>
       </header>
