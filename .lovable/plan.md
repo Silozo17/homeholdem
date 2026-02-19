@@ -1,28 +1,66 @@
 
 
-# Auto-Connect Voice Chat on Table Join
+# Fix: Dealer Scales with Table Wrapper, Not Viewport
 
-## What Changes
+## Root Cause
 
-**File:** `src/components/poker/OnlinePokerTable.tsx`
+The dealer image width is set to `min(9vw, 140px)` — relative to the **viewport**. But the table wrapper maxes out at 990px. On large monitors and larger phones (Pro Max), the viewport is bigger so the dealer image grows larger relative to the table, pushing its visual center downward past the table edge. The `top: -14%/-22%` percentage is correct for the table, but the dealer's own height changes disproportionately.
 
-Add a `useEffect` that automatically calls `voiceChat.connect()` when the player has a seat at the table. The green phone icon button will still be available as a fallback if the auto-connect fails (e.g., microphone permission denied), and players can still disconnect manually.
+## Solution
 
-```typescript
-// New useEffect — auto-connect voice chat when seated
-useEffect(() => {
-  if (mySeat && !voiceChat.connected && !voiceChat.connecting) {
-    voiceChat.connect();
-  }
-}, [mySeat, voiceChat.connected, voiceChat.connecting]);
+Make the dealer's size relative to the **table wrapper** instead of the viewport. Since the dealer is already absolutely positioned inside the table wrapper, we set its width as a percentage of that wrapper.
+
+### Changes
+
+**1. `src/components/poker/DealerCharacter.tsx` (line 31)**
+
+Change the image container width from viewport-relative to parent-relative:
+
+```
+// Current
+width: 'min(9vw, 140px)',
+
+// New
+width: '100%',
 ```
 
-The mic will still start muted (existing behaviour in `useVoiceChat`), so players won't accidentally broadcast audio. They just need to unmute when ready to talk.
+This makes DealerCharacter fill whatever width its parent provides.
+
+**2. `src/components/poker/PokerTablePro.tsx` (line 347)**
+
+Add a percentage width to the dealer wrapper so it scales with the table:
+
+```
+// Current
+<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', zIndex: Z.DEALER }}>
+
+// New
+<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', width: '11%', zIndex: Z.DEALER }}>
+```
+
+11% of the table wrapper width matches the current visual size on iPhone 16 Pro (where it looks perfect).
+
+**3. `src/components/poker/OnlinePokerTable.tsx` (line 1181)**
+
+Add matching width to maintain current behaviour in the online poker table:
+
+```
+// Add width to the existing dealer wrapper div
+style={{ ..., width: 'min(9vw, 140px)' }}
+```
+
+This preserves the existing sizing for OnlinePokerTable since it has its own separate positioning logic.
+
+## Why This Works
+
+- On iPhone 16 Pro: table is ~86vw, 11% of that = ~9.5vw -- same as current, no visual change
+- On large monitors: table caps at 990px, 11% = ~109px -- proportional to table, not oversized
+- On Pro Max: table is slightly wider viewport but same ratio -- dealer stays proportional
+- The `top` percentage now works correctly at all sizes because the dealer's height scales with the table
 
 ## What Does NOT Change
-- `useVoiceChat` hook — no modifications
-- `VoiceChatControls` — still shown for mic/deafen/disconnect controls
-- No layout, styling, navigation, or seat changes
-- Voice chat still auto-disconnects on leave (existing behaviour)
+- No seat positions
+- No card layouts or animations
+- No styling, navigation, or spacing changes
 - Bottom nav untouched
-
+- Dealer expression/sparkle animations untouched
