@@ -30,7 +30,7 @@ export default function Install() {
             </div>
             <CardTitle>{t('install.already_installed')}</CardTitle>
             <CardDescription>
-              {t('install.already_installed_desc')}
+              {t('install.installed_description')}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -54,7 +54,7 @@ export default function Install() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">{t('install.ios_title')}</CardTitle>
-            <CardDescription>{t('install.ios_subtitle')}</CardDescription>
+            <CardDescription>{t('install.ios_description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-4">
@@ -64,7 +64,7 @@ export default function Install() {
               <div className="space-y-1">
                 <p className="font-medium">{t('install.ios_step1')}</p>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  {t('install.ios_step1_desc')} <Share className="h-4 w-4" />
+                  {t('install.ios_step1_detail')} <Share className="h-4 w-4" />
                 </p>
               </div>
             </div>
@@ -76,7 +76,7 @@ export default function Install() {
               <div className="space-y-1">
                 <p className="font-medium">{t('install.ios_step2')}</p>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  {t('install.ios_step2_desc')} <Plus className="h-4 w-4" />
+                  {t('install.ios_step2_detail')} <Plus className="h-4 w-4" />
                 </p>
               </div>
             </div>
@@ -86,9 +86,9 @@ export default function Install() {
                 3
               </div>
               <div className="space-y-1">
-                <p className="font-medium">{t('install.confirm')}</p>
+                <p className="font-medium">{t('install.ios_step3')}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t('install.ios_step3_desc')}
+                  {t('install.ios_step3_detail')}
                 </p>
               </div>
             </div>
@@ -97,8 +97,8 @@ export default function Install() {
       ) : isInstallable ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{t('install.ready')}</CardTitle>
-            <CardDescription>{t('install.ready_desc')}</CardDescription>
+            <CardTitle className="text-lg">{t('install.ready_to_install')}</CardTitle>
+            <CardDescription>{t('install.one_tap')}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={install} className="w-full" size="lg">
@@ -111,7 +111,7 @@ export default function Install() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">{t('install.android_title')}</CardTitle>
-            <CardDescription>{t('install.android_subtitle')}</CardDescription>
+            <CardDescription>{t('install.android_description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-4">
@@ -121,7 +121,7 @@ export default function Install() {
               <div className="space-y-1">
                 <p className="font-medium">{t('install.android_step1')}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t('install.android_step1_desc')}
+                  {t('install.android_step1_detail')}
                 </p>
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function Install() {
               <div className="space-y-1">
                 <p className="font-medium">{t('install.android_step2')}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t('install.android_step2_desc')}
+                  {t('install.android_step2_detail')}
                 </p>
               </div>
             </div>
@@ -143,9 +143,9 @@ export default function Install() {
                 3
               </div>
               <div className="space-y-1">
-                <p className="font-medium">{t('install.confirm')}</p>
+                <p className="font-medium">{t('install.android_step3')}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t('install.android_step3_desc')}
+                  {t('install.android_step3_detail')}
                 </p>
               </div>
             </div>
@@ -158,22 +158,22 @@ export default function Install() {
           <div className="flex items-start gap-3">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-sm">{t('install.benefit_offline')}</p>
-              <p className="text-xs text-muted-foreground">{t('install.benefit_offline_desc')}</p>
+              <p className="font-medium text-sm">{t('install.works_offline')}</p>
+              <p className="text-xs text-muted-foreground">{t('install.offline_description')}</p>
             </div>
           </div>
           <div className="flex items-start gap-3 mt-3">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-sm">{t('install.benefit_quick')}</p>
-              <p className="text-xs text-muted-foreground">{t('install.benefit_quick_desc')}</p>
+              <p className="font-medium text-sm">{t('install.quick_access')}</p>
+              <p className="text-xs text-muted-foreground">{t('install.quick_description')}</p>
             </div>
           </div>
           <div className="flex items-start gap-3 mt-3">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-sm">{t('install.benefit_push')}</p>
-              <p className="text-xs text-muted-foreground">{t('install.benefit_push_desc')}</p>
+              <p className="font-medium text-sm">{t('install.push_notifications')}</p>
+              <p className="text-xs text-muted-foreground">{t('install.push_description')}</p>
             </div>
           </div>
         </CardContent>
