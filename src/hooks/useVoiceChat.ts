@@ -65,9 +65,13 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
     setSpeakingMap(speaking);
   }, []);
 
+  const connectAttemptedRef = useRef(false);
+
   const connect = useCallback(async (manual?: boolean) => {
     if (roomRef.current || connecting) return;
-    if (manual) { failedRef.current = false; setFailed(false); }
+    if (manual) { failedRef.current = false; setFailed(false); connectAttemptedRef.current = false; }
+    if (connectAttemptedRef.current) return;
+    connectAttemptedRef.current = true;
     setConnecting(true);
 
     try {
@@ -106,9 +110,13 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
 
       await room.connect(url, token);
 
-      // Enable mic but start muted
-      await room.localParticipant.setMicrophoneEnabled(true);
-      await room.localParticipant.setMicrophoneEnabled(false);
+      // Enable mic but start muted — graceful fallback if permission denied
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(false);
+      } catch (micErr) {
+        console.warn('[VoiceChat] Mic permission denied, joining listen-only:', micErr);
+      }
       setMicMuted(true);
 
       roomRef.current = room;
