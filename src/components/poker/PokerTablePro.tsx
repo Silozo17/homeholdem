@@ -16,6 +16,7 @@ import { DebugOverlay } from './DebugOverlay';
 import { getSeatPositions, getDefaultEllipse, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Z } from './z';
 import { getBotPersona } from '@/lib/poker/bot-personas';
@@ -320,9 +321,19 @@ export function PokerTablePro({
 
         <div />
 
-        <button onClick={toggleSound} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
-          {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90">
+              {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[180px] bg-popover border border-border z-[9999]">
+            <DropdownMenuItem onClick={toggleSound}>
+              {soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
+              Sound Effects {soundEnabled ? 'On' : 'Off'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* ====== TABLE SCENE ====== */}

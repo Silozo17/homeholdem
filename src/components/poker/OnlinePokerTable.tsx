@@ -1048,12 +1048,26 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Sound toggle — always visible */}
-          <button onClick={toggleSound}
-            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-          >
-            {soundEnabled ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
-          </button>
+          {/* Audio menu — sound effects + voice announcements */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
+              >
+                {(soundEnabled || voiceEnabled) ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px] bg-popover border border-border z-[9999]">
+              <DropdownMenuItem onClick={toggleSound}>
+                {soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
+                Sound Effects {soundEnabled ? 'On' : 'Off'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleVoice}>
+                {voiceEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
+                Voice Announcements {voiceEnabled ? 'On' : 'Off'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Voice Chat Controls */}
           <VoiceChatControls
@@ -1091,10 +1105,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 )}
                 <DropdownMenuItem onClick={() => setInviteOpen(true)}>
                   <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite Players
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={toggleVoice}>
-                  {voiceEnabled ? <Mic className="h-3.5 w-3.5 mr-2" /> : <MicOff className="h-3.5 w-3.5 mr-2" />}
-                  {voiceEnabled ? 'Voice On' : 'Voice Off'}
                 </DropdownMenuItem>
                 {voiceChat.connected && (
                   <>
@@ -1140,12 +1150,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
               >
                 <UserPlus className="h-3.5 w-3.5 text-foreground/80" />
-              </button>
-              <button onClick={toggleVoice}
-                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
-                title={voiceEnabled ? 'Voice announcements on' : 'Voice announcements off'}
-              >
-                {voiceEnabled ? <Mic className="h-3.5 w-3.5 text-foreground/80" /> : <MicOff className="h-3.5 w-3.5 text-foreground/40" />}
               </button>
               {isSpectator && (
                 <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground font-bold">
