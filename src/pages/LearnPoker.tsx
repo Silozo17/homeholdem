@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle2, Lock, BookOpen, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -26,6 +27,7 @@ function saveProgress(completed: number[]) {
 }
 
 export default function LearnPoker() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeLessonIdx, setActiveLessonIdx] = useState<number>(0);
@@ -40,18 +42,14 @@ export default function LearnPoker() {
     stepIndex, totalSteps, stepPhase,
   } = useTutorialGame(activeLesson);
 
-  // Action guard: only allow the required action when coach step demands it
   const guardedAction = useCallback((action: import('@/lib/poker/types').GameAction) => {
     if (allowedAction) {
-      const actionMatches =
-        action.type === allowedAction ||
-        (allowedAction === 'raise' && action.type === 'all-in');
+      const actionMatches = action.type === allowedAction || (allowedAction === 'raise' && action.type === 'all-in');
       if (!actionMatches) return;
     }
     playerAction(action);
   }, [allowedAction, playerAction]);
 
-  // Detect step-driven completion → show LessonCompleteOverlay
   useEffect(() => {
     if (isPlaying && !showComplete && stepPhase === 'done') {
       const timer = setTimeout(() => {
@@ -66,7 +64,6 @@ export default function LearnPoker() {
     }
   }, [stepPhase, isPlaying, showComplete, activeLessonIdx, completedLessons]);
 
-  // Also detect hand_complete / game_over from reducer (fallback)
   useEffect(() => {
     if (isPlaying && !showComplete && stepPhase === 'done' && (state.phase === 'hand_complete' || state.phase === 'game_over')) {
       // Already handled above
@@ -112,7 +109,6 @@ export default function LearnPoker() {
 
   const progressPercent = (completedLessons.length / TUTORIAL_LESSONS.length) * 100;
 
-  // --- PLAYING ---
   if (isPlaying) {
     const isLastLesson = activeLessonIdx >= TUTORIAL_LESSONS.length - 1;
     const showCoach = isPaused && !currentIntroStep && currentStep;
@@ -137,34 +133,15 @@ export default function LearnPoker() {
             }
           />
         </div>
-        {showIntro && (
-          <CoachOverlay
-            introStep={currentIntroStep}
-            onDismiss={dismissCoach}
-          />
-        )}
-        {showCoach && (
-          <CoachOverlay
-            step={currentStep}
-            onDismiss={dismissCoach}
-            requiredAction={currentStep?.requiredAction}
-            currentStepNum={stepIndex + 1}
-            totalSteps={totalSteps}
-          />
-        )}
+        {showIntro && <CoachOverlay introStep={currentIntroStep} onDismiss={dismissCoach} />}
+        {showCoach && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} />}
         {showComplete && activeLesson && (
-          <LessonCompleteOverlay
-            lesson={activeLesson}
-            isLastLesson={isLastLesson}
-            onNextLesson={handleNextLesson}
-            onBackToLessons={handleBackToLessons}
-          />
+          <LessonCompleteOverlay lesson={activeLesson} isLastLesson={isLastLesson} onNextLesson={handleNextLesson} onBackToLessons={handleBackToLessons} />
         )}
       </>
     );
   }
 
-  // --- LESSON SELECT ---
   const nextUnlocked = completedLessons.length;
 
   return (
@@ -181,25 +158,22 @@ export default function LearnPoker() {
       <div className="shrink-0" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} />
 
       <div className="flex-1 overflow-auto px-4 py-6 space-y-5 pb-8">
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto">
             <BookOpen className="h-7 w-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-black text-foreground">Learn Poker</h1>
-          <p className="text-sm text-muted-foreground">Master Texas Hold'em step by step</p>
+          <h1 className="text-2xl font-black text-foreground">{t('learn_poker.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('learn_poker.subtitle')}</p>
         </div>
 
-        {/* Progress */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{completedLessons.length}/{TUTORIAL_LESSONS.length} Lessons</span>
+            <span>{completedLessons.length}/{TUTORIAL_LESSONS.length} {t('learn_poker.lessons')}</span>
             <span>{Math.round(progressPercent)}%</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </div>
 
-        {/* Lesson List */}
         <div className="space-y-2">
           {TUTORIAL_LESSONS.map((lesson, idx) => {
             const isCompleted = completedLessons.includes(idx);
@@ -212,21 +186,15 @@ export default function LearnPoker() {
                 disabled={!isUnlocked}
                 className={cn(
                   'w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all',
-                  isUnlocked
-                    ? 'glass-card active:scale-[0.98]'
-                    : 'bg-muted/30 opacity-50 cursor-not-allowed',
+                  isUnlocked ? 'glass-card active:scale-[0.98]' : 'bg-muted/30 opacity-50 cursor-not-allowed',
                   idx === nextUnlocked && !isCompleted && 'ring-1 ring-primary/50'
                 )}
               >
                 <div className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold',
-                  isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
-                  isUnlocked ? 'bg-primary/20 text-primary' :
-                  'bg-muted/50 text-muted-foreground'
+                  isCompleted ? 'bg-emerald-500/20 text-emerald-400' : isUnlocked ? 'bg-primary/20 text-primary' : 'bg-muted/50 text-muted-foreground'
                 )}>
-                  {isCompleted ? <CheckCircle2 className="h-5 w-5" /> :
-                   !isUnlocked ? <Lock className="h-4 w-4" /> :
-                   <span>{idx + 1}</span>}
+                  {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : !isUnlocked ? <Lock className="h-4 w-4" /> : <span>{idx + 1}</span>}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -240,10 +208,9 @@ export default function LearnPoker() {
           })}
         </div>
 
-        {/* Reset button */}
         {completedLessons.length > 0 && (
           <Button variant="ghost" size="sm" onClick={resetProgress} className="w-full text-muted-foreground">
-            <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset Progress
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> {t('learn_poker.reset_progress')}
           </Button>
         )}
       </div>

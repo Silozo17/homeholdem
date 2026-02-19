@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useOnlinePokerTable, RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
 import { useVoiceChat } from '@/hooks/useVoiceChat';
@@ -110,6 +111,7 @@ function toPokerPlayer(
 }
 
 export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
@@ -982,9 +984,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
             <path d="M12 18h.01" />
           </svg>
-          <p className="text-lg font-bold text-foreground">Rotate Your Device</p>
+          <p className="text-lg font-bold text-foreground">{t('poker_table.rotate_device')}</p>
           <p className="text-sm text-muted-foreground text-center max-w-[240px]">
-            The poker table works best in landscape mode. Please rotate your phone.
+            {t('poker_table.rotate_description')}
           </p>
         </div>
       )}
@@ -1060,11 +1062,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             <DropdownMenuContent align="end" className="min-w-[180px] bg-popover border border-border z-[9999]">
               <DropdownMenuItem onClick={toggleSound}>
                 {soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
-                Sound Effects {soundEnabled ? 'On' : 'Off'}
+                {t('poker_table.sound_effects')} {soundEnabled ? t('poker_table.on') : t('poker_table.off')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={toggleVoice}>
                 {voiceEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
-                Voice Announcements {voiceEnabled ? 'On' : 'Off'}
+                {t('poker_table.voice_announcements')} {voiceEnabled ? t('poker_table.on') : t('poker_table.off')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1095,37 +1097,37 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               <DropdownMenuContent align="end" className="z-[70]">
                 {handHistory.length > 0 && (
                   <DropdownMenuItem onClick={() => setReplayOpen(true)}>
-                    <History className="h-3.5 w-3.5 mr-2" /> Hand History
+                    <History className="h-3.5 w-3.5 mr-2" /> {t('poker_table.hand_history')}
                   </DropdownMenuItem>
                 )}
                 {table.invite_code && (
                   <DropdownMenuItem onClick={copyInviteCode}>
-                    <Copy className="h-3.5 w-3.5 mr-2" /> {codeCopied ? 'Copied!' : 'Copy Code'}
+                    <Copy className="h-3.5 w-3.5 mr-2" /> {codeCopied ? t('common.copied') : t('poker_table.copy_code')}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => setInviteOpen(true)}>
-                  <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite Players
+                  <UserPlus className="h-3.5 w-3.5 mr-2" /> {t('poker_table.invite_players')}
                 </DropdownMenuItem>
                 {voiceChat.connected && (
                   <>
                     <DropdownMenuItem onClick={voiceChat.toggleMic}>
                       {voiceChat.micMuted ? <MicOff className="h-3.5 w-3.5 mr-2" /> : <Mic className="h-3.5 w-3.5 mr-2" />}
-                      {voiceChat.micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                      {voiceChat.micMuted ? t('poker_table.unmute_mic') : t('poker_table.mute_mic')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={voiceChat.toggleDeafen}>
                       {voiceChat.deafened ? <HeadphoneOff className="h-3.5 w-3.5 mr-2" /> : <Headphones className="h-3.5 w-3.5 mr-2" />}
-                      {voiceChat.deafened ? 'Undeafen' : 'Mute All'}
+                      {voiceChat.deafened ? t('poker_table.undeafen') : t('poker_table.mute_all')}
                     </DropdownMenuItem>
                   </>
                 )}
                 {isCreator && canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
                   <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
-                    <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
+                    <UserX className="h-3.5 w-3.5 mr-2" /> {t('poker_table.kick')} {s.display_name}
                   </DropdownMenuItem>
                 ))}
                 {isCreator && canModerate && (
                   <DropdownMenuItem onClick={() => setCloseConfirm(true)} className="text-destructive">
-                    <XCircle className="h-3.5 w-3.5 mr-2" /> Close Table
+                    <XCircle className="h-3.5 w-3.5 mr-2" /> {t('poker_table.close_table')}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -1166,17 +1168,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   <DropdownMenuContent align="end" className="z-[70]">
                     {canModerate && activeSeats.filter(s => s.player_id !== user?.id).map(s => (
                       <DropdownMenuItem key={s.player_id} onClick={() => setKickTarget({ id: s.player_id!, name: s.display_name })}>
-                        <UserX className="h-3.5 w-3.5 mr-2" /> Kick {s.display_name}
+                    <UserX className="h-3.5 w-3.5 mr-2" /> {t('poker_table.kick')} {s.display_name}
                       </DropdownMenuItem>
                     ))}
                     {canModerate && (
                       <DropdownMenuItem onClick={() => setCloseConfirm(true)} className="text-destructive">
-                        <XCircle className="h-3.5 w-3.5 mr-2" /> Close Table
+                        <XCircle className="h-3.5 w-3.5 mr-2" /> {t('poker_table.close_table')}
                       </DropdownMenuItem>
                     )}
                     {!canModerate && hand && (
                       <DropdownMenuItem disabled className="text-muted-foreground text-xs">
-                        Wait for hand to end
+                        {t('poker_table.wait_hand_end')}
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -1269,7 +1271,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
           {(!hand || visibleCommunityCards.length === 0) && (
             <div className="absolute left-1/2 -translate-x-1/2 text-[10px] text-foreground/20 italic font-medium" style={{ top: 'calc(50% + 28px)', zIndex: Z.LOGO, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-              {activeSeats.length >= 2 ? 'Starting soon...' : 'Waiting for players...'}
+              {activeSeats.length >= 2 ? t('poker_table.starting_soon') : t('poker_table.waiting_for_players')}
             </div>
           )}
 
@@ -1290,7 +1292,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"
               style={{ zIndex: Z.ACTIONS, bottom: '28%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <Play className="h-3 w-3 inline mr-1" /> Deal Hand
+              <Play className="h-3 w-3 inline mr-1" /> {t('poker_table.deal_hand')}
             </button>
           )}
 
@@ -1468,7 +1470,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         <div className="absolute pointer-events-none" style={{ bottom: isMobileLandscape ? 'calc(18% + 65px)' : isLandscape ? 'calc(18% + 100px)' : 'calc(22% + 65px)', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS }}>
           <span className="text-[10px] px-3 py-1 rounded-full font-black animate-turn-pulse"
             style={{ background: 'linear-gradient(135deg, hsl(43 74% 49% / 0.3), hsl(43 74% 49% / 0.15))', color: 'hsl(43 74% 60%)', border: '1px solid hsl(43 74% 49% / 0.4)', textShadow: '0 0 8px hsl(43 74% 49% / 0.5)' }}>
-            YOUR TURN
+            {t('poker_table.your_turn')}
           </span>
         </div>
       )}
@@ -1478,7 +1480,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         <div className="absolute pointer-events-none animate-low-time-pill" style={{ top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS + 1 }}>
           <span className="text-[11px] px-4 py-1.5 rounded-full font-black"
             style={{ background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.8), hsl(0 70% 40% / 0.6))', color: 'hsl(0 0% 100%)', border: '1px solid hsl(0 70% 50% / 0.6)', textShadow: '0 0 8px hsl(0 70% 50% / 0.8)', animation: 'low-time-pulse 0.5s ease-in-out infinite' }}>
-            5 SEC LEFT!
+            {t('poker_table.five_sec_left')}
           </span>
         </div>
       )}
@@ -1509,13 +1511,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           <div className="absolute left-0 right-0 text-center pointer-events-none"
             style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 85px)' }}>
             <p className="text-xs font-bold" style={{ color: 'hsl(43 74% 60%)', textShadow: '0 0 8px hsl(43 74% 49% / 0.4)' }}>
-              Tap a glowing seat to join
+              {t('poker_table.tap_seat_to_join')}
             </p>
           </div>
           <button onClick={onLeave}
             className="absolute flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
             style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 12px)', background: 'linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 10%))', color: 'hsl(0 0% 60%)', border: '1px solid hsl(0 0% 20%)' }}>
-            <DoorOpen className="h-3.5 w-3.5" /> Leave
+            <DoorOpen className="h-3.5 w-3.5" /> {t('common.leave')}
           </button>
         </>
       )}
@@ -1524,9 +1526,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <AlertDialog open={showStillPlayingPopup} onOpenChange={(open) => { if (!open) handleStillHere(); }}>
         <AlertDialogContent className="z-[80] max-w-sm text-center">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl">Are you still playing?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl">{t('poker_table.still_playing')}</AlertDialogTitle>
             <AlertDialogDescription className="text-base">
-              You will be removed from your seat in
+              {t('poker_table.will_be_removed')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-center py-4">
@@ -1536,7 +1538,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </div>
           <AlertDialogFooter className="sm:justify-center">
             <AlertDialogAction onClick={handleStillHere} className="w-full text-base py-3">
-              I'm Still Here
+              {t('poker_table.im_still_here')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1546,12 +1548,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <AlertDialog open={!!kickTarget} onOpenChange={(open) => !open && setKickTarget(null)}>
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Kick {kickTarget?.name}?</AlertDialogTitle>
-            <AlertDialogDescription>This will remove {kickTarget?.name} from the table. They can rejoin later.</AlertDialogDescription>
+            <AlertDialogTitle>{t('poker_table.kick')} {kickTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>{t('poker_table.kick_description', { name: kickTarget?.name })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => kickTarget && handleKickPlayer(kickTarget.id)} className="bg-destructive text-destructive-foreground">Kick Player</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => kickTarget && handleKickPlayer(kickTarget.id)} className="bg-destructive text-destructive-foreground">{t('poker_table.kick_player')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1560,12 +1562,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <AlertDialog open={closeConfirm} onOpenChange={setCloseConfirm}>
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Close Table?</AlertDialogTitle>
-            <AlertDialogDescription>This will remove all players and permanently close the table.</AlertDialogDescription>
+            <AlertDialogTitle>{t('poker_table.close_table_confirm')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('poker_table.close_table_description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCloseTable} className="bg-destructive text-destructive-foreground">Close Table</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseTable} className="bg-destructive text-destructive-foreground">{t('poker_table.close_table')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

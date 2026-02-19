@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GameState } from '@/lib/poker/types';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +24,7 @@ import { getBotPersona } from '@/lib/poker/bot-personas';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import pokerBg from '@/assets/poker-background.webp';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PokerTableProProps {
   state: GameState;
@@ -75,7 +77,9 @@ export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
   tutorialAllowedAction, forceShowControls,
 }: PokerTableProProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const humanPlayer = state.players.find(p => p.id === 'human');
   const isShowdown = state.phase === 'hand_complete' || state.phase === 'showdown';
   const isGameOver = state.phase === 'game_over';
@@ -84,6 +88,9 @@ export function PokerTablePro({
   const { play, enabled: soundEnabled, toggle: toggleSound } = usePokerSounds();
   const isLandscape = useIsLandscape();
   useLockLandscape();
+
+  const isTablet = typeof window !== 'undefined' && window.innerWidth >= 768 && window.innerWidth <= 1024;
+  const isLargeDesktop = typeof window !== 'undefined' && window.innerWidth > 1600;
 
   // Keep screen awake during game
   const { requestWakeLock, releaseWakeLock } = useWakeLock();
@@ -246,9 +253,9 @@ export function PokerTablePro({
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
             <path d="M12 18h.01" />
           </svg>
-          <p className="text-lg font-bold text-foreground">Rotate Your Device</p>
+          <p className="text-lg font-bold text-foreground">{t('poker_table.rotate_device')}</p>
           <p className="text-sm text-muted-foreground text-center max-w-[240px]">
-            The poker table works best in landscape mode. Please rotate your phone.
+            {t('poker_table.rotate_description')}
           </p>
         </div>
       )}
@@ -330,7 +337,7 @@ export function PokerTablePro({
           <DropdownMenuContent align="end" className="min-w-[180px] bg-popover border border-border z-[9999]">
             <DropdownMenuItem onClick={toggleSound}>
               {soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
-              Sound Effects {soundEnabled ? 'On' : 'Off'}
+              {t('poker_table.sound_effects')} {soundEnabled ? t('poker_table.on') : t('poker_table.off')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -347,15 +354,17 @@ export function PokerTablePro({
           style={{
             aspectRatio: '16 / 9',
             width: isLandscape ? 'min(79vw, 990px)' : 'min(86vw, 990px)',
+            maxWidth: '990px',
             maxHeight: isLandscape ? '82vh' : '80vh',
             overflow: 'visible',
+            containerType: 'size',
           }}
         >
           {/* Table image */}
           <TableFelt />
 
           {/* Dealer character — top center of table */}
-          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', width: '11%', zIndex: Z.DEALER }}>
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : isLargeDesktop ? 'calc(-4% - 31px)' : 'calc(-4% - 27px)', width: 'min(9vw, 140px)', zIndex: Z.DEALER }}>
             <DealerCharacter expression={dealerExpression} />
           </div>
 
@@ -501,7 +510,7 @@ export function PokerTablePro({
               textShadow: '0 0 8px hsl(43 74% 49% / 0.5)',
             }}
           >
-            YOUR TURN
+            {t('poker_table.your_turn')}
           </span>
         </div>
       )}
@@ -568,15 +577,15 @@ export function PokerTablePro({
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Exit Game?</AlertDialogTitle>
+            <AlertDialogTitle>{t('poker_table.exit_game_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to exit? This will end the game.
+              {t('poker_table.exit_game_description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3 justify-end">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={onQuit} className="bg-red-600 hover:bg-red-700">
-              Exit Game
+              {t('poker_table.exit_game')}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
