@@ -1,108 +1,111 @@
 
+# Wire Up All Missing Push Notifications
 
-# Fix Hand History: Safe Padding, Simplified View, and Hand Navigation
+## Current State
 
-## Issue 1: Controls too close to right edge in landscape mode
-
-The `HandReplay` sheet (which opens from the right in landscape) has its control buttons and close button too close to the screen edge, making the X button untappable.
-
-### Fix
-**`src/components/poker/HandReplay.tsx`** (line 69-74)
-- Add `pr-[calc(5px+env(safe-area-inset-right,0px))]` to the `SheetContent` for landscape mode
-- Also add right safe area to the inner content padding
-
----
-
-## Issue 2: Redesign Hand History display
-
-Currently the hand replay shows a step-by-step action timeline (preflop bet, call, raise, etc.). The user wants:
-- Show only the **final result**: community cards (all 5), each participating player's hole cards and hand name
-- **Do NOT show** cards for players who folded (per poker rules)
-- **Remove** the step-by-step action timeline and Prev/Next step buttons
-- **Replace** with hand number navigation: buttons to jump between hands (not steps within a hand)
-
-### Changes to `src/components/poker/HandReplay.tsx`
-
-Rewrite the component to:
-
-1. Accept the **full `handHistory` array** instead of a single `hand` prop
-2. Track `currentIndex` state (index within the array) 
-3. Show for the selected hand:
-   - Hand number badge
-   - All 5 community cards
-   - "Your cards" section (your hole cards)
-   - "Showdown" section: each player who did NOT fold, showing their name, hole cards (from `revealedCards`), and hand name (from `winners` data)
-   - Winner highlight with trophy icon and amount won
-   - Total pot
-4. Navigation: **hand number buttons** or left/right arrows to go between hands in history
-5. Remove the step-by-step action replay entirely
-
-### Props change
-```
-// Old
-hand: HandRecord | null
-
-// New  
-handHistory: HandRecord[]
-initialHandIndex?: number  // defaults to last hand
-```
-
-### Changes to `src/components/poker/OnlinePokerTable.tsx`
-
-- Destructure `handHistory` from `useHandHistory` (it's already returned but not used)
-- Pass `handHistory` array to `HandReplay` instead of just `lastHand`
-- Change the condition `lastHand &&` to `handHistory.length > 0 &&` for showing the history button
-
-Lines affected:
-- Line 131: add `handHistory` to destructured values
-- Line 1096: change `lastHand` to `handHistory.length > 0`
-- Line 1135: change `lastHand` to `handHistory.length > 0`
-- Line 1586: pass `handHistory={handHistory}` instead of `hand={lastHand}`
-
-### Changes to `src/hooks/useHandHistory.ts`
-
-No changes needed -- `handHistory` array is already returned.
+| Notification | Push Function | Push Called? | In-App Called? |
+|---|---|---|---|
+| Chat message | notifyNewChatMessage | Yes | Yes |
+| Game started | notifyGameStarted | Yes | Yes |
+| Game completed | notifyGameCompleted | Yes | Yes |
+| Player eliminated | notifyPlayerEliminated | Yes | Yes |
+| Rebuy/add-on | notifyRebuyAddon | Yes | Yes |
+| Host confirmed | notifyHostConfirmed | Yes | Yes |
+| Waitlist promotion | notifyWaitlistPromotion | Yes | Yes |
+| Event unlocked | notifyEventUnlocked | Yes | Yes |
+| New event available | notifyNewEventAvailable | Yes | Yes |
+| Poker invite | notifyPokerInvite | Yes | No (push only) |
+| Broadcast | sendBroadcastPush | Yes | Yes |
+| **Date finalized** | notifyDateFinalized | **NO** | Yes (in-app only) |
+| **RSVP received** | notifyEventRsvp | **NO** | Yes (in-app only) |
+| **Blinds up** | notifyBlindsUp | **NO** | **NO** |
+| **Friend request** | -- | **NO** | **NO** |
+| **Friend accepted** | -- | **NO** | **NO** |
+| **Direct message** | -- | **NO** | **NO** |
+| **New member joins club** | -- | **NO** | **NO** |
 
 ---
 
-## Display layout for each hand
+## Plan: 7 notifications to add
 
-```text
-+-----------------------------------+
-| Hand #12                     CSV  |
-+-----------------------------------+
-|     [5 community cards]           |
-|                                   |
-| Your cards: [Ah] [Kd]            |
-|                                   |
-| --- Showdown ---                  |
-| Player1: [Qs][Jh] - Two Pair     |
-| Player2: [9c][9d] - Pair         |
-|                                   |
-| Trophy Winner: Player1 (+1,200)   |
-| Pot: 2,400                        |
-+-----------------------------------+
-| [<] Hand #10  #11  [#12]  [>]    |
-+-----------------------------------+
-```
+### 1. Wire up `notifyDateFinalized` (push)
+**File:** `src/pages/EventDetail.tsx` (around line 790)
+- After calling `notifyDateFinalizedInApp(...)`, add a parallel call to `notifyDateFinalized(userIds, event.title, event.id, formattedDate)`
+- Import `notifyDateFinalized` from push-notifications (already partially imported)
 
-- Players who folded are not shown in the showdown section
-- The navigation shows hand numbers as tappable chips/badges
-- Left/right arrows scroll through hands
+### 2. Wire up `notifyEventRsvp` (push)
+**File:** `src/pages/EventDetail.tsx` (around line 562)
+- After calling `notifyEventRsvpInApp(...)`, add a parallel call to `notifyEventRsvp(event.created_by, event.title, playerName, event.id)`
+- Import `notifyEventRsvp` from push-notifications
+
+### 3. Wire up `notifyBlindsUp` (push + in-app)
+**File:** `src/components/game/TournamentClock.tsx`
+- When blinds advance to a new level, call both `notifyBlindsUp(memberIds, smallBlind, bigBlind, ante)` and `notifyBlindsUpInApp(memberIds, smallBlind, bigBlind, ante)`
+- Need to find the blind level change handler and add the calls there
+- Import both functions
+
+### 4. Friend request sent (push + in-app -- new functions)
+**File:** `src/lib/push-notifications.ts` -- add `notifyFriendRequest()`
+**File:** `src/lib/in-app-notifications.ts` -- add `notifyFriendRequestInApp()`
+**File:** `src/hooks/useFriendship.ts` -- call both when a friend request is sent
+- Title: "Friend Request"
+- Body: "{senderName} wants to be your friend"
+- URL: `/friends`
+
+### 5. Friend request accepted (push + in-app -- new functions)
+**File:** `src/lib/push-notifications.ts` -- add `notifyFriendAccepted()`
+**File:** `src/lib/in-app-notifications.ts` -- add `notifyFriendAcceptedInApp()`
+**File:** `src/hooks/useFriendship.ts` -- call both when accepting a request
+- Title: "Friend Added"
+- Body: "{accepterName} accepted your friend request"
+- URL: `/friends`
+
+### 6. Direct message received (push + in-app -- new functions)
+**File:** `src/lib/push-notifications.ts` -- add `notifyDirectMessage()`
+**File:** `src/lib/in-app-notifications.ts` -- add `notifyDirectMessageInApp()`
+**File:** `src/hooks/useDirectMessages.ts` -- call both when sending a DM (notify the receiver)
+- Title: "{senderName}"
+- Body: "Sent you a message"
+- URL: `/inbox`
+- Tag: `dm-{senderId}` (so multiple DMs from the same person replace each other)
+
+### 7. New member joins club (push + in-app -- new functions)
+**File:** `src/lib/push-notifications.ts` -- add `notifyNewMemberJoined()`
+**File:** `src/lib/in-app-notifications.ts` -- add `notifyNewMemberJoinedInApp()`
+**File:** `src/components/clubs/JoinClubDialog.tsx` -- after successfully joining, notify the club owner/admins
+- Title: "New Member"
+- Body: "{memberName} joined your club"
+- URL: `/club/{clubId}`
+- Only sent to owner and admins, not all members
 
 ---
 
-## Summary of files changed
+## User preferences
+
+The existing preference system (`push_${notification_type}` columns on `user_preferences`) already handles opt-in/out for push delivery. New notification types (friend requests, DMs, new member) will need new preference columns added via a database migration:
+- `push_friend_requests` (default true)
+- `push_direct_messages` (default true)
+- `push_new_member` (default true)
+
+The `send-push-notification` edge function dynamically checks the column name, so no edge function changes are needed -- just the new DB columns and the matching `notificationType` string in each call.
+
+---
+
+## Files changed summary
 
 | File | Change |
-|------|--------|
-| `src/components/poker/HandReplay.tsx` | Rewrite: remove action timeline, show final cards + showdown players, add hand navigation |
-| `src/components/poker/OnlinePokerTable.tsx` | Pass full `handHistory` array, update conditions |
+|---|---|
+| `src/pages/EventDetail.tsx` | Add push calls for date finalized + RSVP |
+| `src/components/game/TournamentClock.tsx` | Add blinds-up push + in-app calls |
+| `src/hooks/useFriendship.ts` | Add friend request + accepted notifications |
+| `src/hooks/useDirectMessages.ts` | Add DM received notification |
+| `src/components/clubs/JoinClubDialog.tsx` | Add new member joined notification |
+| `src/lib/push-notifications.ts` | Add 4 new functions (friend request, friend accepted, DM, new member) |
+| `src/lib/in-app-notifications.ts` | Add 4 new in-app functions + wire blinds-up |
+| Database migration | Add 3 new preference columns |
 
 ## What does NOT change
-- `useHandHistory.ts` hook -- untouched
-- `HandHistory.tsx` component -- untouched (separate component, not used in online table)
-- Bottom navigation -- untouched
-- No database changes
+- Bottom navigation
 - No edge function changes
-
+- No UI layout or styling changes
+- Existing notification functions remain untouched
