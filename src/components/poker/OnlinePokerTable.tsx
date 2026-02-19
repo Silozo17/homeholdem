@@ -128,7 +128,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const prevActiveCountRef = useRef<number>(0);
   const firstHandRef = useRef(true);
   const bigPotAnnouncedRef = useRef(false);
-  const { lastHand, startNewHand, recordAction, finalizeHand, exportCSV } = useHandHistory(tableId);
+  const { lastHand, handHistory, startNewHand, recordAction, finalizeHand, exportCSV } = useHandHistory(tableId);
   const [replayOpen, setReplayOpen] = useState(false);
   const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
   const [prevPhase, setPrevPhase] = useState<string | null>(null);
@@ -1093,7 +1093,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="z-[70]">
-                {lastHand && (
+                {handHistory.length > 0 && (
                   <DropdownMenuItem onClick={() => setReplayOpen(true)}>
                     <History className="h-3.5 w-3.5 mr-2" /> Hand History
                   </DropdownMenuItem>
@@ -1132,7 +1132,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </DropdownMenu>
           ) : (
             <>
-              {lastHand && (
+              {handHistory.length > 0 && (
                 <button onClick={() => setReplayOpen(true)}
                   className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
                 >
@@ -1583,7 +1583,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
 
       {/* Hand Replay sheet */}
-      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} hand={lastHand} isLandscape={isLandscape} onExportCSV={exportCSV} />
+      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} handHistory={handHistory} isLandscape={isLandscape} onExportCSV={exportCSV} />
 
       {/* Quit confirmation dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
