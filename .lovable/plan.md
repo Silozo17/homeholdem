@@ -1,93 +1,77 @@
 
-# Tappable Players Everywhere + Header Icons for Messages/Friends
 
-## Overview
+# Fix Sound Effects + Unified Audio Menu from Speaker Icon
 
-Two changes:
-1. Add **Messages** and **Friends** icons to the top header bar (next to the notification bell) on all key pages
-2. Create a reusable **TappablePlayer** wrapper component and use the existing **PlayerProfileDrawer** everywhere a player name/avatar appears
+## Problem 1: Sound effects stop working
+The Web Audio API `AudioContext` can get suspended by the browser (especially iOS Safari) after a period without user interaction. The current code tries to `resume()` but only when `play()` is called — if the context enters a `closed` state or gets garbage-collected, sounds silently fail. Also, each `play()` call creates oscillators without error handling, so a single failure can cascade.
 
----
+## Problem 2: Voice announcements toggle is hidden
+The AI voice toggle currently shows as a Mic/MicOff icon on desktop (easily confused with voice chat mic) and is buried inside the 3-dot menu on mobile landscape. Players cannot easily find or understand it.
 
-## 1. Header Icons (Messages + Friends)
+## Solution
 
-### New file: `src/components/layout/HeaderSocialIcons.tsx`
+### 1. Replace the speaker button with a dropdown menu (both tables)
 
-A small component rendering two icon buttons side by side:
-- **MessageSquare** icon linking to `/inbox`, with an unread badge (uses `useDirectMessages` hook's `unreadCount`)
-- **Users** icon linking to `/friends`
+Replace the single Volume2/VolumeX button with a `DropdownMenu` triggered by the same speaker icon. The menu will have two toggle rows:
 
-Both icons follow the same size/style as `NotificationBell`.
+- **Sound Effects** — on/off (controls `usePokerSounds`)
+- **Voice Announcements** — on/off (controls `usePokerVoiceAnnouncements`) *(online table only)*
 
-### Modified pages (header area only)
+The speaker icon will show Volume2 when either is on, VolumeX when both are off.
 
-Every page that currently shows `NotificationBell` in the header will also render `HeaderSocialIcons` next to it. The right-side header area will become: `[HeaderSocialIcons] [NotificationBell] [Settings?]`
+### 2. Fix AudioContext reliability
 
-Pages affected:
-- `src/pages/Dashboard.tsx` (line 211)
-- `src/pages/Profile.tsx` (line 224-233)
-- `src/pages/Events.tsx` (line 236)
-- `src/pages/ClubDetail.tsx` (line 370)
-- `src/pages/PokerHub.tsx` (line 32)
-- `src/components/poker/PlayPokerLobby.tsx` (line 45)
-- `src/pages/PaidTournaments.tsx` (line 110)
+In `usePokerSounds.ts`, add defensive handling:
+- Wrap each `play()` call in try/catch so one failure doesn't break future sounds
+- Create a fresh AudioContext if the existing one is in `closed` state
+- Add a user-interaction listener (once) to resume suspended contexts on iOS
 
-For pages using the pattern `<NotificationBell className="absolute right-4" />`, this becomes a `<div className="absolute right-4 flex items-center gap-1">` wrapping `HeaderSocialIcons` + `NotificationBell`.
+### 3. Remove the standalone voice toggle button
 
-For `Profile.tsx` which already has a flex wrapper, just add `HeaderSocialIcons` inside it.
+On the online table (desktop view, lines 1144-1149), remove the standalone Mic/MicOff voice toggle button since it now lives inside the speaker dropdown. In the mobile landscape 3-dot menu, also remove the voice toggle entry (lines 1095-1098) since it's now in the speaker menu.
 
 ---
 
-## 2. Tappable Players Everywhere
+## Files changed
 
-### New file: `src/components/common/TappablePlayer.tsx`
+### `src/hooks/usePokerSounds.ts`
+- Wrap the `play()` function body in a try/catch to prevent silent failures
+- In `ensureContext()`, also handle the case where `ctxRef.current.state === 'closed'` by creating a new context
+- Add a one-time user interaction listener (`click`/`touchstart`) that resumes a suspended context
 
-A wrapper component that:
-- Accepts `userId` (the profile id of the player) and `children` (the existing player row/avatar content)
-- On tap, opens the `PlayerProfileDrawer` for that user
-- Skips interaction if `userId` matches the current user (no self-profile drawer)
-- Renders as a `<button>` with `cursor-pointer` styling but no visual change to the content
-
-```text
-Props:
-  userId: string          -- the player's profile ID
-  children: ReactNode     -- existing row content
-  disabled?: boolean      -- optional, skip if placeholder player
+### `src/components/poker/OnlinePokerTable.tsx`
+**Lines 1050-1056** — Replace the simple speaker `<button>` with a `DropdownMenu`:
+```
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <button ...>
+      {(soundEnabled || voiceEnabled) ? <Volume2 /> : <VolumeX />}
+    </button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuItem onClick={toggleSound}>
+      Sound Effects {soundEnabled ? 'On' : 'Off'}
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={toggleVoice}>
+      Voice Announcements {voiceEnabled ? 'On' : 'Off'}
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
 ```
 
-Internally manages `selectedPlayerId` state and renders `PlayerProfileDrawer` when set.
+**Lines 1144-1149** (desktop non-landscape) — Remove the standalone voice toggle button (Mic/MicOff icon).
 
-### Modified files (wrap player rows with TappablePlayer)
+**Lines 1095-1098** (mobile landscape 3-dot menu) — Remove the voice toggle `DropdownMenuItem` since it is now in the speaker menu.
 
-**`src/pages/ClubDetail.tsx`** (lines 622-668, members tab)
-- Wrap each member row `<div>` inside `<TappablePlayer userId={member.user_id}>` 
-- Only for members with a `user_id` (not placeholder)
-
-**`src/components/events/AttendeesList.tsx`** (Going, Maybe, Not Going, Waitlist sections)
-- Wrap each attendee pill inside `<TappablePlayer userId={attendee.user_id}>`
-
-**`src/components/clubs/Leaderboard.tsx`** (lines 308-351)
-- Wrap each leaderboard row inside `<TappablePlayer userId={player.player_key}>`
-- Only when `player_key` looks like a real user UUID (not a placeholder)
-
-**`src/components/game/PlayerList.tsx`** (game mode player list)
-- Wrap each player row in `<TappablePlayer>`
-
-**`src/components/clubs/SeasonLeaderboard.tsx`**
-- Wrap each standing row in `<TappablePlayer>`
-
-**`src/components/clubs/PaymentLedger.tsx`**
-- Wrap player names in settlements
-
-**`src/pages/Friends.tsx`**
-- Each friend row already navigable -- wrap in `<TappablePlayer>` for consistency
+### `src/components/poker/PokerTablePro.tsx`
+**Lines 323-325** — Replace the simple speaker button with the same dropdown pattern, but only with "Sound Effects" toggle (no voice announcements in practice mode).
 
 ---
 
-## What Does NOT Change
-- Bottom navigation -- untouched
-- Existing `PlayerProfileDrawer` component -- reused as-is
-- Existing `PlayerSeat` click behavior at poker table -- untouched
-- No database changes needed
+## What does NOT change
+- Bottom navigation
+- Voice chat controls (VoiceChatControls component) — unchanged
+- PlayerSeat, PlayerProfileDrawer — unchanged
+- No database changes
 - No edge function changes
-- Styling, spacing, layout of all lists -- untouched (TappablePlayer is a transparent wrapper)
+
