@@ -46,7 +46,7 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { sendEmail } from '@/lib/email';
 import { rsvpConfirmationTemplate } from '@/lib/email-templates';
 import { buildAppUrl } from '@/lib/app-url';
-import { notifyHostConfirmed, notifyWaitlistPromotion } from '@/lib/push-notifications';
+import { notifyHostConfirmed, notifyWaitlistPromotion, notifyDateFinalized, notifyEventRsvp } from '@/lib/push-notifications';
 import { 
   notifyEventRsvpInApp, 
   notifyDateFinalizedInApp, 
@@ -559,7 +559,7 @@ export default function EventDetail() {
       actorName: userProfile.display_name,
     }).catch(console.error);
     
-    // Send in-app notification to event creator/admins when someone RSVPs going
+    // Send in-app + push notification to event creator/admins when someone RSVPs going
     if (status === 'going' && !isWaitlisted && event.created_by && event.created_by !== user.id) {
       notifyEventRsvpInApp(
         event.created_by,
@@ -567,6 +567,12 @@ export default function EventDetail() {
         userProfile.display_name,
         event.id,
         user.id
+      ).catch(console.error);
+      notifyEventRsvp(
+        event.created_by,
+        event.title,
+        userProfile.display_name,
+        event.id
       ).catch(console.error);
     }
 
@@ -788,6 +794,7 @@ export default function EventDetail() {
         const userIds = members.map(m => m.user_id);
         const formattedDate = format(new Date(option.proposed_date), "EEEE, MMMM d", { locale: dateLocale });
         notifyDateFinalizedInApp(userIds, event.title, event.id, formattedDate).catch(console.error);
+        notifyDateFinalized(userIds, event.title, event.id, formattedDate).catch(console.error);
       }
     }
   };

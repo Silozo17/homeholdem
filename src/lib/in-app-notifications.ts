@@ -335,6 +335,68 @@ export async function notifyBlindsUpInApp(
   });
 }
 
+// Friend request notifications
+export async function notifyFriendRequestInApp(
+  targetUserId: string,
+  senderName: string,
+  senderId: string
+) {
+  return createInAppNotification({
+    userId: targetUserId,
+    type: 'club_invite',
+    title: 'Friend Request',
+    body: `${senderName} wants to be your friend`,
+    url: '/friends',
+    senderId,
+  });
+}
+
+export async function notifyFriendAcceptedInApp(
+  requesterId: string,
+  accepterName: string,
+  senderId: string
+) {
+  return createInAppNotification({
+    userId: requesterId,
+    type: 'club_invite',
+    title: 'Friend Added',
+    body: `${accepterName} accepted your friend request`,
+    url: '/friends',
+    senderId,
+  });
+}
+
+// Direct message notification
+export async function notifyDirectMessageInApp(
+  receiverId: string,
+  senderName: string,
+  senderId: string
+) {
+  return createInAppNotification({
+    userId: receiverId,
+    type: 'chat_message',
+    title: senderName,
+    body: 'Sent you a message',
+    url: '/inbox',
+    senderId,
+  });
+}
+
+// New member joined club notification
+export async function notifyNewMemberJoinedInApp(
+  adminUserIds: string[],
+  memberName: string,
+  clubId: string
+) {
+  return createBulkNotifications(adminUserIds, {
+    type: 'club_invite',
+    title: 'New Member',
+    body: `${memberName} joined your club`,
+    url: `/club/${clubId}`,
+    clubId,
+  });
+}
+
 // Broadcast notification from club owner
 export async function sendBroadcastInApp(
   userIds: string[],

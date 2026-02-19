@@ -2164,11 +2164,14 @@ export type Database = {
           push_blinds_up: boolean | null
           push_chat_messages: boolean | null
           push_date_finalized: boolean | null
+          push_direct_messages: boolean
           push_event_unlocked: boolean
+          push_friend_requests: boolean
           push_game_completed: boolean
           push_game_started: boolean | null
           push_member_rsvp: boolean
           push_member_vote: boolean
+          push_new_member: boolean
           push_player_eliminated: boolean | null
           push_rebuy_addon: boolean | null
           push_rsvp_updates: boolean | null
@@ -2191,11 +2194,14 @@ export type Database = {
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
+          push_direct_messages?: boolean
           push_event_unlocked?: boolean
+          push_friend_requests?: boolean
           push_game_completed?: boolean
           push_game_started?: boolean | null
           push_member_rsvp?: boolean
           push_member_vote?: boolean
+          push_new_member?: boolean
           push_player_eliminated?: boolean | null
           push_rebuy_addon?: boolean | null
           push_rsvp_updates?: boolean | null
@@ -2218,11 +2224,14 @@ export type Database = {
           push_blinds_up?: boolean | null
           push_chat_messages?: boolean | null
           push_date_finalized?: boolean | null
+          push_direct_messages?: boolean
           push_event_unlocked?: boolean
+          push_friend_requests?: boolean
           push_game_completed?: boolean
           push_game_started?: boolean | null
           push_member_rsvp?: boolean
           push_member_vote?: boolean
+          push_new_member?: boolean
           push_player_eliminated?: boolean | null
           push_rebuy_addon?: boolean | null
           push_rsvp_updates?: boolean | null
