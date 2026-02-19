@@ -175,12 +175,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => { releaseWakeLock(); };
   }, [requestWakeLock, releaseWakeLock]);
 
-  // Auto-connect voice chat when seated (only once, skip if failed)
+  // Auto-connect voice chat when seated — one-shot per seat assignment
+  const voiceChatAttemptedRef = useRef(false);
   useEffect(() => {
-    if (mySeatNumber !== null && !voiceChat.connected && !voiceChat.connecting && !voiceChat.failed) {
+    if (mySeatNumber !== null && !voiceChatAttemptedRef.current) {
+      voiceChatAttemptedRef.current = true;
       voiceChat.connect();
     }
-  }, [mySeatNumber, voiceChat.connected, voiceChat.connecting, voiceChat.failed]);
+    if (mySeatNumber === null) {
+      voiceChatAttemptedRef.current = false;
+    }
+  }, [mySeatNumber]);
 
   // Capture starting XP on mount for level-up animation
   useEffect(() => {
