@@ -1,79 +1,67 @@
 
-
-# Fix: Voice Chat Connection Failures
+# Fix: Disconnected Players Persist on Table Indefinitely
 
 ## Root Cause
 
-Two issues are causing connection failures:
+The `poker-check-timeouts` edge function already has logic to:
+1. Mark stale-heartbeat players as "disconnected" (if mid-hand)
+2. Delete stale-heartbeat players entirely (if no active hand)
+3. Auto-kick players with 2+ consecutive timeouts
 
-1. **Mic permission crash**: After successfully connecting to the LiveKit room, the code calls `setMicrophoneEnabled(true)` then immediately `setMicrophoneEnabled(false)` (to "start muted"). If the browser blocks mic access, this throws an error and crashes the entire connection -- even though the room itself connected fine. This is likely what happened to Tomek.
+**But `poker-check-timeouts` is NOT on a cron job.** Only `process-pending-notifications` runs on cron. The timeout checker is only triggered by individual player pings (`poker-timeout-ping`), which requires another player at the table to invoke it. If all remaining players are also inactive or nobody triggers it, disconnected players sit there forever.
 
-2. **Retry loop not fully stopped**: The auto-connect `useEffect` depends on `voiceChat.connected`, `voiceChat.connecting`, and `voiceChat.failed` -- all of which change every render, re-triggering the effect. The `failed` flag helps but doesn't fully prevent rapid re-fires.
+**Evidence:** Right now there are two stale players on table `b9eb7f44` -- one disconnected since 20:38, one "active" since 20:54 -- both with heartbeats well past the 90-second threshold, still occupying seats.
 
 ## Fix
 
-### File: `src/hooks/useVoiceChat.ts`
+### 1. Add cron job to call `poker-check-timeouts` every minute
 
-**Change 1 -- Wrap mic enable/disable in try-catch (lines 109-112)**
+Run the following SQL (via the SQL tool, not migration) to schedule `poker-check-timeouts` on a 1-minute cron, matching how `process-pending-notifications` is already scheduled:
 
-Instead of crashing the whole connection when mic permission is denied, catch the error and continue connected (just without mic). The player can still hear others.
-
-```typescript
-// Current (crashes if mic denied):
-await room.localParticipant.setMicrophoneEnabled(true);
-await room.localParticipant.setMicrophoneEnabled(false);
-setMicMuted(true);
-
-// New (graceful fallback):
-try {
-  await room.localParticipant.setMicrophoneEnabled(true);
-  await room.localParticipant.setMicrophoneEnabled(false);
-} catch (micErr) {
-  console.warn('[VoiceChat] Mic permission denied, joining listen-only:', micErr);
-}
-setMicMuted(true);
+```sql
+SELECT cron.schedule(
+  'poker-check-timeouts-every-minute',
+  '* * * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://kmsthmtbvuxmpjzmwybj.supabase.co/functions/v1/poker-check-timeouts',
+    headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id;
+  $$
+);
 ```
 
-**Change 2 -- Add a `connectAttemptedRef` guard (new ref)**
+This ensures the stale-heartbeat sweep (Section 4 of the function) runs automatically every minute, cleaning up disconnected ghosts.
 
-Add a ref that tracks whether auto-connect has already been attempted for this session, preventing re-fires from useEffect dependency changes.
+### 2. Add a second-tier cleanup: force-remove "disconnected" players after 3 minutes
 
-```typescript
-const connectAttemptedRef = useRef(false);
-```
+Currently, Section 4 marks mid-hand players as "disconnected" but only removes them when there's no active hand. If the table is stuck in "waiting" with a disconnected player, it should get deleted. But if a hand keeps running, the disconnected player stays forever.
 
-In the `connect` function, set `connectAttemptedRef.current = true` at the start (before the try block). Reset it only on explicit manual retry.
+**Add new Section 5 in `poker-check-timeouts`** (after Section 4, before the return):
 
-### File: `src/components/poker/OnlinePokerTable.tsx`
+- Query all seats with `status = 'disconnected'` AND `last_heartbeat < NOW() - 3 minutes`
+- For each: delete the seat row entirely (force-remove from table)
+- Broadcast a `seat_change` event so all clients update
 
-**Change 3 -- Stabilise the auto-connect effect (line 178-183)**
+This provides the two-tier system:
+- **Tier 1 (90 seconds):** Player marked "disconnected" (grey avatar, can't act)
+- **Tier 2 (3 minutes):** Player fully removed from seat
 
-Use a one-shot ref to ensure auto-connect fires exactly once per seat assignment, regardless of how many times the effect re-runs.
+### 3. Cleanup currently stuck players
 
-```typescript
-const voiceChatAttemptedRef = useRef(false);
+Run a one-time query to clean up the two stale players currently stuck on the table.
 
-useEffect(() => {
-  if (mySeatNumber !== null && !voiceChatAttemptedRef.current) {
-    voiceChatAttemptedRef.current = true;
-    voiceChat.connect();
-  }
-}, [mySeatNumber]);
-```
-
-Reset the ref when the player leaves the table (so re-seating triggers a new auto-connect).
-
-## What Does NOT Change
-- VoiceChatControls component -- untouched
-- Manual connect/disconnect buttons -- still work
-- Seat positions, dealer, bottom nav -- untouched
-- No layout or styling changes
-
-## Summary
+## Files Changed
 
 | File | Change |
 |---|---|
-| `src/hooks/useVoiceChat.ts` | Wrap mic enable in try-catch so mic-denied doesn't crash the connection |
-| `src/hooks/useVoiceChat.ts` | Add `connectAttemptedRef` to prevent double-connect |
-| `src/components/poker/OnlinePokerTable.tsx` | Use one-shot ref for auto-connect effect, remove unstable dependencies |
+| `supabase/functions/poker-check-timeouts/index.ts` | Add Section 5: force-remove disconnected seats older than 3 minutes |
+| SQL (via insert tool) | Add cron job for `poker-check-timeouts` every minute |
 
+## What Does NOT Change
+- Heartbeat interval (30s) -- untouched
+- Heartbeat edge function -- untouched
+- Client-side code -- untouched
+- Seat positions, dealer, bottom nav -- untouched
+- No layout or styling changes
