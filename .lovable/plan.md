@@ -1,67 +1,74 @@
+# Plan: "Are You Still Playing?" Popup + Faster Inactivity Kicks
 
-# Fix: Disconnected Players Persist on Table Indefinitely
+## What Changes
 
-## Root Cause
+### New Flow After a Turn Timeout
 
-The `poker-check-timeouts` edge function already has logic to:
-1. Mark stale-heartbeat players as "disconnected" (if mid-hand)
-2. Delete stale-heartbeat players entirely (if no active hand)
-3. Auto-kick players with 2+ consecutive timeouts
+Currently, when a player's 45-second turn expires, they are auto-folded and the game continues. There is no check to see if the player is actually still at their device.
 
-**But `poker-check-timeouts` is NOT on a cron job.** Only `process-pending-notifications` runs on cron. The timeout checker is only triggered by individual player pings (`poker-timeout-ping`), which requires another player at the table to invoke it. If all remaining players are also inactive or nobody triggers it, disconnected players sit there forever.
+**New behaviour:**
 
-**Evidence:** Right now there are two stale players on table `b9eb7f44` -- one disconnected since 20:38, one "active" since 20:54 -- both with heartbeats well past the 90-second threshold, still occupying seats.
+1. Player has **45 seconds** to act on their turn (unchanged)
+2. If they time out (auto-fold), a full-screen **"Are you still playing?"** popup appears with a **30-second countdown**
+3. If the player taps **"I'm Still Here"**, the popup closes and they continue playing normally
+4. If the 30 seconds expire without a tap, the player is **kicked from their seat** (but remains at the table as a spectator)
+5. From that moment, if the player does nothing for **90 seconds**, they are **kicked from the table entirely**
 
-## Fix
+### Server-Side Threshold Reductions
 
-### 1. Add cron job to call `poker-check-timeouts` every minute
+The current server-side timers are too generous. They will be tightened:
 
-Run the following SQL (via the SQL tool, not migration) to schedule `poker-check-timeouts` on a 1-minute cron, matching how `process-pending-notifications` is already scheduled:
+- **Heartbeat stale threshold**: 90s to mark as disconnected (stays the same -- already correct)
+- **Force-remove disconnected**: reduced from **3 minutes to 90 seconds** (matches the user's request)
+- Only applies to kicked seat players! Does not affect spectators!
 
-```sql
-SELECT cron.schedule(
-  'poker-check-timeouts-every-minute',
-  '* * * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://kmsthmtbvuxmpjzmwybj.supabase.co/functions/v1/poker-check-timeouts',
-    headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}'::jsonb,
-    body:='{}'::jsonb
-  ) as request_id;
-  $$
-);
-```
+---
 
-This ensures the stale-heartbeat sweep (Section 4 of the function) runs automatically every minute, cleaning up disconnected ghosts.
+## Technical Details
 
-### 2. Add a second-tier cleanup: force-remove "disconnected" players after 3 minutes
+### 1. Client-side: "Are you still playing?" popup
 
-Currently, Section 4 marks mid-hand players as "disconnected" but only removes them when there's no active hand. If the table is stuck in "waiting" with a disconnected player, it should get deleted. But if a hand keeps running, the disconnected player stays forever.
+**File: `src/components/poker/OnlinePokerTable.tsx**`
 
-**Add new Section 5 in `poker-check-timeouts`** (after Section 4, before the return):
+- Add new state: `showStillPlayingPopup` (boolean) and `stillPlayingCountdown` (number, starts at 30)
+- When the turn timer fires `onTimeout` and triggers an auto-fold, instead of just folding silently, also set `showStillPlayingPopup = true`
+- Start a 30-second countdown interval that decrements `stillPlayingCountdown` every second
+- If countdown reaches 0: call `leaveSeat()` to remove the player from their seat, close the popup
+- If the player taps "I'm Still Here": close the popup, reset countdown
+- Render the popup as a full-screen overlay (using AlertDialog) with a large countdown number and a "I'm Still Here" button
 
-- Query all seats with `status = 'disconnected'` AND `last_heartbeat < NOW() - 3 minutes`
-- For each: delete the seat row entirely (force-remove from table)
-- Broadcast a `seat_change` event so all clients update
+**File: `src/components/poker/OnlinePokerTable.tsx**` (inactivity system)
 
-This provides the two-tier system:
-- **Tier 1 (90 seconds):** Player marked "disconnected" (grey avatar, can't act)
-- **Tier 2 (3 minutes):** Player fully removed from seat
+- Reduce the general inactivity timer from **2 minutes to 90 seconds** (for the "kick from table" step after being removed from seat)
+- Remove the current workaround that skips the kick during an active hand (no longer needed since the popup handles in-hand timeouts)
+- The warning period stays at 10 seconds
 
-### 3. Cleanup currently stuck players
+### 2. Server-side: Faster force-removal
 
-Run a one-time query to clean up the two stale players currently stuck on the table.
+**File: `supabase/functions/poker-check-timeouts/index.ts**`
 
-## Files Changed
+- Section 5: Change the force-remove threshold from 180,000ms (3 minutes) to **90,000ms (90 seconds)**
+- This means a disconnected player (grey avatar) will be fully removed after 90 seconds instead of 3 minutes
 
-| File | Change |
-|---|---|
-| `supabase/functions/poker-check-timeouts/index.ts` | Add Section 5: force-remove disconnected seats older than 3 minutes |
-| SQL (via insert tool) | Add cron job for `poker-check-timeouts` every minute |
+### 3. Track consecutive timeouts for the popup trigger
+
+The popup should only appear after an **auto-fold timeout**, not just any fold. The `onTimeout` callback in `PlayerSeat` already fires only when the turn timer expires (not when the player manually folds). We hook into this existing callback.
+
+---
+
+## Summary of File Changes
+
+
+| File                                               | Change                                                                                                                                  |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/poker/OnlinePokerTable.tsx`        | Add "Are you still playing?" popup state + UI, trigger on auto-fold timeout, kick from seat after 30s, reduce general inactivity to 90s |
+| `supabase/functions/poker-check-timeouts/index.ts` | Reduce force-remove threshold from 3min to 90s                                                                                          |
+
 
 ## What Does NOT Change
-- Heartbeat interval (30s) -- untouched
-- Heartbeat edge function -- untouched
-- Client-side code -- untouched
+
+- 45-second turn timer duration -- stays the same
+- Server heartbeat interval (30s pings) -- stays the same  
+- Heartbeat stale threshold (90s to mark disconnected) -- stays the same
 - Seat positions, dealer, bottom nav -- untouched
-- No layout or styling changes
+- No layout or styling changes outside the new popup
