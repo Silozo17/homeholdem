@@ -1,66 +1,62 @@
 
 
-# Fix: Dealer Scales with Table Wrapper, Not Viewport
+# Plan: XP Screen Improvements + Voice Chat Fix
 
-## Root Cause
+## 1. Voice Chat: Silent failure instead of error toast
 
-The dealer image width is set to `min(9vw, 140px)` — relative to the **viewport**. But the table wrapper maxes out at 990px. On large monitors and larger phones (Pro Max), the viewport is bigger so the dealer image grows larger relative to the table, pushing its visual center downward past the table edge. The `top: -14%/-22%` percentage is correct for the table, but the dealer's own height changes disproportionately.
+**Problem:** The auto-connect `useEffect` fires repeatedly because `voiceChat.connect` and `voiceChat.connecting` are recreated each render, causing a flood of calls to the livekit-token edge function. When the connection fails (e.g. browser blocks mic permission, or LiveKit credentials issue), it shows a disruptive red error toast.
 
-## Solution
+**Fix in `src/hooks/useVoiceChat.ts`:**
+- Add a `failedRef` flag so that after the first connection failure, auto-connect does not keep retrying in a loop. The manual phone button still works to retry.
+- Expose this `failed` state so the auto-connect effect can check it.
 
-Make the dealer's size relative to the **table wrapper** instead of the viewport. Since the dealer is already absolutely positioned inside the table wrapper, we set its width as a percentage of that wrapper.
+**Fix in `src/components/poker/OnlinePokerTable.tsx` (auto-connect effect, ~line 179):**
+- Check `voiceChat.failed` to avoid retrying after a failure. Only auto-connect once per session.
 
-### Changes
+## 2. Remove WinnerOverlay stats screen, merge stats into XPLevelUpOverlay
 
-**1. `src/components/poker/DealerCharacter.tsx` (line 31)**
+**Problem:** After game over, WinnerOverlay shows a full stats screen, then XP overlay shows separately. User wants: remove the WinnerOverlay game-over stats screen entirely, and instead show stats inside the XP overlay with "Play Again" and "Close" buttons.
 
-Change the image container width from viewport-relative to parent-relative:
+### Changes to `src/components/poker/XPLevelUpOverlay.tsx`:
+- Add new props: `stats` (handsPlayed, handsWon, bestHandName, biggestPot, duration), `onPlayAgain`, `onClose`
+- Replace the single "Continue" button with two buttons: "Close" (exits table) and "Play Again" (stays at table)
+- Add a stats section below the XP bar showing: Hands Played, Hands Won, Best Hand, Biggest Pot, Duration in a styled grid
 
-```
-// Current
-width: 'min(9vw, 140px)',
+### Changes to `src/components/poker/OnlinePokerTable.tsx`:
 
-// New
-width: '100%',
-```
+**Remove WinnerOverlay for game over (lines 1270-1283):**
+- Remove the `{gameOver && <WinnerOverlay ...>}` block entirely. The hand-win inline banner (non-game-over WinnerOverlay) stays.
 
-This makes DealerCharacter fill whatever width its parent provides.
+**Update XPLevelUpOverlay rendering (lines 1286-1296):**
+- Pass `stats`, `onPlayAgain`, and `onClose` props
+- `onClose`: sets xpOverlay to null, then calls `leaveTable().then(onLeave)`
+- `onPlayAgain`: sets xpOverlay to null, leaves seat (so player is removed from seat) but stays at the table as a spectator who can re-join a seat
 
-**2. `src/components/poker/PokerTablePro.tsx` (line 347)**
+**Seat removal during XP screen:**
+- When `gameOver` is set to true and XP overlay shows, call `leaveSeat()` (not `leaveTable()`) so the player is removed from the seat but remains at the table
+- "Play Again" dismisses the overlay (player is already a spectator, can tap an open seat)
+- "Close" calls `leaveTable().then(onLeave)` to fully exit
 
-Add a percentage width to the dealer wrapper so it scales with the table:
+### Changes to `src/components/poker/WinnerOverlay.tsx`:
+- No changes needed (the non-game-over hand-win banner is still used)
 
-```
-// Current
-<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', zIndex: Z.DEALER }}>
+## 3. Leave seat on game over (before XP screen)
 
-// New
-<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', width: '11%', zIndex: Z.DEALER }}>
-```
+**In `src/components/poker/OnlinePokerTable.tsx`:**
+- In the `saveXpAndStats` callback or in the game-over useEffect, call `leaveSeat()` right when game over triggers (before XP overlay shows). This removes the player from their seat but keeps them at the table.
 
-11% of the table wrapper width matches the current visual size on iPhone 16 Pro (where it looks perfect).
+## Summary of file changes
 
-**3. `src/components/poker/OnlinePokerTable.tsx` (line 1181)**
+| File | Change |
+|---|---|
+| `src/hooks/useVoiceChat.ts` | Add `failed` state + `failedRef` to prevent retry loops |
+| `src/components/poker/OnlinePokerTable.tsx` | Remove game-over WinnerOverlay, pass stats to XP overlay, call leaveSeat on game over, guard auto-connect with failed check |
+| `src/components/poker/XPLevelUpOverlay.tsx` | Add stats grid, "Play Again" + "Close" buttons, new props |
 
-Add matching width to maintain current behaviour in the online poker table:
+## What does NOT change
+- Hand-win WinnerOverlay (inline banner) stays
+- Seat positions, dealer, bottom nav untouched
+- No layout/styling changes outside the XP overlay
+- VoiceChatControls component untouched
+- No navigation changes
 
-```
-// Add width to the existing dealer wrapper div
-style={{ ..., width: 'min(9vw, 140px)' }}
-```
-
-This preserves the existing sizing for OnlinePokerTable since it has its own separate positioning logic.
-
-## Why This Works
-
-- On iPhone 16 Pro: table is ~86vw, 11% of that = ~9.5vw -- same as current, no visual change
-- On large monitors: table caps at 990px, 11% = ~109px -- proportional to table, not oversized
-- On Pro Max: table is slightly wider viewport but same ratio -- dealer stays proportional
-- The `top` percentage now works correctly at all sizes because the dealer's height scales with the table
-
-## What Does NOT Change
-- No seat positions
-- No card layouts or animations
-- No styling, navigation, or spacing changes
-- Bottom nav untouched
-- Dealer expression/sparkle animations untouched
