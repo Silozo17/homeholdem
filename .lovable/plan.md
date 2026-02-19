@@ -1,66 +1,66 @@
 
 
-# Fix: Dealer Scales with Table Wrapper, Not Viewport
+# Fix: Dealer Position Drift in OnlinePokerTable
 
-## Root Cause
+## Problem
 
-The dealer image width is set to `min(9vw, 140px)` — relative to the **viewport**. But the table wrapper maxes out at 990px. On large monitors and larger phones (Pro Max), the viewport is bigger so the dealer image grows larger relative to the table, pushing its visual center downward past the table edge. The `top: -14%/-22%` percentage is correct for the table, but the dealer's own height changes disproportionately.
-
-## Solution
-
-Make the dealer's size relative to the **table wrapper** instead of the viewport. Since the dealer is already absolutely positioned inside the table wrapper, we set its width as a percentage of that wrapper.
-
-### Changes
-
-**1. `src/components/poker/DealerCharacter.tsx` (line 31)**
-
-Change the image container width from viewport-relative to parent-relative:
+The dealer's `top` value on line 1181 mixes percentages with fixed pixel offsets:
 
 ```
-// Current
-width: 'min(9vw, 140px)',
-
-// New
-width: '100%',
+calc(-4% - 32px)   // mobile landscape
+calc(-4% + 8px)    // tablet
+calc(-4% - 31px)   // large desktop
+calc(-4% - 27px)   // default
 ```
 
-This makes DealerCharacter fill whatever width its parent provides.
+The `-4%` scales with the table wrapper, but the pixel values (`-32px`, `-27px`, etc.) do NOT. On smaller tables the pixel portion is a huge chunk; on larger tables it's relatively small. This causes the dealer to float too high on some screens and sit too low on others.
 
-**2. `src/components/poker/PokerTablePro.tsx` (line 347)**
+The same issue applies to the dealer width (`min(9vw, 140px)`) being viewport-relative while the table wrapper has its own sizing constraints.
 
-Add a percentage width to the dealer wrapper so it scales with the table:
+## Fix
 
-```
-// Current
-<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', zIndex: Z.DEALER }}>
+**File:** `src/components/poker/OnlinePokerTable.tsx`, line 1181
 
-// New
-<div className="absolute left-1/2 -translate-x-1/2" style={{ top: isLandscape ? '-14%' : '-22%', width: '11%', zIndex: Z.DEALER }}>
-```
+Replace ALL the breakpoint logic and pixel offsets with pure percentages — matching the approach already used in PokerTablePro:
 
-11% of the table wrapper width matches the current visual size on iPhone 16 Pro (where it looks perfect).
-
-**3. `src/components/poker/OnlinePokerTable.tsx` (line 1181)**
-
-Add matching width to maintain current behaviour in the online poker table:
-
-```
-// Add width to the existing dealer wrapper div
-style={{ ..., width: 'min(9vw, 140px)' }}
+Current:
+```typescript
+style={{
+  top: isMobileLandscape ? 'calc(-4% - 32px)' 
+     : isTablet ? 'calc(-4% + 8px)' 
+     : isLargeDesktop ? 'calc(-4% - 31px)' 
+     : 'calc(-4% - 27px)',
+  width: 'min(9vw, 140px)',
+  zIndex: Z.DEALER
+}}
 ```
 
-This preserves the existing sizing for OnlinePokerTable since it has its own separate positioning logic.
+New:
+```typescript
+style={{
+  top: isLandscape ? '-12%' : '-18%',
+  width: '11%',
+  zIndex: Z.DEALER
+}}
+```
 
 ## Why This Works
 
-- On iPhone 16 Pro: table is ~86vw, 11% of that = ~9.5vw -- same as current, no visual change
-- On large monitors: table caps at 990px, 11% = ~109px -- proportional to table, not oversized
-- On Pro Max: table is slightly wider viewport but same ratio -- dealer stays proportional
-- The `top` percentage now works correctly at all sizes because the dealer's height scales with the table
+- **`width: '11%'`** — dealer width is now a fixed fraction of the table wrapper. As the table grows or shrinks, the dealer scales in lockstep.
+- **`top: '-12%'`** (landscape) — a pure percentage of the table wrapper height. No pixel offsets means no drift at any size.
+- **`top: '-18%'`** (portrait) — same principle for portrait orientation.
+- The `isLandscape` flag checks `width > height`, so it works correctly on all devices regardless of exact pixel width.
+
+The `-12%` value was calculated from the iPhone 16 Pro reference (where it currently looks perfect): the effective offset is roughly 12% of the table wrapper height.
+
+## What Changes
+- `src/components/poker/OnlinePokerTable.tsx` line 1181 only — dealer wrapper style
 
 ## What Does NOT Change
 - No seat positions
-- No card layouts or animations
-- No styling, navigation, or spacing changes
+- No card layouts, animations, or other UI elements
+- `isMobileLandscape` / `isTablet` / `isLargeDesktop` variables are untouched (used elsewhere)
+- DealerCharacter component untouched
+- PokerTablePro untouched
 - Bottom nav untouched
-- Dealer expression/sparkle animations untouched
+
