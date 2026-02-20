@@ -1,90 +1,87 @@
 
 
-# Redesign Hand Rankings to Match PokerStars Reference
+# Pixel-Perfect Hand Rankings Redesign
 
-## What Changes
+## Detailed Reference Analysis
 
-The hand rankings display in both the **Tutorial Explainer (Page 3)** and the **Rules page** will be completely redesigned to match the PokerStars reference image layout. This is a visual-only change -- no game logic, navigation, or data changes.
+Here is every visual element from the PokerStars reference, broken down:
 
-## Key Design Elements from Reference
+### Card Container ("Card Tray")
+- All 5 cards sit inside **ONE rounded rectangle** (not separate individual cards)
+- Rounded corners ~6px on the outer container only
+- Cards are side-by-side with **zero gap, zero overlap**
+- Thin vertical divider lines (~1px light gray) separate each card cell
+- Container has a subtle border/shadow
 
-1. **Card layout**: Cards overlap/fan out (like holding a real hand), roughly 60-65% overlap between cards
-2. **Card size**: Larger cards than current `xs` -- roughly 40-48px wide, 56-64px tall
-3. **Card content**: Large rank in top-left corner, large suit symbol below it -- prominent and readable
-4. **Row layout**: Cards on the LEFT side, rank number + hand name on the RIGHT side (opposite of current layout)
-5. **"BEST" / "WORST" markers**: An upward arrow with "BEST" at the top of the list, and a downward arrow with "WORST" at the bottom
-6. **Faded kicker cards**: In hands where some cards are "fillers" (e.g., the kicker in Four of a Kind, the non-pair cards in One Pair), those cards appear faded/dimmed to highlight the important cards
-7. **No description text per row**: Just the hand name and number -- the description is removed from inline display for a cleaner look matching the reference
+### Individual Card Cells
+- Each cell is equal width (~36-40px)
+- **Rank**: large bold text (~16px), positioned top-left with small padding
+- **Suit symbol**: directly below the rank, same left alignment, ~14px
+- Colors: **red (#DC2626)** for hearts/diamonds, **black (#1A1A1A)** for spades/clubs
+- **Highlighted cards**: pure white background
+- **Faded/kicker cards**: solid **gray background (#D4D4D4)** -- NOT opacity! The text is still fully visible but the background changes to gray
+
+### BEST / WORST Markers
+- Positioned on the **left edge**, text **rotated 90 degrees** (reading bottom-to-top for BEST, top-to-bottom for WORST)
+- BEST: green/emerald text with upward chevron, aligned to the top rows
+- WORST: red text with downward chevron, aligned to the bottom rows
+- They sit outside the card rows, in a narrow left column
+
+### Row Layout (per hand)
+- **Left**: card tray container (5 cells)
+- **Right**: rank number in a small filled circle (amber/gold) + hand name in bold white text
+- Vertically centered
+- Rows separated by spacing (~8-12px), no visible divider lines between rows
+
+### Overall Layout
+- Compact vertical list
+- Background is the dark app background (our existing card-suit-pattern)
+
+---
+
+## Current vs Required Changes
+
+| Element | Current (Wrong) | Required |
+|---------|-----------------|----------|
+| Card overlap | -26px overlap between cards | Zero overlap, side by side |
+| Fading | `opacity-35` on entire card | Gray background (#D4D4D4), full opacity |
+| Card container | Each card is a separate rounded div | All 5 cards inside ONE rounded container |
+| BEST/WORST | Horizontal text above/below list | Rotated 90deg on the left side |
+| Card dividers | Card borders create implicit gaps | Thin 1px internal dividers, no outer per-card border |
+
+---
 
 ## Implementation Plan
 
-### 1. Update `hand-ranking-examples.ts` -- Add "highlight" metadata
+### 1. Rewrite `HandRankingCard.tsx`
+- Remove individual card border and rounded corners (the parent container handles those)
+- Change `isFaded` from `opacity-35` to `bg-[#D4D4D4]` (gray background, full opacity)
+- Keep rank + suit text layout the same (top-left aligned, stacked)
+- Card cell width: ~36px, height: ~52px
 
-Add a `highlighted` array to each hand indicating which card indices are the important ones (the hand-making cards). Non-highlighted cards will be rendered faded.
+### 2. Rewrite `FannedHand.tsx` (rename concept to "CardTray")
+- Remove negative margins (no overlap)
+- Wrap all cards in a single container with `rounded-lg`, `overflow-hidden`, `border`
+- Cards sit in a flex row with no gap
+- Add 1px right border on each card except the last (internal dividers)
+- No z-index manipulation needed
 
-For example:
-- Royal Flush: all 5 highlighted (indices 0-4)
-- Four of a Kind: indices 0-3 highlighted, index 4 (kicker) faded
-- Two Pair: indices 0-1, 2-3 highlighted, index 4 (kicker) faded
-- One Pair: indices 0-1 highlighted, indices 2-4 faded
-- High Card: only index 0 highlighted, rest faded
+### 3. Rewrite `HandRankingsList.tsx`
+- Add a narrow left column for BEST/WORST markers
+- BEST text: rotated -90deg (reads bottom-to-top), positioned at top of list, emerald/green
+- WORST text: rotated -90deg, positioned at bottom of list, red
+- Main content area: the 10 hand rows
+- Each row: card tray (left) + rank circle + name (right)
+- Remove the current horizontal BEST/WORST divs
 
-### 2. Create new `HandRankingCard` component
+### Files Modified
+- `src/components/poker/HandRankingCard.tsx` -- gray bg instead of opacity, remove per-card border
+- `src/components/poker/FannedHand.tsx` -- single container, no overlap, internal dividers
+- `src/components/poker/HandRankingsList.tsx` -- rotated BEST/WORST on left side
 
-A new purpose-built card component for this screen only (not reusing `CardDisplay` which is designed for gameplay). This card:
-- Is roughly 44px wide x 60px tall
-- Shows a large rank letter (top-left, ~14px bold) and suit symbol (~12px) below it
-- White/cream background with subtle border and rounded corners
-- Red (#C53030) for hearts/diamonds, black (#1A1A1A) for spades/clubs
-- Supports an `isFaded` prop that applies `opacity-40` to dim kicker cards
-
-### 3. Create new `FannedHand` component
-
-Takes the array of cards + highlighted indices and renders them in an overlapping fan:
-- Each card overlaps the previous by about 60% (negative margin-left of ~28px on cards after the first)
-- Faded cards get `opacity-40`
-- The row of cards is left-aligned
-
-### 4. Create new `HandRankingsList` component
-
-A shared component used by both Tutorial Page 3 and the Rules page. Layout per row:
-- Left side: `FannedHand` (the overlapping cards)
-- Right side: Rank number (bold, gold circle) + Hand name (bold white text)
-- Vertically centered in each row
-- Subtle divider or spacing between rows
-
-"BEST" marker with upward triangle at the top-left, "WORST" marker with downward triangle at the bottom-left, styled in muted text.
-
-### 5. Update `TutorialExplainer.tsx` (Page 3)
-
-- Replace the current list with the new `HandRankingsList` component
-- Remove the per-hand description text (just name + cards, matching reference)
-- Keep the page title and subtitle
-
-### 6. Update `PokerHandRankings.tsx` (Rules page accordion)
-
-- Replace the hand-rankings accordion content with the same `HandRankingsList` component
-- The accordion still wraps it, but the content inside matches the PokerStars layout
-
-### 7. Update `MiniCardRow.tsx`
-
-This component will no longer be used for hand rankings (replaced by `FannedHand`). It stays in the codebase in case it's used elsewhere, but will no longer be imported by the ranking screens.
-
-## Files Modified
-
-- **Edit**: `src/lib/poker/hand-ranking-examples.ts` -- add `highlighted` indices per hand
-- **New**: `src/components/poker/HandRankingCard.tsx` -- large card for ranking display
-- **New**: `src/components/poker/FannedHand.tsx` -- overlapping card fan
-- **New**: `src/components/poker/HandRankingsList.tsx` -- full list with BEST/WORST markers
-- **Edit**: `src/components/poker/TutorialExplainer.tsx` -- Page3 uses new component
-- **Edit**: `src/components/clubs/PokerHandRankings.tsx` -- accordion content uses new component
-
-## What Does NOT Change
-
-- No game logic, hooks, or engine changes
-- No layout/navigation/bottom nav changes
-- Card data (which cards represent each hand) stays the same
-- Other tutorial pages (1, 2, 4, 5) unchanged
-- Rules page structure (accordion with betting rounds, actions, blinds) unchanged
-- `CardDisplay.tsx` and `MiniCardRow.tsx` untouched (used elsewhere in gameplay)
+### What Does NOT Change
+- `hand-ranking-examples.ts` data (cards + highlighted indices stay the same)
+- `TutorialExplainer.tsx` (just imports HandRankingsList, no changes needed)
+- `PokerHandRankings.tsx` (just imports HandRankingsList, no changes needed)
+- No layout, navigation, bottom nav, or game logic changes
 
