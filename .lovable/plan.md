@@ -1,91 +1,113 @@
 
+# Fix Tutorial Errors, Add Tutorial Gate, Grant XP on Completion
 
-# Fix Learn Poker Tutorial: Correct Messages, Redesign Coach UI, Fix Highlights
+## Part 1: Fix Remaining Tutorial Error
 
-## Issues Found
+### Lesson 5 (Reading the Board) — Line 351
+Viktor's bot action is `{ type: 'call' }` but the message says "Viktor checked." The action should be `{ type: 'check' }`.
 
-### 1. Factual poker errors in Lesson 2 (Hand Rankings)
+**File:** `src/lib/poker/tutorial-lessons.ts`
+- Line 351: Change `botAction: { type: 'call' }` to `botAction: { type: 'check' }`
 
-The scripted messages contain wrong hand evaluations:
-
-**After Flop (A-club K-heart 8-diamond) with Viktor holding K-spade K-club:**
-- Message says: "Viktor has Two Pair (K-K + A on board)" -- **WRONG**
-- Viktor has K-spade K-club + K-heart on the board = **Three of a Kind (Kings)**, not Two Pair
-- The recap step also says "Viktor: Two Pair (Kings + Aces)" -- **WRONG**, it's Three of a Kind Kings
-
-**After Turn (A-spade added) with Viktor holding K-spade K-club:**
-- Message says: "Four of a Kind -- the 2nd best hand in poker! Only a Straight Flush beats this" -- should clarify Royal Flush is the absolute best (a type of Straight Flush)
-- Then says: "Viktor's best hand is a Full House (K-K-K-A-A... wait, no -- he has Two Pair K+A)" -- **DOUBLE WRONG and self-correcting**
-- Viktor actually has K-spade K-club + board K-heart A-club A-spade = **Full House (Kings full of Aces)**. The self-correction makes it worse.
-
-### 2. Repeated action button highlighting
-
-Every single `require_action` step has `highlight: 'actions'` which re-highlights the buttons that were already introduced in the intro tour and shown multiple times. After the first time the user taps action buttons, the highlight ring should not appear again.
-
-**Fix:** Only set `highlight: 'actions'` on the FIRST `require_action` step per lesson. Remove it from all subsequent ones.
-
-### 3. Coach UI redesign -- separate avatar circle from text bubble with floating pointer hands
-
-Current: Avatar and text are inside one card together.
-Requested: Coach avatar as a standalone circle, a separate speech bubble with text, and floating pointing hand emojis that appear near highlighted elements (not just for actions).
+All other lessons (1, 2, 3, 4, 6, 7, 8, 9, 10) have been verified and their hand evaluations, card combinations, and messages are factually correct.
 
 ---
 
-## Plan
+## Part 2: Award 1600 XP on Tutorial Completion
 
-### File 1: `src/lib/poker/tutorial-lessons.ts`
+XP formula: `level = floor(sqrt(xp / 100)) + 1`. To reach level 5: `(5-1)^2 * 100 = 1600 XP`.
 
-**Fix Lesson 2 messages:**
+### Database changes
+1. Add `tutorial_completed_at` column (nullable timestamp) to `profiles` table — null means not completed
+2. Migration data: Set `tutorial_completed_at = now()` for ALL existing users EXCEPT:
+   - Kamil Chuchro (`e5162f27-b90a-48c5-a8f5-b6e22d77fa36`)
+   - TimmyPoker (`9db2b9e1-640e-49cc-b77b-4f3cd379323d`)
+3. For those same users (all except Kamil and Timmy), insert 1600 XP via `xp_events` table (the trigger `update_player_xp` will auto-update `player_xp`)
 
-| Line | Current (wrong) | Correct |
-|------|-----------------|---------|
-| 194 | "Viktor has Kings and pairs his K-heart for Two Pair (K-K + A on board)" | "Viktor has three Kings on the board -- Three of a Kind! But your Three Aces beat his Three Kings." |
-| 195 | "Viktor: Two Pair (Kings + Aces)" | "Viktor: Three of a Kind (Kings)" |
-| 198 | "Four of a Kind -- the 2nd best hand" | "FOUR OF A KIND -- only a Straight Flush (or Royal Flush) can beat this!" |
-| 199 | "his best hand is a Full House (K-K-K-A-A... wait, no -- he has Two Pair K+A)" | "Viktor now has a Full House (Kings full of Aces) -- but your Four Aces still crush it!" |
-
-**Remove repeated `highlight: 'actions'`:**
-- In every lesson, keep `highlight: 'actions'` ONLY on the first `require_action` step
-- Remove it from all subsequent `require_action` steps in that lesson
-- This affects lessons 1-10 (approximately 30+ steps to update)
-
-### File 2: `src/components/poker/CoachOverlay.tsx`
-
-**Redesign to separate avatar from speech bubble + floating pointer hands:**
-
-- Coach avatar: a standalone circle positioned at the left edge of the speech bubble area (not inside the card)
-- Speech bubble: a separate rounded card with the text, positioned adjacent to the avatar (like a chat message)
-- Floating pointer hand: when a `highlight` is active, render an appropriate hand emoji (pointing up/down/left/right) near the highlighted element, with a bounce animation. The hand direction is determined by the highlight position:
-  - `actions` (bottom-right): pointing down hand
-  - `cards` (bottom-center): pointing down hand
-  - `community` (center): pointing up hand
-  - `pot` (upper-center): pointing up hand
-  - `exit` (top-left): pointing left hand
-  - `audio` (top-right): pointing right hand
-  - `timer` (top-center): pointing up hand
-  - `table` (center): no hand (too large)
-- Remove the current combined card layout
-- Only show the highlight ring on intro steps (the table tour), not on gameplay steps that re-highlight actions
-
-### File 3: `src/i18n/locales/en.json` and `src/i18n/locales/pl.json`
-
-- Update the `"Continue"` and `"Got it"` button text keys if not already translated
-- Add translation for "Step X/Y" indicator text
+### Frontend changes
+**File:** `src/pages/LearnPoker.tsx`
+- When ALL 10 lessons are completed and `tutorial_completed_at` is null:
+  - Set `tutorial_completed_at = now()` on the user's profile
+  - Insert an `xp_events` row with `xp_amount: 1600, reason: 'tutorial_complete'`
+  - Show a congratulations toast
 
 ---
 
-## Summary of changes
+## Part 3: Lock Game Modes Until Tutorial Complete
+
+### New component: `src/components/poker/TutorialGateDialog.tsx`
+A dialog/drawer that appears when an unauthenticated-tutorial user tries to access locked game modes:
+- Message: "Complete the tutorial to unlock this game mode"
+- Two buttons:
+  - **"Go to Tutorial"** — navigates to `/learn-poker`
+  - **"Skip Tutorial"** — sets `tutorial_completed_at = now()` (no XP awarded), closes dialog, allows access
+- Tournaments additionally require Level 5 (existing gate stays)
+
+### Files to modify for locking:
 
 | File | Change |
 |------|--------|
-| `src/lib/poker/tutorial-lessons.ts` | Fix 4 wrong poker hand descriptions in Lesson 2. Remove `highlight: 'actions'` from all but the first `require_action` per lesson. |
-| `src/components/poker/CoachOverlay.tsx` | Redesign: separate circle avatar from speech bubble. Add floating pointer hands near highlights. Only show highlight ring during intro steps. |
-| `src/i18n/locales/en.json` | Add/update coach UI translation keys |
-| `src/i18n/locales/pl.json` | Add/update Polish translations for coach UI |
+| `src/components/home/GameModesGrid.tsx` | Check `tutorial_completed_at` from profile. If null, show `TutorialGateDialog` instead of navigating to VS Bots or Multiplayer. Learn mode always accessible. |
+| `src/pages/PokerHub.tsx` | Same gate for "Play with Bots", "Online Multiplayer", and "Paid Tournaments" cards |
+| `src/components/poker/PlayPokerLobby.tsx` | Add redirect check — if tutorial not completed, redirect to tutorial gate |
+| `src/pages/OnlinePoker.tsx` | Add redirect check |
+| `src/pages/PaidTournaments.tsx` | Add redirect check (this also has Level 5 gate already) |
+
+### Hook: `src/hooks/useTutorialComplete.ts`
+- Fetches `tutorial_completed_at` from `profiles` table for current user
+- Returns `{ isComplete: boolean, isLoading: boolean, skipTutorial: () => void, markComplete: (withXp: boolean) => void }`
+- `skipTutorial()` sets `tutorial_completed_at` without XP
+- `markComplete(true)` sets `tutorial_completed_at` and inserts 1600 XP
+
+---
+
+## Part 4: Translations
+
+Add new keys to `en.json` and `pl.json`:
+
+```
+"tutorial_gate": {
+  "title": "Complete Tutorial First",
+  "message": "Complete the poker tutorial to unlock this game mode.",
+  "go_to_tutorial": "Go to Tutorial",
+  "skip_tutorial": "Skip Tutorial",
+  "skip_description": "Skip the tutorial and unlock all game modes (no XP reward)"
+}
+```
+
+Polish:
+```
+"tutorial_gate": {
+  "title": "Najpierw ukoncz samouczek",
+  "message": "Ukoncz samouczek pokera, aby odblokowac ten tryb gry.",
+  "go_to_tutorial": "Przejdz do samouczka",
+  "skip_tutorial": "Pomin samouczek",
+  "skip_description": "Pomin samouczek i odblokuj wszystkie tryby gry (bez nagrody XP)"
+}
+```
+
+---
+
+## Files changed summary
+
+| File | Change |
+|------|--------|
+| `src/lib/poker/tutorial-lessons.ts` | Fix Lesson 5 line 351 bot action from `call` to `check` |
+| Migration SQL | Add `tutorial_completed_at` to `profiles`, backfill for existing users, grant 1600 XP |
+| `src/hooks/useTutorialComplete.ts` | New hook for tutorial completion state |
+| `src/components/poker/TutorialGateDialog.tsx` | New lock overlay dialog |
+| `src/pages/LearnPoker.tsx` | Mark tutorial complete + award XP when all 10 lessons done |
+| `src/components/home/GameModesGrid.tsx` | Add tutorial gate check |
+| `src/pages/PokerHub.tsx` | Add tutorial gate check |
+| `src/components/poker/PlayPokerLobby.tsx` | Add tutorial gate redirect |
+| `src/pages/OnlinePoker.tsx` | Add tutorial gate redirect |
+| `src/pages/PaidTournaments.tsx` | Add tutorial gate redirect |
+| `src/i18n/locales/en.json` | Add `tutorial_gate` translations |
+| `src/i18n/locales/pl.json` | Add `tutorial_gate` Polish translations |
 
 ## What does NOT change
-- Game logic, hooks, or reducer
-- Seat layout or table positioning
 - Bottom navigation
-- No database changes
-
+- Game logic or hooks
+- Existing XP system or level formula
+- Existing subscription/paywall gates
+- Tournament Level 5 requirement (kept as additional gate)
