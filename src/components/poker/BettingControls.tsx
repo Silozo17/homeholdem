@@ -15,10 +15,11 @@ interface BettingControlsProps {
   panelWidth?: number;
   onAction: (action: { type: 'fold' | 'check' | 'call' | 'raise' | 'all-in'; amount?: number }) => void;
   tutorialAllowedAction?: string | null;
+  onSliderToggle?: (open: boolean) => void;
 }
 
 export function BettingControls({
-  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, panelWidth, onAction, tutorialAllowedAction,
+  canCheck, amountToCall, minRaise, maxBet, playerChips, bigBlind, pot, landscape, panelWidth, onAction, tutorialAllowedAction, onSliderToggle,
 }: BettingControlsProps) {
   const minRaiseTotal = maxBet + minRaise;
   const maxRaiseTotal = maxBet + playerChips;
@@ -38,6 +39,7 @@ export function BettingControls({
   const handleRaiseTap = () => {
     if (!showRaiseSlider) {
       setShowRaiseSlider(true);
+      onSliderToggle?.(true);
       setRaiseAmount(minRaiseTotal);
     } else {
       if (raiseAmount >= maxRaiseTotal) {
@@ -46,6 +48,7 @@ export function BettingControls({
         onAction({ type: 'raise', amount: raiseAmount });
       }
       setShowRaiseSlider(false);
+      onSliderToggle?.(false);
     }
   };
 
@@ -128,7 +131,7 @@ export function BettingControls({
               'hsl(0 0% 35%)',
               '0 2px 6px rgba(0,0,0,0.2)'
             )}
-            onClick={() => setShowRaiseSlider(false)}
+            onClick={() => { setShowRaiseSlider(false); onSliderToggle?.(false); }}
           >
             <X size={12} /> Cancel
           </button>
@@ -248,7 +251,7 @@ export function BettingControls({
               'hsl(0 0% 35%)',
               '0 2px 6px rgba(0,0,0,0.2)'
             )}
-            onClick={() => setShowRaiseSlider(false)}
+            onClick={() => { setShowRaiseSlider(false); onSliderToggle?.(false); }}
           >
             <X size={14} /> Cancel
           </button>
