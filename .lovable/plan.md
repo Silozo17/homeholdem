@@ -1,46 +1,64 @@
 
-# Fix Floating Hand Pointer Positions
+# Fix Pointer Hand Precision for Action Buttons and Raise Menu
 
 ## Problem
-The floating pointer hand (pointing emoji) stays in roughly the same spot regardless of what it's pointing at. It doesn't accurately point at the target element -- it's often too high, too far off, or not aligned with the correct button/area on screen.
+From the screenshots:
+1. The pointer hand points at the general "actions" area instead of the specific **Raise button** at the bottom of the action stack.
+2. When the raise slider/presets menu opens, the pointer stays in the same spot instead of moving to point at the **presets panel** (with a right-pointing hand from the left side).
 
-## Root Cause
-The `POINTER_HANDS` map in `CoachOverlay.tsx` has hardcoded CSS positions that were estimated and don't match where the actual elements are. The pointer needs to sit just above/below/beside the corresponding `HIGHLIGHT_POSITIONS` element, pointing directly at it.
+## Solution
 
-## Fix
+### 1. Add `onSliderToggle` callback to BettingControls
+**File: `src/components/poker/BettingControls.tsx`**
+- Add optional prop: `onSliderToggle?: (open: boolean) => void`
+- Call it whenever `showRaiseSlider` changes (inside `handleRaiseTap` and the cancel button)
 
-**File:** `src/components/poker/CoachOverlay.tsx`
+### 2. Track slider state in PokerTablePro
+**File: `src/components/poker/PokerTablePro.tsx`**
+- Add prop: `onRaiseSliderToggle?: (open: boolean) => void`
+- Pass it to `BettingControls` as `onSliderToggle`
 
-Recalculate every entry in `POINTER_HANDS` so each pointer emoji sits 2-3px outside the matching `HIGHLIGHT_POSITIONS` box, pointing directly at it:
+### 3. Track slider state in LearnPoker and pass to CoachOverlay
+**File: `src/pages/LearnPoker.tsx`**
+- Add `const [raiseSliderOpen, setRaiseSliderOpen] = useState(false)`
+- Pass `onRaiseSliderToggle={setRaiseSliderOpen}` to `PokerTablePro`
+- Pass `raiseSliderOpen={raiseSliderOpen}` to `CoachOverlay`
 
-| Target | Emoji | Current position problem | New position logic |
-|--------|-------|-------------------------|-------------------|
-| `actions` | pointing down | Bottom is 170px -- way above the actions area | Place just above the actions highlight box (bottom = highlight bottom + highlight height + 3px) |
-| `cards` | pointing down | Roughly OK but not precise | Place just above the cards area, centered |
-| `community` | pointing down (was up) | Points upward above the cards, should point down toward them | Change to pointing down, placed just above community area |
-| `pot` | pointing down (was up) | Same issue | Change to pointing down, placed just above pot area |
-| `exit` | pointing right | Offset too far right from the button | Place just to the right of the exit button, 2-3px gap |
-| `audio` | pointing left | Offset too far left | Place just to the left of the audio button, 2-3px gap |
-| `timer` | pointing down (was up) | Sits below the timer | Place just below the timer, pointing up at it |
+### 4. Update CoachOverlay pointer logic and positions
+**File: `src/components/poker/CoachOverlay.tsx`**
 
-### Specific position values (derived from HIGHLIGHT_POSITIONS):
+Add new prop `raiseSliderOpen?: boolean`.
 
-- **actions**: `right: calc(safe-area + 70px)`, `bottom: calc(safe-area + 172px)` -- just above the 160px-tall actions box
-- **cards**: `left: 50%`, `bottom: calc(8% + 73px)` -- 3px above the 70px-tall cards area
-- **community**: `left: 50%`, `top: calc(42% - 3px)` with `translateX(-50%)` -- 3px above community area, pointing down
-- **pot**: `left: 50%`, `top: calc(25% - 3px)` with `translateX(-50%)` -- 3px above pot, pointing down
-- **exit**: `top: calc(safe-area + 10px)`, `left: calc(safe-area + 43px)` -- just to the right of the 32px exit button
-- **audio**: `top: calc(safe-area + 10px)`, `right: calc(safe-area + 43px)` -- just to the left of the audio button
-- **timer**: `top: calc(safe-area + 32px)`, `left: calc(safe-area + 110px)` -- just below the timer
+**Update POINTER_HANDS** -- make `actions` point precisely at the Raise button (the bottom-most 37px-tall button in the landscape stack), and add a new `raise_presets` target:
 
-### Emoji direction logic:
-- Elements at the **bottom** of screen (actions, cards): use pointing down emoji that sits **above** the target
-- Elements at the **top** of screen (exit, audio, timer, pot, community): use pointing down emoji that sits **above** the target OR pointing right/left for side buttons
+| Target | Emoji | Position (CSS) | Description |
+|--------|-------|----------------|-------------|
+| `actions` | `👉` | `right: calc(safe-area + 195px)`, `bottom: calc(safe-area + 22px)` | Points RIGHT at the Raise button from the left side, vertically centered on the 37px button |
+| `raise_presets` | `👉` | `right: calc(safe-area + 195px)`, `bottom: calc(safe-area + 190px)` | Points RIGHT at the presets panel from the left side |
+
+**Update pointer selection logic**: When `isRequireAction` and `raiseSliderOpen`, use `raise_presets` instead of `actions`.
+
+```text
+activeHighlight logic:
+  if isRequireAction:
+    if raiseSliderOpen -> 'raise_presets'
+    else -> 'actions'  
+  else:
+    use rawHighlight from step/intro
+```
+
+### Summary of file changes
+
+| File | Change |
+|------|--------|
+| `src/components/poker/BettingControls.tsx` | Add `onSliderToggle` prop, call it on open/close |
+| `src/components/poker/PokerTablePro.tsx` | Add `onRaiseSliderToggle` prop, pass to BettingControls |
+| `src/pages/LearnPoker.tsx` | Track `raiseSliderOpen` state, pass to CoachOverlay |
+| `src/components/poker/CoachOverlay.tsx` | Add `raiseSliderOpen` prop, add `raise_presets` target, fix `actions` to point at Raise button precisely |
 
 ## What does NOT change
-- HIGHLIGHT_POSITIONS (the ring positions are correct)
 - Tutorial lesson messages
-- BettingControls.tsx
 - Bottom navigation
-- Game logic
+- Game logic / engine
 - Database
+- Highlight ring positions (those are correct)
