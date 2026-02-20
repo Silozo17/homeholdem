@@ -8,9 +8,10 @@ interface LessonCompleteOverlayProps {
   isLastLesson: boolean;
   onNextLesson: () => void;
   onBackToLessons: () => void;
+  customMessage?: string;
 }
 
-export function LessonCompleteOverlay({ lesson, isLastLesson, onNextLesson, onBackToLessons }: LessonCompleteOverlayProps) {
+export function LessonCompleteOverlay({ lesson, isLastLesson, onNextLesson, onBackToLessons, customMessage }: LessonCompleteOverlayProps) {
   const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none">
@@ -27,14 +28,20 @@ export function LessonCompleteOverlay({ lesson, isLastLesson, onNextLesson, onBa
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            {lesson.summary.map((point, i) => (
-              <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-background/40">
-                <span className="text-primary font-bold text-xs mt-0.5">•</span>
-                <p className="text-xs text-foreground/90 leading-snug">{point}</p>
-              </div>
-            ))}
-          </div>
+          {customMessage ? (
+            <div className="px-2 py-2">
+              <p className="text-sm text-foreground/90 leading-relaxed">{customMessage}</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {lesson.summary.map((point, i) => (
+                <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-background/40">
+                  <span className="text-primary font-bold text-xs mt-0.5">•</span>
+                  <p className="text-xs text-foreground/90 leading-snug">{point}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Button className="w-full" size="sm" onClick={onNextLesson}>
