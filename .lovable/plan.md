@@ -1,90 +1,49 @@
 
-# Fix Tutorial Errors, Add Tutorial Gate, Grant XP on Completion
 
-## Part 1: Fix Remaining Tutorial Error
+# Fix Coach UI: Bigger Avatar, Cloud Bubble, Clean Up Hands
 
-### Lesson 5 (Reading the Board) — Line 351
-Viktor's bot action is `{ type: 'call' }` but the message says "Viktor checked." The action should be `{ type: 'check' }`.
+## Issues Identified
 
-**File:** `src/lib/poker/tutorial-lessons.ts`
-- Line 351: Change `botAction: { type: 'call' }` to `botAction: { type: 'check' }`
+1. **Coach avatar too small** -- currently 48x48px (w-12), image 40x40px (w-10)
+2. **Speech bubble doesn't look like a chat cloud** -- it's a plain card with a tiny triangle tail
+3. **Hand emojis duplicated** -- pointing hands appear BOTH as floating elements on screen AND embedded in message text (e.g., "Tap 'Call'. pointing down"). The text ones are redundant since the floating hand already points at the element
+4. **Floating pointer hand misplaced** -- for `require_action` steps that don't have `highlight` set, NO pointer appears at all. For steps that DO have `highlight: 'pot'` or `highlight: 'community'`, the hand points at the wrong thing when the user needs to click an action button
+5. **Button text has emoji clutter** -- the require_action prompt shows "pointing up Tap Call below pointing down" with multiple hands
 
-All other lessons (1, 2, 3, 4, 6, 7, 8, 9, 10) have been verified and their hand evaluations, card combinations, and messages are factually correct.
+## Changes
 
----
+### File 1: `src/components/poker/CoachOverlay.tsx`
 
-## Part 2: Award 1600 XP on Tutorial Completion
+**Avatar size increase:**
+- Avatar container: `w-12 h-12` to `w-14 h-14`
+- Image inside: `w-10 h-10` to `w-12 h-12`
 
-XP formula: `level = floor(sqrt(xp / 100)) + 1`. To reach level 5: `(5-1)^2 * 100 = 1600 XP`.
+**Speech bubble redesign to look like a proper cloud bubble:**
+- More rounded corners: `rounded-2xl` to `rounded-3xl`
+- Softer background: use `bg-card/90` with stronger `backdrop-blur-md`
+- Larger speech tail (the triangle pointing left toward the avatar)
+- Subtle inner glow/shadow for cloud-like appearance
 
-### Database changes
-1. Add `tutorial_completed_at` column (nullable timestamp) to `profiles` table — null means not completed
-2. Migration data: Set `tutorial_completed_at = now()` for ALL existing users EXCEPT:
-   - Kamil Chuchro (`e5162f27-b90a-48c5-a8f5-b6e22d77fa36`)
-   - TimmyPoker (`9db2b9e1-640e-49cc-b77b-4f3cd379323d`)
-3. For those same users (all except Kamil and Timmy), insert 1600 XP via `xp_events` table (the trigger `update_player_xp` will auto-update `player_xp`)
+**Pointer hand logic fix:**
+- For `require_action` steps: ALWAYS show the hand pointing at the action buttons (bottom-right area), regardless of whether `highlight` is explicitly set. The pointer for actions is the default for any `require_action` step.
+- For `coach_message` / `deal_community` steps with a `highlight`: show the pointer pointing at the highlighted element as before.
+- This prevents the hand pointing at the pot/community when the step is actually asking the user to click an action button.
 
-### Frontend changes
-**File:** `src/pages/LearnPoker.tsx`
-- When ALL 10 lessons are completed and `tutorial_completed_at` is null:
-  - Set `tutorial_completed_at = now()` on the user's profile
-  - Insert an `xp_events` row with `xp_amount: 1600, reason: 'tutorial_complete'`
-  - Show a congratulations toast
+**Clean up button text:**
+- Remove hand emojis from `buttonText` for require_action. Change from `"pointing up Tap Call below pointing down"` to just `"Tap Call"` (plain text, no emojis)
 
----
+### File 2: `src/lib/poker/tutorial-lessons.ts`
 
-## Part 3: Lock Game Modes Until Tutorial Complete
+**Remove ALL hand emojis from message strings:**
+Every `message` field containing pointing down, pointing up, pointing left, pointing right emojis will have them stripped. This affects approximately 30+ lines across all 10 lessons. The floating pointer on screen already does the pointing job.
 
-### New component: `src/components/poker/TutorialGateDialog.tsx`
-A dialog/drawer that appears when an unauthenticated-tutorial user tries to access locked game modes:
-- Message: "Complete the tutorial to unlock this game mode"
-- Two buttons:
-  - **"Go to Tutorial"** — navigates to `/learn-poker`
-  - **"Skip Tutorial"** — sets `tutorial_completed_at = now()` (no XP awarded), closes dialog, allows access
-- Tournaments additionally require Level 5 (existing gate stays)
+Examples of changes:
+- `"Tap 'Raise' below. pointing down"` becomes `"Tap 'Raise' below."`
+- `"Tap 'Call'. pointing down"` becomes `"Tap 'Call'."`
+- `"Tap 'Check'. pointing down"` becomes `"Tap 'Check'."`
+- `"Tap 'Fold'. pointing down"` becomes `"Tap 'Fold'."`
 
-### Files to modify for locking:
-
-| File | Change |
-|------|--------|
-| `src/components/home/GameModesGrid.tsx` | Check `tutorial_completed_at` from profile. If null, show `TutorialGateDialog` instead of navigating to VS Bots or Multiplayer. Learn mode always accessible. |
-| `src/pages/PokerHub.tsx` | Same gate for "Play with Bots", "Online Multiplayer", and "Paid Tournaments" cards |
-| `src/components/poker/PlayPokerLobby.tsx` | Add redirect check — if tutorial not completed, redirect to tutorial gate |
-| `src/pages/OnlinePoker.tsx` | Add redirect check |
-| `src/pages/PaidTournaments.tsx` | Add redirect check (this also has Level 5 gate already) |
-
-### Hook: `src/hooks/useTutorialComplete.ts`
-- Fetches `tutorial_completed_at` from `profiles` table for current user
-- Returns `{ isComplete: boolean, isLoading: boolean, skipTutorial: () => void, markComplete: (withXp: boolean) => void }`
-- `skipTutorial()` sets `tutorial_completed_at` without XP
-- `markComplete(true)` sets `tutorial_completed_at` and inserts 1600 XP
-
----
-
-## Part 4: Translations
-
-Add new keys to `en.json` and `pl.json`:
-
-```
-"tutorial_gate": {
-  "title": "Complete Tutorial First",
-  "message": "Complete the poker tutorial to unlock this game mode.",
-  "go_to_tutorial": "Go to Tutorial",
-  "skip_tutorial": "Skip Tutorial",
-  "skip_description": "Skip the tutorial and unlock all game modes (no XP reward)"
-}
-```
-
-Polish:
-```
-"tutorial_gate": {
-  "title": "Najpierw ukoncz samouczek",
-  "message": "Ukoncz samouczek pokera, aby odblokowac ten tryb gry.",
-  "go_to_tutorial": "Przejdz do samouczka",
-  "skip_tutorial": "Pomin samouczek",
-  "skip_description": "Pomin samouczek i odblokuj wszystkie tryby gry (bez nagrody XP)"
-}
-```
+Also remove intro step emojis that are redundant (like upward arrows in messages where the floating hand already points).
 
 ---
 
@@ -92,22 +51,12 @@ Polish:
 
 | File | Change |
 |------|--------|
-| `src/lib/poker/tutorial-lessons.ts` | Fix Lesson 5 line 351 bot action from `call` to `check` |
-| Migration SQL | Add `tutorial_completed_at` to `profiles`, backfill for existing users, grant 1600 XP |
-| `src/hooks/useTutorialComplete.ts` | New hook for tutorial completion state |
-| `src/components/poker/TutorialGateDialog.tsx` | New lock overlay dialog |
-| `src/pages/LearnPoker.tsx` | Mark tutorial complete + award XP when all 10 lessons done |
-| `src/components/home/GameModesGrid.tsx` | Add tutorial gate check |
-| `src/pages/PokerHub.tsx` | Add tutorial gate check |
-| `src/components/poker/PlayPokerLobby.tsx` | Add tutorial gate redirect |
-| `src/pages/OnlinePoker.tsx` | Add tutorial gate redirect |
-| `src/pages/PaidTournaments.tsx` | Add tutorial gate redirect |
-| `src/i18n/locales/en.json` | Add `tutorial_gate` translations |
-| `src/i18n/locales/pl.json` | Add `tutorial_gate` Polish translations |
+| `src/components/poker/CoachOverlay.tsx` | Bigger avatar (14x14), cloud-style speech bubble with larger tail, fix pointer hand to always point at actions for require_action steps, clean button text emojis |
+| `src/lib/poker/tutorial-lessons.ts` | Remove all pointing hand emojis from ~30+ message strings across all 10 lessons |
 
 ## What does NOT change
 - Bottom navigation
 - Game logic or hooks
-- Existing XP system or level formula
-- Existing subscription/paywall gates
-- Tournament Level 5 requirement (kept as additional gate)
+- Seat layout or table positioning
+- Database
+- Translations (the messages are in English in the lesson file, not in i18n)
