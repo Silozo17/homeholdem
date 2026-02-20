@@ -14,9 +14,11 @@ import { useTutorialGame } from '@/hooks/useTutorialGame';
 import { getTutorialLessons, TUTORIAL_LESSON_COUNT } from '@/lib/poker/tutorial-lessons';
 import { cn } from '@/lib/utils';
 import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialExplainer } from '@/components/poker/TutorialExplainer';
 import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'poker-tutorial-progress';
+const EXPLAINER_KEY = 'poker-tutorial-explainer-seen';
 
 function getProgress(): number[] {
   try {
@@ -37,6 +39,7 @@ export default function LearnPoker() {
   const [activeLessonIdx, setActiveLessonIdx] = useState<number>(0);
   const [completedLessons, setCompletedLessons] = useState<number[]>(getProgress);
   const [showComplete, setShowComplete] = useState(false);
+  const [showExplainer, setShowExplainer] = useState(false);
   const { isComplete: tutorialAlreadyComplete, markComplete } = useTutorialComplete();
 
   const lessons = useMemo(() => getTutorialLessons(t), [t]);
@@ -84,6 +87,11 @@ export default function LearnPoker() {
   }, [state.phase, isPlaying, showComplete, stepPhase]);
 
   const startLessonHandler = useCallback((idx: number) => {
+    // Show explainer before first lesson if not yet seen
+    if (idx === 0 && !localStorage.getItem(EXPLAINER_KEY)) {
+      setShowExplainer(true);
+      return;
+    }
     setActiveLessonIdx(idx);
     setShowComplete(false);
     const lesson = lessons[idx];
@@ -92,6 +100,24 @@ export default function LearnPoker() {
       setIsPlaying(true);
     }
   }, [startLesson, lessons]);
+
+  const handleExplainerComplete = useCallback(() => {
+    localStorage.setItem(EXPLAINER_KEY, '1');
+    setShowExplainer(false);
+    // Start lesson 1
+    setActiveLessonIdx(0);
+    setShowComplete(false);
+    const lesson = lessons[0];
+    if (lesson) {
+      startLesson(lesson);
+      setIsPlaying(true);
+    }
+  }, [startLesson, lessons]);
+
+  const handleExplainerSkip = useCallback(() => {
+    localStorage.setItem(EXPLAINER_KEY, '1');
+    setShowExplainer(false);
+  }, []);
 
   const handleNextLesson = useCallback(() => {
     if (activeLessonIdx >= TUTORIAL_LESSON_COUNT - 1) {
@@ -195,6 +221,15 @@ export default function LearnPoker() {
           </div>
           <h1 className="text-2xl font-black text-foreground">{t('learn_poker.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('learn_poker.subtitle')}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowExplainer(true)}
+            className="mt-2"
+          >
+            <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+            {t('explainer.basics_button', 'Poker Basics')}
+          </Button>
         </div>
 
         <div className="space-y-1.5">
@@ -245,6 +280,12 @@ export default function LearnPoker() {
           </Button>
         )}
       </div>
+      {showExplainer && (
+        <TutorialExplainer
+          onComplete={handleExplainerComplete}
+          onSkip={handleExplainerSkip}
+        />
+      )}
     </div>
   );
 }

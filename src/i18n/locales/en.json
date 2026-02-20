@@ -1600,5 +1600,32 @@
     "go_to_tutorial": "Go to Tutorial",
     "skip_tutorial": "Skip Tutorial",
     "skip_description": "Skip the tutorial and unlock all game modes (no XP reward)"
+  },
+  "explainer": {
+    "skip": "Skip",
+    "next": "Next",
+    "previous": "Previous",
+    "page1_title": "What is Texas Hold'em?",
+    "page1_text": "Texas Hold'em is the world's most popular poker game. Your goal is to make the best 5-card hand using any combination of your 2 private cards and 5 shared community cards.",
+    "page1_text2": "Win chips by having the best hand at showdown — or by betting so that everyone else folds.",
+    "page2_title": "How a Hand Works",
+    "page2_preflop": "Preflop: Each player gets 2 private cards",
+    "page2_flop": "Flop: 3 community cards are dealt face up",
+    "page2_turn": "Turn: 1 more community card is dealt",
+    "page2_river": "River: The final community card is dealt",
+    "page2_showdown": "Showdown: Players reveal cards, best hand wins",
+    "page2_text": "There is a round of betting after each deal. You can bet, check, call, raise, or fold.",
+    "page3_title": "Hand Rankings",
+    "page3_subtitle": "From strongest (#1) to weakest (#10)",
+    "page4_title": "Your Actions",
+    "page4_fold": "Fold — Give up your hand and sit out until the next deal",
+    "page4_check": "Check — Stay in without betting (only if no one has bet)",
+    "page4_call": "Call — Match the current bet to stay in",
+    "page4_raise": "Raise — Increase the bet, forcing others to match or fold",
+    "page4_allin": "All-in — Bet all your remaining chips",
+    "page5_title": "Ready to Play?",
+    "page5_text": "You know the basics! Let's put it into practice with guided hands.",
+    "begin_lesson": "Begin Lesson 1",
+    "basics_button": "Poker Basics"
   }
 }
