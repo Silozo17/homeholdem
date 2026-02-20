@@ -1,54 +1,39 @@
 
 
-# Fix: Green Screen Crash When User Folds in Lesson 7
+# Add Post-Fold Gameplay to Lesson 7 (When to Fold)
 
-## Root Cause
-
-In Lesson 7 ("When to Fold"), the user folds **pre-flop** (before any community cards are dealt). The next step is `show_result`, which dispatches `SHOWDOWN` to the reducer.
-
-Inside `SHOWDOWN`, the remaining active players (Viktor + Luna, who called/raised) are evaluated with:
-```typescript
-evaluateHand([...p.holeCards, ...state.communityCards])
-```
-
-But `state.communityCards` is **empty** (no flop/turn/river was ever dealt), so each player only has 2 cards. `evaluateHand` throws:
-```
-Error: Need at least 5 cards to evaluate
-```
-
-This unhandled error crashes the React render tree, producing the green error screen.
+## Problem
+After the user folds with 7-2, the lesson jumps straight to `show_result` with Viktor shown as "Winner!" -- but no community cards are dealt and no bot actions happen. This skips the entire rest of the hand, which is confusing for a learner. In real poker, the remaining players continue playing and there's a showdown.
 
 ## Fix
 
-**File: `src/hooks/useTutorialGame.ts`** (SHOWDOWN case, ~lines 238-273)
+Replace the single `show_result` step (line 436) with a sequence that plays out the hand between Viktor and Luna while the coach narrates what's happening:
 
-Add a guard: when only one player remains active (everyone else folded), skip hand evaluation entirely and just award the pot to the sole remaining player. This already exists for `remaining.length === 1`, but the issue is that when the **human** folds, there are still 2+ remaining bots who go through the `evaluateHand` path with insufficient cards.
+1. **Coach message**: "You folded -- smart play! Now let's watch how the rest of the hand plays out between Viktor and Luna."
+2. **Deal flop** (A-K-8): Coach explains Viktor flopped trip Aces, Luna has a pair of Kings. Viktor is way ahead.
+3. **Bot action**: Viktor bets (he has trips).
+4. **Bot action**: Luna calls (she has top pair, doesn't know Viktor has trips).
+5. **Deal turn** (4c): Coach notes nothing changed -- Viktor still dominant.
+6. **Bot action**: Viktor bets again.
+7. **Bot action**: Luna calls again.
+8. **Deal river** (3s): Coach notes the blank river.
+9. **Bot action**: Viktor bets once more.
+10. **Bot action**: Luna calls.
+11. **Show result**: Coach explains Viktor wins with trip Aces vs Luna's pair of Kings. Reinforces the fold lesson -- "Your 7-2 would have made nothing. Great fold!"
 
-The fix wraps the `evaluateHand` call in a check:
-- If `state.communityCards.length < 3` (no flop dealt), skip evaluation and just pick the first remaining player as winner with `handName: 'N/A'`
-- This handles any fold-before-flop scenario safely
+## Technical Details
 
-```typescript
-// Inside SHOWDOWN, the else branch (remaining.length > 1):
-if (state.communityCards.length < 3) {
-  // Pre-flop fold scenario: no community cards, can't evaluate hands
-  // Award pot to the first remaining player (or split equally)
-  const winner = remaining[0];
-  winner.chips += pot;
-  winner.lastAction = 'Winner!';
-  lastHandWinners.push({
-    playerId: winner.id, name: winner.name,
-    handName: 'N/A', chipsWon: pot,
-  });
-} else {
-  // existing evaluateHand logic...
-}
-```
+**File:** `src/lib/poker/tutorial-lessons.ts` (line 436 replaced with ~11 new steps)
+
+The steps use existing step types: `coach_message`, `deal_community`, `bot_action`, and `show_result`. The `deal_community` steps will deal the pre-configured flop/turn/river cards. Bot actions use explicit amounts.
+
+Step count goes from 8 to ~18, which the step counter handles automatically.
 
 ## What does NOT change
-- Tutorial lesson content
 - CoachOverlay UI
 - Bottom navigation
+- Game reducer logic or hooks
 - Database
+- Translations
 - Any other files
 
