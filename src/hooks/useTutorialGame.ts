@@ -247,6 +247,14 @@ function reducer(state: GameState, action: Action): GameState {
         remaining[0].lastAction = 'Winner!';
         if (remaining[0].id === 'human') handsWon++;
         lastHandWinners.push({ playerId: remaining[0].id, name: remaining[0].name, handName: 'N/A', chipsWon: pot });
+      } else if (state.communityCards.length < 3) {
+        // Pre-flop fold scenario: not enough cards to evaluate hands
+        // Award pot to the first remaining player (highest position)
+        const winner = remaining[0];
+        winner.chips += pot;
+        winner.lastAction = 'Winner!';
+        if (winner.id === 'human') handsWon++;
+        lastHandWinners.push({ playerId: winner.id, name: winner.name, handName: 'N/A', chipsWon: pot });
       } else {
         const contributors: PotContributor[] = players.map(p => ({
           playerId: p.id, totalBet: p.totalBetThisHand, status: p.status,
