@@ -28,11 +28,11 @@ export function BottomNav() {
   ];
 
   const pokerNav = [
-    { icon: Home, label: 'Home', path: '/dashboard' },
-    { icon: Gamepad2, label: 'Games', path: '/poker' },
-    { icon: Zap, label: 'Quick', path: null }, // Quick play
-    { icon: Trophy, label: 'Stats', path: '/stats' },
-    { icon: BookOpen, label: 'Rules', path: '/rules' },
+    { icon: Home, label: t('nav.poker_home'), path: '/dashboard' },
+    { icon: Gamepad2, label: t('nav.poker_games'), path: '/poker' },
+    { icon: Zap, label: t('nav.poker_quick'), path: null }, // Quick play
+    { icon: Trophy, label: t('nav.poker_stats'), path: '/stats' },
+    { icon: BookOpen, label: t('nav.poker_rules'), path: '/rules' },
   ];
 
   const navItems = isPokerMode ? pokerNav : defaultNav;

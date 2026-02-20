@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Gamepad2 } from 'lucide-react';
@@ -49,9 +50,10 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ displayName }: HeroSectionProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? t('home.good_morning') : hour < 18 ? t('home.good_afternoon') : t('home.good_evening');
 
   return (
     <div className="relative overflow-hidden rounded-2xl p-6 pb-8 glass-card">
@@ -62,7 +64,7 @@ export function HeroSection({ displayName }: HeroSectionProps) {
           <h1 className="text-2xl font-black text-shimmer">{displayName}</h1>
         </div>
         <p className="text-sm text-muted-foreground/80 max-w-[280px]">
-          Ready for your next hand? Jump into a game or check your clubs.
+          {t('home.hero_subtitle')}
         </p>
         <Button
           onClick={() => navigate('/poker')}
@@ -70,7 +72,7 @@ export function HeroSection({ displayName }: HeroSectionProps) {
           size="lg"
         >
           <Gamepad2 className="h-5 w-5" />
-          Play Now
+          {t('home.play_now')}
         </Button>
       </div>
     </div>

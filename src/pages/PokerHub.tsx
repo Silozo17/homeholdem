@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bot, Users, ArrowLeft, Crown, Coins, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardFan } from '@/components/poker/CardFan';
@@ -13,6 +14,7 @@ import { useTutorialComplete } from '@/hooks/useTutorialComplete';
 import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
 export default function PokerHub() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isActive } = useSubscription();
   const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
@@ -55,29 +57,29 @@ export default function PokerHub() {
         {/* Hero */}
         <CardFan compact className="h-14" />
         <div className="text-center space-y-0.5">
-          <h1 className="text-2xl font-black text-shimmer">Poker</h1>
-          <p className="text-xs text-muted-foreground">Choose your game mode</p>
+          <h1 className="text-2xl font-black text-shimmer">{t('poker_hub.title')}</h1>
+          <p className="text-xs text-muted-foreground">{t('poker_hub.subtitle')}</p>
         </div>
 
         {/* Game mode cards */}
         <div className="w-full max-w-md space-y-2.5">
           <GameModeCard
             icon={BookOpen}
-            title="Learn to Play"
-            description="Interactive lessons teaching Texas Hold'em"
-            hint="10 lessons • Guided hands"
+            title={t('poker_hub.learn_title')}
+            description={t('poker_hub.learn_desc')}
+            hint={t('poker_hub.learn_hint')}
             accentClass="bg-sky-500/15"
-            ctaLabel="Start Learning"
+            ctaLabel={t('poker_hub.learn_cta')}
             onClick={() => navigate('/learn-poker')}
             compact
           />
           <GameModeCard
             icon={Bot}
-            title="Play with Bots"
-            description="Choose opponents, chips, and blinds"
-            hint="1-8 bots • Customizable"
+            title={t('poker_hub.bots_title')}
+            description={t('poker_hub.bots_desc')}
+            hint={t('poker_hub.bots_hint')}
             accentClass="bg-amber-500/15"
-            ctaLabel="Configure & Play"
+            ctaLabel={t('poker_hub.bots_cta')}
             onClick={() => handleGatedMode('/play-poker')}
             compact
           />
@@ -89,22 +91,22 @@ export default function PokerHub() {
             )}
             <GameModeCard
               icon={Users}
-              title="Online Multiplayer"
-              description="Create or join a table with real players"
-              hint="Real-time • Invite friends"
+              title={t('poker_hub.multi_title')}
+              description={t('poker_hub.multi_desc')}
+              hint={t('poker_hub.multi_hint')}
               accentClass="bg-emerald-500/15"
-              ctaLabel="Find Table"
+              ctaLabel={t('poker_hub.multi_cta')}
               onClick={() => handleGatedMode('/online-poker', true)}
               compact
             />
           </div>
           <GameModeCard
             icon={Coins}
-            title="Paid Tournaments"
-            description="Compete for real cash prizes"
-            hint="Entry fee • Prize pool"
+            title={t('poker_hub.tournaments_title')}
+            description={t('poker_hub.tournaments_desc')}
+            hint={t('poker_hub.tournaments_hint')}
             accentClass="bg-yellow-500/15"
-            ctaLabel="View Tournaments"
+            ctaLabel={t('poker_hub.tournaments_cta')}
             onClick={() => handleGatedMode('/tournaments')}
             compact
           />

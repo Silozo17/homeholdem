@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Calendar, ArrowRight } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 
@@ -12,6 +13,7 @@ interface UpcomingEventBannerProps {
 }
 
 export function UpcomingEventBanner({ event }: UpcomingEventBannerProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -23,7 +25,7 @@ export function UpcomingEventBanner({ event }: UpcomingEventBannerProps) {
         <Calendar className="h-5 w-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground">{event.club_name} • Upcoming</p>
+        <p className="text-xs text-muted-foreground">{event.club_name} • {t('home.upcoming')}</p>
         <p className="font-bold text-foreground text-sm truncate">{event.title}</p>
         {event.final_date && (
           <p className="text-xs text-primary">
