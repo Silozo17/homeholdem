@@ -1,141 +1,187 @@
 
-# Full Polish Translation for Learn Poker Tutorial
 
-## Scope
+# Translate Remaining Hardcoded English Strings
 
-There are ~200+ hardcoded English strings across the tutorial system that need Polish translations:
+## Problem
 
-- **10 lesson titles, subtitles, and descriptions** (displayed in the lesson list and completion overlay)
-- **~12 intro steps** (lesson 1 table tour)
-- **~150 scripted step messages** (coach messages, bot actions, deal announcements, require_action prompts, show_result)
-- **~40 summary bullet points** (shown on lesson completion)
-- **3 hardcoded strings in LearnPoker.tsx** (tutorial complete toast, 2 performance messages)
-- **3 strings in CoachOverlay.tsx** (button text: "Continue", "Got it", "Tap X" -- already translated via `coach.*` keys but currently hardcoded in the component)
+Several components still have hardcoded English text instead of using `t()` translation keys:
 
-## Approach
+### 1. `src/components/home/HeroSection.tsx`
+- "Good morning" / "Good afternoon" / "Good evening"
+- "Ready for your next hand? Jump into a game or check your clubs."
+- "Play Now"
 
-### 1. Convert `TUTORIAL_LESSONS` from a static constant to a factory function
+### 2. `src/components/home/GameModesGrid.tsx`
+- "Learn" / "Tutorial" / "Step-by-step poker lessons"
+- "VS Bots" / "Practice Mode" / "Sharpen your skills against AI opponents"
+- "Multiplayer" / "Real Players" / "Play Texas Hold'em with friends online"
 
-**File: `src/lib/poker/tutorial-lessons.ts`**
+### 3. `src/components/home/QuickStatsStrip.tsx`
+- "Wins" / "Games" / "Net"
 
-Change `export const TUTORIAL_LESSONS` to `export function getTutorialLessons(t: TFunction)` that accepts the i18next `t` function and returns the lessons array with all strings wrapped in `t()` calls.
+### 4. `src/components/home/UpcomingEventBanner.tsx`
+- "Upcoming" (in the subtitle)
 
-Every string becomes a translation key lookup:
-```typescript
-title: t('tutorial.basics.title', 'The Basics'),
-subtitle: t('tutorial.basics.subtitle', 'How a Hand Works'),
-// scripted steps:
-message: t('tutorial.basics.step_1', "Your cards are dealt! You have A-S K-S..."),
-// summaries:
-t('tutorial.basics.summary_1', 'A hand has 4 betting rounds...')
+### 5. `src/pages/PokerHub.tsx`
+- "Poker" (heading)
+- "Choose your game mode"
+- "Learn to Play" / "Interactive lessons teaching Texas Hold'em" / "10 lessons - Guided hands" / "Start Learning"
+- "Play with Bots" / "Choose opponents, chips, and blinds" / "1-8 bots - Customizable" / "Configure & Play"
+- "Online Multiplayer" / "Create or join a table with real players" / "Real-time - Invite friends" / "Find Table"
+- "Paid Tournaments" / "Compete for real cash prizes" / "Entry fee - Prize pool" / "View Tournaments"
+
+### 6. `src/components/layout/BottomNav.tsx` (poker mode only)
+- "Home" / "Games" / "Quick" / "Stats" / "Rules" (lines 31-36 -- the `pokerNav` array is hardcoded while `defaultNav` already uses `t()`)
+
+## Changes
+
+### File: `src/components/home/HeroSection.tsx`
+- Add `useTranslation` import
+- Replace greeting with `t('home.good_morning')` / `t('home.good_afternoon')` / `t('home.good_evening')`
+- Replace subtitle with `t('home.hero_subtitle')`
+- Replace "Play Now" with `t('home.play_now')`
+
+### File: `src/components/home/GameModesGrid.tsx`
+- Add `useTranslation` import
+- Replace all 3 mode objects' `title`, `subtitle`, `description` with `t()` calls
+
+### File: `src/components/home/QuickStatsStrip.tsx`
+- Add `useTranslation` import
+- Replace "Wins", "Games", "Net" with `t('home.stat_wins')`, `t('home.stat_games')`, `t('home.stat_net')`
+
+### File: `src/components/home/UpcomingEventBanner.tsx`
+- Add `useTranslation` import
+- Replace "Upcoming" with `t('home.upcoming')`
+
+### File: `src/pages/PokerHub.tsx`
+- Add `useTranslation` import
+- Replace all hardcoded strings with `t('poker_hub.*')` keys
+
+### File: `src/components/layout/BottomNav.tsx`
+- Replace hardcoded `pokerNav` labels with `t('nav.poker_home')`, `t('nav.poker_games')`, `t('nav.poker_quick')`, `t('nav.poker_stats')`, `t('nav.poker_rules')`
+
+### File: `src/i18n/locales/en.json`
+Add keys:
 ```
-
-The second argument is the English default (fallback), so the app still works even if a key is missing.
-
-Also export `TUTORIAL_LESSON_COUNT = 10` as a constant for places that just need the count.
-
-### 2. Update LearnPoker.tsx to use the factory
-
-**File: `src/pages/LearnPoker.tsx`**
-
-```typescript
-const { t } = useTranslation();
-const lessons = useMemo(() => getTutorialLessons(t), [t]);
-// Replace all TUTORIAL_LESSONS references with lessons
-```
-
-Also wrap the 3 hardcoded strings:
-- Toast title: `t('tutorial.complete_toast_title', 'Tutorial Complete!')`
-- Toast description: `t('tutorial.complete_toast_desc', 'You earned 1600 XP...')`
-- Performance messages: `t('tutorial.result_good', "That was good!...")` and `t('tutorial.result_ok', "You've got the basics...")`
-
-### 3. Fix CoachOverlay.tsx button text to use existing translation keys
-
-**File: `src/components/poker/CoachOverlay.tsx`**
-
-The `coach.continue`, `coach.got_it`, `coach.tap_action`, and `coach.step_of` keys already exist in both locales but are NOT used in the component (it has hardcoded English). Fix:
-
-```typescript
-const { t } = useTranslation();
-// ...
-const buttonText = isIntro
-  ? t('coach.continue')
-  : isRequireAction
-    ? t('coach.tap_action', { action: step!.requiredAction! })
-    : t('coach.got_it');
-
-// Step counter:
-t('coach.step_of', { current: currentStepNum, total: totalSteps })
-```
-
-### 4. Add all translation keys to en.json and pl.json
-
-**File: `src/i18n/locales/en.json`** -- Add `tutorial` namespace with all ~200 keys in English.
-
-**File: `src/i18n/locales/pl.json`** -- Add `tutorial` namespace with all ~200 keys translated to Polish.
-
-Key structure:
-```json
-{
-  "tutorial": {
-    "complete_toast_title": "Tutorial Complete! / Samouczek ukończony!",
-    "complete_toast_desc": "You earned 1600 XP... / Zdobyłeś 1600 XP...",
-    "result_good": "That was good!... / To było dobre!...",
-    "result_ok": "You've got the basics... / Opanowałeś podstawy...",
-    "basics": {
-      "title": "The Basics / Podstawy",
-      "subtitle": "How a Hand Works / Jak działa ręka",
-      "description": "... / ...",
-      "intro_1": "Welcome to Learn Poker!... / Witaj w Nauce Pokera!...",
-      "intro_2": "...",
-      "step_1": "Your cards are dealt!... / Karty rozdane!...",
-      "step_2": "...",
-      "summary_1": "...",
-      "summary_2": "..."
-    },
-    "hand_rankings": { ... },
-    "betting_actions": { ... },
-    "position": { ... },
-    "reading_board": { ... },
-    "pot_odds": { ... },
-    "when_to_fold": { ... },
-    "bluffing": { ... },
-    "value_betting": { ... },
-    "final": { ... }
-  }
+"home": {
+  "good_morning": "Good morning",
+  "good_afternoon": "Good afternoon",
+  "good_evening": "Good evening",
+  "hero_subtitle": "Ready for your next hand? Jump into a game or check your clubs.",
+  "play_now": "Play Now",
+  "mode_learn": "Learn",
+  "mode_learn_sub": "Tutorial",
+  "mode_learn_desc": "Step-by-step poker lessons",
+  "mode_bots": "VS Bots",
+  "mode_bots_sub": "Practice Mode",
+  "mode_bots_desc": "Sharpen your skills against AI opponents",
+  "mode_multi": "Multiplayer",
+  "mode_multi_sub": "Real Players",
+  "mode_multi_desc": "Play Texas Hold'em with friends online",
+  "stat_wins": "Wins",
+  "stat_games": "Games",
+  "stat_net": "Net",
+  "upcoming": "Upcoming"
+},
+"poker_hub": {
+  "title": "Poker",
+  "subtitle": "Choose your game mode",
+  "learn_title": "Learn to Play",
+  "learn_desc": "Interactive lessons teaching Texas Hold'em",
+  "learn_hint": "10 lessons \u2022 Guided hands",
+  "learn_cta": "Start Learning",
+  "bots_title": "Play with Bots",
+  "bots_desc": "Choose opponents, chips, and blinds",
+  "bots_hint": "1-8 bots \u2022 Customizable",
+  "bots_cta": "Configure & Play",
+  "multi_title": "Online Multiplayer",
+  "multi_desc": "Create or join a table with real players",
+  "multi_hint": "Real-time \u2022 Invite friends",
+  "multi_cta": "Find Table",
+  "tournaments_title": "Paid Tournaments",
+  "tournaments_desc": "Compete for real cash prizes",
+  "tournaments_hint": "Entry fee \u2022 Prize pool",
+  "tournaments_cta": "View Tournaments"
+},
+"nav": {
+  ... existing keys ...
+  "poker_home": "Home",
+  "poker_games": "Games",
+  "poker_quick": "Quick",
+  "poker_stats": "Stats",
+  "poker_rules": "Rules"
 }
 ```
 
-### Polish translations for all 10 lessons (summary)
+### File: `src/i18n/locales/pl.json`
+Add matching Polish translations:
+```
+"home": {
+  "good_morning": "Dzień dobry",
+  "good_afternoon": "Dzień dobry",
+  "good_evening": "Dobry wieczór",
+  "hero_subtitle": "Gotowy na kolejną rękę? Dołącz do gry lub sprawdź swoje kluby.",
+  "play_now": "Zagraj teraz",
+  "mode_learn": "Nauka",
+  "mode_learn_sub": "Samouczek",
+  "mode_learn_desc": "Lekcje pokera krok po kroku",
+  "mode_bots": "VS Boty",
+  "mode_bots_sub": "Tryb ćwiczebny",
+  "mode_bots_desc": "Doskonal umiejętności grając z AI",
+  "mode_multi": "Multiplayer",
+  "mode_multi_sub": "Prawdziwi gracze",
+  "mode_multi_desc": "Graj w Texas Hold'em z przyjaciółmi online",
+  "stat_wins": "Wygrane",
+  "stat_games": "Gry",
+  "stat_net": "Bilans",
+  "upcoming": "Nadchodzące"
+},
+"poker_hub": {
+  "title": "Poker",
+  "subtitle": "Wybierz tryb gry",
+  "learn_title": "Naucz się grać",
+  "learn_desc": "Interaktywne lekcje Texas Hold'em",
+  "learn_hint": "10 lekcji \u2022 Z przewodnikiem",
+  "learn_cta": "Rozpocznij naukę",
+  "bots_title": "Graj z botami",
+  "bots_desc": "Wybierz przeciwników, żetony i blindy",
+  "bots_hint": "1-8 botów \u2022 Konfigurowalne",
+  "bots_cta": "Skonfiguruj i graj",
+  "multi_title": "Multiplayer online",
+  "multi_desc": "Utwórz lub dołącz do stołu z prawdziwymi graczami",
+  "multi_hint": "W czasie rzeczywistym \u2022 Zaproś znajomych",
+  "multi_cta": "Znajdź stół",
+  "tournaments_title": "Płatne turnieje",
+  "tournaments_desc": "Rywalizuj o nagrody pieniężne",
+  "tournaments_hint": "Wpisowe \u2022 Pula nagród",
+  "tournaments_cta": "Zobacz turnieje"
+},
+"nav": {
+  ... existing keys ...
+  "poker_home": "Główna",
+  "poker_games": "Gry",
+  "poker_quick": "Szybka",
+  "poker_stats": "Statystyki",
+  "poker_rules": "Zasady"
+}
+```
 
-| Lesson | English Title | Polish Title |
-|--------|--------------|-------------|
-| 1 | The Basics | Podstawy |
-| 2 | Hand Rankings | Ranking układów |
-| 3 | Betting Actions | Akcje licytacji |
-| 4 | Position Matters | Znaczenie pozycji |
-| 5 | Reading the Board | Czytanie stołu |
-| 6 | Pot Odds | Szanse puli |
-| 7 | When to Fold | Kiedy spasować |
-| 8 | Bluffing Basics | Podstawy blefu |
-| 9 | Value Betting | Obstawianie wartości |
-| 10 | Putting It All Together | Wszystko razem |
-
-All scripted step messages, intro messages, summaries, and UI strings will receive full Polish translations maintaining poker terminology (using standard Polish poker terms: fold/pas, check/czekaj, call/sprawdzenie, raise/podbicie, blind, flop, turn, river, etc.).
-
-## Files changed
+## Summary of file changes
 
 | File | Change |
 |------|--------|
-| `src/lib/poker/tutorial-lessons.ts` | Convert `TUTORIAL_LESSONS` to `getTutorialLessons(t)` factory; export `TUTORIAL_LESSON_COUNT` |
-| `src/pages/LearnPoker.tsx` | Use factory with `t`; translate toast and performance messages |
-| `src/components/poker/CoachOverlay.tsx` | Use existing `coach.*` translation keys for button text and step counter |
-| `src/i18n/locales/en.json` | Add ~200 keys under `tutorial` namespace |
-| `src/i18n/locales/pl.json` | Add ~200 Polish translations under `tutorial` namespace |
+| `src/components/home/HeroSection.tsx` | Add `useTranslation`, replace 5 hardcoded strings with `t()` |
+| `src/components/home/GameModesGrid.tsx` | Add `useTranslation`, replace 9 hardcoded strings with `t()` |
+| `src/components/home/QuickStatsStrip.tsx` | Add `useTranslation`, replace 3 labels with `t()` |
+| `src/components/home/UpcomingEventBanner.tsx` | Add `useTranslation`, replace "Upcoming" with `t()` |
+| `src/pages/PokerHub.tsx` | Add `useTranslation`, replace ~16 hardcoded strings with `t()` |
+| `src/components/layout/BottomNav.tsx` | Replace 5 hardcoded poker nav labels with `t()` |
+| `src/i18n/locales/en.json` | Add `home` and `poker_hub` namespaces + 5 new `nav` keys |
+| `src/i18n/locales/pl.json` | Add matching Polish translations |
 
 ## What does NOT change
-- Game engine, hooks, reducers
-- Bottom navigation
-- Database
-- Layout or styling
-- Any non-tutorial components
+- Game engine, database, auth flow
+- Layout, styling, spacing
+- Bottom navigation structure (only labels change)
+- Auth page (already uses `t()`)
+- Tutorial system (already translated)
