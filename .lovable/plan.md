@@ -1,58 +1,54 @@
 
 
-# Fix Turn Order: Bot Must Act Before User on Every Post-Flop Street
+# Fix: Green Screen Crash When User Folds in Lesson 7
 
-## Problem
-In real poker, the first active player left of the dealer acts first on every post-flop street. In several lessons, the user is asked to Raise without the bot acting first, breaking proper poker turn order and confusing learners.
+## Root Cause
 
-## Affected Lessons and Fixes
+In Lesson 7 ("When to Fold"), the user folds **pre-flop** (before any community cards are dealt). The next step is `show_result`, which dispatches `SHOWDOWN` to the reducer.
 
-All fixes involve inserting a `bot_action: check` step before the user's `require_action` step on the affected street. Each added step includes a brief, educational message.
-
-### Lesson 1 (The Basics) -- River
-- Insert: Ace (bot-2) checks before user raises
-- Message: "Ace checked. With your Broadway Straight, it's time to bet big!"
-
-### Lesson 2 (Hand Rankings) -- Flop, Turn, and River (3 fixes)
-- **Flop**: Insert Viktor (bot-0) check before user raises
-  - Message: "Viktor checked his trip Kings. But your trip Aces are higher!"
-- **Turn**: Insert Viktor check before user raises
-  - Message: "Viktor checked. He's cautious now."
-- **River**: Insert Viktor check before user raises
-  - Message: "Viktor checked. Time for one last value bet!"
-
-### Lesson 3 (Betting Actions) -- River
-- Insert: Viktor check before user raises
-- Message: "Viktor checked. He missed his draws. Time to bet your Flush!"
-
-### Lesson 6 (Pot Odds) -- River
-- Insert: Viktor check before user raises
-- Message: "Viktor checked. He's worried. Your straight is the best hand!"
-
-### Lesson 9 (Value Betting) -- River
-- Insert: Viktor check before user raises
-- Message: "Viktor checked. He missed his straight draw. One more value bet!"
-
-### Lesson 10 (Final) -- River
-- Insert: Viktor check before user raises
-- Message: "Viktor checked. Your Two Pair is strong!"
-
-## Technical Details
-
-**File changed:** `src/lib/poker/tutorial-lessons.ts`
-
-Each fix is a single line insertion of the form:
+Inside `SHOWDOWN`, the remaining active players (Viktor + Luna, who called/raised) are evaluated with:
 ```typescript
-{ type: 'bot_action', botId: 'bot-0', botAction: { type: 'check' }, message: "...", delay: 1500 },
+evaluateHand([...p.holeCards, ...state.communityCards])
 ```
 
-The step counter (e.g., "Step 16/18") will automatically adjust because it counts total steps. Lessons that gain a step will show the new correct total.
+But `state.communityCards` is **empty** (no flop/turn/river was ever dealt), so each player only has 2 cards. `evaluateHand` throws:
+```
+Error: Need at least 5 cards to evaluate
+```
+
+This unhandled error crashes the React render tree, producing the green error screen.
+
+## Fix
+
+**File: `src/hooks/useTutorialGame.ts`** (SHOWDOWN case, ~lines 238-273)
+
+Add a guard: when only one player remains active (everyone else folded), skip hand evaluation entirely and just award the pot to the sole remaining player. This already exists for `remaining.length === 1`, but the issue is that when the **human** folds, there are still 2+ remaining bots who go through the `evaluateHand` path with insufficient cards.
+
+The fix wraps the `evaluateHand` call in a check:
+- If `state.communityCards.length < 3` (no flop dealt), skip evaluation and just pick the first remaining player as winner with `handName: 'N/A'`
+- This handles any fold-before-flop scenario safely
+
+```typescript
+// Inside SHOWDOWN, the else branch (remaining.length > 1):
+if (state.communityCards.length < 3) {
+  // Pre-flop fold scenario: no community cards, can't evaluate hands
+  // Award pot to the first remaining player (or split equally)
+  const winner = remaining[0];
+  winner.chips += pot;
+  winner.lastAction = 'Winner!';
+  lastHandWinners.push({
+    playerId: winner.id, name: winner.name,
+    handName: 'N/A', chipsWon: pot,
+  });
+} else {
+  // existing evaluateHand logic...
+}
+```
 
 ## What does NOT change
-- Bottom navigation
+- Tutorial lesson content
 - CoachOverlay UI
-- Game reducer logic or hooks
+- Bottom navigation
 - Database
-- Translations
 - Any other files
 
