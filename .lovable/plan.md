@@ -1,64 +1,81 @@
 
-# Fix Pointer Hand Precision for Action Buttons and Raise Menu
 
-## Problem
-From the screenshots:
-1. The pointer hand points at the general "actions" area instead of the specific **Raise button** at the bottom of the action stack.
-2. When the raise slider/presets menu opens, the pointer stays in the same spot instead of moving to point at the **presets panel** (with a right-pointing hand from the left side).
+# Fix Hand Pointer Precision + Lesson 10 Notification Tips
 
-## Solution
+## Part 1: Fix Hand Pointer Positions
 
-### 1. Add `onSliderToggle` callback to BettingControls
-**File: `src/components/poker/BettingControls.tsx`**
-- Add optional prop: `onSliderToggle?: (open: boolean) => void`
-- Call it whenever `showRaiseSlider` changes (inside `handleRaiseTap` and the cancel button)
+### Analysis of Current Layout
 
-### 2. Track slider state in PokerTablePro
-**File: `src/components/poker/PokerTablePro.tsx`**
-- Add prop: `onRaiseSliderToggle?: (open: boolean) => void`
-- Pass it to `BettingControls` as `onSliderToggle`
+The action buttons in landscape mode are positioned as:
+- Panel: `right: safe-area + 10px`, `bottom: safe-area + 12px`, width `180px`
+- Buttons: 37px tall, 9px gap, stacked vertically: **Fold** (top), **Check/Call** (middle), **Raise** (bottom)
+- Raise button vertical center: ~30px from bottom safe-area
+- Panel left edge: `right: safe-area + 190px`
 
-### 3. Track slider state in LearnPoker and pass to CoachOverlay
-**File: `src/pages/LearnPoker.tsx`**
-- Add `const [raiseSliderOpen, setRaiseSliderOpen] = useState(false)`
-- Pass `onRaiseSliderToggle={setRaiseSliderOpen}` to `PokerTablePro`
-- Pass `raiseSliderOpen={raiseSliderOpen}` to `CoachOverlay`
+### Current Problems
+- `actions` pointer at `right: 152px` is **inside** the panel, not beside it -- should be at ~193px to sit 3px outside the left edge
+- `actions` bottom at `20px` is roughly correct for the Raise button center (~30px) but needs fine-tuning
+- `raise_presets` at `bottom: 190px` is a rough guess -- needs to match actual presets panel position
 
-### 4. Update CoachOverlay pointer logic and positions
+### Updated POINTER_HANDS values
+
 **File: `src/components/poker/CoachOverlay.tsx`**
 
-Add new prop `raiseSliderOpen?: boolean`.
+| Target | Emoji | New CSS | Why |
+|--------|-------|---------|-----|
+| `actions` | `👉` | `right: safe-area + 193px`, `bottom: safe-area + 24px` | 3px left of the 180px-wide panel (10+180+3=193), vertically centered on the 37px Raise button (12 + 37/2 ~= 30, minus emoji half-height ~6 = 24) |
+| `raise_presets` | `👉` | `right: safe-area + 193px`, `bottom: safe-area + 175px` | Same horizontal offset; vertically aligned with the presets row which sits above: 3 buttons (37px each) + 2 gaps (9px) + Cancel button (37px) + gap (9px) + presets panel midpoint. Approx bottom: 12 + 37*3 + 9*3 + 37 + 9 + ~20 = ~185px, minus emoji offset ~= 175px |
+| `cards` | `👇` | Keep current (centered, 3px above cards area) |  |
+| `community` | `👇` | Keep current |  |
+| `pot` | `👇` | Keep current |  |
+| `exit` | `👉` | `left: safe-area + 43px`, `top: safe-area + 12px` | 3px to the right of the 32px+8px exit button, vertically centered |
+| `audio` | `👈` | `right: safe-area + 43px`, `top: safe-area + 12px` | 3px to the left of the 32px+8px audio button, vertically centered |
+| `timer` | `👇` | Keep current |  |
 
-**Update POINTER_HANDS** -- make `actions` point precisely at the Raise button (the bottom-most 37px-tall button in the landscape stack), and add a new `raise_presets` target:
+---
 
-| Target | Emoji | Position (CSS) | Description |
-|--------|-------|----------------|-------------|
-| `actions` | `👉` | `right: calc(safe-area + 195px)`, `bottom: calc(safe-area + 22px)` | Points RIGHT at the Raise button from the left side, vertically centered on the 37px button |
-| `raise_presets` | `👉` | `right: calc(safe-area + 195px)`, `bottom: calc(safe-area + 190px)` | Points RIGHT at the presets panel from the left side |
+## Part 2: Lesson 10 -- Replace Coach Overlay with Dismissible Top-Right Notifications
 
-**Update pointer selection logic**: When `isRequireAction` and `raiseSliderOpen`, use `raise_presets` instead of `actions`.
+### Current Behaviour
+Lesson 10 uses the same full CoachOverlay (dim background + speech bubble + pointer hands) as all other lessons. The user wants lesson 10 to feel more like "free play with tips" -- lightweight, non-blocking notifications.
 
-```text
-activeHighlight logic:
-  if isRequireAction:
-    if raiseSliderOpen -> 'raise_presets'
-    else -> 'actions'  
-  else:
-    use rawHighlight from step/intro
-```
+### New Behaviour
+- Create a new `TutorialTipNotification` component rendered in the top-right corner
+- Small card-style notification with the tip text + an X close button
+- Auto-dismisses after 10 seconds
+- When a new notification appears, it replaces the previous one (auto-dismiss old)
+- No dim overlay, no pointer hands -- fully immersive gameplay
+- Only used for `coach_message` steps in lesson 10; `require_action` steps still use normal CoachOverlay (the player needs guidance on what to tap)
+
+### Implementation
+
+**New file: `src/components/poker/TutorialTipNotification.tsx`**
+- Props: `message: string`, `onDismiss: () => void`
+- Fixed position: top-right with safe-area padding
+- Slide-in animation from the right
+- 10-second auto-dismiss timer (resets when message changes)
+- X button to manually dismiss
+- Semi-transparent card background with backdrop blur
+- Max width ~280px so it doesn't block gameplay
+
+**Modified file: `src/pages/LearnPoker.tsx`**
+- Detect when `activeLessonIdx === 9` (lesson 10, the last lesson)
+- For `coach_message` steps: render `TutorialTipNotification` instead of `CoachOverlay`
+- For `require_action` steps: still use `CoachOverlay` as normal (player needs the pointer guidance)
+- `deal_hole_cards`, `deal_community`, `show_result` steps: use `CoachOverlay` as normal (these are important pauses)
 
 ### Summary of file changes
 
 | File | Change |
 |------|--------|
-| `src/components/poker/BettingControls.tsx` | Add `onSliderToggle` prop, call it on open/close |
-| `src/components/poker/PokerTablePro.tsx` | Add `onRaiseSliderToggle` prop, pass to BettingControls |
-| `src/pages/LearnPoker.tsx` | Track `raiseSliderOpen` state, pass to CoachOverlay |
-| `src/components/poker/CoachOverlay.tsx` | Add `raiseSliderOpen` prop, add `raise_presets` target, fix `actions` to point at Raise button precisely |
+| `src/components/poker/CoachOverlay.tsx` | Update `actions` and `raise_presets` pointer positions for precision |
+| `src/components/poker/TutorialTipNotification.tsx` | New component -- top-right dismissible notification |
+| `src/pages/LearnPoker.tsx` | For lesson 10 `coach_message` steps, render `TutorialTipNotification` instead of `CoachOverlay` |
 
-## What does NOT change
-- Tutorial lesson messages
+### What does NOT change
+- Tutorial lesson data/messages in `tutorial-lessons.ts`
+- BettingControls.tsx
 - Bottom navigation
 - Game logic / engine
 - Database
-- Highlight ring positions (those are correct)
+- Lessons 1-9 behaviour (all unchanged)
