@@ -1261,7 +1261,13 @@
     "mute_mic": "Mute Mic",
     "undeafen": "Undeafen",
     "mute_all": "Mute All",
-    "wait_hand_end": "Wait for hand to end"
+    "wait_hand_end": "Wait for hand to end",
+    "fold": "Fold",
+    "check": "Check",
+    "call": "Call",
+    "raise": "Raise",
+    "all_in": "All-in",
+    "call_any": "Call Any"
   },
   "poker_lobby": {
     "play_poker": "Play Poker",
