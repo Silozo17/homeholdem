@@ -1253,7 +1253,13 @@
     "mute_mic": "Wycisz mikrofon",
     "undeafen": "Włącz dźwięk",
     "mute_all": "Wycisz wszystko",
-    "wait_hand_end": "Poczekaj na koniec ręki"
+    "wait_hand_end": "Poczekaj na koniec ręki",
+    "fold": "Pas",
+    "check": "Czekaj",
+    "call": "Sprawdź",
+    "raise": "Podbij",
+    "all_in": "Wszystko",
+    "call_any": "Sprawdź każdy"
   },
   "poker_lobby": {
     "play_poker": "Zagraj w pokera",
