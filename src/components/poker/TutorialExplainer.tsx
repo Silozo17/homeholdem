@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X, Spade, Layers, Trophy, Gamepad2, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { HAND_RANKING_EXAMPLES } from '@/lib/poker/hand-ranking-examples';
+import { MiniCardRow } from '@/components/poker/MiniCardRow';
 
 type TranslateFn = ReturnType<typeof useTranslation>['t'];
 
@@ -12,19 +14,6 @@ interface TutorialExplainerProps {
 }
 
 const TOTAL_PAGES = 5;
-
-const HAND_RANKINGS = [
-  { rank: 1, key: 'royal_flush', example: 'A♠ K♠ Q♠ J♠ 10♠' },
-  { rank: 2, key: 'straight_flush', example: '9♥ 8♥ 7♥ 6♥ 5♥' },
-  { rank: 3, key: 'four_of_kind', example: 'K♠ K♥ K♦ K♣ 3♠' },
-  { rank: 4, key: 'full_house', example: 'Q♠ Q♥ Q♦ 9♣ 9♠' },
-  { rank: 5, key: 'flush', example: 'A♦ J♦ 8♦ 6♦ 2♦' },
-  { rank: 6, key: 'straight', example: '10♠ 9♥ 8♦ 7♣ 6♠' },
-  { rank: 7, key: 'three_of_kind', example: '7♠ 7♥ 7♦ K♣ 2♠' },
-  { rank: 8, key: 'two_pair', example: 'J♠ J♥ 4♦ 4♣ A♠' },
-  { rank: 9, key: 'one_pair', example: '10♠ 10♥ K♦ 7♣ 4♠' },
-  { rank: 10, key: 'high_card', example: 'A♠ J♥ 8♦ 6♣ 2♠' },
-];
 
 export function TutorialExplainer({ onComplete, onSkip }: TutorialExplainerProps) {
   const { t } = useTranslation();
@@ -154,7 +143,7 @@ function Page3({ t }: { t: TranslateFn }) {
         <p className="text-sm text-muted-foreground mt-1">{t('explainer.page3_subtitle')}</p>
       </div>
       <div className="space-y-2">
-        {HAND_RANKINGS.map((hand) => (
+        {HAND_RANKING_EXAMPLES.map((hand) => (
           <div key={hand.rank} className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-card/50 border border-border/30">
             <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
               {hand.rank}
@@ -162,7 +151,7 @@ function Page3({ t }: { t: TranslateFn }) {
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-sm text-foreground">{t(`poker.${hand.key}`)}</div>
               <div className="text-xs text-muted-foreground">{t(`poker.${hand.key}_desc`)}</div>
-              <div className="text-xs font-mono mt-0.5 text-primary/80">{hand.example}</div>
+              <MiniCardRow cards={hand.cards} />
             </div>
           </div>
         ))}
