@@ -7,18 +7,9 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Spade } from 'lucide-react';
-import { HAND_RANKING_EXAMPLES } from '@/lib/poker/hand-ranking-examples';
-import { MiniCardRow } from '@/components/poker/MiniCardRow';
-
+import { HandRankingsList } from '@/components/poker/HandRankingsList';
 export function PokerHandRankings() {
   const { t } = useTranslation();
-
-  const handRankings = HAND_RANKING_EXAMPLES.map((hand) => ({
-    rank: hand.rank,
-    name: t(`poker.${hand.key}`),
-    description: t(`poker.${hand.key}_desc`),
-    cards: hand.cards,
-  }));
 
   const bettingRounds = [
     {
@@ -72,20 +63,7 @@ export function PokerHandRankings() {
           <AccordionItem value="hand-rankings">
             <AccordionTrigger>{t('poker.hand_rankings')}</AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-3">
-                {handRankings.map((hand) => (
-                  <div key={hand.rank} className="flex items-start gap-3 py-2 border-b border-border/30 last:border-0">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                      {hand.rank}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{hand.name}</div>
-                      <div className="text-sm text-muted-foreground">{hand.description}</div>
-                      <MiniCardRow cards={hand.cards} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <HandRankingsList />
             </AccordionContent>
           </AccordionItem>
 
