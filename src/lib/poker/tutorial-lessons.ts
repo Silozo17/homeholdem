@@ -391,7 +391,7 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       { type: 'deal_community', communityPhase: 'river', message: "The River: J♦! You made your straight: 7-8-9-10-J! The math paid off!", highlight: 'community', delay: 1000 },
       { type: 'coach_message', message: "Your straight (7-8-9-10-J) beats Viktor's pair of Aces. This is why pot odds matter — sometimes the right call doesn't hit, but over many hands it's profitable!" },
       { type: 'bot_action', botId: 'bot-0', botAction: { type: 'check' }, message: "Viktor checked. He's worried. Your straight is the best hand!", delay: 1500 },
-      { type: 'require_action', requiredAction: 'raise', message: "Value bet your straight! Make Viktor pay. Tap 'Raise', set to around 500, and confirm!" },
+      { type: 'require_action', requiredAction: 'raise', message: "Value bet your straight! Make Viktor pay. Tap 'Raise', use the presets above the slider (try '¾ Pot'), and confirm!" },
       { type: 'bot_action', botId: 'bot-0', botAction: { type: 'call' }, message: "Viktor called with top pair! He couldn't let go of his Aces.", delay: 1500 },
       { type: 'show_result', message: "Your straight wins! Pot odds told you calling was correct, and the river delivered. Remember: Pot Odds = cost ÷ total pot. Compare to your winning chance!" },
     ],
