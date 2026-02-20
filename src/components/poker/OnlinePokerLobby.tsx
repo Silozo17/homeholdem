@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { CardFan } from './CardFan';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useTranslation } from 'react-i18next';
 
 import { callEdge } from '@/lib/poker/callEdge';
 
@@ -46,6 +47,7 @@ interface OnlinePokerLobbyProps {
 export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [tables, setTables] = useState<TableSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -105,7 +107,6 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
 
   useEffect(() => { fetchTables(); }, [fetchTables]);
 
-  // Realtime subscription for auto-refresh when tables change
   useEffect(() => {
     const channel = supabase
       .channel('poker-tables-lobby')
@@ -120,7 +121,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   }, [fetchTables]);
 
   const handleCreate = async () => {
-    if (!tableName.trim()) { toast({ title: 'Enter a table name', variant: 'destructive' }); return; }
+    if (!tableName.trim()) { toast({ title: t('poker_online.enter_table_name'), variant: 'destructive' }); return; }
     setCreating(true);
     try {
       const data = await callEdge('poker-create-table', {
@@ -142,13 +143,13 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       setInviteOpen(true);
       onJoinTable(data.table.id);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     } finally { setCreating(false); }
   };
 
   const handleJoinByCode = async () => {
     const code = inviteCode.trim().toUpperCase();
-    if (code.length < 4) { toast({ title: 'Enter a valid invite code', variant: 'destructive' }); return; }
+    if (code.length < 4) { toast({ title: t('poker_online.enter_valid_code'), variant: 'destructive' }); return; }
     setJoiningByCode(true);
     try {
       const { data: table } = await supabase
@@ -159,14 +160,14 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         .single();
 
       if (!table) {
-        toast({ title: 'Table not found', description: 'Check the invite code and try again', variant: 'destructive' });
+        toast({ title: t('poker_online.table_not_found'), description: t('poker_online.table_not_found_desc'), variant: 'destructive' });
         return;
       }
       setJoinCodeOpen(false);
       setInviteCode('');
       onJoinTable(table.id);
     } catch {
-      toast({ title: 'Table not found', variant: 'destructive' });
+      toast({ title: t('poker_online.table_not_found'), variant: 'destructive' });
     } finally { setJoiningByCode(false); }
   };
 
@@ -175,24 +176,24 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
     setDeleting(true);
     try {
       await callEdge('poker-moderate-table', { table_id: deleteTarget.id, action: 'close' });
-      toast({ title: 'Table deleted' });
+      toast({ title: t('poker_online.table_deleted') });
       fetchTables();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
     }
   };
 
-  const filteredTables = tables.filter(t => {
+  const filteredTables = tables.filter(tbl => {
     if (clubId) return true;
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'public') return t.table_type === 'public';
-    if (activeFilter === 'friends') return t.table_type === 'friends';
-    if (activeFilter === 'private') return t.table_type === 'private';
-    if (activeFilter === 'community') return t.table_type === 'community';
-    if (activeFilter === 'mine') return t.created_by === user?.id;
+    if (activeFilter === 'public') return tbl.table_type === 'public';
+    if (activeFilter === 'friends') return tbl.table_type === 'friends';
+    if (activeFilter === 'private') return tbl.table_type === 'private';
+    if (activeFilter === 'community') return tbl.table_type === 'community';
+    if (activeFilter === 'mine') return tbl.created_by === user?.id;
     return true;
   });
 
@@ -218,11 +219,11 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   };
 
   const typeLabel = (type: string) => {
-    if (type === 'public') return 'Public';
-    if (type === 'club') return 'Club';
-    if (type === 'private') return 'Private';
-    if (type === 'community') return 'Community';
-    return 'Invite Only';
+    if (type === 'public') return t('poker_online.type_public');
+    if (type === 'club') return t('poker_online.type_club');
+    if (type === 'private') return t('poker_online.type_private');
+    if (type === 'community') return t('poker_online.type_community');
+    return t('poker_online.type_invite_only');
   };
 
   return (
@@ -250,10 +251,10 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         {/* Hero */}
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
-            {clubId ? 'Club Tables' : 'Online Tables'}
+            {clubId ? t('poker_online.club_tables') : t('poker_online.online_tables')}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {clubId ? 'Play poker with your club members' : "Play Texas Hold'em with friends — real-time multiplayer"}
+            {clubId ? t('poker_online.club_tables_desc') : t('poker_online.online_tables_desc')}
           </p>
         </div>
 
@@ -267,33 +268,33 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-foreground text-sm">Create Table</p>
-                  <p className="text-[10px] text-muted-foreground truncate">Set up a new game</p>
+                  <p className="font-bold text-foreground text-sm">{t('poker_online.create_table')}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{t('poker_online.setup_new_game')}</p>
                 </div>
               </button>
             </DialogTrigger>
             <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader><DialogTitle>Create Table</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{t('poker_online.create_table')}</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder="Table name" value={tableName} onChange={(e) => setTableName(e.target.value)} />
+                <Input placeholder={t('poker_online.table_name_placeholder')} value={tableName} onChange={(e) => setTableName(e.target.value)} />
                 {!clubId && (
                   <div className="space-y-2">
-                    <label className="text-sm text-muted-foreground">Type</label>
+                    <label className="text-sm text-muted-foreground">{t('poker_online.type')}</label>
                     <Select value={tableType} onValueChange={(v) => setTableType(v as any)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="friends">Friends (Invite Only)</SelectItem>
-                        <SelectItem value="public">Public</SelectItem>
-                        <SelectItem value="private">Private (Hidden)</SelectItem>
-                        <SelectItem value="community">Community (Permanent)</SelectItem>
+                        <SelectItem value="friends">{t('poker_online.friends_invite_only')}</SelectItem>
+                        <SelectItem value="public">{t('poker_online.public')}</SelectItem>
+                        <SelectItem value="private">{t('poker_online.private_hidden')}</SelectItem>
+                        <SelectItem value="community">{t('poker_online.community_permanent')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 )}
                 <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Description (optional)</label>
+                  <label className="text-sm text-muted-foreground">{t('poker_online.description_optional')}</label>
                   <Textarea
-                    placeholder="Short description for your table..."
+                    placeholder={t('poker_online.description_placeholder')}
                     value={tableDescription}
                     onChange={(e) => setTableDescription(e.target.value.slice(0, 200))}
                     maxLength={200}
@@ -303,22 +304,22 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Blinds</span>
+                    <span className="text-muted-foreground">{t('poker_online.blinds')}</span>
                     <span className="font-bold text-primary">{bigBlind / 2}/{bigBlind}</span>
                   </div>
                   <Slider value={[bigBlind]} min={20} max={1000} step={20} onValueChange={([v]) => setBigBlind(v)} />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Max Buy-in</span>
+                    <span className="text-muted-foreground">{t('poker_online.max_buy_in')}</span>
                     <span className="font-bold text-primary">{maxBuyIn.toLocaleString()}</span>
                   </div>
                   <Slider value={[maxBuyIn]} min={1000} max={100000} step={1000} onValueChange={([v]) => setMaxBuyIn(v)} />
                 </div>
                 <div className="space-y-2">
-                  <span className="text-sm text-muted-foreground">Blind Timer</span>
+                  <span className="text-sm text-muted-foreground">{t('poker_online.blind_timer')}</span>
                   <div className="flex gap-1.5 flex-wrap">
-                    {[{ label: 'Off', value: 0 }, { label: '5m', value: 5 }, { label: '10m', value: 10 }, { label: '15m', value: 15 }, { label: '30m', value: 30 }].map(opt => (
+                    {[{ label: t('poker_online.off'), value: 0 }, { label: '5m', value: 5 }, { label: '10m', value: 10 }, { label: '15m', value: 15 }, { label: '30m', value: 30 }].map(opt => (
                       <button
                         key={opt.value}
                         onClick={() => setBlindTimer(opt.value)}
@@ -335,7 +336,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                   </div>
                 </div>
                 <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleCreate} disabled={creating}>
-                  {creating ? 'Creating...' : 'Create & Sit Down'}
+                  {creating ? t('poker_online.creating') : t('poker_online.create_sit_down')}
                 </Button>
               </div>
             </DialogContent>
@@ -350,23 +351,23 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                     <Hash className="h-5 w-5 text-foreground/70" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-foreground text-sm">Join by Code</p>
-                    <p className="text-[10px] text-muted-foreground truncate">Enter invite code</p>
+                    <p className="font-bold text-foreground text-sm">{t('poker_online.join_by_code')}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{t('poker_online.enter_invite_code')}</p>
                   </div>
                 </button>
               </DialogTrigger>
               <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-                <DialogHeader><DialogTitle>Join Table by Code</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{t('poker_online.join_table_by_code')}</DialogTitle></DialogHeader>
                 <div className="space-y-4 pt-2">
                   <Input
-                    placeholder="Enter 6-character invite code"
+                    placeholder={t('poker_online.enter_6_char')}
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     maxLength={6}
                     className="text-center text-2xl font-mono tracking-[0.3em]"
                   />
                   <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleJoinByCode} disabled={joiningByCode || inviteCode.length < 4}>
-                    {joiningByCode ? 'Joining...' : 'Join Table'}
+                    {joiningByCode ? t('poker_online.joining') : t('poker_online.join_table')}
                   </Button>
                 </div>
               </DialogContent>
@@ -374,7 +375,7 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
           )}
         </div>
 
-        {/* Invite Friends button — only shown when a table was created this session */}
+        {/* Invite Friends button */}
         {lastCreatedTable && (
           <div className="flex gap-2 animate-slide-up-fade stagger-2">
             <button
@@ -385,22 +386,22 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                 <UserPlus className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-foreground text-sm">Invite Friends</p>
-                <p className="text-[10px] text-muted-foreground truncate">Invite to {lastCreatedTable.name}</p>
+                <p className="font-bold text-foreground text-sm">{t('poker_online.invite_friends')}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{t('poker_online.invite_to', { name: lastCreatedTable.name })}</p>
               </div>
             </button>
           </div>
         )}
 
-        {/* Filter tabs (not for club view) */}
+        {/* Filter tabs */}
         {!clubId && (
           <Tabs value={activeFilter} onValueChange={setActiveFilter} className="animate-slide-up-fade stagger-2">
             <TabsList className="grid w-full grid-cols-5 h-8">
-              <TabsTrigger value="all" className="text-[10px] py-1">All</TabsTrigger>
-              <TabsTrigger value="public" className="text-[10px] py-1">Public</TabsTrigger>
-              <TabsTrigger value="community" className="text-[10px] py-1">Community</TabsTrigger>
-              <TabsTrigger value="friends" className="text-[10px] py-1">Friends</TabsTrigger>
-              <TabsTrigger value="mine" className="text-[10px] py-1">Mine</TabsTrigger>
+              <TabsTrigger value="all" className="text-[10px] py-1">{t('poker_online.filter_all')}</TabsTrigger>
+              <TabsTrigger value="public" className="text-[10px] py-1">{t('poker_online.filter_public')}</TabsTrigger>
+              <TabsTrigger value="community" className="text-[10px] py-1">{t('poker_online.filter_community')}</TabsTrigger>
+              <TabsTrigger value="friends" className="text-[10px] py-1">{t('poker_online.filter_friends')}</TabsTrigger>
+              <TabsTrigger value="mine" className="text-[10px] py-1">{t('poker_online.filter_mine')}</TabsTrigger>
             </TabsList>
           </Tabs>
         )}
@@ -408,61 +409,61 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
         {/* Table list */}
         <div className="space-y-3 animate-slide-up-fade stagger-2">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {filteredTables.length} {filteredTables.length === 1 ? 'Table' : 'Tables'}
+            {filteredTables.length === 1 ? t('poker_online.table_count', { count: filteredTables.length }) : t('poker_online.table_count_plural', { count: filteredTables.length })}
           </h2>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground animate-pulse">Loading tables...</div>
+            <div className="text-center py-8 text-muted-foreground animate-pulse">{t('poker_online.loading_tables')}</div>
           ) : filteredTables.length === 0 ? (
             <div className="glass-card rounded-2xl p-8 text-center space-y-4">
               <CardFan />
-              <p className="text-muted-foreground text-sm">No tables yet — be the first to deal!</p>
+              <p className="text-muted-foreground text-sm">{t('poker_online.no_tables')}</p>
             </div>
           ) : (
-            filteredTables.map(t => (
+            filteredTables.map(tbl => (
               <div
-                key={t.id}
+                key={tbl.id}
                 role="button"
                 className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group cursor-pointer transition-all hover:shadow-lg"
-                onClick={() => onJoinTable(t.id)}
+                onClick={() => onJoinTable(tbl.id)}
               >
                 <div className="space-y-1.5 flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-foreground text-sm truncate">{t.name}</p>
-                    {t.is_persistent && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0">Permanent</Badge>}
-                    {t.closing_at && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">Closing</Badge>}
+                    <p className="font-bold text-foreground text-sm truncate">{tbl.name}</p>
+                    {tbl.is_persistent && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0">{t('poker_online.permanent')}</Badge>}
+                    {tbl.closing_at && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">{t('poker_online.closing')}</Badge>}
                   </div>
-                  {t.description && (
-                    <p className="text-[10px] text-muted-foreground truncate">{t.description}</p>
+                  {tbl.description && (
+                    <p className="text-[10px] text-muted-foreground truncate">{tbl.description}</p>
                   )}
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    {typeIcon(t.table_type)}
-                    <span>{typeLabel(t.table_type)}</span>
+                    {typeIcon(tbl.table_type)}
+                    <span>{typeLabel(tbl.table_type)}</span>
                     <span>•</span>
-                    <span>{t.small_blind}/{t.big_blind}</span>
+                    <span>{tbl.small_blind}/{tbl.big_blind}</span>
                   </div>
-                  <SeatDots filled={t.player_count} total={t.max_seats} />
+                  <SeatDots filled={tbl.player_count} total={tbl.max_seats} />
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <div className="flex items-center gap-1">
-                    {t.created_by === user?.id && (
+                    {tbl.created_by === user?.id && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, name: t.name }); }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: tbl.id, name: tbl.name }); }}
                         className="p-1 rounded-md hover:bg-destructive/10 transition-colors"
-                        aria-label="Delete table"
+                        aria-label={t('common.delete')}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </button>
                     )}
                     <span className={cn(
                       'text-[10px] px-2 py-0.5 rounded-full font-medium',
-                      t.status === 'playing' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'
+                      tbl.status === 'playing' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'
                     )}>
-                      {t.status === 'playing' ? 'In Game' : 'Open'}
+                      {tbl.status === 'playing' ? t('poker_online.in_game') : t('poker_online.open')}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Users className="h-3 w-3" />
-                    <span>{t.player_count}/{t.max_seats}</span>
+                    <span>{tbl.player_count}/{tbl.max_seats}</span>
                   </div>
                 </div>
               </div>
@@ -475,18 +476,18 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete table?</AlertDialogTitle>
+            <AlertDialogTitle>{t('poker_online.delete_table')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tables.find(t => t.id === deleteTarget?.id)?.is_persistent
-                ? `This will schedule "${deleteTarget?.name}" for closure in 4 hours if players are inside. No new players will be able to join during this time.`
-                : `This will close "${deleteTarget?.name}" and remove all players. This cannot be undone.`
+              {tables.find(tbl => tbl.id === deleteTarget?.id)?.is_persistent
+                ? t('poker_online.delete_persistent_desc', { name: deleteTarget?.name })
+                : t('poker_online.delete_normal_desc', { name: deleteTarget?.name })
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteTable} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? t('poker_online.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

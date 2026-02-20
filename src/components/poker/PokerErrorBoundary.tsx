@@ -1,5 +1,6 @@
 import React, { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import i18n from '@/i18n';
 
 interface Props {
   children: ReactNode;
@@ -35,12 +36,13 @@ export class PokerErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const t = i18n.t.bind(i18n);
       return (
         <div className="fixed inset-0 flex flex-col items-center justify-center gap-6 bg-background/95 backdrop-blur-sm" style={{ zIndex: 9999 }}>
           <AlertTriangle className="w-12 h-12 text-destructive animate-pulse" />
-          <p className="text-lg font-bold text-foreground">Something went wrong</p>
+          <p className="text-lg font-bold text-foreground">{t('poker_error.something_went_wrong')}</p>
           <p className="text-sm text-muted-foreground text-center max-w-[280px]">
-            The poker table encountered an error. Tap below to reconnect.
+            {t('poker_error.error_description')}
           </p>
           <div className="flex gap-3">
             <button
@@ -48,13 +50,13 @@ export class PokerErrorBoundary extends Component<Props, State> {
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm"
             >
               <RefreshCw className="w-4 h-4" />
-              Reconnect
+              {t('poker_error.reconnect')}
             </button>
             <button
               onClick={this.handleLeave}
               className="px-5 py-2.5 rounded-lg bg-muted text-muted-foreground font-medium text-sm"
             >
-              Leave Table
+              {t('poker_error.leave_table')}
             </button>
           </div>
         </div>
