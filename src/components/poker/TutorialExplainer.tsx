@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X, Spade, Layers, Trophy, Gamepad2, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { HAND_RANKING_EXAMPLES } from '@/lib/poker/hand-ranking-examples';
-import { MiniCardRow } from '@/components/poker/MiniCardRow';
+import { HandRankingsList } from '@/components/poker/HandRankingsList';
 
 type TranslateFn = ReturnType<typeof useTranslation>['t'];
 
@@ -142,20 +141,7 @@ function Page3({ t }: { t: TranslateFn }) {
         <h1 className="text-2xl font-black text-foreground">{t('explainer.page3_title', 'Hand Rankings')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('explainer.page3_subtitle')}</p>
       </div>
-      <div className="space-y-2">
-        {HAND_RANKING_EXAMPLES.map((hand) => (
-          <div key={hand.rank} className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-card/50 border border-border/30">
-            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-              {hand.rank}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm text-foreground">{t(`poker.${hand.key}`)}</div>
-              <div className="text-xs text-muted-foreground">{t(`poker.${hand.key}_desc`)}</div>
-              <MiniCardRow cards={hand.cards} />
-            </div>
-          </div>
-        ))}
-      </div>
+      <HandRankingsList />
     </div>
   );
 }
