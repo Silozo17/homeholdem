@@ -484,6 +484,8 @@ export function useTutorialGame(lesson: TutorialLesson | null) {
     dispatch({ type: 'PLAYER_ACTION', action });
     // Advance to next step after a brief delay
     setRequiredAction(null);
+    setStepPhase('animating');
+    setCoachMessage('');
     timerRef.current = setTimeout(() => {
       executeStep(stepIndex + 1);
     }, 600);
