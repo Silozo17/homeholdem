@@ -1592,5 +1592,32 @@
     "go_to_tutorial": "Przejdź do samouczka",
     "skip_tutorial": "Pomiń samouczek",
     "skip_description": "Pomiń samouczek i odblokuj wszystkie tryby gry (bez nagrody XP)"
+  },
+  "explainer": {
+    "skip": "Pomiń",
+    "next": "Dalej",
+    "previous": "Wstecz",
+    "page1_title": "Czym jest Texas Hold'em?",
+    "page1_text": "Texas Hold'em to najpopularniejsza gra pokerowa na świecie. Twoim celem jest ułożenie najlepszego układu 5 kart z 2 prywatnych kart i 5 wspólnych kart na stole.",
+    "page1_text2": "Wygrywaj żetony mając najlepszy układ na showdownie — lub licytując tak, by wszyscy inni spasowali.",
+    "page2_title": "Jak wygląda ręka",
+    "page2_preflop": "Preflop: Każdy gracz dostaje 2 prywatne karty",
+    "page2_flop": "Flop: 3 wspólne karty są odkrywane",
+    "page2_turn": "Turn: Odkrywana jest kolejna wspólna karta",
+    "page2_river": "River: Odkrywana jest ostatnia wspólna karta",
+    "page2_showdown": "Showdown: Gracze odkrywają karty, najlepszy układ wygrywa",
+    "page2_text": "Po każdym rozdaniu jest runda licytacji. Możesz licytować, czekać, sprawdzić, podbić lub spasować.",
+    "page3_title": "Ranking układów",
+    "page3_subtitle": "Od najsilniejszego (#1) do najsłabszego (#10)",
+    "page4_title": "Twoje akcje",
+    "page4_fold": "Pas — Poddaj rękę i czekaj na następne rozdanie",
+    "page4_check": "Czekaj — Zostań w grze bez licytacji (tylko gdy nikt nie postawił)",
+    "page4_call": "Sprawdź — Wyrównaj aktualny zakład, aby zostać w grze",
+    "page4_raise": "Podbij — Zwiększ zakład, zmuszając innych do wyrównania lub pasu",
+    "page4_allin": "All-in — Postaw wszystkie pozostałe żetony",
+    "page5_title": "Gotowy do gry?",
+    "page5_text": "Znasz podstawy! Przećwiczmy to w praktyce z przewodnikiem.",
+    "begin_lesson": "Rozpocznij lekcję 1",
+    "basics_button": "Podstawy pokera"
   }
 }
