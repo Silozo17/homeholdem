@@ -99,21 +99,25 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
   const message = introStep?.message || step?.message || '';
   const fallbackPosition = introStep?.position || 'bottom';
   const arrowDirection = introStep?.arrowDirection || 'none';
-  const highlight = introStep?.highlight || step?.highlightElement || step?.highlight;
   const isIntro = !!introStep;
   const isRequireAction = !!step?.requiredAction;
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Only show highlight ring during intro steps (table tour), not during gameplay
-  const showHighlightRing = isIntro && !!highlight;
-  const highlightStyle = showHighlightRing ? HIGHLIGHT_POSITIONS[highlight!] : null;
+  // Determine which element to highlight/point at
+  // For require_action steps: ALWAYS point at actions, regardless of step.highlight
+  const rawHighlight = introStep?.highlight || step?.highlightElement || step?.highlight;
+  const activeHighlight = isRequireAction ? 'actions' : rawHighlight;
 
-  // Always show pointer hands when a highlight target is set
-  const pointerHand = highlight ? POINTER_HANDS[highlight] : null;
+  // Only show highlight ring during intro steps (table tour), not during gameplay
+  const showHighlightRing = isIntro && !!activeHighlight;
+  const highlightStyle = showHighlightRing ? HIGHLIGHT_POSITIONS[activeHighlight!] : null;
+
+  // Always show pointer hands when an active highlight target is set
+  const pointerHand = activeHighlight ? POINTER_HANDS[activeHighlight] : null;
 
   const dialogPosition = (() => {
-    if (!highlight) return fallbackPosition || 'center';
-    switch (highlight) {
+    if (!activeHighlight) return fallbackPosition || 'center';
+    switch (activeHighlight) {
       case 'exit': case 'audio': case 'timer': return 'bottom';
       case 'actions': return 'center-left';
       case 'cards': return 'top';
@@ -121,11 +125,11 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
     }
   })();
 
-  // Button text depends on step type
+  // Button text — clean, no emojis
   const buttonText = isIntro
     ? 'Continue →'
     : isRequireAction
-      ? `Tap ${step!.requiredAction!.charAt(0).toUpperCase() + step!.requiredAction!.slice(1)} below 👇`
+      ? `Tap ${step!.requiredAction!.charAt(0).toUpperCase() + step!.requiredAction!.slice(1)}`
       : 'Got it →';
 
   return (
@@ -181,15 +185,15 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
             </div>
           )}
 
-          {/* Coach avatar + speech bubble — separated */}
+          {/* Coach avatar + speech bubble */}
           <div className="flex items-start gap-2.5">
-            {/* Standalone coach avatar circle */}
-            <div className="shrink-0 w-12 h-12 rounded-full bg-card/95 border-2 border-primary/30 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/10 coach-bounce">
+            {/* Bigger coach avatar circle */}
+            <div className="shrink-0 w-14 h-14 rounded-full bg-card/95 border-2 border-primary/30 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/10 coach-bounce">
               {!imgFailed ? (
                 <img
                   src={dealerImg}
                   alt="Coach"
-                  className="w-10 h-10 object-cover rounded-full"
+                  className="w-12 h-12 object-cover rounded-full"
                   draggable={false}
                   onError={() => setImgFailed(true)}
                 />
@@ -198,12 +202,24 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
               )}
             </div>
 
-            {/* Speech bubble */}
+            {/* Cloud-style speech bubble */}
             <div className="flex-1 min-w-0">
-              <div className="bg-card/95 border border-primary/30 rounded-2xl p-3 shadow-xl shadow-primary/10 max-h-[45vh] overflow-y-auto backdrop-blur-sm relative">
-                {/* Speech bubble tail */}
+              <div className="relative bg-card/90 border border-primary/20 rounded-3xl p-3.5 backdrop-blur-md max-h-[45vh] overflow-y-auto"
+                style={{
+                  boxShadow: '0 4px 24px -4px hsl(var(--primary) / 0.15), inset 0 1px 0 hsl(var(--primary) / 0.08)',
+                }}
+              >
+                {/* Cloud bubble tail — larger, rounder */}
                 <div
-                  className="absolute left-[-6px] top-4 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[6px] border-r-primary/30"
+                  className="absolute -left-2 top-4"
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderTop: '8px solid transparent',
+                    borderBottom: '8px solid transparent',
+                    borderRight: '10px solid hsl(var(--card) / 0.9)',
+                    filter: 'drop-shadow(-2px 0 2px hsl(var(--primary) / 0.1))',
+                  }}
                 />
 
                 {/* Step progress indicator */}
@@ -220,7 +236,7 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
                 {/* For require_action: don't show a button, user must tap the game action */}
                 {isRequireAction ? (
                   <p className="text-xs text-primary font-medium animate-pulse mt-2">
-                    👆 {buttonText}
+                    {buttonText}
                   </p>
                 ) : (
                   <Button
