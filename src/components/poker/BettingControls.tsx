@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { X, Check, PhoneIncoming, TrendingUp, Flame } from 'lucide-react';
@@ -26,6 +27,7 @@ export function BettingControls({
   const [raiseAmount, setRaiseAmount] = useState(minRaiseTotal);
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
 
+  const { t } = useTranslation();
   const canRaise = playerChips > amountToCall && minRaiseTotal <= maxRaiseTotal;
 
   // Tutorial visual blocking helpers
@@ -61,14 +63,14 @@ export function BettingControls({
   ];
 
   const callLabel = canCheck
-    ? 'Check'
+    ? t('poker_table.check')
     : amountToCall >= playerChips
-    ? `All-in ${playerChips.toLocaleString()}`
-    : `Call ${amountToCall.toLocaleString()}`;
+    ? `${t('poker_table.all_in')} ${playerChips.toLocaleString()}`
+    : `${t('poker_table.call')} ${amountToCall.toLocaleString()}`;
 
   const raiseLabel = showRaiseSlider
-    ? (raiseAmount >= maxRaiseTotal ? 'All-in' : `Raise ${raiseAmount.toLocaleString()}`)
-    : 'Raise';
+    ? (raiseAmount >= maxRaiseTotal ? t('poker_table.all_in') : `${t('poker_table.raise')} ${raiseAmount.toLocaleString()}`)
+    : t('poker_table.raise');
 
   const btnStyle = (bg: string, border: string, shadow: string) => ({
     background: bg,
@@ -119,7 +121,7 @@ export function BettingControls({
               onValueChange={([v]) => setRaiseAmount(v)}
             />
             <span className="text-[11px] text-primary text-center font-bold tabular-nums">
-              {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
+              {raiseAmount >= maxRaiseTotal ? t('poker_table.all_in') : raiseAmount.toLocaleString()}
             </span>
           </div>
         )}
@@ -133,7 +135,7 @@ export function BettingControls({
             )}
             onClick={() => { setShowRaiseSlider(false); onSliderToggle?.(false); }}
           >
-            <X size={12} /> Cancel
+            <X size={12} /> {t('common.cancel')}
           </button>
         )}
         <button
@@ -150,7 +152,7 @@ export function BettingControls({
           )}
           onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
-          <X size={12} /> Fold
+          <X size={12} /> {t('poker_table.fold')}
         </button>
         <button
           className={cn(
@@ -237,7 +239,7 @@ export function BettingControls({
           <div className="flex items-center gap-3">
             <Slider value={[raiseAmount]} min={minRaiseTotal} max={maxRaiseTotal} step={bigBlind} onValueChange={([v]) => setRaiseAmount(v)} className="flex-1 h-6" />
             <span className="text-xs text-primary w-16 text-right font-bold tabular-nums" style={{ textShadow: '0 0 6px hsl(43 74% 49% / 0.3)' }}>
-              {raiseAmount >= maxRaiseTotal ? 'All-in' : raiseAmount.toLocaleString()}
+              {raiseAmount >= maxRaiseTotal ? t('poker_table.all_in') : raiseAmount.toLocaleString()}
             </span>
           </div>
         </div>
@@ -253,7 +255,7 @@ export function BettingControls({
             )}
             onClick={() => { setShowRaiseSlider(false); onSliderToggle?.(false); }}
           >
-            <X size={14} /> Cancel
+            <X size={14} /> {t('common.cancel')}
           </button>
         </div>
       )}
@@ -272,7 +274,7 @@ export function BettingControls({
           )}
           onClick={() => { onAction({ type: 'fold' }); setShowRaiseSlider(false); }}
         >
-          <X size={14} /> Fold
+          <X size={14} /> {t('poker_table.fold')}
         </button>
         <button
           className={cn(

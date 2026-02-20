@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 export type PreActionType = 'check_fold' | 'call_any' | 'check' | null;
@@ -10,19 +11,20 @@ interface PreActionButtonsProps {
   queued: PreActionType;
 }
 
-const ACTIONS: { id: PreActionType; label: string; description: string }[] = [
-  { id: 'check_fold', label: 'Check/Fold', description: 'Auto-check or fold' },
-  { id: 'call_any', label: 'Call Any', description: 'Auto-call any bet' },
-  { id: 'check', label: 'Check', description: 'Auto-check only' },
-];
-
 export const PreActionButtons = memo(function PreActionButtons({
   canPreCheck, amountToCall, onQueue, queued,
 }: PreActionButtonsProps) {
+  const { t } = useTranslation();
+
+  const ACTIONS: { id: PreActionType; label: string; description: string }[] = [
+    { id: 'check_fold', label: `${t('poker_table.check')}/${t('poker_table.fold')}`, description: 'Auto-check or fold' },
+    { id: 'call_any', label: t('poker_table.call_any'), description: 'Auto-call any bet' },
+    { id: 'check', label: t('poker_table.check'), description: 'Auto-check only' },
+  ];
+
   return (
     <div className="flex flex-col items-end gap-1">
       {ACTIONS.map(action => {
-        // Hide "Check" option if there's already a bet to call
         if (action.id === 'check' && amountToCall > 0 && !canPreCheck) return null;
 
         const isActive = queued === action.id;

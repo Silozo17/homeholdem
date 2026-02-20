@@ -1143,6 +1143,7 @@
     "call": "Call",
     "raise": "Raise",
     "all_in": "All-in",
+    "call_any": "Call Any",
     "online_tables": "Online Tables",
     "club_tables": "Club Tables",
     "play_with_friends": "Play Texas Hold'em with friends — real-time multiplayer",
