@@ -157,7 +157,17 @@ export default function LearnPoker() {
         )}
         {showCoach && !useNotification && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} raiseSliderOpen={raiseSliderOpen} />}
         {showComplete && activeLesson && (
-          <LessonCompleteOverlay lesson={activeLesson} isLastLesson={isLastLesson} onNextLesson={handleNextLesson} onBackToLessons={handleBackToLessons} />
+          <LessonCompleteOverlay
+            lesson={activeLesson}
+            isLastLesson={isLastLesson}
+            onNextLesson={handleNextLesson}
+            onBackToLessons={handleBackToLessons}
+            customMessage={isLesson10 ? (
+              humanPlayer && humanPlayer.chips > activeLesson.startingChips
+                ? "🏆 That was good! You're ready for the real thing."
+                : "👍 You've got the basics down! With practice, you'll get better."
+            ) : undefined}
+          />
         )}
       </>
     );
