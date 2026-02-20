@@ -143,7 +143,7 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
     <div className="fixed inset-0 z-50 pointer-events-none">
       {/* Dim overlay */}
       <div
-        className={cn("fixed inset-0 bg-black/25", isRequireAction ? "pointer-events-none" : "pointer-events-auto")}
+        className={cn("fixed inset-0 bg-black/25", isRequireAction ? "pointer-events-none opacity-0" : "pointer-events-auto")}
         onClick={isRequireAction ? undefined : onDismiss}
       />
 
