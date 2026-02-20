@@ -12,6 +12,8 @@ import { LessonCompleteOverlay } from '@/components/poker/LessonCompleteOverlay'
 import { useTutorialGame } from '@/hooks/useTutorialGame';
 import { TUTORIAL_LESSONS } from '@/lib/poker/tutorial-lessons';
 import { cn } from '@/lib/utils';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'poker-tutorial-progress';
 
@@ -33,6 +35,7 @@ export default function LearnPoker() {
   const [activeLessonIdx, setActiveLessonIdx] = useState<number>(0);
   const [completedLessons, setCompletedLessons] = useState<number[]>(getProgress);
   const [showComplete, setShowComplete] = useState(false);
+  const { isComplete: tutorialAlreadyComplete, markComplete } = useTutorialComplete();
 
   const activeLesson = TUTORIAL_LESSONS[activeLessonIdx] || null;
   const {
@@ -58,6 +61,14 @@ export default function LearnPoker() {
           const next = [...completedLessons, activeLessonIdx];
           setCompletedLessons(next);
           saveProgress(next);
+          // Award XP when all 10 lessons are completed for the first time
+          if (next.length === TUTORIAL_LESSONS.length && !tutorialAlreadyComplete) {
+            markComplete(true);
+            toast({
+              title: '🎉 Tutorial Complete!',
+              description: 'You earned 1600 XP and reached Level 5! All game modes are now unlocked.',
+            });
+          }
         }
       }, 1500);
       return () => clearTimeout(timer);
