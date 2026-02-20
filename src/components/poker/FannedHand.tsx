@@ -9,11 +9,11 @@ interface FannedHandProps {
 
 export const FannedHand = memo(function FannedHand({ cards, highlighted }: FannedHandProps) {
   return (
-    <div className="flex items-center">
+    <div className="flex rounded-md overflow-hidden border border-white/20 shadow-sm">
       {cards.map((card, i) => (
         <div
           key={i}
-          style={{ marginLeft: i > 0 ? -26 : 0, zIndex: i }}
+          className={i < cards.length - 1 ? 'border-r border-gray-300' : ''}
         >
           <HandRankingCard card={card} isFaded={!highlighted.includes(i)} />
         </div>
