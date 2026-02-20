@@ -67,31 +67,31 @@ const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
 const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties }> = {
   actions: {
     emoji: '👇',
-    style: { right: 'calc(env(safe-area-inset-right, 0px) + 80px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 170px)' },
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 70px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 172px)' },
   },
   cards: {
     emoji: '👇',
-    style: { left: '50%', bottom: 'calc(8% + 75px)', transform: 'translateX(-50%)' },
+    style: { left: '50%', bottom: 'calc(8% + 73px)', transform: 'translateX(-50%)' },
   },
   community: {
-    emoji: '👆',
-    style: { left: '50%', top: 'calc(42% - 28px)', transform: 'translateX(-50%)' },
+    emoji: '👇',
+    style: { left: '50%', top: 'calc(42% - 3px)', transform: 'translateX(-50%) translateY(-100%)' },
   },
   pot: {
-    emoji: '👆',
-    style: { left: '50%', top: 'calc(25% - 28px)', transform: 'translateX(-50%)' },
+    emoji: '👇',
+    style: { left: '50%', top: 'calc(25% - 3px)', transform: 'translateX(-50%) translateY(-100%)' },
   },
   exit: {
-    emoji: '👈',
-    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 44px)' },
+    emoji: '👉',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 10px)', left: 'calc(env(safe-area-inset-left, 0px) + 43px)' },
   },
   audio: {
-    emoji: '👉',
-    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 'calc(env(safe-area-inset-right, 0px) + 44px)' },
+    emoji: '👈',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 10px)', right: 'calc(env(safe-area-inset-right, 0px) + 43px)' },
   },
   timer: {
-    emoji: '👆',
-    style: { top: 'calc(env(safe-area-inset-top, 0px) + 32px)', left: 'calc(env(safe-area-inset-left, 0px) + 90px)' },
+    emoji: '👇',
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 32px)', left: 'calc(env(safe-area-inset-left, 0px) + 110px)', transform: 'translateY(-100%)' },
   },
 };
 
