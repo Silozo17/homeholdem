@@ -7,72 +7,18 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Spade } from 'lucide-react';
+import { HAND_RANKING_EXAMPLES } from '@/lib/poker/hand-ranking-examples';
+import { MiniCardRow } from '@/components/poker/MiniCardRow';
 
 export function PokerHandRankings() {
   const { t } = useTranslation();
 
-  const handRankings = [
-    {
-      rank: 1,
-      name: t('poker.royal_flush'),
-      description: t('poker.royal_flush_desc'),
-      example: 'A♠ K♠ Q♠ J♠ 10♠',
-    },
-    {
-      rank: 2,
-      name: t('poker.straight_flush'),
-      description: t('poker.straight_flush_desc'),
-      example: '9♥ 8♥ 7♥ 6♥ 5♥',
-    },
-    {
-      rank: 3,
-      name: t('poker.four_of_kind'),
-      description: t('poker.four_of_kind_desc'),
-      example: 'K♠ K♥ K♦ K♣ 3♠',
-    },
-    {
-      rank: 4,
-      name: t('poker.full_house'),
-      description: t('poker.full_house_desc'),
-      example: 'Q♠ Q♥ Q♦ 9♣ 9♠',
-    },
-    {
-      rank: 5,
-      name: t('poker.flush'),
-      description: t('poker.flush_desc'),
-      example: 'A♦ J♦ 8♦ 6♦ 2♦',
-    },
-    {
-      rank: 6,
-      name: t('poker.straight'),
-      description: t('poker.straight_desc'),
-      example: '10♠ 9♥ 8♦ 7♣ 6♠',
-    },
-    {
-      rank: 7,
-      name: t('poker.three_of_kind'),
-      description: t('poker.three_of_kind_desc'),
-      example: '7♠ 7♥ 7♦ K♣ 2♠',
-    },
-    {
-      rank: 8,
-      name: t('poker.two_pair'),
-      description: t('poker.two_pair_desc'),
-      example: 'J♠ J♥ 4♦ 4♣ A♠',
-    },
-    {
-      rank: 9,
-      name: t('poker.one_pair'),
-      description: t('poker.one_pair_desc'),
-      example: '10♠ 10♥ K♦ 7♣ 4♠',
-    },
-    {
-      rank: 10,
-      name: t('poker.high_card'),
-      description: t('poker.high_card_desc'),
-      example: 'A♠ J♥ 8♦ 6♣ 2♠',
-    },
-  ];
+  const handRankings = HAND_RANKING_EXAMPLES.map((hand) => ({
+    rank: hand.rank,
+    name: t(`poker.${hand.key}`),
+    description: t(`poker.${hand.key}_desc`),
+    cards: hand.cards,
+  }));
 
   const bettingRounds = [
     {
@@ -135,7 +81,7 @@ export function PokerHandRankings() {
                     <div className="flex-1">
                       <div className="font-medium">{hand.name}</div>
                       <div className="text-sm text-muted-foreground">{hand.description}</div>
-                      <div className="text-sm font-mono mt-1 text-primary/80">{hand.example}</div>
+                      <MiniCardRow cards={hand.cards} />
                     </div>
                   </div>
                 ))}
