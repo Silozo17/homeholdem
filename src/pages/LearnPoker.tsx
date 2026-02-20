@@ -32,6 +32,7 @@ export default function LearnPoker() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [raiseSliderOpen, setRaiseSliderOpen] = useState(false);
   const [activeLessonIdx, setActiveLessonIdx] = useState<number>(0);
   const [completedLessons, setCompletedLessons] = useState<number[]>(getProgress);
   const [showComplete, setShowComplete] = useState(false);
@@ -142,10 +143,11 @@ export default function LearnPoker() {
               (!!currentStep?.highlight && currentStep.highlight === 'actions') ||
               (!!currentIntroStep?.highlight && currentIntroStep.highlight === 'actions')
             }
+            onRaiseSliderToggle={setRaiseSliderOpen}
           />
         </div>
-        {showIntro && <CoachOverlay introStep={currentIntroStep} onDismiss={dismissCoach} />}
-        {showCoach && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} />}
+        {showIntro && <CoachOverlay introStep={currentIntroStep} onDismiss={dismissCoach} raiseSliderOpen={raiseSliderOpen} />}
+        {showCoach && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} raiseSliderOpen={raiseSliderOpen} />}
         {showComplete && activeLesson && (
           <LessonCompleteOverlay lesson={activeLesson} isLastLesson={isLastLesson} onNextLesson={handleNextLesson} onBackToLessons={handleBackToLessons} />
         )}

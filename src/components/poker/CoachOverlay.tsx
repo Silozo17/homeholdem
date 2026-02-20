@@ -18,10 +18,9 @@ interface CoachOverlayProps {
   introStep?: IntroStep | null;
   onDismiss: () => void;
   requiredAction?: string;
-  /** Current step number (1-based) */
   currentStepNum?: number;
-  /** Total steps in this lesson */
   totalSteps?: number;
+  raiseSliderOpen?: boolean;
 }
 
 const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
@@ -66,8 +65,12 @@ const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
 /** Map highlight target → pointer hand emoji + offset style */
 const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties }> = {
   actions: {
-    emoji: '👇',
-    style: { right: 'calc(env(safe-area-inset-right, 0px) + 70px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 172px)' },
+    emoji: '👉',
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 152px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' },
+  },
+  raise_presets: {
+    emoji: '👉',
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 152px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 190px)' },
   },
   cards: {
     emoji: '👇',
@@ -95,7 +98,7 @@ const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties 
   },
 };
 
-export function CoachOverlay({ step, introStep, onDismiss, requiredAction, currentStepNum, totalSteps }: CoachOverlayProps) {
+export function CoachOverlay({ step, introStep, onDismiss, requiredAction, currentStepNum, totalSteps, raiseSliderOpen }: CoachOverlayProps) {
   const message = introStep?.message || step?.message || '';
   const fallbackPosition = introStep?.position || 'bottom';
   const arrowDirection = introStep?.arrowDirection || 'none';
@@ -104,9 +107,11 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
   const [imgFailed, setImgFailed] = useState(false);
 
   // Determine which element to highlight/point at
-  // For require_action steps: ALWAYS point at actions, regardless of step.highlight
+  // For require_action steps: point at actions, or raise_presets if slider is open
   const rawHighlight = introStep?.highlight || step?.highlightElement || step?.highlight;
-  const activeHighlight = isRequireAction ? 'actions' : rawHighlight;
+  const activeHighlight = isRequireAction
+    ? (raiseSliderOpen ? 'raise_presets' : 'actions')
+    : rawHighlight;
 
   // Only show highlight ring during intro steps (table tour), not during gameplay
   const showHighlightRing = isIntro && !!activeHighlight;

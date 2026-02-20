@@ -37,6 +37,7 @@ interface PokerTableProProps {
   onQuit: () => void;
   tutorialAllowedAction?: string | null;
   forceShowControls?: boolean;
+  onRaiseSliderToggle?: (open: boolean) => void;
 }
 
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
@@ -75,7 +76,7 @@ function BlindTimerCountdown({ lastBlindIncrease, blindTimer, currentSmall, curr
 
 export function PokerTablePro({
   state, isHumanTurn, amountToCall, canCheck, maxBet, onAction, onNextHand, onQuit,
-  tutorialAllowedAction, forceShowControls,
+  tutorialAllowedAction, forceShowControls, onRaiseSliderToggle,
 }: PokerTableProProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -538,6 +539,7 @@ export function PokerTablePro({
               pot={state.pot}
               onAction={handleAction}
               tutorialAllowedAction={tutorialAllowedAction}
+              onSliderToggle={onRaiseSliderToggle}
             />
           </div>
         ) : (
@@ -560,6 +562,7 @@ export function PokerTablePro({
               pot={state.pot}
               onAction={handleAction}
               tutorialAllowedAction={tutorialAllowedAction}
+              onSliderToggle={onRaiseSliderToggle}
             />
           </div>
         )
