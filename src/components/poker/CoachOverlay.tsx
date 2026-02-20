@@ -66,11 +66,11 @@ const HIGHLIGHT_POSITIONS: Record<string, React.CSSProperties> = {
 const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties }> = {
   actions: {
     emoji: '👉',
-    style: { right: 'calc(env(safe-area-inset-right, 0px) + 152px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' },
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 193px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' },
   },
   raise_presets: {
     emoji: '👉',
-    style: { right: 'calc(env(safe-area-inset-right, 0px) + 152px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 190px)' },
+    style: { right: 'calc(env(safe-area-inset-right, 0px) + 193px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 175px)' },
   },
   cards: {
     emoji: '👇',
@@ -86,11 +86,11 @@ const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties 
   },
   exit: {
     emoji: '👉',
-    style: { top: 'calc(env(safe-area-inset-top, 0px) + 10px)', left: 'calc(env(safe-area-inset-left, 0px) + 43px)' },
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 'calc(env(safe-area-inset-left, 0px) + 43px)' },
   },
   audio: {
     emoji: '👈',
-    style: { top: 'calc(env(safe-area-inset-top, 0px) + 10px)', right: 'calc(env(safe-area-inset-right, 0px) + 43px)' },
+    style: { top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 'calc(env(safe-area-inset-right, 0px) + 43px)' },
   },
   timer: {
     emoji: '👇',

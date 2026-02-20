@@ -9,6 +9,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { PokerTablePro } from '@/components/poker/PokerTablePro';
 import { CoachOverlay } from '@/components/poker/CoachOverlay';
 import { LessonCompleteOverlay } from '@/components/poker/LessonCompleteOverlay';
+import { TutorialTipNotification } from '@/components/poker/TutorialTipNotification';
 import { useTutorialGame } from '@/hooks/useTutorialGame';
 import { TUTORIAL_LESSONS } from '@/lib/poker/tutorial-lessons';
 import { cn } from '@/lib/utils';
@@ -123,8 +124,12 @@ export default function LearnPoker() {
 
   if (isPlaying) {
     const isLastLesson = activeLessonIdx >= TUTORIAL_LESSONS.length - 1;
+    const isLesson10 = activeLessonIdx === 9;
     const showCoach = isPaused && !currentIntroStep && currentStep;
     const showIntro = isPaused && currentIntroStep;
+
+    // Lesson 10: coach_message steps use lightweight notification instead of full overlay
+    const useNotification = isLesson10 && showCoach && !currentStep?.requiredAction;
 
     return (
       <>
@@ -147,7 +152,10 @@ export default function LearnPoker() {
           />
         </div>
         {showIntro && <CoachOverlay introStep={currentIntroStep} onDismiss={dismissCoach} raiseSliderOpen={raiseSliderOpen} />}
-        {showCoach && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} raiseSliderOpen={raiseSliderOpen} />}
+        {useNotification && (
+          <TutorialTipNotification message={currentStep!.message} onDismiss={dismissCoach} />
+        )}
+        {showCoach && !useNotification && <CoachOverlay step={currentStep} onDismiss={dismissCoach} requiredAction={currentStep?.requiredAction} currentStepNum={stepIndex + 1} totalSteps={totalSteps} raiseSliderOpen={raiseSliderOpen} />}
         {showComplete && activeLesson && (
           <LessonCompleteOverlay lesson={activeLesson} isLastLesson={isLastLesson} onNextLesson={handleNextLesson} onBackToLessons={handleBackToLessons} />
         )}
