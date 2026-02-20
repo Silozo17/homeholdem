@@ -33,7 +33,7 @@ export function BettingControls({
     (tutorialAllowedAction === 'call' && type === 'check') ||
     (tutorialAllowedAction === 'check' && type === 'call');
   const blockedStyle = 'opacity-30 pointer-events-none grayscale';
-  const glowStyle = tutorialAllowedAction ? 'ring-2 ring-primary/60 animate-pulse' : '';
+  const allowedStyle = tutorialAllowedAction ? 'scale-105 shadow-lg shadow-primary/30' : '';
 
   const handleRaiseTap = () => {
     if (!showRaiseSlider) {
@@ -138,7 +138,7 @@ export function BettingControls({
             `h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 transition-all`,
             showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92]',
             !isAllowed('fold') && blockedStyle,
-            isAllowed('fold') && glowStyle,
+            isAllowed('fold') && allowedStyle,
           )}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
@@ -153,7 +153,7 @@ export function BettingControls({
           className={cn(
             "h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
             !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
-            isAllowed(canCheck ? 'check' : 'call') && glowStyle,
+            isAllowed(canCheck ? 'check' : 'call') && allowedStyle,
           )}
           style={btnStyle(
             canCheck
@@ -176,7 +176,7 @@ export function BettingControls({
             className={cn(
               "h-[37px] rounded-xl font-bold text-xs flex items-center justify-center gap-0.5 active:scale-[0.92] transition-all",
               !isAllowed('raise') && blockedStyle,
-              isAllowed('raise') && glowStyle,
+              isAllowed('raise') && allowedStyle,
             )}
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
@@ -260,7 +260,7 @@ export function BettingControls({
             'flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1',
             showRaiseSlider ? 'pointer-events-none opacity-40' : 'active:scale-[0.92] active:shadow-none',
             !isAllowed('fold') && blockedStyle,
-            isAllowed('fold') && glowStyle,
+            isAllowed('fold') && allowedStyle,
           )}
           style={btnStyle(
             'linear-gradient(180deg, hsl(0 50% 35%), hsl(0 60% 25%))',
@@ -275,7 +275,7 @@ export function BettingControls({
           className={cn(
             "flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
             !isAllowed(canCheck ? 'check' : 'call') && blockedStyle,
-            isAllowed(canCheck ? 'check' : 'call') && glowStyle,
+            isAllowed(canCheck ? 'check' : 'call') && allowedStyle,
           )}
           style={btnStyle(
             canCheck
@@ -298,7 +298,7 @@ export function BettingControls({
             className={cn(
               "flex-1 h-[51px] rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-1 active:scale-[0.92] active:shadow-none",
               !isAllowed('raise') && blockedStyle,
-              isAllowed('raise') && glowStyle,
+              isAllowed('raise') && allowedStyle,
             )}
             style={{
               background: showRaiseSlider && raiseAmount >= maxRaiseTotal
