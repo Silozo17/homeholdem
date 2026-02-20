@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Users, ArrowLeft, Crown, Coins, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,29 @@ import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { Badge } from '@/components/ui/badge';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
 export default function PokerHub() {
   const navigate = useNavigate();
   const { isActive } = useSubscription();
+  const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+  const pendingPath = useRef<string | null>(null);
 
   const handlePremiumMode = (path: string) => {
     if (!isActive) { setPaywallOpen(true); return; }
+    navigate(path);
+  };
+
+  const handleGatedMode = (path: string, premium = false) => {
+    if (!tutLoading && !tutorialComplete) {
+      pendingPath.current = path;
+      setGateOpen(true);
+      return;
+    }
+    if (premium) { handlePremiumMode(path); return; }
     navigate(path);
   };
 
@@ -63,7 +78,7 @@ export default function PokerHub() {
             hint="1-8 bots • Customizable"
             accentClass="bg-amber-500/15"
             ctaLabel="Configure & Play"
-            onClick={() => navigate('/play-poker')}
+            onClick={() => handleGatedMode('/play-poker')}
             compact
           />
           <div className="relative">
@@ -79,7 +94,7 @@ export default function PokerHub() {
               hint="Real-time • Invite friends"
               accentClass="bg-emerald-500/15"
               ctaLabel="Find Table"
-              onClick={() => handlePremiumMode('/online-poker')}
+              onClick={() => handleGatedMode('/online-poker', true)}
               compact
             />
           </div>
@@ -90,13 +105,18 @@ export default function PokerHub() {
             hint="Entry fee • Prize pool"
             accentClass="bg-yellow-500/15"
             ctaLabel="View Tournaments"
-            onClick={() => navigate('/tournaments')}
+            onClick={() => handleGatedMode('/tournaments')}
             compact
           />
         </div>
       </div>
 
       <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
+      <TutorialGateDialog
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        onSkipped={() => { if (pendingPath.current) navigate(pendingPath.current); }}
+      />
     </div>
   );
 }

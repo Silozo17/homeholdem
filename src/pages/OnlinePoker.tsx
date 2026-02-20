@@ -6,6 +6,8 @@ import { OnlinePokerTable } from '@/components/poker/OnlinePokerTable';
 import { OnlinePokerLobby } from '@/components/poker/OnlinePokerLobby';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
 export default function OnlinePoker() {
   const { user, loading } = useAuth();
@@ -15,6 +17,8 @@ export default function OnlinePoker() {
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
   const { isActive, loading: subLoading } = useSubscription();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
+  const [gateOpen, setGateOpen] = useState(false);
 
   // Auto-join table from invite deep link (?table=xxx)
   useEffect(() => {
@@ -25,7 +29,7 @@ export default function OnlinePoker() {
     }
   }, [searchParams, activeTableId, setSearchParams]);
 
-  if (loading) {
+  if (loading || tutLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-muted-foreground animate-pulse">Loading...</div>
@@ -36,6 +40,14 @@ export default function OnlinePoker() {
   if (!user) {
     navigate('/');
     return null;
+  }
+
+  // Gate behind tutorial
+  if (!tutorialComplete) {
+    return <TutorialGateDialog open={!gateOpen ? true : gateOpen} onOpenChange={(open) => {
+      setGateOpen(open);
+      if (!open) navigate(-1);
+    }} />;
   }
 
   // Gate behind subscription

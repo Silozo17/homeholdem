@@ -348,7 +348,7 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       // Turn
       { type: 'deal_community', communityPhase: 'turn', message: "Turn: 2♣! The club you needed! 🎉 A♣ 10♣ 7♣ 3♣ 2♣ = Ace-high flush! The 'nut flush' — the BEST possible flush!", highlight: 'community', delay: 1000 },
       { type: 'coach_message', message: "'Nut' means the best possible hand. Your Ace-high flush can't be beaten by any other flush. Always check if you have the 'nuts'!" },
-      { type: 'bot_action', botId: 'bot-0', botAction: { type: 'call' }, message: "Viktor checked. He's scared of the 3 clubs on the board — smart of him.", delay: 1500 },
+      { type: 'bot_action', botId: 'bot-0', botAction: { type: 'check' }, message: "Viktor checked. He's scared of the 3 clubs on the board — smart of him.", delay: 1500 },
       { type: 'require_action', requiredAction: 'raise', message: "Bet big with your nut flush! Tap 'Raise'. 👇" },
       { type: 'bot_action', botId: 'bot-0', botAction: { type: 'fold' }, message: "Viktor folded. He correctly guessed you might have the flush!", delay: 1500 },
       { type: 'show_result', message: "🏆 You read the board perfectly! You spotted the flush draw, counted your outs (9), and hit the nut flush. Always look for draws and dangers on the board!" },

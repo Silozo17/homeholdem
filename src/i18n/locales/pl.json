@@ -1240,5 +1240,12 @@
     "got_it": "Rozumiem →",
     "tap_action": "Dotknij {{action}} poniżej 👇",
     "step_of": "Krok {{current}}/{{total}}"
+  },
+  "tutorial_gate": {
+    "title": "Najpierw ukończ samouczek",
+    "message": "Ukończ samouczek pokera, aby odblokować ten tryb gry.",
+    "go_to_tutorial": "Przejdź do samouczka",
+    "skip_tutorial": "Pomiń samouczek",
+    "skip_description": "Pomiń samouczek i odblokuj wszystkie tryby gry (bez nagrody XP)"
   }
 }

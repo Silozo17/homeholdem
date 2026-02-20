@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { Logo } from '@/components/layout/Logo';
 import { HeaderSocialIcons } from '@/components/layout/HeaderSocialIcons';
 import { BOT_PERSONAS } from '@/lib/poker/bot-personas';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialGateDialog } from './TutorialGateDialog';
 
 interface PlayPokerLobbyProps {
   onStart: (settings: LobbySettings) => void;
@@ -23,6 +25,16 @@ export function PlayPokerLobby({ onStart }: PlayPokerLobbyProps) {
   const [bigBlind, setBigBlind] = useState(100);
   const [blindTimer, setBlindTimer] = useState(0);
   const navigate = useNavigate();
+  const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // Show gate if tutorial not completed
+  if (!tutLoading && !tutorialComplete) {
+    return <TutorialGateDialog open={!gateOpen ? true : gateOpen} onOpenChange={(open) => {
+      setGateOpen(open);
+      if (!open) navigate(-1);
+    }} />;
+  }
 
   const PRESETS = [
     { label: t('poker_lobby.casual'), bots: 2, desc: t('poker_lobby.casual_desc') },

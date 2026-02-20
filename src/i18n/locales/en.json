@@ -1248,5 +1248,12 @@
     "got_it": "Got it →",
     "tap_action": "Tap {{action}} below 👇",
     "step_of": "Step {{current}}/{{total}}"
+  },
+  "tutorial_gate": {
+    "title": "Complete Tutorial First",
+    "message": "Complete the poker tutorial to unlock this game mode.",
+    "go_to_tutorial": "Go to Tutorial",
+    "skip_tutorial": "Skip Tutorial",
+    "skip_description": "Skip the tutorial and unlock all game modes (no XP reward)"
   }
 }

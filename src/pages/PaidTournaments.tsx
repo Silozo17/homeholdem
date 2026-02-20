@@ -13,6 +13,8 @@ import { toast } from '@/hooks/use-toast';
 import { PaidTournamentAdmin } from '@/components/poker/PaidTournamentAdmin';
 import { PaidTournamentDetail } from '@/components/poker/PaidTournamentDetail';
 import { format } from 'date-fns';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
 export default function PaidTournaments() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export default function PaidTournaments() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [playerLevel, setPlayerLevel] = useState(1);
+  const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
+  const [gateOpen, setGateOpen] = useState(false);
 
   const registered = searchParams.get('registered');
 
@@ -87,6 +91,14 @@ export default function PaidTournaments() {
     const totalPence = entryPence * maxPlayers;
     const prize = Math.ceil(totalPence * 5 / 9);
     return `£${(prize / 100).toFixed(2)}`;
+  }
+
+  // Gate behind tutorial
+  if (!tutLoading && !tutorialComplete) {
+    return <TutorialGateDialog open={!gateOpen ? true : gateOpen} onOpenChange={(open) => {
+      setGateOpen(open);
+      if (!open) navigate(-1);
+    }} />;
   }
 
   if (selectedId) {

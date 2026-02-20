@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Users, ArrowRight, Crown, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
+import { useTutorialComplete } from '@/hooks/useTutorialComplete';
+import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
 const modes = [
   {
@@ -15,6 +17,7 @@ const modes = [
     accentClass: 'from-sky-500/20 to-sky-500/5',
     iconColor: 'text-sky-400',
     premium: false,
+    requiresTutorial: false,
   },
   {
     title: 'VS Bots',
@@ -25,6 +28,7 @@ const modes = [
     accentClass: 'from-primary/20 to-primary/5',
     iconColor: 'text-primary',
     premium: false,
+    requiresTutorial: true,
   },
   {
     title: 'Multiplayer',
@@ -35,15 +39,24 @@ const modes = [
     accentClass: 'from-emerald-500/20 to-emerald-500/5',
     iconColor: 'text-emerald-400',
     premium: true,
+    requiresTutorial: true,
   },
 ];
 
 export function GameModesGrid() {
   const navigate = useNavigate();
   const { isActive } = useSubscription();
+  const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+  const pendingPath = useRef<string | null>(null);
 
   const handleClick = (mode: typeof modes[0]) => {
+    if (mode.requiresTutorial && !tutLoading && !tutorialComplete) {
+      pendingPath.current = mode.path;
+      setGateOpen(true);
+      return;
+    }
     if (mode.premium && !isActive) {
       setPaywallOpen(true);
       return;
@@ -90,6 +103,11 @@ export function GameModesGrid() {
       })}
     </div>
     <PaywallDrawer open={paywallOpen} onOpenChange={setPaywallOpen} />
+    <TutorialGateDialog
+      open={gateOpen}
+      onOpenChange={setGateOpen}
+      onSkipped={() => { if (pendingPath.current) navigate(pendingPath.current); }}
+    />
     </>
   );
 }
