@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { notifyPokerInvite } from '@/lib/push-notifications';
 import { Check, Send, Users, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 interface ClubMember {
   id: string;
@@ -25,6 +26,7 @@ interface InvitePlayersDialogProps {
 
 export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, clubId }: InvitePlayersDialogProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [inviterName, setInviterName] = useState('Someone');
   const [members, setMembers] = useState<ClubMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,6 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
     if (!open || !user) return;
     setSentTo(new Set());
     fetchMembers();
-    // Fetch display name
     supabase.from('profiles').select('display_name').eq('id', user.id).single()
       .then(({ data }) => { if (data?.display_name) setInviterName(data.display_name); });
   }, [open, user, clubId]);
@@ -47,7 +48,6 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
         const { data } = await supabase.rpc('get_club_member_profiles', { _club_id: clubId });
         setMembers((data || []).filter((m: ClubMember) => m.id !== user?.id));
       } else {
-        // Get all clubs the user belongs to, then fetch members
         const { data: myClubs } = await supabase
           .from('club_members')
           .select('club_id')
@@ -70,7 +70,7 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
         setMembers(allMembers);
       }
     } catch {
-      toast({ title: 'Failed to load members', variant: 'destructive' });
+      toast({ title: t('poker_invite.failed_load'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -81,9 +81,9 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
     try {
       await notifyPokerInvite(memberId, inviterName, tableName, tableId);
       setSentTo(prev => new Set(prev).add(memberId));
-      toast({ title: 'Invite sent!' });
+      toast({ title: t('poker_invite.invite_sent') });
     } catch {
-      toast({ title: 'Failed to send invite', variant: 'destructive' });
+      toast({ title: t('poker_invite.failed_send'), variant: 'destructive' });
     } finally {
       setSending(null);
     }
@@ -95,7 +95,7 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Invite Players
+            {t('poker_invite.title')}
           </DialogTitle>
         </DialogHeader>
 
@@ -106,7 +106,7 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
             </div>
           ) : members.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No club members to invite. Join a club first!
+              {t('poker_invite.no_members')}
             </p>
           ) : (
             members.map(member => {
@@ -130,11 +130,11 @@ export function InvitePlayersDialog({ open, onOpenChange, tableId, tableName, cl
                     className="shrink-0 h-8 px-3"
                   >
                     {isSent ? (
-                      <><Check className="h-3.5 w-3.5 mr-1" /> Sent</>
+                      <><Check className="h-3.5 w-3.5 mr-1" /> {t('poker_invite.sent')}</>
                     ) : isSending ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <><Send className="h-3.5 w-3.5 mr-1" /> Invite</>
+                      <><Send className="h-3.5 w-3.5 mr-1" /> {t('poker_invite.invite')}</>
                     )}
                   </Button>
                 </div>

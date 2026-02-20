@@ -10,6 +10,7 @@ import { CountryFlag } from '@/components/poker/CountryFlag';
 import { MessageSquare, UserPlus, UserCheck, Clock, UserX, Trophy, Gamepad2 } from 'lucide-react';
 import { FriendshipStatus } from '@/hooks/useFriendship';
 import { toast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 interface PlayerProfileDrawerProps {
   playerId: string | null;
@@ -28,6 +29,7 @@ interface ProfileData {
 export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onKick }: PlayerProfileDrawerProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [level, setLevel] = useState(0);
   const [gamesPlayed, setGamesPlayed] = useState(0);
@@ -42,7 +44,6 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
     if (!playerId || playerId === user?.id) return;
     setLoading(true);
 
-    // Fetch all data in parallel
     Promise.all([
       supabase.from('profiles').select('display_name, avatar_url, country_code').eq('id', playerId).single(),
       supabase.from('player_xp').select('level').eq('user_id', playerId).maybeSingle(),
@@ -57,7 +58,6 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
       
       let allGames = gamesRes.data ?? [];
       
-      // Also fetch games played via linked placeholders
       const placeholderIds = (placeholderRes.data ?? []).map((p: any) => p.id);
       if (placeholderIds.length > 0) {
         const { data: placeholderGames } = await supabase
@@ -65,7 +65,6 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
           .select('id, finish_position')
           .in('placeholder_player_id', placeholderIds);
         if (placeholderGames) {
-          // Merge, avoiding duplicates
           const existingIds = new Set(allGames.map(g => g.id));
           for (const g of placeholderGames) {
             if (!existingIds.has(g.id)) allGames.push(g);
@@ -95,24 +94,24 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
     if (friendshipStatus === 'none') {
       await supabase.from('friendships').insert({ requester_id: user.id, addressee_id: playerId });
       setFriendshipStatus('pending_sent');
-      toast({ title: 'Friend request sent' });
+      toast({ title: t('poker_profile.friend_request_sent') });
     } else if (friendshipStatus === 'pending_received' && friendshipId) {
       await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
       setFriendshipStatus('accepted');
-      toast({ title: 'Friend request accepted' });
+      toast({ title: t('poker_profile.friend_request_accepted') });
     } else if ((friendshipStatus === 'accepted' || friendshipStatus === 'pending_sent') && friendshipId) {
       await supabase.from('friendships').delete().eq('id', friendshipId);
       setFriendshipStatus('none');
       setFriendshipId(null);
-      toast({ title: friendshipStatus === 'accepted' ? 'Friend removed' : 'Request cancelled' });
+      toast({ title: friendshipStatus === 'accepted' ? t('poker_profile.friend_removed') : t('poker_profile.request_cancelled') });
     }
   };
 
   const friendButtonLabel = {
-    none: 'Add Friend',
-    pending_sent: 'Request Sent',
-    pending_received: 'Accept Request',
-    accepted: 'Friends ✓',
+    none: t('poker_profile.add_friend'),
+    pending_sent: t('poker_profile.request_sent'),
+    pending_received: t('poker_profile.accept_request'),
+    accepted: t('poker_profile.friends'),
   }[friendshipStatus];
 
   const friendButtonIcon = {
@@ -127,10 +126,9 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
       <SheetContent side="left" className="w-[300px] sm:w-[340px] bg-card border-border/50 p-0">
         {profile && !loading ? (
           <div className="flex flex-col h-full">
-            {/* Header with avatar */}
             <div className="p-6 pb-4 border-b border-border/50" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))' }}>
               <SheetHeader className="mb-4">
-                <SheetTitle className="sr-only">Player Profile</SheetTitle>
+                <SheetTitle className="sr-only">{t('poker_profile.title')}</SheetTitle>
               </SheetHeader>
               <div className="flex items-center gap-4">
                 <div className="relative">
@@ -153,32 +151,30 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground">{profile.display_name}</h3>
-                  {level > 0 && <p className="text-xs text-muted-foreground">Level {level}</p>}
+                  {level > 0 && <p className="text-xs text-muted-foreground">{t('poker_profile.level')} {level}</p>}
                 </div>
               </div>
             </div>
 
-            {/* Stats */}
             <div className="px-6 py-4 border-b border-border/50">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30">
                   <Gamepad2 className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-bold text-foreground">{gamesPlayed}</p>
-                    <p className="text-[10px] text-muted-foreground">Games</p>
+                    <p className="text-[10px] text-muted-foreground">{t('poker_profile.games')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30">
                   <Trophy className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-bold text-foreground">{wins}</p>
-                    <p className="text-[10px] text-muted-foreground">Wins</p>
+                    <p className="text-[10px] text-muted-foreground">{t('poker_profile.wins')}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="px-6 py-4 space-y-2 flex-1">
               <Button
                 variant="outline"
@@ -189,7 +185,7 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
                 }}
               >
                 <MessageSquare className="h-4 w-4" />
-                Send Message
+                {t('poker_profile.send_message')}
               </Button>
 
               <Button
@@ -211,14 +207,14 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
                   }}
                 >
                   <UserX className="h-4 w-4" />
-                  Kick Player
+                  {t('poker_profile.kick_player')}
                 </Button>
               )}
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+            <div className="animate-pulse text-muted-foreground text-sm">{t('poker_profile.loading')}</div>
           </div>
         )}
       </SheetContent>

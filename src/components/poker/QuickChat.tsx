@@ -1,23 +1,25 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
-const REACTIONS = [
-  { emoji: '👍', label: 'Thumbs Up' },
-  { emoji: '👏', label: 'Clap' },
-  { emoji: '😂', label: 'Laugh' },
-  { emoji: '😢', label: 'Cry' },
-  { emoji: '🔥', label: 'Fire' },
-  { emoji: '🤯', label: 'Mind Blown' },
-  { emoji: '😎', label: 'GG' },
-  { emoji: '🙌', label: 'Nice Hand' },
-  { emoji: '💀', label: 'Dead' },
-  { emoji: '🤑', label: 'Money' },
-  { emoji: '🫣', label: 'Peeking' },
-  { emoji: '🤡', label: 'Clown' },
+const REACTION_KEYS = [
+  { emoji: '👍', key: 'thumbs_up' },
+  { emoji: '👏', key: 'clap' },
+  { emoji: '😂', key: 'laugh' },
+  { emoji: '😢', key: 'cry' },
+  { emoji: '🔥', key: 'fire' },
+  { emoji: '🤯', key: 'mind_blown' },
+  { emoji: '😎', key: 'gg' },
+  { emoji: '🙌', key: 'nice_hand' },
+  { emoji: '💀', key: 'dead' },
+  { emoji: '🤑', key: 'money' },
+  { emoji: '🫣', key: 'peeking' },
+  { emoji: '🤡', key: 'clown' },
 ];
 
+// Poker slang stays in English intentionally — universal poker language
 const MESSAGES = [
   'Nice hand!', 'Good luck!', 'Bluff!', 'Oops!', 'GG', "Let's go!",
   'Ship it!', "You're bluffing!", 'I knew it!', 'Slow roll much?',
@@ -26,7 +28,8 @@ const MESSAGES = [
   'Wow', 'Brutal',
 ];
 
-const ALL_ITEMS = [...REACTIONS.map(r => r.emoji), ...MESSAGES];
+const REACTION_EMOJIS = REACTION_KEYS.map(r => r.emoji);
+const ALL_ITEMS = [...REACTION_EMOJIS, ...MESSAGES];
 
 const FREQ_KEY = 'poker-chat-freq';
 
@@ -56,6 +59,7 @@ interface QuickChatProps {
 }
 
 export function QuickChat({ onSend }: QuickChatProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [topItems, setTopItems] = useState<string[]>([]);
 
@@ -69,7 +73,7 @@ export function QuickChat({ onSend }: QuickChatProps) {
     setOpen(false);
   }, [onSend]);
 
-  const isEmoji = (text: string) => REACTIONS.some(r => r.emoji === text);
+  const isEmoji = (text: string) => REACTION_EMOJIS.includes(text);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -90,7 +94,7 @@ export function QuickChat({ onSend }: QuickChatProps) {
         {/* Top 5 most used — pinned outside scroll */}
         {topItems.length > 0 && (
           <div className="px-2 pt-2 pb-1 border-b border-white/5">
-            <p className="text-[8px] text-foreground/30 font-bold uppercase tracking-wider px-1 mb-0.5">Most Used</p>
+            <p className="text-[8px] text-foreground/30 font-bold uppercase tracking-wider px-1 mb-0.5">{t('poker_quick_chat.most_used')}</p>
             <div className="flex gap-1 flex-wrap">
               {topItems.map(item => (
                 <button
@@ -113,15 +117,15 @@ export function QuickChat({ onSend }: QuickChatProps) {
         <div className="max-h-[280px] overflow-y-auto p-2 scrollbar-hide">
           {/* Reaction grid */}
           <div className="grid grid-cols-4 gap-1 mb-2">
-            {REACTIONS.map(({ emoji, label }) => (
+            {REACTION_KEYS.map(({ emoji, key }) => (
               <button
                 key={emoji}
                 onClick={() => handleSend(emoji)}
                 className="w-full aspect-square rounded-lg flex flex-col items-center justify-center gap-0 hover:bg-white/10 active:scale-90 transition-all"
-                title={label}
+                title={t(`poker_quick_chat.${key}`)}
               >
                 <span className="text-lg leading-none">{emoji}</span>
-                <span className="text-[7px] text-foreground/30 font-medium leading-tight mt-0.5">{label}</span>
+                <span className="text-[7px] text-foreground/30 font-medium leading-tight mt-0.5">{t(`poker_quick_chat.${key}`)}</span>
               </button>
             ))}
           </div>

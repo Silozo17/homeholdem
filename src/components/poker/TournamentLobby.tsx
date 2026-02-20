@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { CardFan } from './CardFan';
 import { Logo } from '@/components/layout/Logo';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useTranslation } from 'react-i18next';
 
 import { callEdge } from '@/lib/poker/callEdge';
 
@@ -59,6 +60,7 @@ interface TournamentLobbyProps {
 export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const levelData = usePlayerLevel(user?.id);
   const canPlayTournaments = (levelData?.level ?? 0) >= 5;
   const [tournaments, setTournaments] = useState<TournamentSummary[]>([]);
@@ -69,12 +71,10 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
   const [inviteCode, setInviteCode] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
 
-  // Detail view
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Create form
   const [name, setName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(18);
   const [startingStack, setStartingStack] = useState(5000);
@@ -94,7 +94,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       const { data: allT } = await query;
       if (!allT) { setTournaments([]); return; }
 
-      const tIds = allT.map(t => t.id);
+      const tIds = allT.map(item => item.id);
       const { data: players } = await supabase
         .from('poker_tournament_players')
         .select('tournament_id')
@@ -103,7 +103,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       const countMap = new Map<string, number>();
       (players || []).forEach(p => { countMap.set(p.tournament_id, (countMap.get(p.tournament_id) || 0) + 1); });
 
-      setTournaments(allT.map(t => ({ ...t, player_count: countMap.get(t.id) || 0 })));
+      setTournaments(allT.map(item => ({ ...item, player_count: countMap.get(item.id) || 0 })));
     } catch { /* */ } finally { setLoading(false); }
   }, [clubId]);
 
@@ -115,15 +115,14 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       const data = await callEdge('poker-tournament-state', { tournament_id: tid });
       setDetail(data);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     } finally { setDetailLoading(false); }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (selectedId) fetchDetail(selectedId);
   }, [selectedId, fetchDetail]);
 
-  // Realtime subscription for tournament updates
   useEffect(() => {
     if (!selectedId) return;
     const channel = supabase.channel(`tournament:${selectedId}`)
@@ -134,7 +133,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
   }, [selectedId, fetchDetail]);
 
   const handleCreate = async () => {
-    if (!name.trim()) { toast({ title: 'Enter a tournament name', variant: 'destructive' }); return; }
+    if (!name.trim()) { toast({ title: t('poker_tournament.enter_tournament_name'), variant: 'destructive' }); return; }
     setCreating(true);
     try {
       const data = await callEdge('poker-create-tournament', {
@@ -148,18 +147,18 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       setSelectedId(data.tournament.id);
       fetchTournaments();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     } finally { setCreating(false); }
   };
 
   const handleRegister = async (tid: string) => {
     try {
       await callEdge('poker-register-tournament', { tournament_id: tid });
-      toast({ title: 'Registered!' });
+      toast({ title: t('poker_tournament.registered') });
       if (selectedId === tid) fetchDetail(tid);
       fetchTournaments();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -174,15 +173,14 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
       setSelectedId(data.tournament.id);
       fetchTournaments();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     } finally { setJoiningByCode(false); }
   };
 
   const handleStart = async (tid: string) => {
     try {
       const data = await callEdge('poker-start-tournament', { tournament_id: tid });
-      toast({ title: 'Tournament started!', description: `${data.player_count} players across ${data.table_count} tables` });
-      // Auto-navigate to the player's table
+      toast({ title: t('poker_tournament.tournament_started'), description: t('poker_tournament.tournament_started_desc', { playerCount: data.player_count, tableCount: data.table_count }) });
       const detailData = await callEdge('poker-tournament-state', { tournament_id: tid });
       if (detailData.my_table_id) {
         onJoinTable(detailData.my_table_id);
@@ -190,7 +188,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         setDetail(detailData);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -202,10 +200,10 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
   // Detail view
   if (selectedId && detail) {
-    const t = detail.tournament;
-    const isCreator = t.created_by === user?.id;
+    const tourney = detail.tournament;
+    const isCreator = tourney.created_by === user?.id;
     const isRegistered = detail.players.some((p: any) => p.player_id === user?.id);
-    const isRunning = t.status === 'running';
+    const isRunning = tourney.status === 'running';
 
     return (
       <div className="fixed inset-0 flex flex-col poker-felt-bg card-suit-pattern safe-area-bottom z-10 overflow-y-auto overflow-x-hidden">
@@ -229,49 +227,46 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
 
         <div className="flex-1 px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="text-center space-y-1">
-            <h1 className="text-xl font-black text-shimmer">{t.name}</h1>
+            <h1 className="text-xl font-black text-shimmer">{tourney.name}</h1>
             <Badge variant={isRunning ? 'default' : 'secondary'} className="text-[10px]">
-              {t.status === 'registering' ? 'Registration Open' : isRunning ? 'In Progress' : t.status}
+              {tourney.status === 'registering' ? t('poker_tournament.registration_open') : isRunning ? t('poker_tournament.in_progress') : tourney.status}
             </Badge>
           </div>
 
-          {/* Invite code */}
-          {t.invite_code && (
+          {tourney.invite_code && (
             <div className="glass-card rounded-xl p-3 flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Invite Code</p>
-                <p className="text-xl font-mono font-bold tracking-[0.3em] text-primary">{t.invite_code}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">{t('poker_tournament.invite_code')}</p>
+                <p className="text-xl font-mono font-bold tracking-[0.3em] text-primary">{tourney.invite_code}</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => copyCode(t.invite_code)}>
+              <Button variant="ghost" size="icon" onClick={() => copyCode(tourney.invite_code)}>
                 {copiedCode ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
           )}
 
-          {/* Tournament info */}
           <div className="grid grid-cols-3 gap-2">
             <div className="glass-card rounded-xl p-3 text-center">
-              <p className="text-[10px] text-muted-foreground">Players</p>
+              <p className="text-[10px] text-muted-foreground">{t('poker_tournament.players')}</p>
               <p className="text-lg font-bold text-primary">{detail.players_remaining}/{detail.total_players}</p>
             </div>
             <div className="glass-card rounded-xl p-3 text-center">
-              <p className="text-[10px] text-muted-foreground">Stack</p>
-              <p className="text-lg font-bold text-primary">{t.starting_stack.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{t('poker_tournament.stack')}</p>
+              <p className="text-lg font-bold text-primary">{tourney.starting_stack.toLocaleString()}</p>
             </div>
             <div className="glass-card rounded-xl p-3 text-center">
-              <p className="text-[10px] text-muted-foreground">Tables</p>
+              <p className="text-[10px] text-muted-foreground">{t('poker_tournament.tables')}</p>
               <p className="text-lg font-bold text-primary">{detail.tables.length || '-'}</p>
             </div>
           </div>
 
-          {/* Current blinds (if running) */}
           {isRunning && detail.current_blinds && (
             <div className="glass-card rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-primary" />
                   <span className="text-sm font-bold">
-                    {detail.current_blinds.break ? 'BREAK' : `Level ${detail.current_blinds.level}`}
+                    {detail.current_blinds.break ? t('poker_tournament.break') : `${t('poker_tournament.level')} ${detail.current_blinds.level}`}
                   </span>
                 </div>
                 {detail.time_remaining_seconds !== null && (
@@ -282,16 +277,15 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
               </div>
               {!detail.current_blinds.break && (
                 <p className="text-xs text-muted-foreground">
-                  Blinds: {detail.current_blinds.small}/{detail.current_blinds.big}
+                  {t('poker_online.blinds')}: {detail.current_blinds.small}/{detail.current_blinds.big}
                   {(detail.current_blinds.ante || 0) > 0 && ` • Ante: ${detail.current_blinds.ante}`}
                 </p>
               )}
             </div>
           )}
 
-          {/* Blind schedule */}
           <div className="glass-card rounded-xl p-4 space-y-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase">Blind Schedule</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase">{t('poker_tournament.blind_schedule')}</h3>
             <ScrollArea className="max-h-40">
               <div className="space-y-1">
                 {detail.blind_schedule.map((l, i) => (
@@ -300,7 +294,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
                     isRunning && l.level === detail.current_blinds?.level && !l.break && 'bg-primary/10 text-primary font-bold',
                     l.break && 'text-amber-400 italic'
                   )}>
-                    <span>{l.break ? '☕ Break' : `Level ${l.level}`}</span>
+                    <span>{l.break ? t('poker_tournament.break_label') : `${t('poker_tournament.level')} ${l.level}`}</span>
                     {!l.break && <span>{l.small}/{l.big}{(l.ante || 0) > 0 && ` (${l.ante})`}</span>}
                     <span className="text-muted-foreground">{l.duration_minutes}m</span>
                   </div>
@@ -309,10 +303,9 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
             </ScrollArea>
           </div>
 
-          {/* Players */}
           <div className="glass-card rounded-xl p-4 space-y-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase">
-              Players ({detail.total_players})
+              {t('poker_tournament.players')} ({detail.total_players})
             </h3>
             <div className="space-y-1">
               {detail.players.map((p: any) => (
@@ -335,26 +328,25 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="space-y-2">
-            {t.status === 'registering' && !isRegistered && canPlayTournaments && (
-              <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={() => handleRegister(t.id)}>
-                Register
+            {tourney.status === 'registering' && !isRegistered && canPlayTournaments && (
+              <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={() => handleRegister(tourney.id)}>
+                {t('poker_tournament.register')}
               </Button>
             )}
-            {t.status === 'registering' && !isRegistered && !canPlayTournaments && (
-              <p className="text-xs text-center text-muted-foreground py-2">Reach Level 5 to register (currently Level {levelData?.level ?? 1})</p>
+            {tourney.status === 'registering' && !isRegistered && !canPlayTournaments && (
+              <p className="text-xs text-center text-muted-foreground py-2">{t('poker_tournament.reach_level_to_register', { level: levelData?.level ?? 1 })}</p>
             )}
-            {t.status === 'registering' && isCreator && detail.total_players >= 2 && (
-              <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => handleStart(t.id)}>
+            {tourney.status === 'registering' && isCreator && detail.total_players >= 2 && (
+              <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => handleStart(tourney.id)}>
                 <Play className="h-4 w-4 mr-2" />
-                Start Tournament ({detail.total_players} players)
+                {t('poker_tournament.start_tournament', { count: detail.total_players })}
               </Button>
             )}
             {isRunning && detail.my_table_id && (
               <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={() => onJoinTable(detail.my_table_id!)}>
                 <Trophy className="h-4 w-4 mr-2" />
-                Go to My Table
+                {t('poker_tournament.go_to_my_table')}
               </Button>
             )}
           </div>
@@ -388,9 +380,9 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         <div className="text-center space-y-2 animate-slide-up-fade">
           <h1 className="text-2xl font-black text-shimmer">
             <Trophy className="inline h-6 w-6 mr-2 text-primary" />
-            Tournaments
+            {t('poker_tournament.tournaments')}
           </h1>
-          <p className="text-sm text-muted-foreground">Compete in structured poker tournaments</p>
+          <p className="text-sm text-muted-foreground">{t('poker_tournament.tournaments_desc')}</p>
         </div>
 
         {/* Level Gate */}
@@ -400,13 +392,13 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
               <Trophy className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-bold text-foreground text-sm">Tournaments Locked</p>
-              <p className="text-xs text-muted-foreground mt-1">Reach Level 5 to unlock tournaments</p>
+              <p className="font-bold text-foreground text-sm">{t('poker_tournament.tournaments_locked')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('poker_tournament.reach_level_5')}</p>
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Level {levelData?.level ?? 1}</span>
-                <span>Level 5</span>
+                <span>{t('poker_tournament.level')} {levelData?.level ?? 1}</span>
+                <span>{t('poker_tournament.level')} 5</span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
                 <div className="h-full rounded-full" style={{
@@ -415,7 +407,7 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
                   transition: 'width 0.5s ease-out',
                 }} />
               </div>
-              <p className="text-[10px] text-muted-foreground">Play practice or cash games to earn XP</p>
+              <p className="text-[10px] text-muted-foreground">{t('poker_tournament.play_to_earn_xp')}</p>
             </div>
           </div>
         )}
@@ -429,31 +421,31 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-foreground text-sm">Create Tournament</p>
-                  <p className="text-[10px] text-muted-foreground truncate">Set up a new competition</p>
+                  <p className="font-bold text-foreground text-sm">{t('poker_tournament.create_tournament')}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{t('poker_tournament.setup_competition')}</p>
                 </div>
               </button>
             </DialogTrigger>
             <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader><DialogTitle>Create Tournament</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{t('poker_tournament.create_tournament')}</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder="Tournament name" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input placeholder={t('poker_tournament.enter_tournament_name')} value={name} onChange={(e) => setName(e.target.value)} />
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Max Players</span>
+                    <span className="text-muted-foreground">{t('poker_tournament.max_players')}</span>
                     <span className="font-bold text-primary">{maxPlayers}</span>
                   </div>
                   <Slider value={[maxPlayers]} min={2} max={36} step={1} onValueChange={([v]) => setMaxPlayers(v)} />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Starting Stack</span>
+                    <span className="text-muted-foreground">{t('poker_tournament.starting_stack')}</span>
                     <span className="font-bold text-primary">{startingStack.toLocaleString()}</span>
                   </div>
                   <Slider value={[startingStack]} min={1000} max={50000} step={1000} onValueChange={([v]) => setStartingStack(v)} />
                 </div>
                 <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleCreate} disabled={creating}>
-                  {creating ? 'Creating...' : 'Create Tournament'}
+                  {creating ? t('poker_tournament.creating') : t('poker_tournament.create_tournament')}
                 </Button>
               </div>
             </DialogContent>
@@ -466,23 +458,23 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
                   <Hash className="h-4 w-4 text-foreground/70" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-foreground text-sm">Join by Code</p>
-                  <p className="text-[10px] text-muted-foreground truncate">Enter invite code</p>
+                  <p className="font-bold text-foreground text-sm">{t('poker_tournament.join_by_code')}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{t('poker_tournament.enter_invite_code')}</p>
                 </div>
               </button>
             </DialogTrigger>
             <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader><DialogTitle>Join Tournament by Code</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{t('poker_tournament.join_tournament_by_code')}</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
                 <Input
-                  placeholder="Enter 6-character code"
+                  placeholder={t('poker_tournament.enter_6_char')}
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                   maxLength={6}
                   className="text-center text-2xl font-mono tracking-[0.3em]"
                 />
                 <Button className="w-full shimmer-btn text-primary-foreground font-bold" onClick={handleJoinByCode} disabled={joiningByCode || inviteCode.length < 4}>
-                  {joiningByCode ? 'Joining...' : 'Join Tournament'}
+                  {joiningByCode ? t('poker_tournament.joining') : t('poker_tournament.join_tournament')}
                 </Button>
               </div>
             </DialogContent>
@@ -492,36 +484,36 @@ export function TournamentLobby({ onJoinTable, clubId }: TournamentLobbyProps) {
         {/* Tournament list */}
         <div className="space-y-3 animate-slide-up-fade stagger-2">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {tournaments.length} {tournaments.length === 1 ? 'Tournament' : 'Tournaments'}
+            {tournaments.length === 1 ? t('poker_tournament.tournament_count', { count: tournaments.length }) : t('poker_tournament.tournament_count_plural', { count: tournaments.length })}
           </h2>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground animate-pulse">Loading tournaments...</div>
+            <div className="text-center py-8 text-muted-foreground animate-pulse">{t('poker_tournament.loading_tournaments')}</div>
           ) : tournaments.length === 0 ? (
             <div className="glass-card rounded-2xl p-8 text-center space-y-4">
               <CardFan />
-              <p className="text-muted-foreground text-sm">No tournaments yet — create one to get started!</p>
+              <p className="text-muted-foreground text-sm">{t('poker_tournament.no_tournaments')}</p>
             </div>
           ) : (
-            tournaments.map(t => (
+            tournaments.map(item => (
               <button
-                key={t.id}
+                key={item.id}
                 className="w-full glass-card rounded-xl p-4 flex items-center justify-between text-left group active:scale-[0.98] transition-all hover:shadow-lg"
-                onClick={() => setSelectedId(t.id)}
+                onClick={() => setSelectedId(item.id)}
               >
                 <div className="space-y-1.5">
-                  <p className="font-bold text-foreground text-sm">{t.name}</p>
+                  <p className="font-bold text-foreground text-sm">{item.name}</p>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Trophy className="h-3 w-3 text-primary" />
-                    <span>{t.starting_stack.toLocaleString()} chips</span>
+                    <span>{item.starting_stack.toLocaleString()} {t('poker_tournament.chips')}</span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <Badge variant={t.status === 'running' ? 'default' : 'secondary'} className="text-[10px]">
-                    {t.status === 'registering' ? 'Open' : 'Live'}
+                  <Badge variant={item.status === 'running' ? 'default' : 'secondary'} className="text-[10px]">
+                    {item.status === 'registering' ? t('poker_tournament.open') : t('poker_tournament.live')}
                   </Badge>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Users className="h-3 w-3" />
-                    <span>{t.player_count}/{t.max_players}</span>
+                    <span>{item.player_count}/{item.max_players}</span>
                   </div>
                 </div>
               </button>
