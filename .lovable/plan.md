@@ -1,39 +1,78 @@
 
 
-# Add Post-Fold Gameplay to Lesson 7 (When to Fold)
+# Tell Users How Much to Raise + Fix Button Visibility
 
-## Problem
-After the user folds with 7-2, the lesson jumps straight to `show_result` with Viktor shown as "Winner!" -- but no community cards are dealt and no bot actions happen. This skips the entire rest of the hand, which is confusing for a learner. In real poker, the remaining players continue playing and there's a showdown.
+## Two Changes
 
-## Fix
+### 1. Update all raise instruction messages to tell the user the exact amount
 
-Replace the single `show_result` step (line 436) with a sequence that plays out the hand between Viktor and Luna while the coach narrates what's happening:
+Every `require_action` step with `requiredAction: 'raise'` will be updated to include:
+- The exact raise amount the user should set (matching what makes sense for that lesson scenario)
+- Clear two-step instructions: "Tap 'Raise' to open the bet slider, set it to [amount], then tap 'Raise' again to confirm!"
+- The **first time** a raise is required (Lesson 1, line 135), the instructions will be the most detailed, teaching the mechanic. Subsequent lessons will use shorter but still specific wording.
 
-1. **Coach message**: "You folded -- smart play! Now let's watch how the rest of the hand plays out between Viktor and Luna."
-2. **Deal flop** (A-K-8): Coach explains Viktor flopped trip Aces, Luna has a pair of Kings. Viktor is way ahead.
-3. **Bot action**: Viktor bets (he has trips).
-4. **Bot action**: Luna calls (she has top pair, doesn't know Viktor has trips).
-5. **Deal turn** (4c): Coach notes nothing changed -- Viktor still dominant.
-6. **Bot action**: Viktor bets again.
-7. **Bot action**: Luna calls again.
-8. **Deal river** (3s): Coach notes the blank river.
-9. **Bot action**: Viktor bets once more.
-10. **Bot action**: Luna calls.
-11. **Show result**: Coach explains Viktor wins with trip Aces vs Luna's pair of Kings. Reinforces the fold lesson -- "Your 7-2 would have made nothing. Great fold!"
+**File: `src/lib/poker/tutorial-lessons.ts`**
 
-## Technical Details
+All raise steps updated (approximately 18 steps across lessons 1-10):
 
-**File:** `src/lib/poker/tutorial-lessons.ts` (line 436 replaced with ~11 new steps)
+| Lesson | Line | Current message | New message (summary) |
+|--------|------|----------------|----------------------|
+| 1 | 135 | "...Tap 'Raise'." | "...Tap 'Raise' to open the bet slider, set it to 300, then tap 'Raise' again to confirm!" |
+| 1 | 147 | "...Tap 'Raise'!" | "...Tap 'Raise', set to 400, and confirm!" |
+| 2 | 186 | "...Tap 'Raise'." | "...Tap 'Raise', set to 400, and confirm!" |
+| 2 | 191 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 2 | 196 | "...Tap 'Raise'." | "...Tap 'Raise', set to 500, and confirm!" |
+| 2 | 200 | "...Tap 'Raise'." | "...Tap 'Raise', set to 600, and confirm!" |
+| 3 | 249 | "...Tap 'Raise'." | "...Tap 'Raise', pick your amount, and confirm!" |
+| 4 | 288 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 4 | 292 | "...Tap 'Raise'." | "...Tap 'Raise', set to 250, and confirm!" |
+| 4 | 296 | "...Tap 'Raise'." | "...Tap 'Raise', set to 400, and confirm!" |
+| 5 | 343 | "...Tap 'Raise'." | "...Tap 'Raise', set to 500, and confirm!" |
+| 8 | 484 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 8 | 489 | "...Tap 'Raise'." | "...Tap 'Raise', set to 350, and confirm!" |
+| 8 | 493 | "...Tap 'Raise'." | "...Tap 'Raise', set to 500, and confirm!" |
+| 9 | 533 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 9 | 539 | "...Tap 'Raise'." | "...Tap 'Raise', set to 250, and confirm!" |
+| 9 | 543 | "...Tap 'Raise'." | "...Tap 'Raise', set to 400, and confirm!" |
+| 9 | 548 | "...Tap 'Raise'." | "...Tap 'Raise', set to 350, and confirm!" |
+| 10 | 588 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 10 | 592 | "...Tap 'Raise'." | "...Tap 'Raise', set to 300, and confirm!" |
+| 10 | 596 | "...Tap 'Raise'." | "...Tap 'Raise', set to 400, and confirm!" |
+| 10 | 601 | "...Tap 'Raise'." | "...Tap 'Raise', set to 500, and confirm!" |
 
-The steps use existing step types: `coach_message`, `deal_community`, `bot_action`, and `show_result`. The `deal_community` steps will deal the pre-configured flop/turn/river cards. Bot actions use explicit amounts.
+The first raise (Lesson 1, line 135) will have the most detailed instruction:
+> "With A-K suited, you should raise! This tells opponents you're strong and builds the pot. Tap 'Raise' to open the bet slider, set the amount to around 300, then tap 'Raise' again to confirm!"
 
-Step count goes from 8 to ~18, which the step counter handles automatically.
+Subsequent raises will be shorter:
+> "Bet for value! Tap 'Raise', set to 300, and confirm!"
+
+### 2. Fix button visibility during tutorials
+
+**File: `src/components/poker/BettingControls.tsx`** (line 36)
+
+Replace the subtle pulse glow with full-colour visibility for the allowed button:
+
+```
+// Before (line 36):
+const glowStyle = tutorialAllowedAction ? 'ring-2 ring-primary/60 animate-pulse' : '';
+
+// After:
+const allowedStyle = tutorialAllowedAction ? 'scale-105 shadow-lg shadow-primary/30' : '';
+```
+
+Then replace all 8 occurrences of `glowStyle` with `allowedStyle` (lines 141, 156, 179, 263, 277, 301 in both portrait and landscape layouts).
+
+This means:
+- **Blocked buttons**: 30% opacity, greyscale, no interaction -- clearly locked
+- **Allowed button**: Full original colour, slightly enlarged (105%), bright shadow -- clearly the one to press. No pulsing animation.
+
+---
 
 ## What does NOT change
-- CoachOverlay UI
+- Raise slider does NOT auto-open (user must tap Raise manually)
 - Bottom navigation
+- CoachOverlay UI layout
 - Game reducer logic or hooks
 - Database
-- Translations
 - Any other files
 
