@@ -1,76 +1,141 @@
 
-# Lesson 10: Unguided Free Play
+# Full Polish Translation for Learn Poker Tutorial
 
-## What Changes
+## Scope
 
-### 1. Rewrite Lesson 10 scripted steps (`src/lib/poker/tutorial-lessons.ts`)
+There are ~200+ hardcoded English strings across the tutorial system that need Polish translations:
 
-Remove all `require_action` steps (which force specific actions) and all messages that reveal opponent hands. Replace with a free-play flow:
+- **10 lesson titles, subtitles, and descriptions** (displayed in the lesson list and completion overlay)
+- **~12 intro steps** (lesson 1 table tour)
+- **~150 scripted step messages** (coach messages, bot actions, deal announcements, require_action prompts, show_result)
+- **~40 summary bullet points** (shown on lesson completion)
+- **3 hardcoded strings in LearnPoker.tsx** (tutorial complete toast, 2 performance messages)
+- **3 strings in CoachOverlay.tsx** (button text: "Continue", "Got it", "Tap X" -- already translated via `coach.*` keys but currently hardcoded in the component)
 
-- **`deal_hole_cards`**: Show "A-H K-D -- Big Slick! A premium hand. Use everything you've learned. This one's all you!" (no mention of opponents' cards)
-- **`bot_action` steps**: Remove opponent card reveals. Messages become neutral: "Viktor called.", "Luna folded.", "Ace folded." -- no hand info shown.
-- **Player turns**: Change all `require_action` steps to `coach_message` steps with no `requiredAction` field. Since Lesson 10 already uses the `TutorialTipNotification` for `coach_message` steps (from previous change), these will appear as lightweight dismissible tips. But crucially, since they have no `requiredAction`, the engine won't block any action -- the player is free to do whatever they want.
+## Approach
 
-However, there's a problem: the current engine only lets the player act during `require_action` steps. For true free play, the engine needs a new step type or the `require_action` steps need `requiredAction` removed.
+### 1. Convert `TUTORIAL_LESSONS` from a static constant to a factory function
 
-Looking at the code (line 486-489), when `requiredAction` is null, the `playerAction` callback accepts ANY action. So: keep the step type as `require_action` (so the engine waits for user input) but set `requiredAction` to `undefined`. This means all buttons are enabled and the player can do anything.
+**File: `src/lib/poker/tutorial-lessons.ts`**
 
-**Updated Lesson 10 steps:**
+Change `export const TUTORIAL_LESSONS` to `export function getTutorialLessons(t: TFunction)` that accepts the i18next `t` function and returns the lessons array with all strings wrapped in `t()` calls.
 
-| Step | Type | Message | Notes |
-|------|------|---------|-------|
-| 1 | `deal_hole_cards` | "A-H K-D -- Big Slick! Use everything you've learned. This one's all you!" | No opponent info |
-| 2 | `coach_message` | "Think about position, hand strength, and your plan." | Light tip via notification |
-| 3-5 | `bot_action` | "Viktor called." / "Luna folded." / "Ace folded." | No hand reveals |
-| 6 | `require_action` | (no message, no requiredAction) | Player free to act -- all buttons enabled |
-| 7 | `bot_action` | "Viktor called." | No hand info |
-| 8 | `deal_community` | "Flop: A-C 8-D 3-H." | No analysis of opponent hands |
-| 9 | `bot_action` | "Viktor checked." | Neutral |
-| 10 | `require_action` | (no message, no requiredAction) | Free choice |
-| 11 | `bot_action` | "Viktor called." | Neutral |
-| 12 | `deal_community` | "Turn: 7-S." | Board only, no opponent analysis |
-| 13 | `bot_action` | "Viktor checked." | Neutral |
-| 14 | `require_action` | (no message, no requiredAction) | Free choice |
-| 15 | `bot_action` | "Viktor called." | Neutral |
-| 16 | `deal_community` | "River: K-C. Two Pair -- Aces and Kings!" | Your hand only |
-| 17 | `bot_action` | "Viktor checked." | Neutral |
-| 18 | `require_action` | (no message, no requiredAction) | Free choice |
-| 19 | `bot_action` | "Viktor folded." | Neutral |
-| 20 | `show_result` | Dynamic -- see below | Performance-based |
+Every string becomes a translation key lookup:
+```typescript
+title: t('tutorial.basics.title', 'The Basics'),
+subtitle: t('tutorial.basics.subtitle', 'How a Hand Works'),
+// scripted steps:
+message: t('tutorial.basics.step_1', "Your cards are dealt! You have A-S K-S..."),
+// summaries:
+t('tutorial.basics.summary_1', 'A hand has 4 betting rounds...')
+```
 
-### 2. Dynamic end-of-lesson result message
+The second argument is the English default (fallback), so the app still works even if a key is missing.
+
+Also export `TUTORIAL_LESSON_COUNT = 10` as a constant for places that just need the count.
+
+### 2. Update LearnPoker.tsx to use the factory
 
 **File: `src/pages/LearnPoker.tsx`**
 
-When lesson 10 completes (`stepPhase === 'done'`), evaluate the player's performance by comparing their final chip count to their starting chips:
+```typescript
+const { t } = useTranslation();
+const lessons = useMemo(() => getTutorialLessons(t), [t]);
+// Replace all TUTORIAL_LESSONS references with lessons
+```
 
-- **Won chips (chips > startingChips)**: show_result message = "That was good! You're ready for the real thing."
-- **Lost chips or broke even**: show_result message = "You've got the basics down! With practice, you'll get better."
+Also wrap the 3 hardcoded strings:
+- Toast title: `t('tutorial.complete_toast_title', 'Tutorial Complete!')`
+- Toast description: `t('tutorial.complete_toast_desc', 'You earned 1600 XP...')`
+- Performance messages: `t('tutorial.result_good', "That was good!...")` and `t('tutorial.result_ok', "You've got the basics...")`
 
-Since the `show_result` message is baked into the lesson data, the simplest approach is to set a generic message in the lesson ("Congratulations -- tutorial complete!") and override the `LessonCompleteOverlay` or the `showComplete` logic in `LearnPoker.tsx` to display the performance-based message.
+### 3. Fix CoachOverlay.tsx button text to use existing translation keys
 
-Specifically: in `LearnPoker.tsx`, when `activeLessonIdx === 9` and `showComplete` is true, compute whether `humanPlayer.chips > activeLesson.startingChips` and pass a custom subtitle to `LessonCompleteOverlay`. Since `LessonCompleteOverlay` already receives the `lesson` prop, we can add an optional `customMessage` prop.
+**File: `src/components/poker/CoachOverlay.tsx`**
 
-**File: `src/components/poker/LessonCompleteOverlay.tsx`**
-- Add optional `customMessage?: string` prop
-- If provided, display it instead of the default lesson summary
+The `coach.continue`, `coach.got_it`, `coach.tap_action`, and `coach.step_of` keys already exist in both locales but are NOT used in the component (it has hardcoded English). Fix:
 
-### 3. Remove `highlight: 'actions'` from free-play require_action steps
+```typescript
+const { t } = useTranslation();
+// ...
+const buttonText = isIntro
+  ? t('coach.continue')
+  : isRequireAction
+    ? t('coach.tap_action', { action: step!.requiredAction! })
+    : t('coach.got_it');
 
-Since there's no guided action, there should be no highlight ring around the actions panel during free play. The `require_action` steps in lesson 10 will have no `highlight` property.
+// Step counter:
+t('coach.step_of', { current: currentStepNum, total: totalSteps })
+```
 
-## Summary of file changes
+### 4. Add all translation keys to en.json and pl.json
+
+**File: `src/i18n/locales/en.json`** -- Add `tutorial` namespace with all ~200 keys in English.
+
+**File: `src/i18n/locales/pl.json`** -- Add `tutorial` namespace with all ~200 keys translated to Polish.
+
+Key structure:
+```json
+{
+  "tutorial": {
+    "complete_toast_title": "Tutorial Complete! / Samouczek ukończony!",
+    "complete_toast_desc": "You earned 1600 XP... / Zdobyłeś 1600 XP...",
+    "result_good": "That was good!... / To było dobre!...",
+    "result_ok": "You've got the basics... / Opanowałeś podstawy...",
+    "basics": {
+      "title": "The Basics / Podstawy",
+      "subtitle": "How a Hand Works / Jak działa ręka",
+      "description": "... / ...",
+      "intro_1": "Welcome to Learn Poker!... / Witaj w Nauce Pokera!...",
+      "intro_2": "...",
+      "step_1": "Your cards are dealt!... / Karty rozdane!...",
+      "step_2": "...",
+      "summary_1": "...",
+      "summary_2": "..."
+    },
+    "hand_rankings": { ... },
+    "betting_actions": { ... },
+    "position": { ... },
+    "reading_board": { ... },
+    "pot_odds": { ... },
+    "when_to_fold": { ... },
+    "bluffing": { ... },
+    "value_betting": { ... },
+    "final": { ... }
+  }
+}
+```
+
+### Polish translations for all 10 lessons (summary)
+
+| Lesson | English Title | Polish Title |
+|--------|--------------|-------------|
+| 1 | The Basics | Podstawy |
+| 2 | Hand Rankings | Ranking układów |
+| 3 | Betting Actions | Akcje licytacji |
+| 4 | Position Matters | Znaczenie pozycji |
+| 5 | Reading the Board | Czytanie stołu |
+| 6 | Pot Odds | Szanse puli |
+| 7 | When to Fold | Kiedy spasować |
+| 8 | Bluffing Basics | Podstawy blefu |
+| 9 | Value Betting | Obstawianie wartości |
+| 10 | Putting It All Together | Wszystko razem |
+
+All scripted step messages, intro messages, summaries, and UI strings will receive full Polish translations maintaining poker terminology (using standard Polish poker terms: fold/pas, check/czekaj, call/sprawdzenie, raise/podbicie, blind, flop, turn, river, etc.).
+
+## Files changed
 
 | File | Change |
 |------|--------|
-| `src/lib/poker/tutorial-lessons.ts` | Rewrite lesson 10: remove opponent hand reveals, remove `requiredAction` from all `require_action` steps, remove `highlight` from free-play steps |
-| `src/pages/LearnPoker.tsx` | Add performance-based message logic for lesson 10 completion |
-| `src/components/poker/LessonCompleteOverlay.tsx` | Add optional `customMessage` prop |
+| `src/lib/poker/tutorial-lessons.ts` | Convert `TUTORIAL_LESSONS` to `getTutorialLessons(t)` factory; export `TUTORIAL_LESSON_COUNT` |
+| `src/pages/LearnPoker.tsx` | Use factory with `t`; translate toast and performance messages |
+| `src/components/poker/CoachOverlay.tsx` | Use existing `coach.*` translation keys for button text and step counter |
+| `src/i18n/locales/en.json` | Add ~200 keys under `tutorial` namespace |
+| `src/i18n/locales/pl.json` | Add ~200 Polish translations under `tutorial` namespace |
 
 ## What does NOT change
-- Lessons 1-9 (all unchanged)
-- Game engine / reducer logic
-- BettingControls.tsx
-- CoachOverlay.tsx
+- Game engine, hooks, reducers
 - Bottom navigation
 - Database
+- Layout or styling
+- Any non-tutorial components
