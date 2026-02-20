@@ -1,68 +1,58 @@
 
 
-# Fix Tutorial: Bot Raise Amounts + Control Flash After Player Action
+# Fix Turn Order: Bot Must Act Before User on Every Post-Flop Street
 
-## Issue 1: Bot raises don't specify amounts
+## Problem
+In real poker, the first active player left of the dealer acts first on every post-flop street. In several lessons, the user is asked to Raise without the bot acting first, breaking proper poker turn order and confusing learners.
 
-When a bot uses `{ type: 'raise' }` without an explicit `amount`, the game reducer defaults to `maxBet + minRaise` (usually just 100 -- the big blind). This means the call button correctly shows "Call 100" even when the coach message says "Viktor raised 200" or "Viktor bet 300". The fix is to add explicit `amount` values to every bot raise so the game state matches the messages.
+## Affected Lessons and Fixes
 
-**Affected bot raises across all lessons:**
+All fixes involve inserting a `bot_action: check` step before the user's `require_action` step on the affected street. Each added step includes a brief, educational message.
 
-| Lesson | Line | Message says | Fix |
-|--------|------|-------------|-----|
-| 3 (Betting Actions) | ~240 | "Viktor raised... betting 200" | Add `amount: 200` |
-| 5 (Reading the Board) | ~333 | "Viktor raised" (no specific amount) | Add `amount: 200` for consistency |
-| 6 (Pot Odds) | ~381 | "Viktor raised 200" | Add `amount: 200` |
-| 6 (Pot Odds) | ~384 | "bet again -- 300" | Add `amount: 300` |
-| 7 (When to Fold) | ~425 | "Viktor raised big" | Add `amount: 400` (a "big" raise) |
+### Lesson 1 (The Basics) -- River
+- Insert: Ace (bot-2) checks before user raises
+- Message: "Ace checked. With your Broadway Straight, it's time to bet big!"
 
-**File:** `src/lib/poker/tutorial-lessons.ts`
+### Lesson 2 (Hand Rankings) -- Flop, Turn, and River (3 fixes)
+- **Flop**: Insert Viktor (bot-0) check before user raises
+  - Message: "Viktor checked his trip Kings. But your trip Aces are higher!"
+- **Turn**: Insert Viktor check before user raises
+  - Message: "Viktor checked. He's cautious now."
+- **River**: Insert Viktor check before user raises
+  - Message: "Viktor checked. Time for one last value bet!"
 
-## Issue 2: Flash of controls + stale message after player acts
+### Lesson 3 (Betting Actions) -- River
+- Insert: Viktor check before user raises
+- Message: "Viktor checked. He missed his draws. Time to bet your Flush!"
 
-When the user taps Call/Fold/Raise during a `require_action` step, the `playerAction` handler in `useTutorialGame.ts`:
-1. Sets `requiredAction` to `null`
-2. Waits 600ms before executing the next step
+### Lesson 6 (Pot Odds) -- River
+- Insert: Viktor check before user raises
+- Message: "Viktor checked. He's worried. Your straight is the best hand!"
 
-During that 600ms gap, `stepPhase` is still `'waiting_action'`, so:
-- `isHumanTurn` remains `true` (controls stay visible)
-- `currentStep` still has the old coach message
-- All 3 action buttons flash briefly with the stale message
+### Lesson 9 (Value Betting) -- River
+- Insert: Viktor check before user raises
+- Message: "Viktor checked. He missed his straight draw. One more value bet!"
 
-**Fix in `useTutorialGame.ts` (playerAction callback, ~line 486):**
-- Immediately set `stepPhase` to `'animating'` (hides controls and coach bubble)
-- Clear `coachMessage` to empty string
-- Then after 600ms, execute the next step as before
+### Lesson 10 (Final) -- River
+- Insert: Viktor check before user raises
+- Message: "Viktor checked. Your Two Pair is strong!"
 
+## Technical Details
+
+**File changed:** `src/lib/poker/tutorial-lessons.ts`
+
+Each fix is a single line insertion of the form:
 ```typescript
-// Current (buggy):
-setRequiredAction(null);
-timerRef.current = setTimeout(() => {
-  executeStep(stepIndex + 1);
-}, 600);
-
-// Fixed:
-setRequiredAction(null);
-setStepPhase('animating');   // immediately hide controls
-setCoachMessage('');          // clear stale message
-timerRef.current = setTimeout(() => {
-  executeStep(stepIndex + 1);
-}, 600);
+{ type: 'bot_action', botId: 'bot-0', botAction: { type: 'check' }, message: "...", delay: 1500 },
 ```
 
-This ensures the user sees a clean transition: action executed, controls disappear instantly, then the next step loads.
-
-## Files changed
-
-| File | Change |
-|------|--------|
-| `src/lib/poker/tutorial-lessons.ts` | Add explicit `amount` to 5 bot raise actions across lessons 3, 5, 6, 7 |
-| `src/hooks/useTutorialGame.ts` | Set `stepPhase='animating'` and clear `coachMessage` immediately after player acts |
+The step counter (e.g., "Step 16/18") will automatically adjust because it counts total steps. Lessons that gain a step will show the new correct total.
 
 ## What does NOT change
-- CoachOverlay UI
 - Bottom navigation
+- CoachOverlay UI
+- Game reducer logic or hooks
 - Database
 - Translations
-- Game reducer logic
+- Any other files
 
