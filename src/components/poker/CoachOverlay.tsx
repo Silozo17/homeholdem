@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import dealerImg from '@/assets/dealer/dealer-main.png';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** Generic coach step info (not tied to ScriptedStep type) */
 export interface CoachStepInfo {
@@ -99,6 +100,7 @@ const POINTER_HANDS: Record<string, { emoji: string; style: React.CSSProperties 
 };
 
 export function CoachOverlay({ step, introStep, onDismiss, requiredAction, currentStepNum, totalSteps, raiseSliderOpen }: CoachOverlayProps) {
+  const { t } = useTranslation();
   const message = introStep?.message || step?.message || '';
   const fallbackPosition = introStep?.position || 'bottom';
   const arrowDirection = introStep?.arrowDirection || 'none';
@@ -130,12 +132,12 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
     }
   })();
 
-  // Button text — clean, no emojis
+  // Button text — uses translation keys
   const buttonText = isIntro
-    ? 'Continue →'
+    ? t('coach.continue')
     : isRequireAction
-      ? `Tap ${step!.requiredAction!.charAt(0).toUpperCase() + step!.requiredAction!.slice(1)}`
-      : 'Got it →';
+      ? t('coach.tap_action', { action: step!.requiredAction!.charAt(0).toUpperCase() + step!.requiredAction!.slice(1) })
+      : t('coach.got_it');
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
@@ -231,7 +233,7 @@ export function CoachOverlay({ step, introStep, onDismiss, requiredAction, curre
                 {!isIntro && currentStepNum != null && totalSteps != null && totalSteps > 0 && (
                   <div className="flex justify-end mb-1">
                     <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
-                      Step {currentStepNum}/{totalSteps}
+                      {t('coach.step_of', { current: currentStepNum, total: totalSteps })}
                     </span>
                   </div>
                 )}

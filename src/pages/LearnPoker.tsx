@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle2, Lock, BookOpen, ChevronRight, RotateCcw } from 'lucide-react';
@@ -11,7 +11,7 @@ import { CoachOverlay } from '@/components/poker/CoachOverlay';
 import { LessonCompleteOverlay } from '@/components/poker/LessonCompleteOverlay';
 import { TutorialTipNotification } from '@/components/poker/TutorialTipNotification';
 import { useTutorialGame } from '@/hooks/useTutorialGame';
-import { TUTORIAL_LESSONS } from '@/lib/poker/tutorial-lessons';
+import { getTutorialLessons, TUTORIAL_LESSON_COUNT } from '@/lib/poker/tutorial-lessons';
 import { cn } from '@/lib/utils';
 import { useTutorialComplete } from '@/hooks/useTutorialComplete';
 import { toast } from '@/hooks/use-toast';
@@ -39,7 +39,8 @@ export default function LearnPoker() {
   const [showComplete, setShowComplete] = useState(false);
   const { isComplete: tutorialAlreadyComplete, markComplete } = useTutorialComplete();
 
-  const activeLesson = TUTORIAL_LESSONS[activeLessonIdx] || null;
+  const lessons = useMemo(() => getTutorialLessons(t), [t]);
+  const activeLesson = lessons[activeLessonIdx] || null;
   const {
     state, startLesson, playerAction, nextHand, quitGame,
     isHumanTurn, humanPlayer, amountToCall, canCheck, maxBet,
@@ -63,19 +64,18 @@ export default function LearnPoker() {
           const next = [...completedLessons, activeLessonIdx];
           setCompletedLessons(next);
           saveProgress(next);
-          // Award XP when all 10 lessons are completed for the first time
-          if (next.length === TUTORIAL_LESSONS.length && !tutorialAlreadyComplete) {
+          if (next.length === TUTORIAL_LESSON_COUNT && !tutorialAlreadyComplete) {
             markComplete(true);
             toast({
-              title: '🎉 Tutorial Complete!',
-              description: 'You earned 1600 XP and reached Level 5! All game modes are now unlocked.',
+              title: t('tutorial.complete_toast_title', '🎉 Tutorial Complete!'),
+              description: t('tutorial.complete_toast_desc', 'You earned 1600 XP and reached Level 5! All game modes are now unlocked.'),
             });
           }
         }
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [stepPhase, isPlaying, showComplete, activeLessonIdx, completedLessons]);
+  }, [stepPhase, isPlaying, showComplete, activeLessonIdx, completedLessons, t]);
 
   useEffect(() => {
     if (isPlaying && !showComplete && stepPhase === 'done' && (state.phase === 'hand_complete' || state.phase === 'game_over')) {
@@ -86,15 +86,15 @@ export default function LearnPoker() {
   const startLessonHandler = useCallback((idx: number) => {
     setActiveLessonIdx(idx);
     setShowComplete(false);
-    const lesson = TUTORIAL_LESSONS[idx];
+    const lesson = lessons[idx];
     if (lesson) {
       startLesson(lesson);
       setIsPlaying(true);
     }
-  }, [startLesson]);
+  }, [startLesson, lessons]);
 
   const handleNextLesson = useCallback(() => {
-    if (activeLessonIdx >= TUTORIAL_LESSONS.length - 1) {
+    if (activeLessonIdx >= TUTORIAL_LESSON_COUNT - 1) {
       quitGame();
       setIsPlaying(false);
       setShowComplete(false);
@@ -120,10 +120,10 @@ export default function LearnPoker() {
     saveProgress([]);
   }, []);
 
-  const progressPercent = (completedLessons.length / TUTORIAL_LESSONS.length) * 100;
+  const progressPercent = (completedLessons.length / TUTORIAL_LESSON_COUNT) * 100;
 
   if (isPlaying) {
-    const isLastLesson = activeLessonIdx >= TUTORIAL_LESSONS.length - 1;
+    const isLastLesson = activeLessonIdx >= TUTORIAL_LESSON_COUNT - 1;
     const isLesson10 = activeLessonIdx === 9;
     const showCoach = isPaused && !currentIntroStep && currentStep;
     const showIntro = isPaused && currentIntroStep;
@@ -164,8 +164,8 @@ export default function LearnPoker() {
             onBackToLessons={handleBackToLessons}
             customMessage={isLesson10 ? (
               humanPlayer && humanPlayer.chips > activeLesson.startingChips
-                ? "🏆 That was good! You're ready for the real thing."
-                : "👍 You've got the basics down! With practice, you'll get better."
+                ? t('tutorial.result_good', "🏆 That was good! You're ready for the real thing.")
+                : t('tutorial.result_ok', "👍 You've got the basics down! With practice, you'll get better.")
             ) : undefined}
           />
         )}
@@ -199,14 +199,14 @@ export default function LearnPoker() {
 
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{completedLessons.length}/{TUTORIAL_LESSONS.length} {t('learn_poker.lessons')}</span>
+            <span>{completedLessons.length}/{TUTORIAL_LESSON_COUNT} {t('learn_poker.lessons')}</span>
             <span>{Math.round(progressPercent)}%</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </div>
 
         <div className="space-y-2">
-          {TUTORIAL_LESSONS.map((lesson, idx) => {
+          {lessons.map((lesson, idx) => {
             const isCompleted = completedLessons.includes(idx);
             const isUnlocked = idx <= nextUnlocked || isCompleted;
 
