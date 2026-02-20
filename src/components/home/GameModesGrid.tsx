@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bot, Users, ArrowRight, Crown, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -7,49 +8,50 @@ import { PaywallDrawer } from '@/components/subscription/PaywallDrawer';
 import { useTutorialComplete } from '@/hooks/useTutorialComplete';
 import { TutorialGateDialog } from '@/components/poker/TutorialGateDialog';
 
-const modes = [
-  {
-    title: 'Learn',
-    subtitle: 'Tutorial',
-    description: 'Step-by-step poker lessons',
-    icon: BookOpen,
-    path: '/learn-poker',
-    accentClass: 'from-sky-500/20 to-sky-500/5',
-    iconColor: 'text-sky-400',
-    premium: false,
-    requiresTutorial: false,
-  },
-  {
-    title: 'VS Bots',
-    subtitle: 'Practice Mode',
-    description: 'Sharpen your skills against AI opponents',
-    icon: Bot,
-    path: '/play-poker',
-    accentClass: 'from-primary/20 to-primary/5',
-    iconColor: 'text-primary',
-    premium: false,
-    requiresTutorial: true,
-  },
-  {
-    title: 'Multiplayer',
-    subtitle: 'Real Players',
-    description: 'Play Texas Hold\'em with friends online',
-    icon: Users,
-    path: '/poker',
-    accentClass: 'from-emerald-500/20 to-emerald-500/5',
-    iconColor: 'text-emerald-400',
-    premium: true,
-    requiresTutorial: true,
-  },
-];
-
 export function GameModesGrid() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isActive } = useSubscription();
   const { isComplete: tutorialComplete, isLoading: tutLoading } = useTutorialComplete();
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const pendingPath = useRef<string | null>(null);
+
+  const modes = [
+    {
+      title: t('home.mode_learn'),
+      subtitle: t('home.mode_learn_sub'),
+      description: t('home.mode_learn_desc'),
+      icon: BookOpen,
+      path: '/learn-poker',
+      accentClass: 'from-sky-500/20 to-sky-500/5',
+      iconColor: 'text-sky-400',
+      premium: false,
+      requiresTutorial: false,
+    },
+    {
+      title: t('home.mode_bots'),
+      subtitle: t('home.mode_bots_sub'),
+      description: t('home.mode_bots_desc'),
+      icon: Bot,
+      path: '/play-poker',
+      accentClass: 'from-primary/20 to-primary/5',
+      iconColor: 'text-primary',
+      premium: false,
+      requiresTutorial: true,
+    },
+    {
+      title: t('home.mode_multi'),
+      subtitle: t('home.mode_multi_sub'),
+      description: t('home.mode_multi_desc'),
+      icon: Users,
+      path: '/poker',
+      accentClass: 'from-emerald-500/20 to-emerald-500/5',
+      iconColor: 'text-emerald-400',
+      premium: true,
+      requiresTutorial: true,
+    },
+  ];
 
   const handleClick = (mode: typeof modes[0]) => {
     if (mode.requiresTutorial && !tutLoading && !tutorialComplete) {

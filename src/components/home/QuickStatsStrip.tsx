@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Trophy, Target, TrendingUp } from 'lucide-react';
 
 interface QuickStatsStripProps {
@@ -6,16 +7,18 @@ interface QuickStatsStripProps {
   netProfit: string;
 }
 
-const stats = (p: QuickStatsStripProps) => [
-  { label: 'Wins', value: p.wins, icon: Trophy, color: 'text-primary' },
-  { label: 'Games', value: p.gamesPlayed, icon: Target, color: 'text-emerald-400' },
-  { label: 'Net', value: p.netProfit, icon: TrendingUp, color: 'text-sky-400' },
-];
-
 export function QuickStatsStrip(props: QuickStatsStripProps) {
+  const { t } = useTranslation();
+
+  const items = [
+    { label: t('home.stat_wins'), value: props.wins, icon: Trophy, color: 'text-primary' },
+    { label: t('home.stat_games'), value: props.gamesPlayed, icon: Target, color: 'text-emerald-400' },
+    { label: t('home.stat_net'), value: props.netProfit, icon: TrendingUp, color: 'text-sky-400' },
+  ];
+
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-      {stats(props).map((stat) => {
+      {items.map((stat) => {
         const Icon = stat.icon;
         return (
           <div
