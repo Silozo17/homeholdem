@@ -26,13 +26,13 @@ export const HandRankingCard = memo(function HandRankingCard({ card, isFaded }: 
 
   return (
     <div
-      className={`relative flex flex-col items-start rounded-[4px] border border-gray-300 bg-white shadow-sm select-none ${isFaded ? 'opacity-35' : ''}`}
-      style={{ width: 40, height: 56, padding: '2px 3px' }}
+      className={`flex flex-col items-start select-none ${isFaded ? 'bg-[#D4D4D4]' : 'bg-white'}`}
+      style={{ width: 36, height: 52, padding: '3px 4px' }}
     >
-      <span className={`${colorClass} font-bold leading-none`} style={{ fontSize: 14 }}>
+      <span className={`${colorClass} font-bold leading-none`} style={{ fontSize: 15 }}>
         {rank}
       </span>
-      <span className={`${colorClass} leading-none`} style={{ fontSize: 12, marginTop: -1 }}>
+      <span className={`${colorClass} leading-none`} style={{ fontSize: 13, marginTop: -1 }}>
         {suit}
       </span>
     </div>
