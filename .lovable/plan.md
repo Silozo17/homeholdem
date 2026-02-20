@@ -1,80 +1,90 @@
 
 
-# Replace Text Card Examples with Real Card Graphics
+# Redesign Hand Rankings to Match PokerStars Reference
 
 ## What Changes
 
-Both the **tutorial explainer** (3rd screen - Hand Rankings) and the **Rules page** currently show hand examples as plain monospaced text like `A♠ K♠ Q♠ J♠ 10♠`. These will be replaced with the existing `CardDisplay` component that renders beautiful mini playing cards with proper suit colours (red for hearts/diamonds, black for spades/clubs).
+The hand rankings display in both the **Tutorial Explainer (Page 3)** and the **Rules page** will be completely redesigned to match the PokerStars reference image layout. This is a visual-only change -- no game logic, navigation, or data changes.
 
-## Approach
+## Key Design Elements from Reference
 
-### 1. Create a shared hand example data structure
+1. **Card layout**: Cards overlap/fan out (like holding a real hand), roughly 60-65% overlap between cards
+2. **Card size**: Larger cards than current `xs` -- roughly 40-48px wide, 56-64px tall
+3. **Card content**: Large rank in top-left corner, large suit symbol below it -- prominent and readable
+4. **Row layout**: Cards on the LEFT side, rank number + hand name on the RIGHT side (opposite of current layout)
+5. **"BEST" / "WORST" markers**: An upward arrow with "BEST" at the top of the list, and a downward arrow with "WORST" at the bottom
+6. **Faded kicker cards**: In hands where some cards are "fillers" (e.g., the kicker in Four of a Kind, the non-pair cards in One Pair), those cards appear faded/dimmed to highlight the important cards
+7. **No description text per row**: Just the hand name and number -- the description is removed from inline display for a cleaner look matching the reference
 
-Instead of string examples like `'A♠ K♠ Q♠ J♠ 10♠'`, define each hand's example as an array of `Card` objects. For example:
+## Implementation Plan
 
-```text
-Royal Flush -> [{rank:14, suit:'spades'}, {rank:13, suit:'spades'}, {rank:12, suit:'spades'}, {rank:11, suit:'spades'}, {rank:10, suit:'spades'}]
-```
+### 1. Update `hand-ranking-examples.ts` -- Add "highlight" metadata
 
-This data will be shared between both components.
+Add a `highlighted` array to each hand indicating which card indices are the important ones (the hand-making cards). Non-highlighted cards will be rendered faded.
 
-### 2. Create a `MiniCardRow` helper component
+For example:
+- Royal Flush: all 5 highlighted (indices 0-4)
+- Four of a Kind: indices 0-3 highlighted, index 4 (kicker) faded
+- Two Pair: indices 0-1, 2-3 highlighted, index 4 (kicker) faded
+- One Pair: indices 0-1 highlighted, indices 2-4 faded
+- High Card: only index 0 highlighted, rest faded
 
-A small reusable component that takes an array of `Card` objects and renders a horizontal row of `CardDisplay` components at the `xs` size (24x34px each). This keeps the cards compact enough to fit in each ranking row on mobile.
+### 2. Create new `HandRankingCard` component
 
-### 3. Update `TutorialExplainer.tsx` (Page3)
+A new purpose-built card component for this screen only (not reusing `CardDisplay` which is designed for gameplay). This card:
+- Is roughly 44px wide x 60px tall
+- Shows a large rank letter (top-left, ~14px bold) and suit symbol (~12px) below it
+- White/cream background with subtle border and rounded corners
+- Red (#C53030) for hearts/diamonds, black (#1A1A1A) for spades/clubs
+- Supports an `isFaded` prop that applies `opacity-40` to dim kicker cards
 
-- Import `CardDisplay` from `@/components/poker/CardDisplay`
-- Replace the text-based `HAND_RANKINGS` array (lines 16-27) with card object arrays
-- In Page3, replace the `<div className="text-xs font-mono ...">` line with a row of mini `CardDisplay` components
-- Each row shows 5 tiny cards side by side
+### 3. Create new `FannedHand` component
 
-### 4. Update `PokerHandRankings.tsx` (Rules page)
+Takes the array of cards + highlighted indices and renders them in an overlapping fan:
+- Each card overlaps the previous by about 60% (negative margin-left of ~28px on cards after the first)
+- Faded cards get `opacity-40`
+- The row of cards is left-aligned
 
-- Import `CardDisplay` from `@/components/poker/CardDisplay`
-- Replace the string `example` field in `handRankings` with card object arrays
-- Replace `<div className="text-sm font-mono ...">` with the same mini card row
+### 4. Create new `HandRankingsList` component
 
-## Visual Result
+A shared component used by both Tutorial Page 3 and the Rules page. Layout per row:
+- Left side: `FannedHand` (the overlapping cards)
+- Right side: Rank number (bold, gold circle) + Hand name (bold white text)
+- Vertically centered in each row
+- Subtle divider or spacing between rows
 
-Each hand ranking row will look like:
+"BEST" marker with upward triangle at the top-left, "WORST" marker with downward triangle at the bottom-left, styled in muted text.
 
-```text
-[1]  Royal Flush
-     A, K, Q, J, 10 all same suit
-     [A♠][K♠][Q♠][J♠][10♠]  <-- tiny rendered cards
-```
+### 5. Update `TutorialExplainer.tsx` (Page 3)
 
-Instead of the current plain text `A♠ K♠ Q♠ J♠ 10♠`.
+- Replace the current list with the new `HandRankingsList` component
+- Remove the per-hand description text (just name + cards, matching reference)
+- Keep the page title and subtitle
 
-## Card Data for All 10 Hands
+### 6. Update `PokerHandRankings.tsx` (Rules page accordion)
 
-| Hand | Cards |
-|------|-------|
-| Royal Flush | A♠ K♠ Q♠ J♠ 10♠ |
-| Straight Flush | 9♥ 8♥ 7♥ 6♥ 5♥ |
-| Four of a Kind | K♠ K♥ K♦ K♣ 3♠ |
-| Full House | Q♠ Q♥ Q♦ 9♣ 9♠ |
-| Flush | A♦ J♦ 8♦ 6♦ 2♦ |
-| Straight | 10♠ 9♥ 8♦ 7♣ 6♠ |
-| Three of a Kind | 7♠ 7♥ 7♦ K♣ 2♠ |
-| Two Pair | J♠ J♥ 4♦ 4♣ A♠ |
-| One Pair | 10♠ 10♥ K♦ 7♣ 4♠ |
-| High Card | A♠ J♥ 8♦ 6♣ 2♠ |
+- Replace the hand-rankings accordion content with the same `HandRankingsList` component
+- The accordion still wraps it, but the content inside matches the PokerStars layout
 
-(Same examples as currently used, just rendered as real cards.)
+### 7. Update `MiniCardRow.tsx`
+
+This component will no longer be used for hand rankings (replaced by `FannedHand`). It stays in the codebase in case it's used elsewhere, but will no longer be imported by the ranking screens.
 
 ## Files Modified
 
-- `src/components/poker/TutorialExplainer.tsx` -- Page3 renders real cards
-- `src/components/clubs/PokerHandRankings.tsx` -- Hand Rankings accordion renders real cards
+- **Edit**: `src/lib/poker/hand-ranking-examples.ts` -- add `highlighted` indices per hand
+- **New**: `src/components/poker/HandRankingCard.tsx` -- large card for ranking display
+- **New**: `src/components/poker/FannedHand.tsx` -- overlapping card fan
+- **New**: `src/components/poker/HandRankingsList.tsx` -- full list with BEST/WORST markers
+- **Edit**: `src/components/poker/TutorialExplainer.tsx` -- Page3 uses new component
+- **Edit**: `src/components/clubs/PokerHandRankings.tsx` -- accordion content uses new component
 
 ## What Does NOT Change
 
-- No layout, spacing, or navigation changes
-- No game logic or engine changes
-- Bottom navigation untouched
-- Card sizes remain compact (xs) to fit mobile screens
-- All other pages/sections in the Tutorial Explainer (pages 1,2,4,5) remain the same
-- Betting rounds, actions, and blinds sections in Rules page remain the same
+- No game logic, hooks, or engine changes
+- No layout/navigation/bottom nav changes
+- Card data (which cards represent each hand) stays the same
+- Other tutorial pages (1, 2, 4, 5) unchanged
+- Rules page structure (accordion with betting rounds, actions, blinds) unchanged
+- `CardDisplay.tsx` and `MiniCardRow.tsx` untouched (used elsewhere in gameplay)
 
