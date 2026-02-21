@@ -1,67 +1,80 @@
 
 
-# Backfill Achievement XP for All Players
+# Fix: Achievement XP Backfill Not Triggering
 
-## Current State
+## Root Cause
 
-Achievements are already MP-only -- `useAchievements` / `checkAndAward` is only called in `OnlinePokerTable.tsx`. The bot game (`PlayPoker.tsx` / `PokerTablePro`) does NOT use achievements at all. So no code change needed there.
+The backfill code only runs on the **Profile page** and **MP table mount**. The user hasn't visited either of those pages since the code was deployed. They land on `/` which redirects to `/dashboard` -- where no backfill exists.
 
-The real problem: the XP bonus code (`ACHIEVEMENT_XP` insert into `xp_events`) was added recently, AFTER many players had already unlocked achievements. Those players have achievements in localStorage but zero corresponding `xp_events` rows.
+Confirmed: the `xp_events` table has **zero** rows with `reason LIKE 'achievement:%'`.
 
 ## Fix
 
-### 1. Add XP backfill on Profile page load
+Add the same one-time achievement XP backfill to `Dashboard.tsx` -- the page every logged-in user sees first. Also add `console.log` to help debug if it still doesn't work.
 
-In `Profile.tsx`, after loading the unlocked achievement IDs from localStorage, query `xp_events` for any existing `achievement:*` rows for this user. For any unlocked achievement missing its XP row, insert the missing XP events.
+### File: `src/pages/Dashboard.tsx`
 
-This is a self-healing one-time sync that runs each time the user visits their Profile. It uses a component-level ref to avoid duplicate inserts within the same page session.
+- Import `useRef` from React
+- Import `ACHIEVEMENT_XP` from `@/lib/poker/achievements`
+- Import `supabase` (already imported)
+- Add a `useEffect` with a ref guard that:
+  1. Reads `poker-achievements` from localStorage
+  2. Queries `xp_events` for existing `achievement:*` rows
+  3. Inserts missing XP records
+  4. Logs results for debugging
 
-### 2. Add XP backfill on MP table join
+```text
+Code change (pseudocode):
 
-In `OnlinePokerTable.tsx`, add the same one-time sync on mount (guarded by a ref). This catches players who play MP but never visit Profile.
-
-### Implementation Detail
-
-```
-// Pseudocode for both files:
 useEffect(() => {
-  if (!user) return;
-  const unlocked = parse localStorage 'poker-achievements' -> unlocked[]
-  if (unlocked.length === 0) return;
+  if (!user || syncedRef.current) return;
+  syncedRef.current = true;
+
+  const raw = localStorage.getItem('poker-achievements');
+  if (!raw) return;
+  const { unlocked } = JSON.parse(raw);
+  if (!unlocked?.length) return;
 
   supabase.from('xp_events')
     .select('reason')
     .eq('user_id', user.id)
     .like('reason', 'achievement:%')
-    .then(({ data }) => {
+    .then(({ data, error }) => {
+      if (error) { console.error('XP backfill query error', error); return; }
       const existing = new Set(data.map(r => r.reason));
       const missing = unlocked.filter(id =>
-        ACHIEVEMENT_XP[id] > 0 && !existing.has('achievement:' + id)
+        ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
       );
       if (missing.length === 0) return;
       supabase.from('xp_events').insert(
         missing.map(id => ({
           user_id: user.id,
           xp_amount: ACHIEVEMENT_XP[id],
-          reason: 'achievement:' + id,
+          reason: `achievement:${id}`,
         }))
-      );
+      ).then(({ error: insertErr }) => {
+        if (insertErr) console.error('XP backfill insert error', insertErr);
+        else console.log('Backfilled XP for', missing.length, 'achievements');
+      });
     });
 }, [user?.id]);
 ```
+
+### Also: Add error logging to existing backfills
+
+In both `Profile.tsx` and `OnlinePokerTable.tsx`, the existing backfill code has no error handling on the insert -- errors are silently swallowed. Add `.then(({ error }) => { if (error) console.error(...) })` to the insert calls so we can diagnose failures.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/pages/Profile.tsx` | Add achievement XP backfill on page load |
-| `src/components/poker/OnlinePokerTable.tsx` | Add achievement XP backfill on table mount |
+| `src/pages/Dashboard.tsx` | Add achievement XP backfill on page load |
+| `src/pages/Profile.tsx` | Add error logging to existing backfill insert |
+| `src/components/poker/OnlinePokerTable.tsx` | Add error logging to existing backfill insert |
 
 ## What Does NOT Change
 
-- No changes to bot game code (already doesn't use achievements)
 - No database schema changes
-- No edge function changes
 - No navigation, layout, or bottom nav changes
-- Achievement localStorage storage format unchanged
-
+- No edge function changes
+- Existing backfill logic in Profile and OnlinePokerTable stays
