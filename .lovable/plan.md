@@ -1,91 +1,67 @@
 
+# Fix: Players Not Visible to Each Other at Poker Table
 
-# Fix: Winner Timing + End Game Landscape Layout
+## Root Cause
 
-## Issue 1: Winner Shows Before Cards Are Dealt (ROOT CAUSE FOUND)
+The `game_state` broadcast handler in `useOnlinePokerTable.ts` (line 261) merges seat data using `.map()` over `prev.seats` only. This means it only updates seats that already exist in local state -- it **never adds** new seats that appear in the broadcast.
 
-### Why the current fix doesn't work
+The intended flow is:
+1. Player joins -> `seat_change` broadcast fires -> client adds new seat to local state
+2. Subsequent `game_state` broadcasts update that seat's data
 
-The runout detection is broken because of event ordering:
+But if the `seat_change` broadcast is missed (network hiccup, late subscription, race condition), the new player's seat never gets added to local state. The `game_state` broadcasts keep arriving with all seats including the new player, but the `.map()` silently ignores any seats not already in `prev.seats`.
 
-1. Server sends `game_state` broadcast with 5 community cards
-2. The `game_state` handler (line 230) immediately sets `prevCommunityAtResultRef.current = 5`
-3. The staged runout effect in `OnlinePokerTable.tsx` starts slowly revealing cards (flop at 0ms, turn at 2000ms, river at 4000ms)
-4. Server sends `hand_result` broadcast
-5. `hand_result` handler checks: `prevCommunityAtResultRef.current < 5` -- but it's already 5!
-6. `wasRunout = false`, so `winnerDelay = 0` -- winner shows IMMEDIATELY
+This is why Admin can't see Amir -- Admin missed the `seat_change` for Amir's join, and `game_state` never reconciles the missing seat.
 
-The winner overlay, voice announcement, and confetti all fire before the staged cards finish dealing because the runout detection flag is already stale.
+## Fix
 
-### The fix
+**File: `src/hooks/useOnlinePokerTable.ts` (lines 259-265)**
 
-Add a dedicated `wasRunoutRef` boolean in `useOnlinePokerTable.ts` that gets set in the `game_state` handler when a community card jump is detected, and consumed (read + reset) in the `hand_result` handler.
+After mapping existing seats, also append any seats from the broadcast that don't exist in local state. This ensures `game_state` is self-healing -- even if `seat_change` was missed, the next `game_state` broadcast will add the missing player.
 
-**File: `src/hooks/useOnlinePokerTable.ts`**
-
-1. Add new ref: `const wasRunoutRef = useRef(false);`
-
-2. In the `game_state` handler (around line 229-230), detect the jump BEFORE updating the count:
 ```typescript
-const newCommunityCount = (payload.community_cards || []).length;
-const oldCommunityCount = prevCommunityAtResultRef.current;
-// Detect runout: community cards jumped by more than 1 in a single broadcast
-if (newCommunityCount > oldCommunityCount + 1) {
-  wasRunoutRef.current = true;
-}
-prevCommunityAtResultRef.current = newCommunityCount;
+// Current (broken):
+const mergedSeats = prev.seats.map(existingSeat => {
+  const updated = seats.find(s => s.seat === existingSeat.seat);
+  return updated ? { ...existingSeat, ...updated } : existingSeat;
+});
+
+// Fixed:
+const mergedSeats = prev.seats.map(existingSeat => {
+  const updated = seats.find(s => s.seat === existingSeat.seat);
+  return updated ? { ...existingSeat, ...updated } : existingSeat;
+});
+// Self-healing: add any seats from broadcast that are missing locally
+const existingSeatNumbers = new Set(prev.seats.map(s => s.seat));
+const newSeats = seats
+  .filter(s => !existingSeatNumbers.has(s.seat) && s.player_id)
+  .map(s => ({
+    seat: s.seat,
+    player_id: s.player_id,
+    display_name: s.display_name || 'Player',
+    avatar_url: s.avatar_url || null,
+    country_code: s.country_code || null,
+    stack: s.stack ?? 0,
+    status: s.status || 'sitting_out',
+    has_cards: s.has_cards || false,
+    current_bet: s.current_bet ?? 0,
+    last_action: s.last_action ?? null,
+  }));
+const allSeats = [...mergedSeats, ...newSeats];
+return { ...prev, current_hand: broadcastHand, seats: allSeats };
 ```
 
-3. In the `hand_result` handler (lines 359-362), use the flag instead of re-computing:
-```typescript
-const winnerDelay = wasRunoutRef.current ? 5500 : 0;
-wasRunoutRef.current = false; // Reset after use
-```
-
-4. Reset the flag on new hand (line 139):
-```typescript
-prevCommunityAtResultRef.current = 0;
-wasRunoutRef.current = false;
-```
-
-This ensures the runout is detected at the moment the community cards jump (in `game_state`), and the delay is applied when the winner is determined (in `hand_result`), regardless of the order or timing of broadcasts.
-
----
-
-## Issue 2: End Game Screen Cut Off in Mobile Landscape
-
-The current `XPLevelUpOverlay` uses `max-w-sm` (384px) which doesn't use landscape width. On a phone rotated to landscape (e.g. 812x375), the content is forced into a narrow column, causing vertical overflow.
-
-**File: `src/components/poker/XPLevelUpOverlay.tsx`**
-
-Restructure the layout to use a two-column layout in landscape:
-
-- Add landscape media query detection via the container
-- In landscape: use `max-w-2xl` and split into two columns -- left column has XP header + level progress, right column has stats + buttons
-- In portrait: keep current single-column layout
-- Use `landscape:` Tailwind variants throughout:
-  - Outer: `max-w-sm landscape:max-w-2xl`
-  - Inner: `landscape:flex-row landscape:gap-6`
-  - Stats + buttons: `landscape:flex-1`
-  - XP header + level: `landscape:flex-1`
-- Reduce vertical spacing in landscape: `py-4 landscape:py-2`
-- Reduce margins and font sizes in landscape mode
-- Ensure buttons always visible: `landscape:mt-auto` on button container
-
-This uses CSS `@media (orientation: landscape)` which Tailwind supports via the `landscape:` variant -- no JS needed.
-
----
+This is the smallest possible change -- it only adds missing seats, never removes or reorders existing ones. It makes the `game_state` handler self-healing without needing a full `refreshState`.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Add `wasRunoutRef` for reliable runout detection; set in `game_state`, consume in `hand_result` |
-| `src/components/poker/XPLevelUpOverlay.tsx` | Two-column landscape layout to fit full screen width |
+| `src/hooks/useOnlinePokerTable.ts` | Add self-healing seat reconciliation in `game_state` handler (~5 lines added) |
 
 ## What Does NOT Change
 
 - No database, schema, or edge function changes
-- No navigation or bottom nav changes
-- No changes to staged runout timing (stays at 0/2000/4000ms)
-- No changes to voice, confetti, or other previously-fixed issues
+- No navigation, bottom nav, or layout changes
+- No changes to any other poker logic or timing
+- No changes to `seat_change` handler (it still works as before)
