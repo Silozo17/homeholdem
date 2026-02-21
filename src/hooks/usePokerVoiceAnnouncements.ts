@@ -21,7 +21,7 @@ export function usePokerVoiceAnnouncements() {
   const lastAnnouncedRef = useRef<{ msg: string; at: number }>({ msg: '', at: 0 });
   const MAX_CACHE = 20;
   const DEDUP_MS = 3000;
-  const STALE_MS = 15000;
+  const STALE_MS = 8000;
 
   const addToCache = useCallback((key: string, value: string) => {
     const cache = cacheRef.current;
@@ -131,6 +131,10 @@ export function usePokerVoiceAnnouncements() {
     enqueue(message);
   }, [enqueue]);
 
+  const clearQueue = useCallback(() => {
+    queueRef.current = [];
+  }, []);
+
   const toggleVoice = useCallback(() => setVoiceEnabled(v => !v), []);
 
   // Pre-cache common static phrases on first call
@@ -156,6 +160,7 @@ export function usePokerVoiceAnnouncements() {
     announceCountdown,
     announceGameOver,
     announceCustom,
+    clearQueue,
     voiceEnabled,
     toggleVoice,
     precache,

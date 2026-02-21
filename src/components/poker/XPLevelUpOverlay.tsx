@@ -64,22 +64,22 @@ function formatDuration(seconds: number): string {
 /** Mini donut chart for win rate */
 function WinRateRing({ played, won }: { played: number; won: number }) {
   const pct = played > 0 ? (won / played) * 100 : 0;
-  const radius = 28;
+  const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const dashoffset = circumference - (pct / 100) * circumference;
 
   return (
-    <div className="relative w-16 h-16 flex items-center justify-center">
-      <svg width="64" height="64" viewBox="0 0 64 64" className="absolute inset-0 -rotate-90">
-        <circle cx="32" cy="32" r={radius} fill="none" stroke="hsl(0 0% 20%)" strokeWidth="5" />
+    <div className="relative w-12 h-12 flex items-center justify-center">
+      <svg width="48" height="48" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
+        <circle cx="24" cy="24" r={radius} fill="none" stroke="hsl(0 0% 20%)" strokeWidth="4" />
         <circle
-          cx="32" cy="32" r={radius} fill="none"
-          stroke="hsl(43 74% 49%)" strokeWidth="5" strokeLinecap="round"
+          cx="24" cy="24" r={radius} fill="none"
+          stroke="hsl(43 74% 49%)" strokeWidth="4" strokeLinecap="round"
           strokeDasharray={circumference} strokeDashoffset={dashoffset}
           className="transition-all duration-[1.5s] ease-out"
         />
       </svg>
-      <span className="text-sm font-black" style={{ color: 'hsl(43 74% 55%)' }}>
+      <span className="text-[11px] font-black" style={{ color: 'hsl(43 74% 55%)' }}>
         {Math.round(pct)}%
       </span>
     </div>
@@ -153,7 +153,7 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-y-auto transition-opacity duration-500',
+        'fixed inset-0 z-[100] flex flex-col items-center justify-center max-h-[100dvh] overflow-hidden transition-opacity duration-500',
         visible ? 'opacity-100' : 'opacity-0',
       )}
       style={{
@@ -161,21 +161,21 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
         backdropFilter: 'blur(8px)',
       }}
     >
-      <div className="w-full max-w-sm px-6 py-8 flex flex-col items-center">
+      <div className="w-full max-w-sm px-5 py-4 flex flex-col items-center">
         {/* XP Earned Header */}
-        <div className="text-center mb-6 animate-fade-in">
-          <p className="text-xs uppercase tracking-[0.3em] mb-1" style={{ color: 'hsl(43 74% 49% / 0.6)' }}>Match Complete</p>
-          <p className="text-4xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
+        <div className="text-center mb-4 animate-fade-in">
+          <p className="text-[10px] uppercase tracking-[0.3em] mb-0.5" style={{ color: 'hsl(43 74% 49% / 0.6)' }}>Match Complete</p>
+          <p className="text-3xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
             +{xpGained} XP
           </p>
         </div>
 
         {/* Level Progress Area */}
-        <div className="w-full space-y-4 mb-6">
+        <div className="w-full space-y-3 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className={cn('w-10 h-10 rounded-full flex items-center justify-center font-black text-lg transition-all duration-300',
+                className={cn('w-8 h-8 rounded-full flex items-center justify-center font-black text-sm transition-all duration-300',
                   flashLevel ? 'scale-125' : 'scale-100'
                 )}
                 style={{
@@ -187,12 +187,12 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
               >
                 {flashLevel ?? displayLevel}
               </div>
-              <span className="text-sm font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
+              <span className="text-xs font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
             </div>
-            <span className="text-xs text-white/40">Lv {displayLevel + 1}</span>
+            <span className="text-[10px] text-white/40">Lv {displayLevel + 1}</span>
           </div>
 
-          <div className="relative h-4 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
+          <div className="relative h-3 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
             <div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
@@ -208,10 +208,10 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
           </div>
 
           {segments.length > 1 && (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {segments.filter(s => s.levelUp).map((s, i) => (
                 <div key={i} className={cn(
-                  'flex items-center gap-2 text-xs transition-opacity duration-500',
+                  'flex items-center gap-2 text-[10px] transition-opacity duration-500',
                   i <= activeIdx - 1 ? 'opacity-100' : 'opacity-30',
                 )}>
                   <span style={{ color: 'hsl(43 74% 49%)' }}>★</span>
@@ -224,37 +224,37 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
 
         {/* Stats Section */}
         {stats && showStats && (
-          <div className="w-full animate-fade-in space-y-4">
+          <div className="w-full animate-fade-in space-y-3">
             {/* Win rate ring + key stat */}
-            <div className="flex items-center gap-4 justify-center mb-2">
+            <div className="flex items-center gap-3 justify-center mb-1">
               <WinRateRing played={stats.handsPlayed} won={stats.handsWon} />
               <div className="text-left">
-                <p className="text-xs text-white/40 uppercase tracking-wider">Win Rate</p>
-                <p className="text-xl font-black text-white">{winRate}%</p>
-                <p className="text-[10px] text-white/30">{stats.handsWon} / {stats.handsPlayed} hands</p>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">Win Rate</p>
+                <p className="text-lg font-black text-white">{winRate}%</p>
+                <p className="text-[9px] text-white/30">{stats.handsWon} / {stats.handsPlayed} hands</p>
               </div>
             </div>
 
             {/* Stats grid */}
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard icon={<Target className="h-4 w-4" />} label="Hands Played" value={String(stats.handsPlayed)} color="hsl(210 80% 55%)" />
-              <StatCard icon={<Trophy className="h-4 w-4" />} label="Hands Won" value={String(stats.handsWon)} color="hsl(142 70% 45%)" />
-              <StatCard icon={<Crown className="h-4 w-4" />} label="Best Hand" value={stats.bestHandName || '—'} color="hsl(43 74% 49%)" />
-              <StatCard icon={<Flame className="h-4 w-4" />} label="Biggest Pot" value={stats.biggestPot > 0 ? stats.biggestPot.toLocaleString() : '—'} color="hsl(0 70% 50%)" />
-              <StatCard icon={<Clock className="h-4 w-4" />} label="Duration" value={formatDuration(stats.duration)} color="hsl(280 60% 55%)" colSpan />
+            <div className="grid grid-cols-2 gap-1.5">
+              <StatCard icon={<Target className="h-3.5 w-3.5" />} label="Hands Played" value={String(stats.handsPlayed)} color="hsl(210 80% 55%)" />
+              <StatCard icon={<Trophy className="h-3.5 w-3.5" />} label="Hands Won" value={String(stats.handsWon)} color="hsl(142 70% 45%)" />
+              <StatCard icon={<Crown className="h-3.5 w-3.5" />} label="Best Hand" value={stats.bestHandName || '—'} color="hsl(43 74% 49%)" />
+              <StatCard icon={<Flame className="h-3.5 w-3.5" />} label="Biggest Pot" value={stats.biggestPot > 0 ? stats.biggestPot.toLocaleString() : '—'} color="hsl(0 70% 50%)" />
+              <StatCard icon={<Clock className="h-3.5 w-3.5" />} label="Duration" value={formatDuration(stats.duration)} color="hsl(280 60% 55%)" colSpan />
             </div>
           </div>
         )}
 
         {/* Buttons */}
         {showContent && (
-          <div className="mt-8 flex gap-3 animate-fade-in w-full">
+          <div className="mt-5 flex gap-3 animate-fade-in w-full">
             {onPlayAgain ? (
               <>
                 <Button
                   onClick={handleClose}
                   variant="outline"
-                  className="flex-1 py-3 font-bold text-sm"
+                  className="flex-1 py-2.5 font-bold text-sm"
                   style={{
                     background: 'hsl(0 0% 12%)',
                     borderColor: 'hsl(0 0% 25%)',
@@ -265,7 +265,7 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
                 </Button>
                 <Button
                   onClick={onPlayAgain}
-                  className="flex-1 py-3 font-bold text-sm"
+                  className="flex-1 py-2.5 font-bold text-sm"
                   style={{
                     background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
                     color: 'hsl(0 0% 5%)',
@@ -278,7 +278,7 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
             ) : (
               <Button
                 onClick={handleClose}
-                className="flex-1 py-3 font-bold text-base"
+                className="flex-1 py-2.5 font-bold text-base"
                 style={{
                   background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
                   color: 'hsl(0 0% 5%)',
@@ -300,18 +300,18 @@ function StatCard({ icon, label, value, color, colSpan }: {
 }) {
   return (
     <div
-      className={cn('rounded-xl p-3 flex items-center gap-3', colSpan && 'col-span-2')}
+      className={cn('rounded-xl p-2 flex items-center gap-2', colSpan && 'col-span-2')}
       style={{
         background: 'hsl(0 0% 10%)',
         border: '1px solid hsl(0 0% 18%)',
       }}
     >
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}20`, color }}>
+      <div className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${color}20`, color }}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] text-white/40 uppercase tracking-wider leading-tight">{label}</p>
-        <p className="text-sm font-bold text-white truncate">{value}</p>
+        <p className="text-[9px] text-white/40 uppercase tracking-wider leading-tight">{label}</p>
+        <p className="text-xs font-bold text-white truncate">{value}</p>
       </div>
     </div>
   );
