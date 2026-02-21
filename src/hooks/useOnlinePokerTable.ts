@@ -93,7 +93,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const autoStartRetriesRef = useRef(0);
   const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
   const prevCommunityAtResultRef = useRef(0);
-  const wasRunoutRef = useRef(false);
   const lastAppliedVersionRef = useRef(0);
   const lastActedVersionRef = useRef<number | null>(null);
 
@@ -140,7 +139,6 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       }
       prevHandIdRef.current = currentHandId;
       prevCommunityAtResultRef.current = 0;
-      wasRunoutRef.current = false;
     }
   }, [hand?.hand_id]);
 
@@ -230,12 +228,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           return next;
         });
 
-        // Track community card count for runout detection
+        // Track community card count for staged card animation
         const newCommunityCount = (payload.community_cards || []).length;
-        const oldCommunityCount = prevCommunityAtResultRef.current;
-        if (newCommunityCount > oldCommunityCount + 1) {
-          wasRunoutRef.current = true;
-        }
         prevCommunityAtResultRef.current = newCommunityCount;
 
         // Merge broadcast state into local state
@@ -400,15 +394,20 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Use wasRunoutRef set during game_state broadcast for reliable detection
-        const winnerDelay = wasRunoutRef.current ? 5500 : 0;
-        wasRunoutRef.current = false; // Reset after use
+        // Self-contained runout detection: compare current visible cards vs result cards
+        const currentCommunity = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
+        const resultCommunity = (payload.community_cards || []).length;
 
-        if (winnerDelay > 0) {
-          setTimeout(() => setHandWinners(winners), winnerDelay);
-        } else {
-          setHandWinners(winners);
+        let winnerDelay = 500; // Default: 0.5s after last card for normal hands
+        if (resultCommunity >= 5 && currentCommunity < 3) {
+          winnerDelay = 5500; // Full runout: flop(0) + turn(2s) + river(4s) + 1.5s buffer
+        } else if (resultCommunity >= 5 && currentCommunity < 4) {
+          winnerDelay = 3500; // Turn+river staging
+        } else if (resultCommunity >= 5 && currentCommunity < 5) {
+          winnerDelay = 1500; // Just river staging
         }
+
+        setTimeout(() => setHandWinners(winners), winnerDelay);
 
         setTableState(prev => {
           if (!prev) return prev;
@@ -424,9 +423,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
 
-        // Use longer delay when all community cards arrived at once (all-in runout)
-        const communityCount = (payload.community_cards || []).length;
-        const showdownDelay = communityCount >= 5 ? 9000 : 3500;
+        // Showdown cleanup = winnerDelay + 3.5s (winner visible for 3s + buffer)
+        const showdownDelay = winnerDelay + 3500;
 
         showdownTimerRef.current = setTimeout(() => {
           if (!gameOverPendingRef.current) {
