@@ -118,7 +118,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     amountToCall, canCheck, joinTable, leaveSeat, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
     spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp, onlinePlayerIds,
-    kickedForInactivity,
+    kickedForInactivity, gameOverPendingRef,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -663,7 +663,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   // Game over detection — loser (stack=0) OR winner (last player standing)
   useEffect(() => {
-    if (!tableState || !user) return;
+    if (gameOver || !tableState || !user) return;
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     if (!mySeatInfo || handWinners.length === 0) return;
 
@@ -672,27 +672,30 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     // LOSER: my stack is 0 after a hand result AND I didn't win anything
     const heroWonSomething = handWinners.some(w => w.player_id === user.id);
     if (mySeatInfo.stack <= 0 && !heroWonSomething) {
-      const winner = handWinners[0];
+      // Signal hook to preserve handWinners through showdown cleanup
+      gameOverPendingRef.current = true;
+      const snapshotWinners = [...handWinners];
+      const winner = snapshotWinners[0];
       announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
         setGameOver(true);
-        setGameOverWinners(handWinners);
+        setGameOverWinners(snapshotWinners);
       }, 4000);
       return () => clearTimeout(timer);
     }
 
     // WINNER: I'm the last player with chips (wait briefly for stacks to sync)
     if (activePlayers.length === 1 && activePlayers[0].player_id === user.id && mySeatInfo.stack > 0) {
-      // Delay slightly to avoid race condition with stack updates
+      gameOverPendingRef.current = true;
+      const snapshotWinners = [...handWinners];
       const timer = setTimeout(() => {
-        // Re-check after delay
         announceGameOver('You', true);
         setGameOver(true);
-        setGameOverWinners(handWinners);
+        setGameOverWinners(snapshotWinners);
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [tableState, user, handWinners]);
+  }, [tableState, user, handWinners, gameOver]);
 
   // Fallback: loser detection when seat is already gone (server cleaned up before detection)
   useEffect(() => {
@@ -701,11 +704,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     // If seat is gone AND we had 0 chips last known, we busted
     if (!mySeatInfo && lastKnownStack === 0) {
-      const winner = handWinners[0];
+      gameOverPendingRef.current = true;
+      const snapshotWinners = [...handWinners];
+      const winner = snapshotWinners[0];
       announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
         setGameOver(true);
-        setGameOverWinners(handWinners);
+        setGameOverWinners(snapshotWinners);
       }, 2000);
       return () => clearTimeout(timer);
     }

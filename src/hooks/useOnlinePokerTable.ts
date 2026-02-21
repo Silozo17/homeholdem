@@ -31,6 +31,7 @@ export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
 interface UseOnlinePokerTableReturn extends Record<string, any> {
   tableState: OnlineTableState | null;
+  gameOverPendingRef: React.MutableRefObject<boolean>;
   myCards: Card[] | null;
   loading: boolean;
   error: string | null;
@@ -101,6 +102,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const [onlinePlayerIds, setOnlinePlayerIds] = useState<Set<string>>(new Set());
   const timeoutPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [kickedForInactivity, setKickedForInactivity] = useState(false);
+  const gameOverPendingRef = useRef(false);
 
   // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
   useEffect(() => {
@@ -289,7 +291,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
             setMyCards(null);
             setRevealedCards([]);
-            setHandWinners([]);
+            if (!gameOverPendingRef.current) {
+              setHandWinners([]);
+            }
             showdownTimerRef.current = null;
             setAutoStartAttempted(false);
           }, 6000);
@@ -431,7 +435,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           });
           setMyCards(null);
           setRevealedCards([]);
-          setHandWinners([]);
+          if (!gameOverPendingRef.current) {
+            setHandWinners([]);
+          }
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
         }, showdownDelay);
@@ -782,6 +788,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     lastKnownStack,
     onlinePlayerIds,
     kickedForInactivity,
+    gameOverPendingRef,
     joinTable,
     leaveSeat,
     leaveTable,
