@@ -1018,12 +1018,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleJoinSeat = async (seatNum: number) => {
+    if (joining) return;
     setJoining(true);
     try {
       await joinTable(seatNum, table.max_buy_in);
       toast({ title: 'Seated!' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      const msg = err?.message || '';
+      if (msg.includes('Already seated')) {
+        await refreshState();
+        toast({ title: 'Seated!' });
+      } else {
+        toast({ title: 'Error', description: msg, variant: 'destructive' });
+      }
     } finally {
       setJoining(false);
     }
@@ -1502,7 +1509,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             if (isEmpty) {
               return (
                 <SeatAnchor key={`empty-${actualSeatNumber}`} xPct={pos.xPct} yPct={pos.yPct} zIndex={Z.SEATS}>
-                  <EmptySeatDisplay seatNumber={actualSeatNumber} canJoin={!isSeated} onJoin={() => handleJoinSeat(actualSeatNumber)} />
+                  <EmptySeatDisplay seatNumber={actualSeatNumber} canJoin={!isSeated && !joining} onJoin={() => handleJoinSeat(actualSeatNumber)} />
                 </SeatAnchor>
               );
             }
