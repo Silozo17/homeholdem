@@ -1,88 +1,36 @@
 
-# Add Table Join Notifications (Opt-In Bell Icon)
 
-## Overview
+# Auto-Enable Table Notifications for 15 Users
 
-Users can subscribe to individual poker tables in the lobby. When subscribed, they receive in-app and push notifications whenever someone joins that table -- unless they themselves are already seated at it.
+## What This Does
 
-## Implementation
+Inserts rows into `poker_table_watchers` for the table **"Texas Hold'em 24/7"** so all 15 listed users automatically have notifications enabled for that table.
 
-### 1. New Database Table: `poker_table_watchers`
+**Note:** There is no table called "Poker Masters 24/7" in the database. The only 24/7 table is **"Texas Hold'em 24/7"** (`b9eb7f44-...`). This plan assumes that is the correct table.
 
-Stores which users are watching which tables.
+## Data to Insert
 
-```sql
-CREATE TABLE poker_table_watchers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  table_id uuid NOT NULL REFERENCES poker_tables(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(table_id, user_id)
-);
+| User | ID |
+|------|-----|
+| Kryniu | `01de4645-...` |
+| Borys | `f1e0cfa9-...` |
+| Matt R | `7e5a9aef-...` |
+| Kuba | `7672bfb9-...` |
+| Amir | `9255cdbf-...` |
+| Puchar | `ac40d9b2-...` |
+| Kris | `c122cd52-...` |
+| BluffMeBaby | `744cd829-...` |
+| Tomek | `4e6263f7-...` |
+| Mikołaj | `b5959f31-...` |
+| TimmyPoker | `9db2b9e1-...` |
+| Julia | `8192d4fb-...` |
+| Wuzet | `f3bb9039-...` |
+| Breku | `70daebda-...` |
+| Admin | `f42473bf-...` |
 
-ALTER TABLE poker_table_watchers ENABLE ROW LEVEL SECURITY;
+## Technical Detail
 
--- Users can see their own watches
-CREATE POLICY "Users can view own watches"
-  ON poker_table_watchers FOR SELECT
-  USING (auth.uid() = user_id);
+Single SQL INSERT into `poker_table_watchers` with `ON CONFLICT DO NOTHING` (safe to re-run). All 15 rows reference table `b9eb7f44-9bbc-4c2f-8fa6-5c4dfcafb985`.
 
--- Users can add watches
-CREATE POLICY "Users can add watches"
-  ON poker_table_watchers FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+No code changes, no schema changes, no navigation or UI changes.
 
--- Users can remove watches
-CREATE POLICY "Users can remove watches"
-  ON poker_table_watchers FOR DELETE
-  USING (auth.uid() = user_id);
-```
-
-### 2. Update `poker-join-table` Edge Function
-
-After successfully inserting the seat, query `poker_table_watchers` for all watchers of this table. Exclude:
-- The joining player themselves
-- Any user currently seated at the table
-
-For each eligible watcher:
-- Insert an in-app notification into `notifications` table
-- Call the `send-push-notification` function internally (or insert push logic inline)
-
-The notification will say:
-- Title: "Player Joined"
-- Body: "{display_name} joined {table_name}"
-- URL: `/online-poker?table={table_id}`
-
-### 3. Bell Icon in Lobby Table List
-
-In `OnlinePokerLobby.tsx`:
-
-- On mount, fetch all `poker_table_watchers` rows for the current user to build a `Set<string>` of watched table IDs
-- For each table card, add a bell icon button (between the delete button and status badge)
-- Clicking the bell toggles the watch: insert or delete from `poker_table_watchers`
-- The bell is filled/highlighted when watching, outlined when not
-- Click stops propagation so it doesn't trigger table join
-
-### 4. Translation Keys
-
-Add to `en.json` and `pl.json`:
-- `poker_online.watch_table` / `poker_online.unwatch_table` (for aria-labels)
-- Notification strings are hardcoded in the edge function (server-side, no i18n needed)
-
-## File Changes
-
-| File | Change |
-|------|--------|
-| Migration (SQL) | Create `poker_table_watchers` table with RLS |
-| `supabase/functions/poker-join-table/index.ts` | After seat insert, notify watchers (in-app + push) |
-| `src/components/poker/OnlinePokerLobby.tsx` | Fetch watched tables, render bell icon, toggle handler |
-| `src/i18n/locales/en.json` | Add watch/unwatch labels |
-| `src/i18n/locales/pl.json` | Add Polish translations |
-
-## What Does NOT Change
-
-- No navigation, bottom nav, or layout changes
-- No changes to game engine or hand evaluation
-- No changes to existing notification types or preferences
-- No notifications for any table event other than player joins
-- Users seated at the table do NOT receive the notification
