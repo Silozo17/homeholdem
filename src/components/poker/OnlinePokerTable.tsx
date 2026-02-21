@@ -1394,46 +1394,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
           {/* Game-over WinnerOverlay removed — stats merged into XP overlay */}
 
-          {/* XP Level-Up Overlay with stats */}
-          {xpOverlay && (
-            <XPLevelUpOverlay
-              startXp={xpOverlay.startXp}
-              endXp={xpOverlay.endXp}
-              xpGained={xpOverlay.xpGained}
-              stats={{
-                handsPlayed: handsPlayedRef.current,
-                handsWon: handsWonRef.current,
-                bestHandName: bestHandNameRef.current,
-                biggestPot: biggestPotRef.current,
-                duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
-              }}
-              onPlayAgain={() => {
-                setXpOverlay(null);
-                setGameOver(false);
-                setGameOverWinners([]);
-                // Reset all session tracking for next game
-                xpSavedRef.current = false;
-                handsPlayedRef.current = 0;
-                handsWonRef.current = 0;
-                bestHandNameRef.current = '';
-                bestHandRankRef.current = -1;
-                biggestPotRef.current = 0;
-                gameStartTimeRef.current = Date.now();
-                winStreakRef.current = 0;
-                chatCountRef.current = 0;
-                startingStackRef.current = 0;
-                // Re-fetch current XP as new baseline
-                if (user) {
-                  supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
-                    .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
-                }
-              }}
-              onClose={() => {
-                setXpOverlay(null);
-                leaveTable().then(onLeave).catch(onLeave);
-              }}
-            />
-          )}
+          {/* XP overlay moved to root level of z-[60] wrapper for correct stacking */}
 
           {showConfetti && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
@@ -1600,7 +1561,46 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* Spectator overlay — hidden when XP overlay is showing */}
+      {/* XP Level-Up Overlay — at root level so z-[100] is above header & pre-action buttons */}
+      {xpOverlay && (
+        <XPLevelUpOverlay
+          startXp={xpOverlay.startXp}
+          endXp={xpOverlay.endXp}
+          xpGained={xpOverlay.xpGained}
+          stats={{
+            handsPlayed: handsPlayedRef.current,
+            handsWon: handsWonRef.current,
+            bestHandName: bestHandNameRef.current,
+            biggestPot: biggestPotRef.current,
+            duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+          }}
+          onPlayAgain={() => {
+            setXpOverlay(null);
+            setGameOver(false);
+            setGameOverWinners([]);
+            xpSavedRef.current = false;
+            handsPlayedRef.current = 0;
+            handsWonRef.current = 0;
+            bestHandNameRef.current = '';
+            bestHandRankRef.current = -1;
+            biggestPotRef.current = 0;
+            gameStartTimeRef.current = Date.now();
+            winStreakRef.current = 0;
+            chatCountRef.current = 0;
+            startingStackRef.current = 0;
+            if (user) {
+              supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
+                .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
+            }
+          }}
+          onClose={() => {
+            setXpOverlay(null);
+            leaveTable().then(onLeave).catch(onLeave);
+          }}
+        />
+      )}
+
+
       {isSpectator && !xpOverlay && (
         <>
           <div className="absolute left-0 right-0 text-center pointer-events-none"
