@@ -417,10 +417,10 @@ Deno.serve(async (req) => {
       try {
         console.log(`Auto-kicking player ${seat.player_id} from table ${seat.table_id} (${seat.consecutive_timeouts} timeouts)`);
 
-        // Clear the seat directly
+        // Delete the seat row entirely (prevents ghost seats)
         await admin
           .from("poker_seats")
-          .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
+          .delete()
           .eq("id", seat.id);
 
         kickResults.push({ player_id: seat.player_id, table_id: seat.table_id, status: "kicked" });
@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
         await channel.send({
           type: "broadcast",
           event: "seat_change",
-          payload: { action: "kicked", seat: seat.seat_number, player_id: seat.player_id },
+          payload: { action: "kicked", seat: seat.seat_number, player_id: seat.player_id, kicked_player_id: seat.player_id },
         });
       } catch (kickErr: any) {
         console.error(`Error kicking player ${seat.player_id}:`, kickErr);
