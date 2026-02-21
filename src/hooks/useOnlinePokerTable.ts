@@ -92,6 +92,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const autoStartRetriesRef = useRef(0);
   const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
   const prevCommunityAtResultRef = useRef(0);
+  const wasRunoutRef = useRef(false);
   const lastAppliedVersionRef = useRef(0);
   const lastActedVersionRef = useRef<number | null>(null);
 
@@ -137,6 +138,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       }
       prevHandIdRef.current = currentHandId;
       prevCommunityAtResultRef.current = 0;
+      wasRunoutRef.current = false;
     }
   }, [hand?.hand_id]);
 
@@ -227,7 +229,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         });
 
         // Track community card count for runout detection
-        prevCommunityAtResultRef.current = (payload.community_cards || []).length;
+        const newCommunityCount = (payload.community_cards || []).length;
+        const oldCommunityCount = prevCommunityAtResultRef.current;
+        if (newCommunityCount > oldCommunityCount + 1) {
+          wasRunoutRef.current = true;
+        }
+        prevCommunityAtResultRef.current = newCommunityCount;
 
         // Merge broadcast state into local state
         setTableState(prev => {
@@ -356,10 +363,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Detect all-in runout: only delay if community cards jumped from <5 to 5
-        const incomingCommunityCount = (payload.community_cards || []).length;
-        const wasRunout = prevCommunityAtResultRef.current < 5 && incomingCommunityCount === 5;
-        const winnerDelay = wasRunout ? 5500 : 0;
+        // Use wasRunoutRef set during game_state broadcast for reliable detection
+        const winnerDelay = wasRunoutRef.current ? 5500 : 0;
+        wasRunoutRef.current = false; // Reset after use
 
         if (winnerDelay > 0) {
           setTimeout(() => setHandWinners(winners), winnerDelay);
