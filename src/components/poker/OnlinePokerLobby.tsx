@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus, Trash2, Shield, Globe2, XCircle } from 'lucide-react';
+import { Plus, Users, RefreshCw, ArrowLeft, Globe, Lock, Search, Hash, UserPlus, Trash2, Shield, Globe2, XCircle, Bell, BellOff } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { InvitePlayersDialog } from './InvitePlayersDialog';
 import { toast } from '@/hooks/use-toast';
@@ -60,6 +60,8 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   const [lastCreatedTable, setLastCreatedTable] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [watchedTables, setWatchedTables] = useState<Set<string>>(new Set());
+  const [togglingWatch, setTogglingWatch] = useState<string | null>(null);
 
   const [tableName, setTableName] = useState('');
   const [tableType, setTableType] = useState<'public' | 'friends' | 'club' | 'private' | 'community'>(clubId ? 'club' : 'friends');
@@ -106,6 +108,34 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
   }, [clubId]);
 
   useEffect(() => { fetchTables(); }, [fetchTables]);
+
+  // Fetch watched tables for bell icon state
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('poker_table_watchers')
+      .select('table_id')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (data) setWatchedTables(new Set(data.map(r => r.table_id)));
+      });
+  }, [user?.id]);
+
+  const toggleWatch = async (tableId: string) => {
+    if (!user || togglingWatch) return;
+    setTogglingWatch(tableId);
+    const isWatching = watchedTables.has(tableId);
+    try {
+      if (isWatching) {
+        await supabase.from('poker_table_watchers').delete().eq('table_id', tableId).eq('user_id', user.id);
+        setWatchedTables(prev => { const next = new Set(prev); next.delete(tableId); return next; });
+      } else {
+        await supabase.from('poker_table_watchers').insert({ table_id: tableId, user_id: user.id });
+        setWatchedTables(prev => new Set(prev).add(tableId));
+      }
+    } catch { /* RLS */ }
+    setTogglingWatch(null);
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -445,6 +475,17 @@ export function OnlinePokerLobby({ onJoinTable, clubId }: OnlinePokerLobbyProps)
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleWatch(tbl.id); }}
+                      className={cn(
+                        'p-1 rounded-md transition-colors',
+                        watchedTables.has(tbl.id) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                      aria-label={watchedTables.has(tbl.id) ? t('poker_online.unwatch_table') : t('poker_online.watch_table')}
+                      disabled={togglingWatch === tbl.id}
+                    >
+                      {watchedTables.has(tbl.id) ? <Bell className="h-3.5 w-3.5 fill-current" /> : <BellOff className="h-3.5 w-3.5" />}
+                    </button>
                     {tbl.created_by === user?.id && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: tbl.id, name: tbl.name }); }}

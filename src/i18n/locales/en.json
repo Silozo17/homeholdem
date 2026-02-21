@@ -1714,7 +1714,9 @@
     "table_not_found_desc": "Check the invite code and try again",
     "table_deleted": "Table deleted",
     "enter_valid_code": "Enter a valid invite code",
-    "table_name_placeholder": "Table name"
+    "table_name_placeholder": "Table name",
+    "watch_table": "Get notified when someone joins",
+    "unwatch_table": "Stop notifications for this table"
   },
   "poker_tournament": {
     "tournaments": "Tournaments",

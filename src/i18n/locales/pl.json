@@ -1706,7 +1706,9 @@
     "table_not_found_desc": "Sprawdź kod zaproszenia i spróbuj ponownie",
     "table_deleted": "Stół usunięty",
     "enter_valid_code": "Wpisz prawidłowy kod zaproszenia",
-    "table_name_placeholder": "Nazwa stołu"
+    "table_name_placeholder": "Nazwa stołu",
+    "watch_table": "Powiadomienia o dołączeniu graczy",
+    "unwatch_table": "Wyłącz powiadomienia dla tego stołu"
   },
   "poker_tournament": {
     "tournaments": "Turnieje",
