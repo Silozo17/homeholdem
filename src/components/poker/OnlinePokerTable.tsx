@@ -43,7 +43,7 @@ import { toast } from '@/hooks/use-toast';
 import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
-import { AchievementContext } from '@/lib/poker/achievements';
+import { AchievementContext, ACHIEVEMENT_XP } from '@/lib/poker/achievements';
 import pokerBg from '@/assets/poker-background.webp';
 import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
 import { GameStateDebugPanel } from './GameStateDebugPanel';
@@ -465,6 +465,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const newAchs = checkAndAward(ctx);
     if (newAchs.length > 0) {
       play('achievement');
+      // Award bonus XP for achievements in multiplayer
+      const achXpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
+      for (const ach of newAchs) {
+        const bonus = ACHIEVEMENT_XP[ach.id];
+        if (bonus && bonus > 0) {
+          achXpEvents.push({ user_id: user.id, xp_amount: bonus, reason: `achievement:${ach.id}` });
+        }
+      }
+      if (achXpEvents.length > 0) {
+        supabase.from('xp_events').insert(achXpEvents).then(({ error: achErr }) => {
+          if (achErr) console.error('[XP] achievement xp insert failed:', achErr);
+        });
+      }
     }
   }, [handWinners]);
 
@@ -593,8 +606,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
 
-    // LOSER: my stack is 0 after a hand result
-    if (mySeatInfo.stack <= 0) {
+    // LOSER: my stack is 0 after a hand result AND I didn't win anything
+    const heroWonSomething = handWinners.some(w => w.player_id === user.id);
+    if (mySeatInfo.stack <= 0 && !heroWonSomething) {
       const winner = handWinners[0];
       announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
@@ -604,13 +618,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       return () => clearTimeout(timer);
     }
 
-    // WINNER: I'm the last player with chips
-    if (activePlayers.length === 1 && activePlayers[0].player_id === user.id) {
-      announceGameOver('You', true);
+    // WINNER: I'm the last player with chips (wait briefly for stacks to sync)
+    if (activePlayers.length === 1 && activePlayers[0].player_id === user.id && mySeatInfo.stack > 0) {
+      // Delay slightly to avoid race condition with stack updates
       const timer = setTimeout(() => {
+        // Re-check after delay
+        announceGameOver('You', true);
         setGameOver(true);
         setGameOverWinners(handWinners);
-      }, 4000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [tableState, user, handWinners]);
@@ -1505,8 +1521,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* Spectator overlay */}
-      {isSpectator && (
+      {/* Spectator overlay — hidden when XP overlay is showing */}
+      {isSpectator && !xpOverlay && (
         <>
           <div className="absolute left-0 right-0 text-center pointer-events-none"
             style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 85px)' }}>

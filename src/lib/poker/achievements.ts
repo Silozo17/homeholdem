@@ -75,6 +75,30 @@ const HAND_NAME_MAP: Record<string, string> = {
   'straight': 'straight_hit',
 };
 
+/** XP bonus per achievement (awarded in multiplayer only) */
+export const ACHIEVEMENT_XP: Record<string, number> = {
+  royal_flush: 100_000,
+  straight_flush: 25_000,
+  four_of_a_kind: 10_000,
+  full_house: 2_000,
+  flush_hit: 1_000,
+  straight_hit: 500,
+  all_in_win: 1_500,
+  comeback_king: 5_000,
+  survivor: 10_000,
+  heads_up_hero: 3_000,
+  ten_streak: 5_000,
+  five_streak: 2_000,
+  three_streak: 500,
+  first_win: 100,
+  double_up: 500,
+  pot_monster: 2_000,
+  iron_man: 3_000,
+  chip_leader: 500,
+  big_blind_defender: 1_500,
+  social_butterfly: 200,
+};
+
 export function checkAchievements(
   ctx: AchievementContext,
   unlocked: Set<string>,

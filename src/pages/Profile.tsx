@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe, MessageSquare, UserPlus } from 'lucide-react';
+import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe, MessageSquare, UserPlus, Swords, Zap, RotateCcw, Sparkles, Stars, Grid2x2, Home, Coins, Dumbbell, MessageCircle, ShieldCheck, Sword, Medal, Droplets, ArrowRight, Lock, TrendingUp } from 'lucide-react';
+import { ACHIEVEMENTS, ACHIEVEMENT_XP } from '@/lib/poker/achievements';
 import { COUNTRIES, isoToEmoji } from '@/lib/countries';
 import { CountrySelector } from '@/components/profile/CountrySelector';
 import { toast } from '@/hooks/use-toast';
@@ -146,8 +147,8 @@ export default function Profile() {
 
     setQuickStats({ totalGames, totalWins, clubCount });
 
-    // Calculate achievements
-    const achievementsList: Achievement[] = [
+    // Calculate club achievements
+    const clubAchievements: Achievement[] = [
       {
         id: 'first_game',
         name: t('profile.achievements.first_game'),
@@ -156,7 +157,7 @@ export default function Profile() {
         unlocked: totalGames >= 1,
       },
       {
-        id: 'first_win',
+        id: 'club_first_win',
         name: t('profile.achievements.first_win'),
         description: t('profile.achievements.first_win_desc'),
         icon: <Trophy className="h-5 w-5" />,
@@ -178,7 +179,55 @@ export default function Profile() {
       },
     ];
 
-    setAchievements(achievementsList);
+    // Load multiplayer poker achievements from localStorage
+    const ICON_MAP: Record<string, React.ReactNode> = {
+      Swords: <Swords className="h-5 w-5" />,
+      Flame: <Flame className="h-5 w-5" />,
+      Zap: <Zap className="h-5 w-5" />,
+      Crown: <Crown className="h-5 w-5" />,
+      Shield: <Shield className="h-5 w-5" />,
+      TrendingUp: <TrendingUp className="h-5 w-5" />,
+      RotateCcw: <RotateCcw className="h-5 w-5" />,
+      Sparkles: <Sparkles className="h-5 w-5" />,
+      Stars: <Stars className="h-5 w-5" />,
+      Grid2x2: <Grid2x2 className="h-5 w-5" />,
+      Home: <Home className="h-5 w-5" />,
+      Coins: <Coins className="h-5 w-5" />,
+      Dumbbell: <Dumbbell className="h-5 w-5" />,
+      MessageCircle: <MessageCircle className="h-5 w-5" />,
+      Trophy: <Trophy className="h-5 w-5" />,
+      ShieldCheck: <ShieldCheck className="h-5 w-5" />,
+      Sword: <Sword className="h-5 w-5" />,
+      Medal: <Medal className="h-5 w-5" />,
+      Droplets: <Droplets className="h-5 w-5" />,
+      ArrowRight: <ArrowRight className="h-5 w-5" />,
+    };
+
+    let unlockedIds: Set<string> = new Set();
+    try {
+      const raw = localStorage.getItem('poker-achievements');
+      if (raw) {
+        const data = JSON.parse(raw);
+        unlockedIds = new Set(data.unlocked || []);
+      }
+    } catch {}
+
+    const RARITY_STYLES: Record<string, string> = {
+      common: 'border-border/50',
+      rare: 'border-blue-500/40',
+      epic: 'border-purple-500/40',
+      legendary: 'border-amber-400/50',
+    };
+
+    const pokerAchievements: Achievement[] = ACHIEVEMENTS.map(ach => ({
+      id: `mp_${ach.id}`,
+      name: ach.title,
+      description: `${ach.description}${ACHIEVEMENT_XP[ach.id] ? ` (+${ACHIEVEMENT_XP[ach.id].toLocaleString()} XP)` : ''}`,
+      icon: ICON_MAP[ach.icon] || <Trophy className="h-5 w-5" />,
+      unlocked: unlockedIds.has(ach.id),
+    }));
+
+    setAchievements([...clubAchievements, ...pokerAchievements]);
     setLoadingData(false);
   };
 
