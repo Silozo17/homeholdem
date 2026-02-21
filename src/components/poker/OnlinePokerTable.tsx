@@ -198,6 +198,39 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
   }, [user]);
 
+  // One-time achievement XP backfill
+  const achievementXpSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!user || achievementXpSyncedRef.current) return;
+    achievementXpSyncedRef.current = true;
+    try {
+      const raw = localStorage.getItem('poker-achievements');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const unlocked: string[] = parsed.unlocked || [];
+      if (unlocked.length === 0) return;
+
+      supabase.from('xp_events')
+        .select('reason')
+        .eq('user_id', user.id)
+        .like('reason', 'achievement:%')
+        .then(({ data }) => {
+          const existing = new Set((data ?? []).map(r => r.reason));
+          const missing = unlocked.filter(id =>
+            ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
+          );
+          if (missing.length === 0) return;
+          supabase.from('xp_events').insert(
+            missing.map(id => ({
+              user_id: user.id,
+              xp_amount: ACHIEVEMENT_XP[id],
+              reason: `achievement:${id}`,
+            }))
+          );
+        });
+    } catch {}
+  }, [user?.id]);
+
   // "Are you still playing?" popup state
   const [showStillPlayingPopup, setShowStillPlayingPopup] = useState(false);
   const [stillPlayingCountdown, setStillPlayingCountdown] = useState(30);
