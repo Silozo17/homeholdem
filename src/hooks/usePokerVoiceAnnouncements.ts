@@ -46,6 +46,8 @@ export function usePokerVoiceAnnouncements() {
     const cached = cacheRef.current.get(message);
     if (cached) return cached;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
         method: 'POST',
@@ -55,7 +57,9 @@ export function usePokerVoiceAnnouncements() {
           Authorization: `Bearer ${SUPABASE_KEY}`,
         },
         body: JSON.stringify({ announcement: message }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) return null;
       const data = await res.json();
       if (!data.audioContent) return null;
@@ -63,6 +67,7 @@ export function usePokerVoiceAnnouncements() {
       addToCache(message, dataUri);
       return dataUri;
     } catch {
+      clearTimeout(timeoutId);
       return null;
     }
   }, [addToCache]);
@@ -83,7 +88,7 @@ export function usePokerVoiceAnnouncements() {
             await new Promise<void>((resolve) => {
               audio.onended = () => resolve();
               audio.onerror = () => resolve();
-              audio.play().catch(() => resolve());
+              audio.play().catch((err) => { console.warn('[voice] play blocked:', err?.name, err?.message); resolve(); });
             });
           } catch { /* ignore playback errors */ }
         }
