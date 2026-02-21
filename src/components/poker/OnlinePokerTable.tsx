@@ -381,8 +381,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       }
       if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') { play('flip'); haptic('cardReveal'); }
       if (currentPhase === 'showdown' || currentPhase === 'complete') {
-        play('win');
-        haptic('win');
         setDealerExpression('smile');
         setTimeout(() => setDealerExpression('neutral'), 2500);
       }
@@ -561,6 +559,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // FIX 2: Voice announce hand winners with debug log
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
+    play('win');
+    haptic('win');
 
     for (const winner of handWinners) {
       const isHero = winner.player_id === user.id;
@@ -717,12 +717,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       gameOverPendingRef.current = true;
       const snapshotWinners = [...handWinners];
       const winner = snapshotWinners[0];
-      announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
-        leaveSeat().catch(() => {});
+        announceGameOver(winner?.display_name || 'Unknown', false);
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
-      }, 500);
+      }, 4000);
       return () => clearTimeout(timer);
     }
 
@@ -732,7 +731,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const snapshotWinners = [...handWinners];
       const timer = setTimeout(() => {
         announceGameOver('You', true);
-        leaveSeat().catch(() => {});
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
       }, 3000);
