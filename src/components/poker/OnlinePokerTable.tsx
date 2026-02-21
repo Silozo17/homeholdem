@@ -214,7 +214,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         .select('reason')
         .eq('user_id', user.id)
         .like('reason', 'achievement:%')
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) { console.error('MP XP backfill query error', error); return; }
           const existing = new Set((data ?? []).map(r => r.reason));
           const missing = unlocked.filter(id =>
             ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
@@ -226,7 +227,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               xp_amount: ACHIEVEMENT_XP[id],
               reason: `achievement:${id}`,
             }))
-          );
+          ).then(({ error: insertErr }) => {
+            if (insertErr) console.error('MP XP backfill insert error', insertErr);
+            else console.log('MP: backfilled XP for', missing.length, 'achievements');
+          });
         });
     } catch {}
   }, [user?.id]);

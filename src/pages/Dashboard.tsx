@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +21,7 @@ import { QuickStatsStrip } from '@/components/home/QuickStatsStrip';
 import { UpcomingEventBanner } from '@/components/home/UpcomingEventBanner';
 import { toast } from 'sonner';
 import { SuitRow } from '@/components/common/CardSuits';
+import { ACHIEVEMENT_XP } from '@/lib/poker/achievements';
 
 interface ClubWithRole {
   id: string;
@@ -48,10 +49,47 @@ export default function Dashboard() {
   const [playerStats, setPlayerStats] = useState({ wins: 0, gamesPlayed: 0, netProfit: '0' });
   
   const [wasAuthenticated, setWasAuthenticated] = useState(false);
+  const achievementXpSyncedRef = useRef(false);
 
   useEffect(() => {
     if (user) setWasAuthenticated(true);
   }, [user]);
+
+  // One-time achievement XP backfill on dashboard load
+  useEffect(() => {
+    if (!user || achievementXpSyncedRef.current) return;
+    achievementXpSyncedRef.current = true;
+    try {
+      const raw = localStorage.getItem('poker-achievements');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const unlocked: string[] = parsed.unlocked || [];
+      if (unlocked.length === 0) return;
+
+      supabase.from('xp_events')
+        .select('reason')
+        .eq('user_id', user.id)
+        .like('reason', 'achievement:%')
+        .then(({ data, error }) => {
+          if (error) { console.error('XP backfill query error', error); return; }
+          const existing = new Set((data ?? []).map(r => r.reason));
+          const missing = unlocked.filter(id =>
+            ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
+          );
+          if (missing.length === 0) { console.log('Achievement XP backfill: nothing to do'); return; }
+          supabase.from('xp_events').insert(
+            missing.map(id => ({
+              user_id: user.id,
+              xp_amount: ACHIEVEMENT_XP[id],
+              reason: `achievement:${id}`,
+            }))
+          ).then(({ error: insertErr }) => {
+            if (insertErr) console.error('XP backfill insert error', insertErr);
+            else console.log('Backfilled XP for', missing.length, 'achievements');
+          });
+        });
+    } catch (e) { console.error('XP backfill exception', e); }
+  }, [user?.id]);
 
   // Handle subscription URL params
   useEffect(() => {
