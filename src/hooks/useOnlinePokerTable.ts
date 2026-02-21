@@ -321,7 +321,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             };
           });
           // If this player was kicked for inactivity, flag it
-          if (payload.action === 'kicked' && payload.player_id === userId) {
+          if (payload.action === 'kicked' && payload.kicked_player_id === userId) {
             setKickedForInactivity(true);
           }
           return;

@@ -323,17 +323,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     });
   }, [onBlindsUp, announceBlindUp]);
 
-  // Handle server-side inactivity kick
+  // Handle server-side inactivity kick — unseat only, stay as spectator
   useEffect(() => {
     if (kickedForInactivity) {
       toast({
         title: '⚠️ Removed for inactivity',
-        description: 'You were removed from the table due to inactivity.',
+        description: 'You were removed from your seat. You can rejoin or leave.',
         variant: 'destructive',
       });
-      onLeave();
+      leaveSeat().catch(() => {});
     }
-  }, [kickedForInactivity, onLeave]);
+  }, [kickedForInactivity, leaveSeat]);
 
   // Track starting stack when first seated
   useEffect(() => {
