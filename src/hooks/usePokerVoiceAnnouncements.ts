@@ -21,7 +21,7 @@ export function usePokerVoiceAnnouncements() {
   const lastAnnouncedRef = useRef<{ msg: string; at: number }>({ msg: '', at: 0 });
   const MAX_CACHE = 20;
   const DEDUP_MS = 3000;
-  const STALE_MS = 5000;
+  const STALE_MS = 15000;
 
   const addToCache = useCallback((key: string, value: string) => {
     const cache = cacheRef.current;
@@ -70,24 +70,31 @@ export function usePokerVoiceAnnouncements() {
 
   const processQueue = useCallback(async () => {
     if (playingRef.current) return;
-    while (queueRef.current.length > 0) {
-      const item = queueRef.current.shift()!;
-      // Skip stale items
-      if (Date.now() - item.addedAt > STALE_MS) continue;
+    playingRef.current = true;
+    try {
+      while (queueRef.current.length > 0) {
+        const item = queueRef.current.shift()!;
+        // Skip stale items
+        if (Date.now() - item.addedAt > STALE_MS) continue;
 
-      playingRef.current = true;
-      const audioUri = await fetchAudio(item.message);
-      if (audioUri) {
-        try {
-          const audio = new Audio(audioUri);
-          await new Promise<void>((resolve) => {
-            audio.onended = () => resolve();
-            audio.onerror = () => resolve();
-            audio.play().catch(() => resolve());
-          });
-        } catch { /* ignore playback errors */ }
+        const audioUri = await fetchAudio(item.message);
+        if (audioUri) {
+          try {
+            const audio = new Audio(audioUri);
+            await new Promise<void>((resolve) => {
+              audio.onended = () => resolve();
+              audio.onerror = () => resolve();
+              audio.play().catch(() => resolve());
+            });
+          } catch { /* ignore playback errors */ }
+        }
       }
+    } finally {
       playingRef.current = false;
+      // Re-check: items may have been added during playback
+      if (queueRef.current.length > 0) {
+        processQueue();
+      }
     }
   }, [fetchAudio]);
 
