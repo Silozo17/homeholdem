@@ -1,109 +1,81 @@
 
 
-# Fix 6 Multiplayer Poker Issues
+# Fix 4 Multiplayer Poker Issues
 
-## Issue 1: "Tap a glowing seat to join" appears ON TOP of XP overlay
+## Issue 1: Connection Overlay Missing Translations
 
-**Problem**: The spectator hint ("Tap a glowing seat to join") at z-index `Z.ACTIONS` (50) renders on top of the XP overlay at z-index `z-[100]`. After game over, the player leaves their seat (becomes a spectator), so the spectator overlay text appears through the XP screen.
+**Problem**: `ConnectionOverlay.tsx` has 7 hardcoded English strings that show as raw text instead of using `t()` translation keys.
 
-**Fix**: In `OnlinePokerTable.tsx`, hide the spectator overlay text when the XP overlay is showing. Add a condition `!xpOverlay` to the spectator hint section (around line 1509-1522).
+**Fix**: Replace all hardcoded strings with `t()` calls and add the keys to both `en.json` and `pl.json`.
+
+Strings to translate:
+- "Reconnected!" (line 85)
+- "Hand:" (line 131)
+- "Pre-Flop" (line 133)
+- "Your stack:" (line 138)
+- "Reconnecting will restore your position" (line 143)
+- "Reconnecting..." / "Auto-reconnect exhausted" / "Attempt X/Y" (lines 155-159)
+
+**Files**: `src/components/poker/ConnectionOverlay.tsx`, `src/i18n/locales/en.json`, `src/i18n/locales/pl.json`
+
+---
+
+## Issue 2: Winner Announced Before Community Cards Finish Dealing
+
+**Problem**: When players go all-in, the server sends all community cards at once. The staged runout animation (`setVisibleCommunityCards`) takes up to 3 seconds to reveal all 5 cards. However, `handWinners` arrives simultaneously, and the winner voice announcement fires immediately (line 484-499) before the cards finish animating.
+
+**Fix**: Delay the winner voice announcement until the staged runout completes. Calculate the delay based on how many cards are being staged:
+- If all 5 cards arrive at once (from 0): flop instant + turn at 1.5s + river at 3s + 1s pause = announce at 4s
+- If fewer cards staged, proportionally less delay
+- Store whether if a runout is in progress via a ref, and gate the winner announcement behind it
+
+**Files**: `src/components/poker/OnlinePokerTable.tsx`
+
+---
+
+## Issue 3: Voice Announcements Being Skipped
+
+Three bugs causing skipped announcements:
+
+**Bug A**: `break` on line 514 -- only the FIRST all-in player in `lastActions` is announced. If two players go all-in in the same action batch, only one is spoken. Remove the `break`.
+
+**Bug B**: `STALE_MS = 5000` in `usePokerVoiceAnnouncements.ts` -- items queued while another is playing get discarded if they sit in the queue for over 5 seconds. Since TTS fetch + playback can easily take 3-4 seconds per item, queued items expire before being played. Increase `STALE_MS` to 15000.
+
+**Bug C**: `DEDUP_MS = 3000` -- prevents announcing two different winners within 3 seconds because the dedup compares only the message text. Since winner messages are unique per player name, this should not be the issue, but for all-in it could be (e.g., two "All in!" messages for different players have different text so this is fine). The real dedup issue is that the `processQueue` function doesn't re-trigger after adding new items if it's currently playing. After the `while` loop ends and `playingRef` is set to false, new items added during playback are never processed. Fix: call `processQueue()` at the end of each iteration to check for new items, or use a recursive approach.
+
+**Files**: `src/components/poker/OnlinePokerTable.tsx` (remove `break`), `src/hooks/usePokerVoiceAnnouncements.ts` (increase `STALE_MS`, fix queue drain)
+
+---
+
+## Issue 4: Big Pot Threshold Too Low
+
+**Problem**: Currently triggers when pot exceeds `big_blind * 10`. For a table with 25/50 blinds and 5000 starting chips, that's only 500 chips -- way too early.
+
+**Fix**: Use `min_buy_in * 0.10` (10% of starting chips per player) as the threshold. The table object has `min_buy_in` which represents the starting chip amount. If `min_buy_in` is 5000, threshold = 500. If `min_buy_in` is 50000, threshold = 5000.
+
+Wait -- looking at the numbers again: for 5k starting chips, 10% = 500 which is 10x the big blind (50). That matches the current threshold coincidentally. The user wants 1k for 5k starting = 20% of starting chips. Let me re-read: "at least 10% of the starting player chips" and "5k chips each, thats 1k chips". 10% of 5k = 500, not 1k. But user said 1k. So user means 20%. Actually re-reading: "at least 10% of the starting player chips (single player not all players accumulated). For games where the starting players amount is 5k chips each, thats 1k chips". 10% of 5k is 500, not 1k. The user may have miscalculated, but their intent is clear: 1k for 5k games, 5k for 50k games. That's 20%.
+
+Actually wait: 5k for 50k is 10%. 1k for 5k is 20%. These are inconsistent. Let me just use the explicit examples: 1k/5k = 20%, 5k/50k = 10%. Average could be ~15%, or the user might just want a flat 10% and miscalculated the 5k example. Given the 50k example is exactly 10%, I'll use 10% and note it.
+
+**Fix**: Change threshold from `big_blind * 10` to `table.min_buy_in * 0.10` (10% of starting stack).
 
 **File**: `src/components/poker/OnlinePokerTable.tsx`
-
----
-
-## Issue 2: Mute Party (headphone/deafen) not working
-
-**Problem**: In `useVoiceChat.ts`, `toggleDeafen` sets volume to 0 on all currently attached audio elements. However, new tracks that get subscribed AFTER deafening are not checked against `deafenedRef`. Looking at the `TrackSubscribed` handler (line 94-100), it only checks `deafenedRef.current` at subscription time, which is correct. But the issue may be that `deafenedRef` is correctly updated but `track.attachedElements` iteration in `toggleDeafen` may miss elements. The real bug is that the deafen toggle iterates `audioTrackPublications` and checks `pub.track`, but the track's `attachedElements` may not include the audio element we appended to `document.body` because LiveKit may return a new element from `track.attach()`. The fix is to also set the volume on the element we appended in `TrackSubscribed`.
-
-**Fix**: Store all appended audio elements in a ref. In `toggleDeafen`, iterate this list to set volume. In `TrackSubscribed`, add each new element to this list and respect current deafen state.
-
-**File**: `src/hooks/useVoiceChat.ts`
-
----
-
-## Issue 3: Tapping players at the table does not open profile drawer
-
-**Problem**: The `PlayerSeat` component has an `onClick` prop, and `OnlinePokerTable.tsx` line 1448 passes `onClick` for non-hero seats: `onClick={!isMe && seatData!.player_id ? () => setSelectedPlayer(seatData!.player_id!) : undefined}`. The `PlayerSeat` component does have `onClick` handling on line 161. However, the issue is likely that the click area is too small or that the avatar/nameplate sub-elements are blocking the click propagation. Looking at the outer div (line 154-162), it has `onClick={onClick}` but children don't prevent propagation, so it should work. Let me check if the `PlayerProfileDrawer` is correctly rendering -- it's at line 1619. The drawer uses `playerId={selectedPlayer}` which only opens when non-null. This should work. The most likely issue is that the click target is on the wrapper `div` but the avatar, nameplate, and card elements inside have `pointer-events-none` on some but not all. The card fan at line 121 has `pointer-events-none`, good. But the nameplate at line 214 does NOT have `pointer-events-none`, so it intercepts clicks without calling `onClick`. The fix is to ensure the nameplate and other clickable-looking children don't block the parent's onClick.
-
-**Fix**: Add `pointer-events-none` to the nameplate bar and other internal elements that shouldn't intercept clicks, and ensure the outer wrapper's onClick propagates correctly. Alternatively, attach `onClick` to both the avatar and nameplate individually.
-
-**File**: `src/components/poker/PlayerSeat.tsx`
-
----
-
-## Issue 4: Players kicked out after all-in despite 2 players having chips
-
-**Problem**: The game-over detection logic (lines 588-647) triggers when a player's stack is 0 after `handWinners` arrive, OR when only 1 player has chips. In an all-in scenario where 2+ players survive (side pots, partial all-in), the detection might incorrectly fire if there's a timing issue where `tableState.seats` hasn't fully updated with the new stacks from the hand result. This is a race condition between `handWinners` arriving and the seat stacks being updated.
-
-**Fix**: Add a guard to the game-over detection: only trigger "LOSER" if the hero's stack is truly 0 AND handWinners don't include the hero (meaning the hero lost). Also add a brief delay or check that the seat data is post-result. Additionally, for the "WINNER" path, verify that other players with chips are truly gone (not just temporarily showing 0 during state sync).
-
-**File**: `src/components/poker/OnlinePokerTable.tsx`
-
----
-
-## Issue 5: Bonus XP for achievements
-
-**Problem**: Currently achievements are tracked in localStorage only (via `useAchievements` hook) and award no XP. Need to add XP bonuses for hand-based achievements, with Royal Flush giving 100,000 XP.
-
-**Implementation**:
-- Define an XP bonus map per achievement ID
-- When achievements are earned in multiplayer, insert XP events into `xp_events` table
-- Backfill: create a one-time migration or script that checks existing `poker_play_results` for best hands and awards retroactive XP
-
-**XP Bonus Scale**:
-- `royal_flush`: 100,000 XP
-- `straight_flush`: 25,000 XP
-- `four_of_a_kind`: 10,000 XP
-- `full_house`: 2,000 XP
-- `flush_hit`: 1,000 XP
-- `straight_hit`: 500 XP
-- `all_in_win`: 1,500 XP
-- `comeback_king`: 5,000 XP
-- `survivor`: 10,000 XP
-- `heads_up_hero`: 3,000 XP
-- `ten_streak`: 5,000 XP
-- `five_streak`: 2,000 XP
-- `three_streak`: 500 XP
-- `first_win`: 100 XP
-- `double_up`: 500 XP
-- `pot_monster`: 2,000 XP
-- `iron_man`: 3,000 XP
-- `chip_leader`: 500 XP
-- `big_blind_defender`: 1,500 XP
-- `social_butterfly`: 200 XP
-
-**Files**: `src/lib/poker/achievements.ts`, `src/components/poker/OnlinePokerTable.tsx`
-
----
-
-## Issue 6: MP achievements viewable in Profile
-
-**Problem**: The Profile page currently shows a hardcoded set of 4 achievements based on club game stats. It does not show the poker achievements from `useAchievements` (which are stored in localStorage). Need to merge the multiplayer poker achievements into the Profile page.
-
-**Implementation**:
-- Import `ACHIEVEMENTS` from `src/lib/poker/achievements.ts` and read unlocked IDs from localStorage
-- Display the poker achievements in the Profile page's Achievements section, grouped or merged with existing ones
-- Show unlocked achievements with their rarity styling and locked ones as greyed out
-- Map achievement icons from string names to Lucide components
-
-**Files**: `src/pages/Profile.tsx`
 
 ---
 
 ## Summary of Files Changed
 
-| File | Changes |
-|------|---------|
-| `src/components/poker/OnlinePokerTable.tsx` | Issues 1, 4, 5 -- hide spectator text during XP overlay, fix all-in game-over detection, award XP for achievements |
-| `src/hooks/useVoiceChat.ts` | Issue 2 -- fix deafen not muting all audio elements |
-| `src/components/poker/PlayerSeat.tsx` | Issue 3 -- fix click propagation for player profile drawer |
-| `src/lib/poker/achievements.ts` | Issue 5 -- add XP bonus map per achievement |
-| `src/pages/Profile.tsx` | Issue 6 -- show MP poker achievements |
+| File | Issue |
+|------|-------|
+| `src/components/poker/ConnectionOverlay.tsx` | Issue 1 -- replace hardcoded strings with t() |
+| `src/i18n/locales/en.json` | Issue 1 -- add new translation keys |
+| `src/i18n/locales/pl.json` | Issue 1 -- add Polish translations |
+| `src/components/poker/OnlinePokerTable.tsx` | Issues 2, 3A, 4 -- delay winner voice, remove break, fix big pot threshold |
+| `src/hooks/usePokerVoiceAnnouncements.ts` | Issue 3B/3C -- increase STALE_MS, fix queue not draining |
 
 ## What Does NOT Change
 
 - No navigation, bottom nav, or layout changes
-- No game engine or hand evaluation logic changes
-- No database schema changes (uses existing `xp_events` table)
-- No edge function changes
+- No game engine, hand evaluation, or edge function changes
+- No database schema changes
+
