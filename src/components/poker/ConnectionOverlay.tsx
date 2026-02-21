@@ -82,7 +82,7 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
           }}
         >
           <Wifi className="h-5 w-5 text-green-400" />
-          <span className="text-sm font-bold text-green-300">Reconnected!</span>
+          <span className="text-sm font-bold text-green-300">{t('poker_online.reconnected')}</span>
         </div>
       </div>
     );
@@ -129,18 +129,18 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
           >
             {lastPhase && (
               <div className="flex items-center gap-1.5 text-[11px]">
-                <span className="text-foreground/50">Hand:</span>
-                <span className="text-primary font-bold capitalize">{lastPhase === 'preflop' ? 'Pre-Flop' : lastPhase}</span>
+                <span className="text-foreground/50">{t('poker_online.hand_label')}</span>
+                <span className="text-primary font-bold capitalize">{lastPhase === 'preflop' ? t('poker_online.pre_flop') : lastPhase}</span>
               </div>
             )}
             {myStack != null && (
               <div className="flex items-center gap-1.5 text-[11px]">
-                <span className="text-foreground/50">Your stack:</span>
+                <span className="text-foreground/50">{t('poker_online.your_stack')}</span>
                 <span className="text-foreground font-bold">{myStack.toLocaleString()}</span>
               </div>
             )}
             <p className="text-[10px] text-foreground/40 italic">
-              Reconnecting will restore your position
+              {t('poker_online.reconnect_restore')}
             </p>
           </div>
         )}
@@ -153,10 +153,10 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
           />
           <p className="text-[10px] text-muted-foreground">
             {reconnecting
-              ? 'Reconnecting...'
+              ? t('poker_online.reconnecting')
               : isExhausted
-                ? 'Auto-reconnect exhausted'
-                : `Attempt ${attempts}/${MAX_ATTEMPTS}`
+                ? t('poker_online.auto_reconnect_exhausted')
+                : t('poker_online.reconnect_attempt', { current: attempts, max: MAX_ATTEMPTS })
             }
           </p>
         </div>

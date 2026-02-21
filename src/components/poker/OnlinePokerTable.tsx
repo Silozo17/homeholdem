@@ -481,21 +481,38 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // Voice: announce hand winners
+  // Voice: announce hand winners (delayed until staged runout finishes)
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
-    for (const winner of handWinners) {
-      const isHero = winner.player_id === user.id;
-      const name = isHero ? 'You' : winner.display_name;
-      const handName = winner.hand_name && winner.hand_name !== 'Last standing'
-        ? winner.hand_name
-        : undefined;
-      if (handName) {
-        announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
-      } else {
-        announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
-      }
+
+    // Calculate delay: if a staged runout is in progress, wait for it to finish + 1s
+    const communityCards = tableState?.current_hand?.community_cards ?? [];
+    const prevCount = prevCommunityCountRef.current;
+    const newCount = communityCards.length;
+    let voiceDelay = 0;
+    if (newCount > prevCount && (newCount - prevCount) > 1) {
+      // Staged runout: flop instant, turn at 1.5s, river at 3s, + 1.4s pause
+      if (newCount > 4) voiceDelay = 3000 + 1400;
+      else if (newCount > 3) voiceDelay = 1500 + 1400;
+      else voiceDelay = 1400;
     }
+
+    const timer = setTimeout(() => {
+      for (const winner of handWinners) {
+        const isHero = winner.player_id === user.id;
+        const name = isHero ? 'You' : winner.display_name;
+        const handName = winner.hand_name && winner.hand_name !== 'Last standing'
+          ? winner.hand_name
+          : undefined;
+        if (handName) {
+          announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
+        } else {
+          announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
+        }
+      }
+    }, voiceDelay);
+
+    return () => clearTimeout(timer);
   }, [handWinners, user, announceCustom]);
 
   // Voice: detect all-in from lastActions
@@ -511,7 +528,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           const seat = tableState?.seats.find(s => s.player_id === playerId);
           const playerName = seat?.display_name || 'A player';
           announceCustom(`All in! ${playerName} is all in!`);
-          break;
         }
       }
     }
@@ -531,7 +547,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   useEffect(() => {
     if (!tableState || bigPotAnnouncedRef.current) return;
     const pot = tableState.current_hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
-    if (pot > tableState.table.big_blind * 10) {
+    const bigPotThreshold = tableState.table.min_buy_in * 0.10;
+    if (pot > bigPotThreshold) {
       bigPotAnnouncedRef.current = true;
       announceCustom("Big pot building!");
     }
