@@ -124,7 +124,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
-  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, clearQueue, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
+  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, clearQueue, resetHandDedup, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
   const [showConfetti, setShowConfetti] = useState(false);
   const voiceChat = useVoiceChat(tableId);
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
@@ -519,29 +519,22 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // Voice: announce hand winners (delayed until staged runout finishes)
+  // Voice: announce hand winners (fires immediately — delay is already baked into when handWinners is set by the hook)
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
 
-    // Voice always speaks 1s after winner overlay (which is already delayed by the hook)
-    const voiceDelay = 1000;
-
-    const timer = setTimeout(() => {
-      for (const winner of handWinners) {
-        const isHero = winner.player_id === user.id;
-        const name = isHero ? 'You' : winner.display_name;
-        const handName = winner.hand_name && winner.hand_name !== 'Last standing'
-          ? winner.hand_name
-          : undefined;
-        if (handName) {
-          announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
-        } else {
-          announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
-        }
+    for (const winner of handWinners) {
+      const isHero = winner.player_id === user.id;
+      const name = isHero ? 'You' : winner.display_name;
+      const handName = winner.hand_name && winner.hand_name !== 'Last standing'
+        ? winner.hand_name
+        : undefined;
+      if (handName) {
+        announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
+      } else {
+        announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
       }
-    }, voiceDelay);
-
-    return () => clearTimeout(timer);
+    }
   }, [handWinners, user, announceCustom]);
 
    // Voice: detect all-in from lastActions
@@ -588,11 +581,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Precache common voice phrases on mount
   useEffect(() => { precache(); }, [precache]);
 
-  // Clear voice queue on new hand to prevent stale announcements
+  // Reset per-hand voice dedup on new hand (but don't wipe the audio queue — let in-flight audio finish)
   useEffect(() => {
     const handId = tableState?.current_hand?.hand_id;
-    if (handId) clearQueue();
-  }, [tableState?.current_hand?.hand_id, clearQueue]);
+    if (handId) resetHandDedup();
+  }, [tableState?.current_hand?.hand_id, resetHandDedup]);
 
   // Trigger confetti on hero win, auto-clear after 3s
   useEffect(() => {

@@ -135,6 +135,10 @@ export function usePokerVoiceAnnouncements() {
     announcedThisHandRef.current.clear();
   }, []);
 
+  const resetHandDedup = useCallback(() => {
+    announcedThisHandRef.current.clear();
+  }, []);
+
   const toggleVoice = useCallback(() => setVoiceEnabled(v => !v), []);
 
   // Pre-cache common static phrases on first call
@@ -161,6 +165,7 @@ export function usePokerVoiceAnnouncements() {
     announceGameOver,
     announceCustom,
     clearQueue,
+    resetHandDedup,
     voiceEnabled,
     toggleVoice,
     precache,
