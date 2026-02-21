@@ -212,7 +212,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Nameplate bar — wide rounded rectangle, overlaps avatar bottom */}
       <div className={cn(
-      'relative flex flex-col items-center rounded-2xl',
+      'relative flex flex-col items-center rounded-2xl pointer-events-none',
         compact ? '-mt-4' : '-mt-5',
         compact ? 'min-w-[100px] px-4 py-1' : 'min-w-[120px] px-5 py-1.5',
       )} style={{

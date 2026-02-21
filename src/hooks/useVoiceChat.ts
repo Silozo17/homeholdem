@@ -5,11 +5,8 @@ import {
   Track,
   RemoteParticipant,
   LocalParticipant,
-  ParticipantEvent,
-  ConnectionState,
 } from 'livekit-client';
 import { callEdge } from '@/lib/poker/callEdge';
-import { toast } from '@/hooks/use-toast';
 
 export interface VoiceChatParticipant {
   identity: string;
@@ -43,6 +40,8 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
   const [participants, setParticipants] = useState<VoiceChatParticipant[]>([]);
   const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
   const deafenedRef = useRef(false);
+  // Store all appended audio elements so toggleDeafen can reliably control them
+  const audioElementsRef = useRef<Set<HTMLAudioElement>>(new Set());
 
   const updateParticipants = useCallback((room: Room) => {
     const parts: VoiceChatParticipant[] = [];
@@ -94,18 +93,26 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
       room.on(RoomEvent.TrackSubscribed, (track) => {
         if (track.kind === Track.Kind.Audio) {
           const el = track.attach();
+          // Respect current deafen state for newly subscribed tracks
           el.volume = deafenedRef.current ? 0 : 1;
           document.body.appendChild(el);
+          // Store reference for toggleDeafen
+          audioElementsRef.current.add(el);
         }
         onUpdate();
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
-        track.detach().forEach((el) => el.remove());
+        const detached = track.detach();
+        detached.forEach((el) => {
+          el.remove();
+          audioElementsRef.current.delete(el as HTMLAudioElement);
+        });
         onUpdate();
       });
       room.on(RoomEvent.Disconnected, () => {
         setConnected(false);
         roomRef.current = null;
+        audioElementsRef.current.clear();
       });
 
       await room.connect(url, token);
@@ -126,7 +133,6 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
       console.error('[VoiceChat] connect error:', err);
       failedRef.current = true;
       setFailed(true);
-      // Silent failure — no toast for auto-connect. Manual retry via phone button.
     } finally {
       setConnecting(false);
     }
@@ -137,6 +143,7 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
       roomRef.current.disconnect();
       roomRef.current = null;
     }
+    audioElementsRef.current.clear();
     setConnected(false);
     setParticipants([]);
     setSpeakingMap({});
@@ -156,16 +163,9 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
     const newDeafened = !deafened;
     deafenedRef.current = newDeafened;
 
-    // Mute/unmute all remote audio elements
-    room.remoteParticipants.forEach((p) => {
-      p.audioTrackPublications.forEach((pub) => {
-        const track = pub.track;
-        if (track) {
-          track.attachedElements.forEach((el) => {
-            (el as HTMLAudioElement).volume = newDeafened ? 0 : 1;
-          });
-        }
-      });
+    // Mute/unmute ALL tracked audio elements (reliable reference)
+    audioElementsRef.current.forEach((el) => {
+      el.volume = newDeafened ? 0 : 1;
     });
 
     setDeafened(newDeafened);
@@ -178,6 +178,7 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
         roomRef.current.disconnect();
         roomRef.current = null;
       }
+      audioElementsRef.current.clear();
     };
   }, []);
 
