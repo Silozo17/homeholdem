@@ -18,9 +18,8 @@ export function usePokerVoiceAnnouncements() {
   const playingRef = useRef(false);
   const cacheRef = useRef(new Map<string, string>()); // message -> data URI
   const cacheOrderRef = useRef<string[]>([]); // LRU order
-  const lastAnnouncedRef = useRef<{ msg: string; at: number }>({ msg: '', at: 0 });
+  const announcedThisHandRef = useRef(new Set<string>());
   const MAX_CACHE = 20;
-  const DEDUP_MS = 3000;
   const STALE_MS = 8000;
 
   const addToCache = useCallback((key: string, value: string) => {
@@ -100,12 +99,12 @@ export function usePokerVoiceAnnouncements() {
 
   const enqueue = useCallback((message: string) => {
     if (!voiceEnabled) return;
-    // Dedup: skip if same message within 3s
-    const now = Date.now();
-    if (lastAnnouncedRef.current.msg === message && now - lastAnnouncedRef.current.at < DEDUP_MS) return;
-    lastAnnouncedRef.current = { msg: message, at: now };
-
-    queueRef.current.push({ message, addedAt: now });
+    // Never repeat same message within a hand
+    if (announcedThisHandRef.current.has(message)) return;
+    // Also skip if already in queue
+    if (queueRef.current.some(q => q.message === message)) return;
+    announcedThisHandRef.current.add(message);
+    queueRef.current.push({ message, addedAt: Date.now() });
     processQueue();
   }, [voiceEnabled, processQueue]);
 
@@ -133,6 +132,7 @@ export function usePokerVoiceAnnouncements() {
 
   const clearQueue = useCallback(() => {
     queueRef.current = [];
+    announcedThisHandRef.current.clear();
   }, []);
 
   const toggleVoice = useCallback(() => setVoiceEnabled(v => !v), []);
