@@ -790,7 +790,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const isWinner = (mySeatInfo?.stack ?? 0) > 0;
     // Leave seat immediately so player is removed from seat but stays at table
     leaveSeat().catch(() => {});
-    saveXpAndStats(isWinner);
+    // Delay XP overlay so winner popup + confetti are visible for ~3.5s
+    const timer = setTimeout(() => {
+      saveXpAndStats(isWinner);
+    }, 3500);
+    return () => clearTimeout(timer);
   }, [gameOver, user, tableState, saveXpAndStats, leaveSeat]);
 
   // Staged community card reveal for all-in runouts
@@ -1385,7 +1389,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          {handWinners.length > 0 && !gameOver && (
+          {handWinners.length > 0 && !xpOverlay && (
             <WinnerOverlay
               winners={handWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
               isGameOver={false} onNextHand={() => {}} onQuit={() => {}}
