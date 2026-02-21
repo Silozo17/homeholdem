@@ -551,7 +551,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           processedActionsRef.current.add(key);
           const seat = tableState?.seats.find(s => s.player_id === playerId);
           const playerName = seat?.display_name || 'A player';
-          announceCustom(`${playerName} went all in`);
+          announceCustom(`${playerName} is all in`);
         }
       }
     }
@@ -673,9 +673,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const winner = snapshotWinners[0];
       announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
+        leaveSeat().catch(() => {});
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
-      }, 3000);
+      }, 500);
       return () => clearTimeout(timer);
     }
 
@@ -685,6 +686,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const snapshotWinners = [...handWinners];
       const timer = setTimeout(() => {
         announceGameOver('You', true);
+        leaveSeat().catch(() => {});
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
       }, 3000);

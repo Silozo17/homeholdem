@@ -421,7 +421,7 @@ async function processAction(
     }
 
     // If all active players are all-in, run out all remaining cards
-    if (activePlayers.length <= 1 && allInPlayers.length > 0 && nonFolded.length > 1) {
+    if (activePlayers.length === 0 && allInPlayers.length > 0 && nonFolded.length > 1) {
       // Run out all community cards at once
       while (communityCards.length < 5) {
         communityCards.push(deck[deckOffset + communityCards.length]);
@@ -680,6 +680,7 @@ async function processAction(
         pots: results.pots,
         community_cards: communityCards,
         state_version: commitResult.state_version,
+        seats: publicState.seats,
       },
     });
 

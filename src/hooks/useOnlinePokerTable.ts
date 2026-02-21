@@ -95,6 +95,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const prevCommunityAtResultRef = useRef(0);
   const lastAppliedVersionRef = useRef(0);
   const lastActedVersionRef = useRef<number | null>(null);
+  const pendingWinnersRef = useRef<{ winners: HandWinner[]; winnerDelay: number; targetCardCount: number } | null>(null);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -139,6 +140,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       }
       prevHandIdRef.current = currentHandId;
       prevCommunityAtResultRef.current = 0;
+      pendingWinnersRef.current = null;
     }
   }, [hand?.hand_id]);
 
@@ -232,6 +234,13 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const newCommunityCount = (payload.community_cards || []).length;
         prevCommunityAtResultRef.current = newCommunityCount;
 
+        // Check if pending winners can now fire (cards have arrived via game_state)
+        const pending = pendingWinnersRef.current;
+        if (pending && newCommunityCount >= pending.targetCardCount) {
+          pendingWinnersRef.current = null;
+          setTimeout(() => setHandWinners(pending.winners), pending.winnerDelay);
+        }
+
         // Merge broadcast state into local state
         setTableState(prev => {
           if (!prev) return prev;
@@ -284,6 +293,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           showdownTimerRef.current = setTimeout(() => {
             if (!gameOverPendingRef.current) {
               setHandWinners([]);
+              pendingWinnersRef.current = null;
               setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
             }
             setMyCards(null);
@@ -383,9 +393,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const revealed: RevealedCard[] = payload.revealed_cards || [];
         setRevealedCards(revealed);
 
-        const currentSeats = tableStateRef.current?.seats || [];
+        // Use seats from hand_result payload (authoritative) for display names
+        const payloadSeats: any[] = payload.seats || [];
+        const fallbackSeats = tableStateRef.current?.seats || [];
         const winners: HandWinner[] = (payload.winners || []).map((w: any) => {
-          const seatData = currentSeats.find((s) => s.player_id === w.player_id);
+          const seatData = payloadSeats.find((s: any) => s.player_id === w.player_id)
+            || fallbackSeats.find((s) => s.player_id === w.player_id);
           return {
             player_id: w.player_id,
             display_name: seatData?.display_name || 'Unknown',
@@ -394,20 +407,30 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Self-contained runout detection: compare current visible cards vs result cards
-        const currentCommunity = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
+        // Self-contained delay calculation using payload.community_cards (not stale ref)
         const resultCommunity = (payload.community_cards || []).length;
+        const currentCommunity = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
 
-        let winnerDelay = 500; // Default: 0.5s after last card for normal hands
-        if (resultCommunity >= 5 && currentCommunity < 3) {
-          winnerDelay = 5500; // Full runout: flop(0) + turn(2s) + river(4s) + 1.5s buffer
-        } else if (resultCommunity >= 5 && currentCommunity < 4) {
-          winnerDelay = 3500; // Turn+river staging
-        } else if (resultCommunity >= 5 && currentCommunity < 5) {
-          winnerDelay = 1500; // Just river staging
+        let winnerDelay = 500; // Default: 0.5s for normal hands
+        if (resultCommunity > currentCommunity && (resultCommunity - currentCommunity) > 1) {
+          // Runout: cards need to stage visually
+          if (resultCommunity >= 5 && currentCommunity <= 3) {
+            winnerDelay = 4500; // Full runout: flop(0) + turn(2s) + river(4s) + 0.5s
+          } else {
+            winnerDelay = 2500; // Partial runout
+          }
+        } else if (resultCommunity > currentCommunity) {
+          winnerDelay = 500; // Single card dealt (river)
         }
 
-        setTimeout(() => setHandWinners(winners), winnerDelay);
+        // Don't fire winners immediately — wait for game_state to deliver cards
+        if (resultCommunity > currentCommunity) {
+          // Cards haven't arrived yet; store pending and let game_state handler fire it
+          pendingWinnersRef.current = { winners, winnerDelay, targetCardCount: resultCommunity };
+        } else {
+          // Cards already visible — fire immediately
+          setTimeout(() => setHandWinners(winners), winnerDelay);
+        }
 
         setTableState(prev => {
           if (!prev) return prev;
@@ -415,7 +438,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             ...prev,
             current_hand: prev.current_hand ? { ...prev.current_hand, phase: 'complete' } : null,
             seats: prev.seats.map(existingSeat => {
-              const updated = (payload.seats || []).find((s: any) => s.seat === existingSeat.seat);
+              const updated = payloadSeats.find((s: any) => s.seat === existingSeat.seat);
               return updated ? { ...existingSeat, ...updated } : existingSeat;
             }),
           };
@@ -429,6 +452,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         showdownTimerRef.current = setTimeout(() => {
           if (!gameOverPendingRef.current) {
             setHandWinners([]);
+            pendingWinnersRef.current = null;
             setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
           }
           setMyCards(null);

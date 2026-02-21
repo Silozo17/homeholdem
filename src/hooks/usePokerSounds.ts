@@ -105,7 +105,7 @@ export function usePokerSounds() {
       ctxRef.current = getAudioContext();
     }
     if (ctxRef.current?.state === 'suspended') {
-      ctxRef.current.resume().catch(() => {});
+      ctxRef.current.resume().catch(err => console.warn('[sfx] resume failed:', err));
     }
     return ctxRef.current;
   }, []);
@@ -303,8 +303,8 @@ export function usePokerSounds() {
           break;
         }
       }
-    } catch {
-      // Silently handle any AudioContext errors to prevent cascading failures
+    } catch (err) {
+      console.warn('[sfx] error:', err);
     }
   }, [enabled, ensureContext]);
 
