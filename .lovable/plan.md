@@ -1,56 +1,80 @@
 
 
-# Fix: Delay End Game Screen to Let Winner Popup + Confetti Display
+# Fix: Loser Not Seeing End Game Screen After All-In Loss
 
 ## Problem
 
-When the final hand is won, the winner banner appears but is almost immediately replaced by the XP/end-game overlay. The sequence is:
+When a player loses an all-in and busts out, they don't see the end-game XP screen. They remain at the table with no way to proceed. Only the winner sees the end screen.
 
-1. `handWinners` set → winner banner + confetti show
-2. 4-5 seconds later → `gameOver = true` → winner banner hides (condition is `!gameOver`) → `saveXpAndStats` fires → `setXpOverlay` triggers almost instantly (~500ms DB call)
-3. Result: winner popup barely visible before end screen covers it
+## Root Cause
+
+Two issues in `src/components/poker/OnlinePokerTable.tsx`:
+
+1. **Timer gets cancelled repeatedly**: The game-over effect (line 787) has `saveXpAndStats` in its dependency array. `saveXpAndStats` is a `useCallback` that depends on `tableState`. When `leaveSeat()` fires and refreshes state, `tableState` changes, which gives `saveXpAndStats` a new reference, which re-runs the effect, which clears the previous 3.5s timer and starts a new one. If `tableState` keeps changing (opponent also leaving, realtime updates), the timer can be reset repeatedly or the callback captures stale data.
+
+2. **Possible seat removal before detection**: If the loser's seat record is cleaned up server-side before the game-over detection effect re-runs, `mySeatInfo` becomes null and the effect bails at line 668.
 
 ## Fix
 
-Add a 3.5-second delay between `gameOver` becoming true and calling `saveXpAndStats`. This keeps the winner banner and confetti visible for longer before the XP overlay appears.
-
-### Changes
-
 **File: `src/components/poker/OnlinePokerTable.tsx`**
 
-Update the "Save XP on game over" `useEffect` (lines 786-794) to add a delay:
+### Change 1: Stabilize the game-over XP effect
+
+Remove `saveXpAndStats` from the game-over effect's dependency array and call it via a ref, so that `tableState` changes don't reset the 3.5s timer:
 
 ```typescript
-// Save XP on game over + leave seat (but stay at table)
+// Add a stable ref for saveXpAndStats
+const saveXpAndStatsRef = useRef(saveXpAndStats);
+useEffect(() => { saveXpAndStatsRef.current = saveXpAndStats; }, [saveXpAndStats]);
+
+// Save XP on game over + leave seat
 useEffect(() => {
   if (!gameOver || !user || xpSavedRef.current) return;
   const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
   const isWinner = (mySeatInfo?.stack ?? 0) > 0;
-  // Leave seat immediately
   leaveSeat().catch(() => {});
-  // Delay XP overlay so winner popup + confetti are visible
+  // Use ref so tableState changes don't clear this timer
   const timer = setTimeout(() => {
-    saveXpAndStats(isWinner);
+    saveXpAndStatsRef.current(isWinner);
   }, 3500);
   return () => clearTimeout(timer);
-}, [gameOver, user, tableState, saveXpAndStats, leaveSeat]);
+  // Intentionally exclude saveXpAndStats to prevent timer resets
+}, [gameOver, user]);
 ```
 
-Also keep the winner banner visible during the `gameOver` state until the XP overlay appears — change line 1388 from `!gameOver` to `!xpOverlay`:
+### Change 2: Harden loser detection with fallback
+
+Add a secondary fallback: if the player's seat shows `status === 'eliminated'` or stack is 0, and `handWinners` exist, trigger game over even if `mySeatInfo` isn't found by `player_id` (in case the seat was reassigned). Also guard against `mySeatInfo` being undefined when the seat is already removed by checking `lastKnownStack`:
+
+After the existing game-over detection effect (line 665-695), add a fallback that uses `lastKnownStack`:
 
 ```typescript
-{handWinners.length > 0 && !xpOverlay && (
-  <WinnerOverlay ... />
-)}
+// Fallback: loser detection when seat is already gone
+useEffect(() => {
+  if (gameOver || !user || !tableState) return;
+  if (handWinners.length === 0) return;
+  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+  // If seat is gone AND we had 0 chips last known, we busted
+  if (!mySeatInfo && lastKnownStack === 0) {
+    const winner = handWinners[0];
+    announceGameOver(winner?.display_name || 'Unknown', false);
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners(handWinners);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }
+}, [tableState?.seats, user, gameOver, handWinners, lastKnownStack]);
 ```
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Add 3.5s delay before `saveXpAndStats` in game-over effect; keep winner banner visible until XP overlay appears |
+| `src/components/poker/OnlinePokerTable.tsx` | Add stable ref for `saveXpAndStats` to prevent timer resets; add fallback loser detection using `lastKnownStack` |
 
 ## What Does NOT Change
 
-- No changes to WinnerOverlay or XPLevelUpOverlay components
+- No changes to WinnerOverlay, XPLevelUpOverlay, or any other component
 - No z-index, style, layout, or navigation changes
 - No database or edge function changes
+- No changes to the bottom navigation
 
