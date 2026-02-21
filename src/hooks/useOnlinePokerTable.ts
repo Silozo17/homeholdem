@@ -308,7 +308,23 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           setTableState(prev => prev ? { ...prev, table: { ...prev.table, closing_at: null } } : prev);
           return;
         }
-        if ((payload?.action === 'leave' || payload?.action === 'kicked' || payload?.action === 'disconnected') && payload?.seat != null) {
+        // Handle disconnected: update status only (seat still exists server-side)
+        if (payload?.action === 'disconnected' && payload?.seat != null) {
+          setTableState(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              seats: prev.seats.map(s =>
+                s.seat === payload.seat
+                  ? { ...s, status: 'disconnected' }
+                  : s
+              ),
+            };
+          });
+          return;
+        }
+        // Handle leave, kicked, force_removed: clear seat visually
+        if ((payload?.action === 'leave' || payload?.action === 'kicked' || payload?.action === 'force_removed') && payload?.seat != null) {
           setTableState(prev => {
             if (!prev) return prev;
             return {
@@ -321,7 +337,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             };
           });
           // If this player was kicked for inactivity, flag it
-          if (payload.action === 'kicked' && payload.kicked_player_id === userId) {
+          if (payload.action === 'kicked' && (payload.kicked_player_id === userId || payload.player_id === userId)) {
             setKickedForInactivity(true);
           }
           return;
