@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,6 +88,39 @@ export default function Profile() {
       fetchProfileData();
     }
   }, [user]);
+
+  // One-time achievement XP backfill
+  const xpBackfilledRef = useRef(false);
+  useEffect(() => {
+    if (!user || xpBackfilledRef.current) return;
+    xpBackfilledRef.current = true;
+    try {
+      const raw = localStorage.getItem('poker-achievements');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const unlocked: string[] = parsed.unlocked || [];
+      if (unlocked.length === 0) return;
+
+      supabase.from('xp_events')
+        .select('reason')
+        .eq('user_id', user.id)
+        .like('reason', 'achievement:%')
+        .then(({ data }) => {
+          const existing = new Set((data ?? []).map(r => r.reason));
+          const missing = unlocked.filter(id =>
+            ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
+          );
+          if (missing.length === 0) return;
+          supabase.from('xp_events').insert(
+            missing.map(id => ({
+              user_id: user.id,
+              xp_amount: ACHIEVEMENT_XP[id],
+              reason: `achievement:${id}`,
+            }))
+          );
+        });
+    } catch {}
+  }, [user?.id]);
 
   const fetchProfileData = async () => {
     if (!user) return;
