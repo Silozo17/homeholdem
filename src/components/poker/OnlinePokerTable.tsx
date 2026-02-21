@@ -93,12 +93,13 @@ function toPokerPlayer(
   isHero?: boolean,
   revealedCards?: Card[] | null,
   lastActionOverride?: string,
+  displayStack?: number,
 ): PokerPlayer {
   const holeCards = isHero && heroCards ? heroCards : (revealedCards ?? []);
   return {
     id: seat.player_id!,
     name: isHero ? 'You' : seat.display_name,
-    chips: seat.stack,
+    chips: displayStack ?? seat.stack,
     status: seat.status === 'folded' ? 'folded' : seat.status === 'all-in' ? 'all-in' : 'active',
     holeCards,
     currentBet: seat.current_bet ?? 0,
@@ -160,6 +161,12 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const prevIsMyTurnRef = useRef(false);
   const chipAnimIdRef = useRef(0);
   const winStreakRef = useRef(0);
+  // FIX 1: Freeze displayed stacks until winner overlay appears
+  const [displayStacks, setDisplayStacks] = useState<Record<number, number>>({});
+  const frozenStacksRef = useRef<Record<number, number>>({});
+  const stacksFrozenRef = useRef(false);
+  // FIX 4: Store max stack at hand start for big pot threshold
+  const handStartMaxStackRef = useRef(0);
   const handsPlayedRef = useRef(0);
   const handsWonRef = useRef(0);
   const bestHandNameRef = useRef('');
@@ -396,7 +403,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [currentPhase]);
 
-  // Hand history: snapshot players on new hand
+  // Hand history: snapshot players on new hand + FIX 1 & FIX 4: freeze stacks & capture max stack
   useEffect(() => {
     const hand = tableState?.current_hand;
     if (!hand) return;
@@ -407,6 +414,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         .filter(s => s.player_id)
         .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
       startNewHand(currentHandId, hand.hand_number, players);
+      // FIX 1: Snapshot stacks at hand start so display doesn't update until winner overlay
+      const snapshot: Record<number, number> = {};
+      for (const s of (tableState?.seats ?? [])) {
+        if (s.player_id) snapshot[s.seat] = s.stack;
+      }
+      frozenStacksRef.current = snapshot;
+      setDisplayStacks(snapshot);
+      stacksFrozenRef.current = true;
+      // FIX 4: Capture max stack at hand start for big pot threshold
+      const seatedStacks = (tableState?.seats ?? []).filter(s => s.player_id).map(s => s.stack);
+      handStartMaxStackRef.current = seatedStacks.length > 0 ? Math.max(...seatedStacks) : 0;
     }
   }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase, tableState?.seats, startNewHand]);
 
@@ -519,39 +537,66 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // Voice: announce hand winners (fires immediately — delay is already baked into when handWinners is set by the hook)
+  // FIX 1: Unfreeze stacks when winner overlay appears
+  useEffect(() => {
+    if (handWinners.length > 0 && stacksFrozenRef.current) {
+      stacksFrozenRef.current = false;
+      // Update display stacks to current real stacks
+      const realStacks: Record<number, number> = {};
+      for (const s of (tableState?.seats ?? [])) {
+        if (s.player_id) realStacks[s.seat] = s.stack;
+      }
+      setDisplayStacks(realStacks);
+    }
+    if (handWinners.length === 0 && !stacksFrozenRef.current && !tableState?.current_hand) {
+      // Between hands — sync display stacks to real stacks
+      const realStacks: Record<number, number> = {};
+      for (const s of (tableState?.seats ?? [])) {
+        if (s.player_id) realStacks[s.seat] = s.stack;
+      }
+      setDisplayStacks(realStacks);
+    }
+  }, [handWinners, tableState?.seats, tableState?.current_hand]);
+
+  // FIX 2: Voice announce hand winners with debug log
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
 
     for (const winner of handWinners) {
       const isHero = winner.player_id === user.id;
       const name = isHero ? 'You' : winner.display_name;
-      const handName = winner.hand_name && winner.hand_name !== 'Last standing'
+      const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
         ? winner.hand_name
         : undefined;
+      let message: string;
       if (handName) {
-        announceCustom(`${name} win${isHero ? '' : 's'} ${winner.amount} chips with ${handName}`);
+        message = `${name} wins with ${handName}`;
       } else {
-        announceCustom(`${name} take${isHero ? '' : 's'} the pot, ${winner.amount} chips`);
+        message = `${name} wins the pot`;
       }
+      console.log('[voice] announcing winner:', message);
+      announceCustom(message);
     }
   }, [handWinners, user, announceCustom]);
 
-   // Voice: detect all-in from lastActions
+   // FIX 3: Voice detect all-in from lastActions with debug log
   useEffect(() => {
     if (!lastActions || !user) return;
     const handId = tableState?.current_hand?.hand_id ?? '';
     for (const [playerId, actionStr] of Object.entries(lastActions)) {
-      // Skip self announcements
-      if (playerId === user.id) continue;
       const lower = actionStr.toLowerCase();
-      if (lower === 'all_in' || lower === 'all-in') {
-        const key = `voice:${playerId}:${lower}:${handId}`;
+      if (lower === 'all_in' || lower === 'all-in' || lower === 'allin') {
+        console.log('[voice] all-in trigger, player:', playerId, 'me:', user.id);
+        // Skip self announcements
+        if (playerId === user.id) continue;
+        const key = `voice:allin:${playerId}:${handId}`;
         if (!processedActionsRef.current.has(key)) {
           processedActionsRef.current.add(key);
           const seat = tableState?.seats.find(s => s.player_id === playerId);
           const playerName = seat?.display_name || 'A player';
-          announceCustom(`${playerName} is all in`);
+          const message = `${playerName} is all in`;
+          console.log('[voice] announcing all-in:', message);
+          announceCustom(message);
         }
       }
     }
@@ -567,12 +612,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     prevActiveCountRef.current = activeCount;
   }, [tableState?.seats, announceCustom]);
 
-  // Voice: big pot detection
+  // FIX 4: Voice big pot detection — 20% of max stack at hand start
   useEffect(() => {
     if (!tableState || bigPotAnnouncedRef.current) return;
-    const pot = tableState.current_hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
-    const bigPotThreshold = tableState.table.min_buy_in * 0.10;
-    if (pot > bigPotThreshold) {
+    const totalPotNow = tableState.current_hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+    const maxStack = handStartMaxStackRef.current;
+    const bigPotThreshold = maxStack > 0 ? maxStack * 0.20 : Infinity;
+    if (totalPotNow >= bigPotThreshold) {
       bigPotAnnouncedRef.current = true;
       announceCustom("Big pot building!");
     }
@@ -1518,7 +1564,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
             const opponentRevealed = !isMe ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null : null;
             const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
-            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction);
+            const frozenStack = stacksFrozenRef.current ? displayStacks[seatData!.seat] : undefined;
+            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, frozenStack);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
             return (
