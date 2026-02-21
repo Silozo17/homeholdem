@@ -694,6 +694,23 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [tableState, user, handWinners]);
 
+  // Fallback: loser detection when seat is already gone (server cleaned up before detection)
+  useEffect(() => {
+    if (gameOver || !user || !tableState) return;
+    if (handWinners.length === 0) return;
+    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+    // If seat is gone AND we had 0 chips last known, we busted
+    if (!mySeatInfo && lastKnownStack === 0) {
+      const winner = handWinners[0];
+      announceGameOver(winner?.display_name || 'Unknown', false);
+      const timer = setTimeout(() => {
+        setGameOver(true);
+        setGameOverWinners(handWinners);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [tableState?.seats, user, gameOver, handWinners, lastKnownStack]);
+
   // Game over: last player standing when opponent LEFT (no hand result)
   useEffect(() => {
     if (gameOver || !tableState || !user) return;
@@ -783,6 +800,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return 'no_overlay';
   }, [user, tableState]);
 
+  // Stable ref so game-over timer isn't reset by tableState changes
+  const saveXpAndStatsRef = useRef(saveXpAndStats);
+  useEffect(() => { saveXpAndStatsRef.current = saveXpAndStats; }, [saveXpAndStats]);
+
   // Save XP on game over + leave seat (but stay at table)
   useEffect(() => {
     if (!gameOver || !user || xpSavedRef.current) return;
@@ -791,11 +812,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     // Leave seat immediately so player is removed from seat but stays at table
     leaveSeat().catch(() => {});
     // Delay XP overlay so winner popup + confetti are visible for ~3.5s
+    // Use ref so tableState changes don't reset this timer
     const timer = setTimeout(() => {
-      saveXpAndStats(isWinner);
+      saveXpAndStatsRef.current(isWinner);
     }, 3500);
     return () => clearTimeout(timer);
-  }, [gameOver, user, tableState, saveXpAndStats, leaveSeat]);
+    // Intentionally exclude saveXpAndStats to prevent timer resets
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameOver, user]);
 
   // Staged community card reveal for all-in runouts
   useEffect(() => {
