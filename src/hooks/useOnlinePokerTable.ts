@@ -262,7 +262,24 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             const updated = seats.find(s => s.seat === existingSeat.seat);
             return updated ? { ...existingSeat, ...updated } : existingSeat;
           });
-          return { ...prev, current_hand: broadcastHand, seats: mergedSeats };
+          // Self-healing: add any seats from broadcast that are missing locally
+          const existingSeatNumbers = new Set(prev.seats.map(s => s.seat));
+          const newSeats = seats
+            .filter(s => !existingSeatNumbers.has(s.seat) && s.player_id)
+            .map(s => ({
+              seat: s.seat,
+              player_id: s.player_id,
+              display_name: s.display_name || 'Player',
+              avatar_url: s.avatar_url || null,
+              country_code: s.country_code || null,
+              stack: s.stack ?? 0,
+              status: s.status || 'sitting_out',
+              has_cards: s.has_cards || false,
+              current_bet: s.current_bet ?? 0,
+              last_action: s.last_action ?? null,
+            }));
+          const allSeats = [...mergedSeats, ...newSeats];
+          return { ...prev, current_hand: broadcastHand, seats: allSeats };
         });
 
         // Fallback: if hand_result never arrives after complete, force cleanup after 6s
