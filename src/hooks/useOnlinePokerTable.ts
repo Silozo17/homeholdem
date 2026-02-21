@@ -408,7 +408,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         // Fix 4: Rewritten hand_result winner logic
         const resultCommunity = (payload.community_cards || []).length;
-        const currentCommunity = tableStateRef.current?.current_hand?.community_cards?.length ?? 0;
+        const currentCommunity = prevCommunityAtResultRef.current ?? 0;
         const cardDiff = resultCommunity - currentCommunity;
 
         let winnerDelay: number;
@@ -422,7 +422,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         pendingWinnersRef.current = { winners, winnerDelay, targetCardCount: resultCommunity };
 
         // Then immediately check if game_state already delivered these cards
-        const alreadyDelivered = (tableStateRef.current?.current_hand?.community_cards?.length ?? 0) >= resultCommunity;
+        const alreadyDelivered = (prevCommunityAtResultRef.current ?? 0) >= resultCommunity;
         if (alreadyDelivered) {
           pendingWinnersRef.current = null;
           const msUntilRunoutDone = Math.max(0, runoutCompleteTimeRef.current - Date.now());
