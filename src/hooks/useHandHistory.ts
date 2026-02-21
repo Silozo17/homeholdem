@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Card } from '@/lib/poker/types';
 import { RevealedCard, HandWinner } from '@/hooks/useOnlinePokerTable';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface HandAction {
   playerName: string;
@@ -31,7 +30,7 @@ export interface HandRecord {
   timestamp: number;
 }
 
-const MAX_HANDS = 20;
+const MAX_HANDS = 10;
 const MAX_TABLES = 5;
 const STORAGE_PREFIX = 'poker-hand-history-';
 
@@ -109,7 +108,7 @@ export function useHandHistory(tableId: string): UseHandHistoryReturn {
     }
   }, []);
 
-  const finalizeHand = useCallback(async (data: {
+  const finalizeHand = useCallback((data: {
     communityCards: Card[];
     winners: HandWinner[];
     pots: Array<{ amount: number }>;
@@ -119,34 +118,11 @@ export function useHandHistory(tableId: string): UseHandHistoryReturn {
     const current = currentHandRef.current;
     if (!current || !current.handId) return;
 
-    // Fetch full action log from the server for complete history
-    let serverActions: HandAction[] = current.actions || [];
-    try {
-      const { data: actionsData } = await supabase
-        .from('poker_actions')
-        .select('*')
-        .eq('hand_id', current.handId)
-        .order('sequence');
-
-      if (actionsData && actionsData.length > 0) {
-        const playerMap = new Map((current.players || []).map(p => [p.playerId, p.name]));
-        serverActions = actionsData.map(a => ({
-          playerName: playerMap.get(a.player_id) || 'Unknown',
-          action: a.action_type,
-          amount: a.amount || 0,
-          phase: a.phase,
-          timestamp: new Date(a.server_timestamp).getTime(),
-        }));
-      }
-    } catch {
-      // Fall back to locally recorded actions
-    }
-
     const record: HandRecord = {
       handId: current.handId!,
       handNumber: current.handNumber!,
       players: current.players || [],
-      actions: serverActions,
+      actions: current.actions || [],
       communityCards: data.communityCards,
       winners: data.winners,
       pots: data.pots,

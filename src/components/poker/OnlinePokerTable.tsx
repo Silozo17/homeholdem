@@ -544,11 +544,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => clearTimeout(timer);
   }, [handWinners, user, announceCustom]);
 
-  // Voice: detect all-in from lastActions
+   // Voice: detect all-in from lastActions
   useEffect(() => {
-    if (!lastActions) return;
+    if (!lastActions || !user) return;
     const handId = tableState?.current_hand?.hand_id ?? '';
     for (const [playerId, actionStr] of Object.entries(lastActions)) {
+      // Skip self announcements
+      if (playerId === user.id) continue;
       const lower = actionStr.toLowerCase();
       if (lower === 'all_in' || lower === 'all-in') {
         const key = `voice:${playerId}:${lower}:${handId}`;
@@ -556,11 +558,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           processedActionsRef.current.add(key);
           const seat = tableState?.seats.find(s => s.player_id === playerId);
           const playerName = seat?.display_name || 'A player';
-          announceCustom(`All in! ${playerName} is all in!`);
+          announceCustom(`${playerName} went all in`);
         }
       }
     }
-  }, [lastActions, announceCustom]);
+  }, [lastActions, announceCustom, user]);
 
   // Voice: detect heads-up
   useEffect(() => {
@@ -672,7 +674,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     // LOSER: my stack is 0 after a hand result AND I didn't win anything
     const heroWonSomething = handWinners.some(w => w.player_id === user.id);
     if (mySeatInfo.stack <= 0 && !heroWonSomething) {
-      // Signal hook to preserve handWinners through showdown cleanup
+      // Signal hook to preserve handWinners + community cards through showdown cleanup
       gameOverPendingRef.current = true;
       const snapshotWinners = [...handWinners];
       const winner = snapshotWinners[0];
@@ -680,7 +682,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const timer = setTimeout(() => {
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
-      }, 4000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
 
@@ -692,7 +694,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         announceGameOver('You', true);
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
-      }, 5000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [tableState, user, handWinners, gameOver]);
@@ -1618,6 +1620,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             setXpOverlay(null);
             setGameOver(false);
             setGameOverWinners([]);
+            gameOverPendingRef.current = false;
             xpSavedRef.current = false;
             handsPlayedRef.current = 0;
             handsWonRef.current = 0;
@@ -1628,13 +1631,18 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             winStreakRef.current = 0;
             chatCountRef.current = 0;
             startingStackRef.current = 0;
+            // Clear hand state that was preserved for game-over screen
+            setVisibleCommunityCards([]);
+            prevCommunityCountRef.current = 0;
             if (user) {
               supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
                 .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
             }
+            refreshState();
           }}
           onClose={() => {
             setXpOverlay(null);
+            gameOverPendingRef.current = false;
             leaveTable().then(onLeave).catch(onLeave);
           }}
         />
