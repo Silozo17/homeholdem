@@ -1,33 +1,45 @@
 
 
-# Fix: End Game Overlay Rendering Behind Header & Quick Actions
+# Fix: Drawers/Sheets Too Close to Screen Edges in Landscape
 
 ## Problem
 
-The XPLevelUpOverlay (end game screen) is rendered **inside** the table container element (around line 1280) which has `containerType: 'size'`. This CSS property creates a new stacking context, meaning the overlay's `z-[100]` only applies within that container -- it cannot compete with elements outside it like the header bar (`Z.HEADER = 40`) and PreActionButtons (`Z.ACTIONS = 50`) which sit at the root level of the `z-[60]` wrapper.
-
-That is why the "Check/Fold", "Call Any", "Check" buttons and the top icons (volume, chat, etc.) render on top of the end game screen.
+In landscape mode on mobile, the Sheet components (Hand History/Replay, Notifications, Player Profile) render flush against the screen edges. On devices with notches or rounded corners, this makes the close button (X) and content difficult to tap.
 
 ## Fix
 
-Move the XPLevelUpOverlay rendering from inside the table container to the root level of the `z-[60]` wrapper div -- right next to where the header and PreActionButtons are rendered. This puts it in the same stacking context, where its `z-[100]` will correctly sit above `Z.HEADER (40)` and `Z.ACTIONS (50)`.
+Add safe-area inset padding to the Sheet component itself (`src/components/ui/sheet.tsx`) so **all** sheets automatically respect device safe areas, rather than patching each individual sheet.
 
-## Technical Details
+### Changes
 
-**File: `src/components/poker/OnlinePokerTable.tsx`**
+**File: `src/components/ui/sheet.tsx`** -- Update the `SheetContent` to include safe-area padding based on the `side` prop:
 
-1. Cut the XPLevelUpOverlay block (lines 1397-1436) from inside the table container
-2. Paste it after the PreActionButtons section (after line 1601), at the root level of the `z-[60]` div
-3. No changes to the overlay itself -- its `fixed inset-0 z-[100]` will now work correctly since it is no longer trapped inside the container stacking context
+- **Right side sheets**: Add `padding-right: env(safe-area-inset-right)` and move the close (X) button inward accordingly
+- **Left side sheets**: Add `padding-left: env(safe-area-inset-left)`
+- **Bottom side sheets**: Add `padding-bottom: env(safe-area-inset-bottom)`
+- **Top side sheets**: Add `padding-top: env(safe-area-inset-top)`
+
+The close button position will also be adjusted to account for the right safe-area inset so it remains tappable on notched devices.
+
+### Technical Detail
+
+In `SheetContent`, apply inline `style` with the appropriate safe-area env() values based on the `side` variant:
+
+```typescript
+// For right-side sheets:
+style={{ paddingRight: 'env(safe-area-inset-right, 0px)' }}
+// Close button: right-[calc(1rem+env(safe-area-inset-right,0px))]
+
+// For left-side sheets:
+style={{ paddingLeft: 'env(safe-area-inset-left, 0px)' }}
+```
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Move XPLevelUpOverlay rendering from inside table container to root level of the main wrapper |
+| `src/components/ui/sheet.tsx` | Add safe-area inset padding to SheetContent and adjust close button position |
 
 ## What Does NOT Change
 
-- No changes to XPLevelUpOverlay component itself
-- No z-index value changes
-- No style, layout, or navigation changes
+- No changes to individual sheet consumers (HandReplay, NotificationPanel, PlayerProfileDrawer, etc.)
+- No layout, navigation, or bottom nav changes
 - No database or edge function changes
-
