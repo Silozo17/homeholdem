@@ -1,67 +1,70 @@
 
-# Fix: Players Not Visible to Each Other at Poker Table
+
+# Fix: Voice Announcements Repeating
 
 ## Root Cause
 
-The `game_state` broadcast handler in `useOnlinePokerTable.ts` (line 261) merges seat data using `.map()` over `prev.seats` only. This means it only updates seats that already exist in local state -- it **never adds** new seats that appear in the broadcast.
+The current dedup in `usePokerVoiceAnnouncements.ts` only tracks the **last single message** with a 3-second window (`lastAnnouncedRef`). This fails when:
 
-The intended flow is:
-1. Player joins -> `seat_change` broadcast fires -> client adds new seat to local state
-2. Subsequent `game_state` broadcasts update that seat's data
-
-But if the `seat_change` broadcast is missed (network hiccup, late subscription, race condition), the new player's seat never gets added to local state. The `game_state` broadcasts keep arriving with all seats including the new player, but the `.map()` silently ignores any seats not already in `prev.seats`.
-
-This is why Admin can't see Amir -- Admin missed the `seat_change` for Amir's join, and `game_state` never reconciles the missing seat.
+1. Multiple React effects re-fire and call `announceGameOver` or `announceCustom` again with the same text -- the 3s window has passed, so it gets enqueued again.
+2. The `announceGameOver` calls at lines 676, 689, and 715 in `OnlinePokerTable.tsx` can each fire independently from different `useEffect` blocks (loser detection, winner detection, opponent-left detection), causing duplicate "Game over" announcements.
+3. Winner announcements at line 537 re-fire when `handWinners` array reference changes due to state updates even though the content is the same.
 
 ## Fix
 
-**File: `src/hooks/useOnlinePokerTable.ts` (lines 259-265)**
+### 1. Replace single-message dedup with a per-hand Set (`usePokerVoiceAnnouncements.ts`)
 
-After mapping existing seats, also append any seats from the broadcast that don't exist in local state. This ensures `game_state` is self-healing -- even if `seat_change` was missed, the next `game_state` broadcast will add the missing player.
+Replace `lastAnnouncedRef` (tracks 1 message for 3s) with `announcedThisHandRef` (a `Set<string>` that tracks ALL messages announced in the current hand). Once a message is spoken, it can never repeat until `clearQueue()` is called (which happens on every new hand).
+
+- Remove `lastAnnouncedRef` and `DEDUP_MS`
+- Add `announcedThisHandRef = useRef(new Set<string>())`
+- In `enqueue`: skip if `announcedThisHandRef.current.has(message)`; otherwise add it
+- In `clearQueue`: also clear `announcedThisHandRef.current`
+
+### 2. Also deduplicate items already in the queue (`usePokerVoiceAnnouncements.ts`)
+
+Before pushing to the queue, check if the same message is already queued (prevents double-enqueue from rapid effect re-fires).
+
+## Technical Details
+
+**File: `src/hooks/usePokerVoiceAnnouncements.ts`**
 
 ```typescript
-// Current (broken):
-const mergedSeats = prev.seats.map(existingSeat => {
-  const updated = seats.find(s => s.seat === existingSeat.seat);
-  return updated ? { ...existingSeat, ...updated } : existingSeat;
-});
+// Replace:
+const lastAnnouncedRef = useRef<{ msg: string; at: number }>({ msg: '', at: 0 });
+const DEDUP_MS = 3000;
 
-// Fixed:
-const mergedSeats = prev.seats.map(existingSeat => {
-  const updated = seats.find(s => s.seat === existingSeat.seat);
-  return updated ? { ...existingSeat, ...updated } : existingSeat;
-});
-// Self-healing: add any seats from broadcast that are missing locally
-const existingSeatNumbers = new Set(prev.seats.map(s => s.seat));
-const newSeats = seats
-  .filter(s => !existingSeatNumbers.has(s.seat) && s.player_id)
-  .map(s => ({
-    seat: s.seat,
-    player_id: s.player_id,
-    display_name: s.display_name || 'Player',
-    avatar_url: s.avatar_url || null,
-    country_code: s.country_code || null,
-    stack: s.stack ?? 0,
-    status: s.status || 'sitting_out',
-    has_cards: s.has_cards || false,
-    current_bet: s.current_bet ?? 0,
-    last_action: s.last_action ?? null,
-  }));
-const allSeats = [...mergedSeats, ...newSeats];
-return { ...prev, current_hand: broadcastHand, seats: allSeats };
+// With:
+const announcedThisHandRef = useRef(new Set<string>());
+
+// In enqueue:
+const enqueue = useCallback((message: string) => {
+  if (!voiceEnabled) return;
+  // Never repeat same message within a hand
+  if (announcedThisHandRef.current.has(message)) return;
+  // Also skip if already in queue
+  if (queueRef.current.some(q => q.message === message)) return;
+  announcedThisHandRef.current.add(message);
+  queueRef.current.push({ message, addedAt: Date.now() });
+  processQueue();
+}, [voiceEnabled, processQueue]);
+
+// In clearQueue:
+const clearQueue = useCallback(() => {
+  queueRef.current = [];
+  announcedThisHandRef.current.clear();
+}, []);
 ```
-
-This is the smallest possible change -- it only adds missing seats, never removes or reorders existing ones. It makes the `game_state` handler self-healing without needing a full `refreshState`.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Add self-healing seat reconciliation in `game_state` handler (~5 lines added) |
+| `src/hooks/usePokerVoiceAnnouncements.ts` | Replace single-message dedup with per-hand Set; add queue dedup; clear Set on `clearQueue` |
 
 ## What Does NOT Change
 
-- No database, schema, or edge function changes
-- No navigation, bottom nav, or layout changes
-- No changes to any other poker logic or timing
-- No changes to `seat_change` handler (it still works as before)
+- No changes to `OnlinePokerTable.tsx` or any other file
+- No database, navigation, or layout changes
+- No changes to timing, confetti, or any other logic
+
