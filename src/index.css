@@ -709,7 +709,7 @@
   0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
   100% { opacity: 0; transform: translateY(60px) rotate(360deg) scale(0.3); }
 }
-.animate-confetti-drift { animation: confetti-drift 2s ease-out both; }
+.animate-confetti-drift { animation: confetti-drift 2s ease-out forwards; will-change: transform, opacity; }
 
 /* Enhanced counter pulse with gold flash */
 @keyframes counter-pulse-gold {

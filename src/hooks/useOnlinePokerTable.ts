@@ -359,7 +359,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Detect all-in runout: only delay if community cards jumped from <5 to 5
         const incomingCommunityCount = (payload.community_cards || []).length;
         const wasRunout = prevCommunityAtResultRef.current < 5 && incomingCommunityCount === 5;
-        const winnerDelay = wasRunout ? 4000 : 0;
+        const winnerDelay = wasRunout ? 5500 : 0;
 
         if (winnerDelay > 0) {
           setTimeout(() => setHandWinners(winners), winnerDelay);
@@ -383,7 +383,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         // Use longer delay when all community cards arrived at once (all-in runout)
         const communityCount = (payload.community_cards || []).length;
-        const showdownDelay = communityCount >= 5 ? 6000 : 3500;
+        const showdownDelay = communityCount >= 5 ? 9000 : 3500;
 
         showdownTimerRef.current = setTimeout(() => {
           setTableState(prev => {

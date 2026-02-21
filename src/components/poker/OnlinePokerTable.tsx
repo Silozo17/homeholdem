@@ -124,7 +124,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
-  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
+  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, clearQueue, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
+  const [showConfetti, setShowConfetti] = useState(false);
   const voiceChat = useVoiceChat(tableId);
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
   const prevActiveCountRef = useRef<number>(0);
@@ -522,17 +523,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
 
-    // Calculate delay: if a staged runout is in progress, wait for it to finish + 1s
-    const communityCards = tableState?.current_hand?.community_cards ?? [];
-    const prevCount = prevCommunityCountRef.current;
-    const newCount = communityCards.length;
-    let voiceDelay = 0;
-    if (newCount > prevCount && (newCount - prevCount) > 1) {
-      // Staged runout: flop instant, turn at 1.5s, river at 3s, + 1.4s pause
-      if (newCount > 4) voiceDelay = 3000 + 1400;
-      else if (newCount > 3) voiceDelay = 1500 + 1400;
-      else voiceDelay = 1400;
-    }
+    // Voice always speaks 1s after winner overlay (which is already delayed by the hook)
+    const voiceDelay = 1000;
 
     const timer = setTimeout(() => {
       for (const winner of handWinners) {
@@ -593,6 +585,23 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   // Precache common voice phrases on mount
   useEffect(() => { precache(); }, [precache]);
+
+  // Clear voice queue on new hand to prevent stale announcements
+  useEffect(() => {
+    const handId = tableState?.current_hand?.hand_id;
+    if (handId) clearQueue();
+  }, [tableState?.current_hand?.hand_id, clearQueue]);
+
+  // Trigger confetti on hero win, auto-clear after 3s
+  useEffect(() => {
+    if (handWinners.length === 0 || !user) return;
+    const heroWon = handWinners.some(w => w.player_id === user.id);
+    if (heroWon) {
+      setShowConfetti(true);
+      const t = setTimeout(() => setShowConfetti(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [handWinners, user]);
 
   // Your turn: sound + haptic + pre-action execution
   useEffect(() => {
@@ -794,11 +803,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       stagedRunoutRef.current = [];
       setVisibleCommunityCards(communityCards.slice(0, Math.min(3, newCount)));
       if (newCount > 3) {
-        const t1 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 4)), 1500);
+        const t1 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 4)), 2000);
         stagedRunoutRef.current.push(t1);
       }
       if (newCount > 4) {
-        const t2 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 5)), 3000);
+        const t2 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 5)), 4000);
         stagedRunoutRef.current.push(t2);
       }
     } else {
@@ -922,7 +931,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     })), []
   );
   const confettiPositions = useMemo(() =>
-    Array.from({ length: 24 }, (_, i) => ({
+    Array.from({ length: 12 }, (_, i) => ({
       left: 10 + ((i * 31 + 11) % 80),
       top: 10 + ((i * 17 + 5) % 30),
       w: 6 + (i % 7),
@@ -1299,7 +1308,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           </div>
 
           {totalPot > 0 && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5" style={{ top: '20%', zIndex: Z.CARDS }}>
+            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5" style={{ top: '28%', zIndex: Z.CARDS }}>
               <PotDisplay pot={totalPot} />
               <PotOddsDisplay pot={totalPot} amountToCall={amountToCall} visible={isMyTurn && amountToCall > 0} />
             </div>
@@ -1401,7 +1410,23 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               onPlayAgain={() => {
                 setXpOverlay(null);
                 setGameOver(false);
-                // Player already left seat via game-over effect, stays at table as spectator
+                setGameOverWinners([]);
+                // Reset all session tracking for next game
+                xpSavedRef.current = false;
+                handsPlayedRef.current = 0;
+                handsWonRef.current = 0;
+                bestHandNameRef.current = '';
+                bestHandRankRef.current = -1;
+                biggestPotRef.current = 0;
+                gameStartTimeRef.current = Date.now();
+                winStreakRef.current = 0;
+                chatCountRef.current = 0;
+                startingStackRef.current = 0;
+                // Re-fetch current XP as new baseline
+                if (user) {
+                  supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
+                    .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
+                }
               }}
               onClose={() => {
                 setXpOverlay(null);
@@ -1410,7 +1435,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             />
           )}
 
-          {((handWinners.length > 0 && handWinners.some(w => w.player_id === user?.id)) || (gameOver && gameOverWinners.some(w => w.player_id === user?.id))) && (
+          {showConfetti && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
               {confettiPositions.map((c, i) => (
                 <div key={i} className="absolute animate-confetti-drift"
