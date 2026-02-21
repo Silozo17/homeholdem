@@ -1,80 +1,56 @@
 
 
-# Fix: Loser Not Seeing End Game Screen After All-In Loss
+# Fix: Kicked Inactive User Not Properly Removed for Other Players
 
 ## Problem
 
-When a player loses an all-in and busts out, they don't see the end-game XP screen. They remain at the table with no way to proceed. Only the winner sees the end screen.
+Two bugs related to inactivity kicks:
 
-## Root Cause
+1. **Broadcast payload mismatch**: The `poker-moderate-table` edge function broadcasts `kicked_player_id` for the kicked player's ID, but the client handler in `useOnlinePokerTable.ts` checks `payload.player_id` (which is always `null` in the kick broadcast). This means the kicked player never receives the `kickedForInactivity` flag from server-initiated kicks.
 
-Two issues in `src/components/poker/OnlinePokerTable.tsx`:
-
-1. **Timer gets cancelled repeatedly**: The game-over effect (line 787) has `saveXpAndStats` in its dependency array. `saveXpAndStats` is a `useCallback` that depends on `tableState`. When `leaveSeat()` fires and refreshes state, `tableState` changes, which gives `saveXpAndStats` a new reference, which re-runs the effect, which clears the previous 3.5s timer and starts a new one. If `tableState` keeps changing (opponent also leaving, realtime updates), the timer can be reset repeatedly or the callback captures stale data.
-
-2. **Possible seat removal before detection**: If the loser's seat record is cleaned up server-side before the game-over detection effect re-runs, `mySeatInfo` becomes null and the effect bails at line 668.
+2. **`onLeave()` navigates away entirely**: When the `kickedForInactivity` flag IS set, the handler calls `onLeave()` which navigates the user completely away from the table. The user should instead just be removed from their seat and become a spectator, with the option to re-join or leave.
 
 ## Fix
 
-**File: `src/components/poker/OnlinePokerTable.tsx`**
+**File: `src/hooks/useOnlinePokerTable.ts`**
 
-### Change 1: Stabilize the game-over XP effect
-
-Remove `saveXpAndStats` from the game-over effect's dependency array and call it via a ref, so that `tableState` changes don't reset the 3.5s timer:
+Fix the broadcast handler to check `payload.kicked_player_id` instead of `payload.player_id`:
 
 ```typescript
-// Add a stable ref for saveXpAndStats
-const saveXpAndStatsRef = useRef(saveXpAndStats);
-useEffect(() => { saveXpAndStatsRef.current = saveXpAndStats; }, [saveXpAndStats]);
-
-// Save XP on game over + leave seat
-useEffect(() => {
-  if (!gameOver || !user || xpSavedRef.current) return;
-  const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
-  const isWinner = (mySeatInfo?.stack ?? 0) > 0;
-  leaveSeat().catch(() => {});
-  // Use ref so tableState changes don't clear this timer
-  const timer = setTimeout(() => {
-    saveXpAndStatsRef.current(isWinner);
-  }, 3500);
-  return () => clearTimeout(timer);
-  // Intentionally exclude saveXpAndStats to prevent timer resets
-}, [gameOver, user]);
+// Line 324: was checking wrong field
+if (payload.action === 'kicked' && payload.kicked_player_id === userId) {
+  setKickedForInactivity(true);
+}
 ```
 
-### Change 2: Harden loser detection with fallback
+**File: `src/components/poker/OnlinePokerTable.tsx`**
 
-Add a secondary fallback: if the player's seat shows `status === 'eliminated'` or stack is 0, and `handWinners` exist, trigger game over even if `mySeatInfo` isn't found by `player_id` (in case the seat was reassigned). Also guard against `mySeatInfo` being undefined when the seat is already removed by checking `lastKnownStack`:
-
-After the existing game-over detection effect (line 665-695), add a fallback that uses `lastKnownStack`:
+Change the `kickedForInactivity` handler to call `leaveSeat()` (just remove from seat, stay as spectator) instead of `onLeave()` (navigate away from table):
 
 ```typescript
-// Fallback: loser detection when seat is already gone
 useEffect(() => {
-  if (gameOver || !user || !tableState) return;
-  if (handWinners.length === 0) return;
-  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-  // If seat is gone AND we had 0 chips last known, we busted
-  if (!mySeatInfo && lastKnownStack === 0) {
-    const winner = handWinners[0];
-    announceGameOver(winner?.display_name || 'Unknown', false);
-    const timer = setTimeout(() => {
-      setGameOver(true);
-      setGameOverWinners(handWinners);
-    }, 2000);
-    return () => clearTimeout(timer);
+  if (kickedForInactivity) {
+    toast({
+      title: 'Removed for inactivity',
+      description: 'You were removed from your seat. You can rejoin or leave.',
+      variant: 'destructive',
+    });
+    // Just unseat, don't navigate away
+    leaveSeat().catch(() => {});
   }
-}, [tableState?.seats, user, gameOver, handWinners, lastKnownStack]);
+}, [kickedForInactivity, leaveSeat]);
 ```
 
 | File | Change |
 |------|--------|
-| `src/components/poker/OnlinePokerTable.tsx` | Add stable ref for `saveXpAndStats` to prevent timer resets; add fallback loser detection using `lastKnownStack` |
+| `src/hooks/useOnlinePokerTable.ts` | Fix `payload.player_id` to `payload.kicked_player_id` in kicked broadcast handler |
+| `src/components/poker/OnlinePokerTable.tsx` | Replace `onLeave()` with `leaveSeat()` in kickedForInactivity handler so user stays as spectator |
 
 ## What Does NOT Change
 
-- No changes to WinnerOverlay, XPLevelUpOverlay, or any other component
+- No edge function changes (the broadcast payload is already correct)
+- No changes to the "Still Playing?" countdown flow (already works correctly via `leaveSeat()`)
+- No changes to the 90s general inactivity timer
 - No z-index, style, layout, or navigation changes
-- No database or edge function changes
 - No changes to the bottom navigation
 
