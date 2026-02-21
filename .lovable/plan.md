@@ -1,80 +1,88 @@
 
+# Add Table Join Notifications (Opt-In Bell Icon)
 
-# Fix: Achievement XP Backfill Not Triggering
+## Overview
 
-## Root Cause
+Users can subscribe to individual poker tables in the lobby. When subscribed, they receive in-app and push notifications whenever someone joins that table -- unless they themselves are already seated at it.
 
-The backfill code only runs on the **Profile page** and **MP table mount**. The user hasn't visited either of those pages since the code was deployed. They land on `/` which redirects to `/dashboard` -- where no backfill exists.
+## Implementation
 
-Confirmed: the `xp_events` table has **zero** rows with `reason LIKE 'achievement:%'`.
+### 1. New Database Table: `poker_table_watchers`
 
-## Fix
+Stores which users are watching which tables.
 
-Add the same one-time achievement XP backfill to `Dashboard.tsx` -- the page every logged-in user sees first. Also add `console.log` to help debug if it still doesn't work.
+```sql
+CREATE TABLE poker_table_watchers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_id uuid NOT NULL REFERENCES poker_tables(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(table_id, user_id)
+);
 
-### File: `src/pages/Dashboard.tsx`
+ALTER TABLE poker_table_watchers ENABLE ROW LEVEL SECURITY;
 
-- Import `useRef` from React
-- Import `ACHIEVEMENT_XP` from `@/lib/poker/achievements`
-- Import `supabase` (already imported)
-- Add a `useEffect` with a ref guard that:
-  1. Reads `poker-achievements` from localStorage
-  2. Queries `xp_events` for existing `achievement:*` rows
-  3. Inserts missing XP records
-  4. Logs results for debugging
+-- Users can see their own watches
+CREATE POLICY "Users can view own watches"
+  ON poker_table_watchers FOR SELECT
+  USING (auth.uid() = user_id);
 
-```text
-Code change (pseudocode):
+-- Users can add watches
+CREATE POLICY "Users can add watches"
+  ON poker_table_watchers FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
-useEffect(() => {
-  if (!user || syncedRef.current) return;
-  syncedRef.current = true;
-
-  const raw = localStorage.getItem('poker-achievements');
-  if (!raw) return;
-  const { unlocked } = JSON.parse(raw);
-  if (!unlocked?.length) return;
-
-  supabase.from('xp_events')
-    .select('reason')
-    .eq('user_id', user.id)
-    .like('reason', 'achievement:%')
-    .then(({ data, error }) => {
-      if (error) { console.error('XP backfill query error', error); return; }
-      const existing = new Set(data.map(r => r.reason));
-      const missing = unlocked.filter(id =>
-        ACHIEVEMENT_XP[id] > 0 && !existing.has(`achievement:${id}`)
-      );
-      if (missing.length === 0) return;
-      supabase.from('xp_events').insert(
-        missing.map(id => ({
-          user_id: user.id,
-          xp_amount: ACHIEVEMENT_XP[id],
-          reason: `achievement:${id}`,
-        }))
-      ).then(({ error: insertErr }) => {
-        if (insertErr) console.error('XP backfill insert error', insertErr);
-        else console.log('Backfilled XP for', missing.length, 'achievements');
-      });
-    });
-}, [user?.id]);
+-- Users can remove watches
+CREATE POLICY "Users can remove watches"
+  ON poker_table_watchers FOR DELETE
+  USING (auth.uid() = user_id);
 ```
 
-### Also: Add error logging to existing backfills
+### 2. Update `poker-join-table` Edge Function
 
-In both `Profile.tsx` and `OnlinePokerTable.tsx`, the existing backfill code has no error handling on the insert -- errors are silently swallowed. Add `.then(({ error }) => { if (error) console.error(...) })` to the insert calls so we can diagnose failures.
+After successfully inserting the seat, query `poker_table_watchers` for all watchers of this table. Exclude:
+- The joining player themselves
+- Any user currently seated at the table
 
-## Files Modified
+For each eligible watcher:
+- Insert an in-app notification into `notifications` table
+- Call the `send-push-notification` function internally (or insert push logic inline)
+
+The notification will say:
+- Title: "Player Joined"
+- Body: "{display_name} joined {table_name}"
+- URL: `/online-poker?table={table_id}`
+
+### 3. Bell Icon in Lobby Table List
+
+In `OnlinePokerLobby.tsx`:
+
+- On mount, fetch all `poker_table_watchers` rows for the current user to build a `Set<string>` of watched table IDs
+- For each table card, add a bell icon button (between the delete button and status badge)
+- Clicking the bell toggles the watch: insert or delete from `poker_table_watchers`
+- The bell is filled/highlighted when watching, outlined when not
+- Click stops propagation so it doesn't trigger table join
+
+### 4. Translation Keys
+
+Add to `en.json` and `pl.json`:
+- `poker_online.watch_table` / `poker_online.unwatch_table` (for aria-labels)
+- Notification strings are hardcoded in the edge function (server-side, no i18n needed)
+
+## File Changes
 
 | File | Change |
 |------|--------|
-| `src/pages/Dashboard.tsx` | Add achievement XP backfill on page load |
-| `src/pages/Profile.tsx` | Add error logging to existing backfill insert |
-| `src/components/poker/OnlinePokerTable.tsx` | Add error logging to existing backfill insert |
+| Migration (SQL) | Create `poker_table_watchers` table with RLS |
+| `supabase/functions/poker-join-table/index.ts` | After seat insert, notify watchers (in-app + push) |
+| `src/components/poker/OnlinePokerLobby.tsx` | Fetch watched tables, render bell icon, toggle handler |
+| `src/i18n/locales/en.json` | Add watch/unwatch labels |
+| `src/i18n/locales/pl.json` | Add Polish translations |
 
 ## What Does NOT Change
 
-- No database schema changes
-- No navigation, layout, or bottom nav changes
-- No edge function changes
-- Existing backfill logic in Profile and OnlinePokerTable stays
+- No navigation, bottom nav, or layout changes
+- No changes to game engine or hand evaluation
+- No changes to existing notification types or preferences
+- No notifications for any table event other than player joins
+- Users seated at the table do NOT receive the notification
