@@ -286,14 +286,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         // Fallback: if hand_result never arrives after complete, force cleanup after 6s
         if (payload.phase === 'complete') {
-          if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
           showdownTimerRef.current = setTimeout(() => {
-            setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
-            setMyCards(null);
-            setRevealedCards([]);
             if (!gameOverPendingRef.current) {
               setHandWinners([]);
+              setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
             }
+            setMyCards(null);
+            setRevealedCards([]);
             showdownTimerRef.current = null;
             setAutoStartAttempted(false);
           }, 6000);
@@ -347,33 +347,33 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           return;
         }
         if (payload?.action === 'join') {
+          // Apply join locally for instant feedback (both during hand and idle)
+          setTableState(prev => {
+            if (!prev) return prev;
+            const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
+            if (alreadyExists) return prev;
+            return {
+              ...prev,
+              seats: [...prev.seats, {
+                seat: payload.seat,
+                player_id: payload.player_id,
+                display_name: payload.display_name || 'Player',
+                avatar_url: payload.avatar_url || null,
+                country_code: null,
+                stack: payload.stack || 0,
+                status: 'sitting_out',
+                has_cards: false,
+                current_bet: 0,
+                last_action: null,
+              }],
+            };
+          });
           const currentState = tableStateRef.current;
           const handActive = !!currentState?.current_hand;
-          if (handActive) {
-            // Mid-hand join: add seat locally as sitting_out with has_cards=false
-            // Do NOT refreshState — it would replace the active hand's seat array
-            setTableState(prev => {
-              if (!prev) return prev;
-              const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
-              if (alreadyExists) return prev;
-              return {
-                ...prev,
-                seats: [...prev.seats, {
-                  seat: payload.seat,
-                  player_id: payload.player_id,
-                  display_name: payload.display_name || 'Player',
-                  avatar_url: payload.avatar_url || null,
-                  country_code: null,
-                  stack: payload.stack || 0,
-                  status: 'sitting_out',
-                  has_cards: false,
-                  current_bet: 0,
-                  last_action: null,
-                }],
-              };
-            });
-            return; // Skip refreshState during active hand
-          }
+          if (handActive) return; // Skip refreshState during active hand
+          // Background refresh for authoritative data
+          refreshState();
+          return;
         }
         // No active hand: safe to do a full refresh
         refreshState();
@@ -429,15 +429,12 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const showdownDelay = communityCount >= 5 ? 9000 : 3500;
 
         showdownTimerRef.current = setTimeout(() => {
-          setTableState(prev => {
-            if (!prev) return prev;
-            return { ...prev, current_hand: null };
-          });
-          setMyCards(null);
-          setRevealedCards([]);
           if (!gameOverPendingRef.current) {
             setHandWinners([]);
+            setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
           }
+          setMyCards(null);
+          setRevealedCards([]);
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
         }, showdownDelay);
