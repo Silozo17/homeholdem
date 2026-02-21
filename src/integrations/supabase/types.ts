@@ -1637,6 +1637,35 @@ export type Database = {
           },
         ]
       }
+      poker_table_watchers: {
+        Row: {
+          created_at: string
+          id: string
+          table_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          table_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          table_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poker_table_watchers_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poker_tables: {
         Row: {
           ante: number

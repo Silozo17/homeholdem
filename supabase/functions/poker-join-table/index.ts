@@ -189,6 +189,57 @@ Deno.serve(async (req) => {
       },
     });
 
+    // Notify watchers (in-app + push)
+    try {
+      const seatedPlayerIds = new Set((seats || []).map((s: any) => s.player_id));
+      seatedPlayerIds.add(user.id); // include the joining player
+
+      const { data: watchers } = await admin
+        .from("poker_table_watchers")
+        .select("user_id")
+        .eq("table_id", table_id);
+
+      if (watchers && watchers.length > 0) {
+        const eligibleIds = watchers
+          .map((w: any) => w.user_id)
+          .filter((id: string) => !seatedPlayerIds.has(id));
+
+        if (eligibleIds.length > 0) {
+          const displayName = profile?.display_name || "A player";
+          const tableName = table.name || "a table";
+
+          // In-app notifications
+          const notifRows = eligibleIds.map((uid: string) => ({
+            user_id: uid,
+            title: "Player Joined",
+            body: `${displayName} joined ${tableName}`,
+            type: "table_join",
+            url: `/online-poker?table=${table_id}`,
+            sender_id: user.id,
+          }));
+          await admin.from("notifications").insert(notifRows);
+
+          // Push notifications (fire-and-forget)
+          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push-notification`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({
+              user_ids: eligibleIds,
+              title: "Player Joined",
+              body: `${displayName} joined ${tableName}`,
+              url: `/online-poker?table=${table_id}`,
+              tag: `table-join-${table_id}`,
+            }),
+          }).catch(() => {});
+        }
+      }
+    } catch (notifyErr) {
+      console.error("Watcher notification error (non-fatal):", notifyErr);
+    }
+
     return new Response(JSON.stringify({ seat }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
