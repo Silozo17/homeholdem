@@ -1,81 +1,113 @@
 
 
-# Comprehensive Seat Consistency Audit and Fix
+# Fix: Losing Players Never See Game-Over Screen
 
-## Issues Found
+## Root Cause
 
-After a thorough review of the entire online multiplayer seating codebase (client hooks, UI component, and all relevant edge functions), here are all the bugs and inconsistencies that cause ghost seats, misplaced seats, and desync between players:
+There is a critical race condition between the **showdown cleanup timer** and the **game-over detection effect**:
+
+1. `hand_result` broadcast arrives -- `handWinners` is set to the winner list, seat stacks are updated (loser has 0 chips)
+2. Game-over detection effect fires (depends on `handWinners` and `tableState`), sees `stack <= 0` and `handWinners.length > 0`, starts a **4-second timer** to set `gameOver = true`
+3. The showdown cleanup timer fires after **3.5 seconds** and clears `handWinners` back to `[]`
+4. Clearing `handWinners` re-runs the game-over effect (it's a dependency), which triggers the cleanup function that **cancels the 4-second timer**
+5. The loser never sees the game-over screen
+
+Additionally, when `gameOver` fires, `leaveSeat()` is called (line 813), but by that time the server may have already deleted the busted player's seat row, causing the leave call to fail silently.
+
+## Fix
+
+### Change 1: Stop the showdown timer from clearing `handWinners` when game is over
+
+**File: `src/hooks/useOnlinePokerTable.ts`**
+
+In the showdown cleanup timer (the `setTimeout` at line 427-437), check if the player has busted (stack = 0) before clearing `handWinners`. If the player busted, skip the clear so the game-over detection effect can complete its timer.
+
+Add a ref to track "game over is pending" so the showdown timer knows not to clear winners.
+
+### Change 2: Guard the game-over detection effect with `gameOver` check and snapshot winners into a ref
+
+**File: `src/components/poker/OnlinePokerTable.tsx`**
+
+The game-over effect at line 665 is missing a `gameOver` guard. Add `if (gameOver) return;` at the top to prevent re-triggering. Also, snapshot `handWinners` into `gameOverWinners` immediately (not after the delay) so they survive the showdown cleanup.
+
+### Change 3: Make the loser detection more resilient
+
+Instead of relying on `handWinners` still being populated after 4 seconds, set `gameOver` and `gameOverWinners` synchronously when bust is detected, then use the delay only for the announcement timing.
 
 ---
 
-### Bug 1: `poker-check-timeouts` auto-kick creates ghost seats (CRITICAL)
+## Technical Details
 
-**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 420-424)
+### File: `src/hooks/useOnlinePokerTable.ts`
 
-When a player is auto-kicked for 2+ consecutive timeouts, the code does:
+Add a `gameOverPendingRef` that is set to `true` when the component signals game over is imminent. In the showdown cleanup timer, skip clearing `handWinners` if this ref is true:
+
 ```typescript
-await admin.from("poker_seats")
-  .update({ player_id: null, stack: 0, status: "active", consecutive_timeouts: 0 })
-  .eq("id", seat.id);
+// New ref
+const gameOverPendingRef = useRef(false);
+
+// In showdown timer (line 427-437), before clearing:
+showdownTimerRef.current = setTimeout(() => {
+  if (!gameOverPendingRef.current) {
+    setHandWinners([]);
+  }
+  setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
+  setMyCards(null);
+  setRevealedCards([]);
+  showdownTimerRef.current = null;
+  setAutoStartAttempted(false);
+}, showdownDelay);
 ```
 
-This **nullifies `player_id` but keeps the seat row**, creating a ghost seat -- an empty row in the database that has no player but occupies a seat number. The client's seat visibility RLS query and lobby counts will see this ghost row.
+Also do the same for the fallback cleanup at line 288-295.
 
-**Fix:** Change to `DELETE` instead of `UPDATE`, matching the pattern used in heartbeat kicks (line 524) and force-removes (line 555).
+Expose `gameOverPendingRef` so the component can set it.
 
----
+### File: `src/components/poker/OnlinePokerTable.tsx`
 
-### Bug 2: `poker-check-timeouts` auto-kick broadcasts wrong payload field
+In the game-over detection effect (line 665-695):
 
-**File:** `supabase/functions/poker-check-timeouts/index.ts` (line 429-433)
+1. Add `if (gameOver) return;` at the top
+2. When loser is detected, immediately snapshot winners and set gameOver flag, using the timeout only for the announcement delay:
 
-The auto-kick for consecutive timeouts broadcasts:
 ```typescript
-payload: { action: "kicked", seat: seat.seat_number, player_id: seat.player_id }
+useEffect(() => {
+  if (gameOver || !tableState || !user) return;
+  const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
+  if (!mySeatInfo || handWinners.length === 0) return;
+
+  const heroWonSomething = handWinners.some(w => w.player_id === user.id);
+
+  // LOSER: stack is 0 and didn't win
+  if (mySeatInfo.stack <= 0 && !heroWonSomething) {
+    // Signal hook to preserve handWinners
+    gameOverPendingRef.current = true;
+    const snapshotWinners = [...handWinners];
+    const winner = snapshotWinners[0];
+    announceGameOver(winner?.display_name || 'Unknown', false);
+    const timer = setTimeout(() => {
+      setGameOver(true);
+      setGameOverWinners(snapshotWinners);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+
+  // WINNER: last player with chips
+  const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+  if (activePlayers.length === 1 && activePlayers[0].player_id === user.id && mySeatInfo.stack > 0) {
+    gameOverPendingRef.current = true;
+    const snapshotWinners = [...handWinners];
+    const timer = setTimeout(() => {
+      announceGameOver('You', true);
+      setGameOver(true);
+      setGameOverWinners(snapshotWinners);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }
+}, [tableState, user, handWinners, gameOver]);
 ```
 
-But the client handler (line 324 in `useOnlinePokerTable.ts`) expects `kicked_player_id`:
-```typescript
-if (payload.action === 'kicked' && payload.kicked_player_id === userId)
-```
-
-The `poker-moderate-table` function correctly sends `kicked_player_id`, but `poker-check-timeouts` sends `player_id`. This means auto-kicked players never get the `kickedForInactivity` flag and remain stuck visually.
-
-**Fix:** Add `kicked_player_id: seat.player_id` to the broadcast payload.
-
----
-
-### Bug 3: Client `seat_change` handler doesn't handle `force_removed` and `disconnected` action types for self-detection
-
-**File:** `src/hooks/useOnlinePokerTable.ts` (line 311-327)
-
-The handler correctly processes `leave`, `kicked`, and `disconnected` for seat removal visuals, but:
-
-1. When `action === 'disconnected'`, it clears the seat visually (sets `player_id: null`), but if the player IS the disconnected one (e.g. they reconnected), they see themselves removed even though the server only marked them as `disconnected` (not deleted).
-
-2. When `action === 'force_removed'`, it's not handled at all -- falls through to `refreshState()` which works but is slower and may cause a flash.
-
-**Fix:** Add `force_removed` to the existing seat-clearing condition. For `disconnected`, update the seat status to `disconnected` instead of clearing the player entirely (since the server only marks it, doesn't delete mid-hand).
-
----
-
-### Bug 4: `leaveSeat` has no early-out guard for spectators
-
-**File:** `src/hooks/useOnlinePokerTable.ts` (line 540-547)
-
-`leaveSeat` checks `mySeatNumber === null` but this is derived from `tableState` which can be stale. If the server already removed the seat but the local state hasn't refreshed, the edge function call goes through and returns "Not seated" (200 OK with `{ message: "Not seated", stack: 0 }`), but the client doesn't know and still calls `refreshState()`. This is harmless but causes unnecessary network chatter. More importantly, the `kickedForInactivity` handler (line 328-336) calls `leaveSeat()` which may fail if the seat is already gone.
-
-**Fix:** Add a try-catch around the `leaveSeat` call in the kickedForInactivity handler (already done), and ensure the leaveSeat callback gracefully handles the "Not seated" response.
-
----
-
-### Bug 5: `seat_change` handler for `disconnected` wrongly clears the seat visually
-
-**File:** `src/hooks/useOnlinePokerTable.ts` (line 311-327)
-
-When a stale heartbeat triggers a `disconnected` broadcast, the client handler treats it the same as `leave` or `kicked` -- it nullifies the seat visually. But on the server, the seat still has a `player_id` (just marked `disconnected`). Other clients then see an empty seat, but if the disconnected player reconnects and sends a heartbeat, their seat is still there server-side, causing a desync: the visual shows an empty seat but the server has a player there.
-
-**Fix:** For `disconnected` action, update the seat's status to `disconnected` instead of clearing `player_id`. This way other players still see the player (with a disconnected indicator) until force-removal actually deletes the seat.
+Same snapshot approach for the fallback effect at line 697-712.
 
 ---
 
@@ -83,14 +115,14 @@ When a stale heartbeat triggers a `disconnected` broadcast, the client handler t
 
 | File | Change |
 |------|--------|
-| `supabase/functions/poker-check-timeouts/index.ts` | (1) Change auto-kick from `UPDATE player_id=null` to `DELETE`; (2) Add `kicked_player_id` to auto-kick broadcast payload |
-| `src/hooks/useOnlinePokerTable.ts` | (1) Add `force_removed` to seat-clearing conditions; (2) Handle `disconnected` by updating status instead of clearing seat; (3) Add `kicked_player_id` check for auto-kick broadcasts |
+| `src/hooks/useOnlinePokerTable.ts` | Add `gameOverPendingRef`; skip clearing `handWinners` in showdown timer when game-over is pending; expose ref |
+| `src/components/poker/OnlinePokerTable.tsx` | Add `gameOver` guard to detection effect; snapshot winners immediately; set `gameOverPendingRef` when bust detected |
 
 ## What Does NOT Change
 
+- No edge function changes
 - No UI/style/layout/navigation changes
-- No changes to `poker-join-table`, `poker-leave-table`, `poker-moderate-table`, or `poker-table-state`
-- No changes to `OnlinePokerTable.tsx`
 - No changes to the bottom navigation
 - No database schema changes
+- Winner detection logic unchanged (only loser path fixed)
 
