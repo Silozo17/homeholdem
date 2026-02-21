@@ -153,7 +153,7 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[100] flex flex-col items-center justify-center max-h-[100dvh] overflow-hidden transition-opacity duration-500',
+        'fixed inset-0 z-[100] flex items-center justify-center overflow-hidden transition-opacity duration-500',
         visible ? 'opacity-100' : 'opacity-0',
       )}
       style={{
@@ -161,137 +161,160 @@ export function XPLevelUpOverlay({ startXp, endXp, xpGained, stats, onPlayAgain,
         backdropFilter: 'blur(8px)',
       }}
     >
-      <div className="w-full max-w-sm px-5 py-4 flex flex-col items-center">
-        {/* XP Earned Header */}
-        <div className="text-center mb-4 animate-fade-in">
-          <p className="text-[10px] uppercase tracking-[0.3em] mb-0.5" style={{ color: 'hsl(43 74% 49% / 0.6)' }}>Match Complete</p>
-          <p className="text-3xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
-            +{xpGained} XP
-          </p>
-        </div>
+      {/* Portrait: single column / Landscape: two columns */}
+      <div className="w-full max-w-sm landscape:max-w-2xl px-4 py-3 landscape:py-2 flex flex-col landscape:flex-row landscape:gap-6 landscape:items-center max-h-[100dvh]">
 
-        {/* Level Progress Area */}
-        <div className="w-full space-y-3 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className={cn('w-8 h-8 rounded-full flex items-center justify-center font-black text-sm transition-all duration-300',
-                  flashLevel ? 'scale-125' : 'scale-100'
-                )}
-                style={{
-                  background: 'hsl(0 0% 10%)',
-                  border: '2px solid hsl(43 74% 49%)',
-                  color: 'white',
-                  boxShadow: flashLevel ? '0 0 20px hsl(43 74% 49% / 0.6)' : '0 0 6px hsl(43 74% 49% / 0.2)',
-                }}
-              >
-                {flashLevel ?? displayLevel}
-              </div>
-              <span className="text-xs font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
-            </div>
-            <span className="text-[10px] text-white/40">Lv {displayLevel + 1}</span>
+        {/* Left column: XP + Level */}
+        <div className="flex flex-col items-center landscape:flex-1 landscape:items-center">
+          {/* XP Earned Header */}
+          <div className="text-center mb-3 landscape:mb-2 animate-fade-in">
+            <p className="text-[10px] uppercase tracking-[0.3em] mb-0.5" style={{ color: 'hsl(43 74% 49% / 0.6)' }}>Match Complete</p>
+            <p className="text-3xl landscape:text-2xl font-black" style={{ color: 'hsl(43 74% 49%)', textShadow: '0 0 20px hsl(43 74% 49% / 0.4)' }}>
+              +{xpGained} XP
+            </p>
           </div>
 
-          <div className="relative h-3 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
-            <div
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{
-                width: `${barPct}%`,
-                background: 'linear-gradient(90deg, hsl(43 74% 40%), hsl(43 74% 55%))',
-                boxShadow: '0 0 12px hsl(43 74% 49% / 0.5)',
-                transition: 'width 1s ease-out',
-              }}
-            />
-            {flashLevel && (
-              <div className="absolute inset-0 animate-pulse" style={{ background: 'hsl(43 74% 80% / 0.3)' }} />
+          {/* Level Progress Area */}
+          <div className="w-full space-y-2 mb-3 landscape:mb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn('w-8 h-8 rounded-full flex items-center justify-center font-black text-sm transition-all duration-300',
+                    flashLevel ? 'scale-125' : 'scale-100'
+                  )}
+                  style={{
+                    background: 'hsl(0 0% 10%)',
+                    border: '2px solid hsl(43 74% 49%)',
+                    color: 'white',
+                    boxShadow: flashLevel ? '0 0 20px hsl(43 74% 49% / 0.6)' : '0 0 6px hsl(43 74% 49% / 0.2)',
+                  }}
+                >
+                  {flashLevel ?? displayLevel}
+                </div>
+                <span className="text-xs font-bold text-white/80">Level {flashLevel ?? displayLevel}</span>
+              </div>
+              <span className="text-[10px] text-white/40">Lv {displayLevel + 1}</span>
+            </div>
+
+            <div className="relative h-3 rounded-full overflow-hidden" style={{ background: 'hsl(0 0% 15%)' }}>
+              <div
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{
+                  width: `${barPct}%`,
+                  background: 'linear-gradient(90deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+                  boxShadow: '0 0 12px hsl(43 74% 49% / 0.5)',
+                  transition: 'width 1s ease-out',
+                }}
+              />
+              {flashLevel && (
+                <div className="absolute inset-0 animate-pulse" style={{ background: 'hsl(43 74% 80% / 0.3)' }} />
+              )}
+            </div>
+
+            {segments.length > 1 && (
+              <div className="space-y-1">
+                {segments.filter(s => s.levelUp).map((s, i) => (
+                  <div key={i} className={cn(
+                    'flex items-center gap-2 text-[10px] transition-opacity duration-500',
+                    i <= activeIdx - 1 ? 'opacity-100' : 'opacity-30',
+                  )}>
+                    <span style={{ color: 'hsl(43 74% 49%)' }}>★</span>
+                    <span className="text-white/70">Level {s.level} → Level {s.level + 1}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          {segments.length > 1 && (
-            <div className="space-y-1">
-              {segments.filter(s => s.levelUp).map((s, i) => (
-                <div key={i} className={cn(
-                  'flex items-center gap-2 text-[10px] transition-opacity duration-500',
-                  i <= activeIdx - 1 ? 'opacity-100' : 'opacity-30',
-                )}>
-                  <span style={{ color: 'hsl(43 74% 49%)' }}>★</span>
-                  <span className="text-white/70">Level {s.level} → Level {s.level + 1}</span>
-                </div>
-              ))}
+          {/* In landscape, show buttons under level on left side if no stats */}
+          {!stats && showContent && (
+            <div className="hidden landscape:flex mt-2 gap-3 animate-fade-in w-full">
+              <ActionButtons onPlayAgain={onPlayAgain} handleClose={handleClose} />
             </div>
           )}
         </div>
 
-        {/* Stats Section */}
-        {stats && showStats && (
-          <div className="w-full animate-fade-in space-y-3">
-            {/* Win rate ring + key stat */}
-            <div className="flex items-center gap-3 justify-center mb-1">
-              <WinRateRing played={stats.handsPlayed} won={stats.handsWon} />
-              <div className="text-left">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider">Win Rate</p>
-                <p className="text-lg font-black text-white">{winRate}%</p>
-                <p className="text-[9px] text-white/30">{stats.handsWon} / {stats.handsPlayed} hands</p>
+        {/* Right column: Stats + Buttons */}
+        <div className="flex flex-col landscape:flex-1">
+          {/* Stats Section */}
+          {stats && showStats && (
+            <div className="w-full animate-fade-in space-y-2">
+              {/* Win rate ring + key stat */}
+              <div className="flex items-center gap-3 justify-center mb-1">
+                <WinRateRing played={stats.handsPlayed} won={stats.handsWon} />
+                <div className="text-left">
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Win Rate</p>
+                  <p className="text-lg landscape:text-base font-black text-white">{winRate}%</p>
+                  <p className="text-[9px] text-white/30">{stats.handsWon} / {stats.handsPlayed} hands</p>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <StatCard icon={<Target className="h-3.5 w-3.5" />} label="Hands Played" value={String(stats.handsPlayed)} color="hsl(210 80% 55%)" />
+                <StatCard icon={<Trophy className="h-3.5 w-3.5" />} label="Hands Won" value={String(stats.handsWon)} color="hsl(142 70% 45%)" />
+                <StatCard icon={<Crown className="h-3.5 w-3.5" />} label="Best Hand" value={stats.bestHandName || '—'} color="hsl(43 74% 49%)" />
+                <StatCard icon={<Flame className="h-3.5 w-3.5" />} label="Biggest Pot" value={stats.biggestPot > 0 ? stats.biggestPot.toLocaleString() : '—'} color="hsl(0 70% 50%)" />
+                <StatCard icon={<Clock className="h-3.5 w-3.5" />} label="Duration" value={formatDuration(stats.duration)} color="hsl(280 60% 55%)" colSpan />
               </div>
             </div>
+          )}
 
-            {/* Stats grid */}
-            <div className="grid grid-cols-2 gap-1.5">
-              <StatCard icon={<Target className="h-3.5 w-3.5" />} label="Hands Played" value={String(stats.handsPlayed)} color="hsl(210 80% 55%)" />
-              <StatCard icon={<Trophy className="h-3.5 w-3.5" />} label="Hands Won" value={String(stats.handsWon)} color="hsl(142 70% 45%)" />
-              <StatCard icon={<Crown className="h-3.5 w-3.5" />} label="Best Hand" value={stats.bestHandName || '—'} color="hsl(43 74% 49%)" />
-              <StatCard icon={<Flame className="h-3.5 w-3.5" />} label="Biggest Pot" value={stats.biggestPot > 0 ? stats.biggestPot.toLocaleString() : '—'} color="hsl(0 70% 50%)" />
-              <StatCard icon={<Clock className="h-3.5 w-3.5" />} label="Duration" value={formatDuration(stats.duration)} color="hsl(280 60% 55%)" colSpan />
+          {/* Buttons */}
+          {showContent && (
+            <div className={cn("mt-3 landscape:mt-2 flex gap-3 animate-fade-in w-full", !stats && "landscape:hidden")}>
+              <ActionButtons onPlayAgain={onPlayAgain} handleClose={handleClose} />
             </div>
-          </div>
-        )}
-
-        {/* Buttons */}
-        {showContent && (
-          <div className="mt-5 flex gap-3 animate-fade-in w-full">
-            {onPlayAgain ? (
-              <>
-                <Button
-                  onClick={handleClose}
-                  variant="outline"
-                  className="flex-1 py-2.5 font-bold text-sm"
-                  style={{
-                    background: 'hsl(0 0% 12%)',
-                    borderColor: 'hsl(0 0% 25%)',
-                    color: 'hsl(0 0% 60%)',
-                  }}
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={onPlayAgain}
-                  className="flex-1 py-2.5 font-bold text-sm"
-                  style={{
-                    background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
-                    color: 'hsl(0 0% 5%)',
-                    boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
-                  }}
-                >
-                  <Zap className="h-4 w-4 mr-1" /> Play Again
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={handleClose}
-                className="flex-1 py-2.5 font-bold text-base"
-                style={{
-                  background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
-                  color: 'hsl(0 0% 5%)',
-                  boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
-                }}
-              >
-                Continue
-              </Button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Shared action buttons extracted to avoid duplication */
+function ActionButtons({ onPlayAgain, handleClose }: { onPlayAgain?: () => void; handleClose: () => void }) {
+  if (onPlayAgain) {
+    return (
+      <>
+        <Button
+          onClick={handleClose}
+          variant="outline"
+          className="flex-1 py-2.5 font-bold text-sm"
+          style={{
+            background: 'hsl(0 0% 12%)',
+            borderColor: 'hsl(0 0% 25%)',
+            color: 'hsl(0 0% 60%)',
+          }}
+        >
+          Close
+        </Button>
+        <Button
+          onClick={onPlayAgain}
+          className="flex-1 py-2.5 font-bold text-sm"
+          style={{
+            background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+            color: 'hsl(0 0% 5%)',
+            boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
+          }}
+        >
+          <Zap className="h-4 w-4 mr-1" /> Play Again
+        </Button>
+      </>
+    );
+  }
+  return (
+    <Button
+      onClick={handleClose}
+      className="flex-1 py-2.5 font-bold text-base"
+      style={{
+        background: 'linear-gradient(135deg, hsl(43 74% 40%), hsl(43 74% 55%))',
+        color: 'hsl(0 0% 5%)',
+        boxShadow: '0 4px 20px hsl(43 74% 49% / 0.3)',
+      }}
+    >
+      Continue
+    </Button>
   );
 }
 
