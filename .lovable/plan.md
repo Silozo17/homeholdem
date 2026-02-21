@@ -1,70 +1,33 @@
 
 
-# Fix: Voice Announcements Repeating
+# Fix: End Game Overlay Rendering Behind Header & Quick Actions
 
-## Root Cause
+## Problem
 
-The current dedup in `usePokerVoiceAnnouncements.ts` only tracks the **last single message** with a 3-second window (`lastAnnouncedRef`). This fails when:
+The XPLevelUpOverlay (end game screen) is rendered **inside** the table container element (around line 1280) which has `containerType: 'size'`. This CSS property creates a new stacking context, meaning the overlay's `z-[100]` only applies within that container -- it cannot compete with elements outside it like the header bar (`Z.HEADER = 40`) and PreActionButtons (`Z.ACTIONS = 50`) which sit at the root level of the `z-[60]` wrapper.
 
-1. Multiple React effects re-fire and call `announceGameOver` or `announceCustom` again with the same text -- the 3s window has passed, so it gets enqueued again.
-2. The `announceGameOver` calls at lines 676, 689, and 715 in `OnlinePokerTable.tsx` can each fire independently from different `useEffect` blocks (loser detection, winner detection, opponent-left detection), causing duplicate "Game over" announcements.
-3. Winner announcements at line 537 re-fire when `handWinners` array reference changes due to state updates even though the content is the same.
+That is why the "Check/Fold", "Call Any", "Check" buttons and the top icons (volume, chat, etc.) render on top of the end game screen.
 
 ## Fix
 
-### 1. Replace single-message dedup with a per-hand Set (`usePokerVoiceAnnouncements.ts`)
-
-Replace `lastAnnouncedRef` (tracks 1 message for 3s) with `announcedThisHandRef` (a `Set<string>` that tracks ALL messages announced in the current hand). Once a message is spoken, it can never repeat until `clearQueue()` is called (which happens on every new hand).
-
-- Remove `lastAnnouncedRef` and `DEDUP_MS`
-- Add `announcedThisHandRef = useRef(new Set<string>())`
-- In `enqueue`: skip if `announcedThisHandRef.current.has(message)`; otherwise add it
-- In `clearQueue`: also clear `announcedThisHandRef.current`
-
-### 2. Also deduplicate items already in the queue (`usePokerVoiceAnnouncements.ts`)
-
-Before pushing to the queue, check if the same message is already queued (prevents double-enqueue from rapid effect re-fires).
+Move the XPLevelUpOverlay rendering from inside the table container to the root level of the `z-[60]` wrapper div -- right next to where the header and PreActionButtons are rendered. This puts it in the same stacking context, where its `z-[100]` will correctly sit above `Z.HEADER (40)` and `Z.ACTIONS (50)`.
 
 ## Technical Details
 
-**File: `src/hooks/usePokerVoiceAnnouncements.ts`**
+**File: `src/components/poker/OnlinePokerTable.tsx`**
 
-```typescript
-// Replace:
-const lastAnnouncedRef = useRef<{ msg: string; at: number }>({ msg: '', at: 0 });
-const DEDUP_MS = 3000;
-
-// With:
-const announcedThisHandRef = useRef(new Set<string>());
-
-// In enqueue:
-const enqueue = useCallback((message: string) => {
-  if (!voiceEnabled) return;
-  // Never repeat same message within a hand
-  if (announcedThisHandRef.current.has(message)) return;
-  // Also skip if already in queue
-  if (queueRef.current.some(q => q.message === message)) return;
-  announcedThisHandRef.current.add(message);
-  queueRef.current.push({ message, addedAt: Date.now() });
-  processQueue();
-}, [voiceEnabled, processQueue]);
-
-// In clearQueue:
-const clearQueue = useCallback(() => {
-  queueRef.current = [];
-  announcedThisHandRef.current.clear();
-}, []);
-```
-
-## Files Modified
+1. Cut the XPLevelUpOverlay block (lines 1397-1436) from inside the table container
+2. Paste it after the PreActionButtons section (after line 1601), at the root level of the `z-[60]` div
+3. No changes to the overlay itself -- its `fixed inset-0 z-[100]` will now work correctly since it is no longer trapped inside the container stacking context
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePokerVoiceAnnouncements.ts` | Replace single-message dedup with per-hand Set; add queue dedup; clear Set on `clearQueue` |
+| `src/components/poker/OnlinePokerTable.tsx` | Move XPLevelUpOverlay rendering from inside table container to root level of the main wrapper |
 
 ## What Does NOT Change
 
-- No changes to `OnlinePokerTable.tsx` or any other file
-- No database, navigation, or layout changes
-- No changes to timing, confetti, or any other logic
+- No changes to XPLevelUpOverlay component itself
+- No z-index value changes
+- No style, layout, or navigation changes
+- No database or edge function changes
 
