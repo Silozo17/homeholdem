@@ -562,21 +562,20 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     play('win');
     haptic('win');
 
-    for (const winner of handWinners) {
-      const isHero = winner.player_id === user.id;
-      const name = isHero ? 'You' : winner.display_name;
-      const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
-        ? winner.hand_name
-        : undefined;
-      let message: string;
-      if (handName) {
-        message = `${name} wins with ${handName}`;
-      } else {
-        message = `${name} wins the pot`;
+    const timer = setTimeout(() => {
+      for (const winner of handWinners) {
+        const isHero = winner.player_id === user.id;
+        const name = isHero ? 'You' : winner.display_name;
+        const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
+          ? winner.hand_name
+          : undefined;
+        const message = handName ? `${name} wins with ${handName}` : `${name} wins the pot`;
+        console.log('[voice] announcing winner:', message);
+        announceCustom(message);
       }
-      console.log('[voice] announcing winner:', message);
-      announceCustom(message);
-    }
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [handWinners, user, announceCustom]);
 
    // FIX 3: Voice detect all-in from lastActions with debug log
@@ -586,7 +585,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     for (const [playerId, actionStr] of Object.entries(lastActions)) {
       const lower = actionStr.toLowerCase();
       if (lower === 'all_in' || lower === 'all-in' || lower === 'allin') {
-        console.log('[voice] all-in trigger, player:', playerId, 'me:', user.id);
+        console.log('[voice] all-in check, playerId:', playerId, 'user.id:', user?.id, 'match:', playerId === user?.id);
         // Skip self announcements
         if (playerId === user.id) continue;
         const key = `voice:allin:${playerId}:${handId}`;
@@ -872,6 +871,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const communityCards = tableState?.current_hand?.community_cards ?? [];
     const prevCount = prevCommunityCountRef.current;
     const newCount = communityCards.length;
+
+    // Do not clear cards if hand just ended — keep them visible until game over screen shows
+    if (newCount === 0 && !gameOver) return;
+
     if (newCount > prevCount && (newCount - prevCount) > 1) {
       stagedRunoutRef.current.forEach(t => clearTimeout(t));
       stagedRunoutRef.current = [];
@@ -893,7 +896,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       stagedRunoutRef.current = [];
       prevCommunityCountRef.current = 0;
     }
-  }, [tableState?.current_hand?.community_cards]);
+  }, [tableState?.current_hand?.community_cards, gameOver]);
 
   useEffect(() => {
     return () => { stagedRunoutRef.current.forEach(t => clearTimeout(t)); };
