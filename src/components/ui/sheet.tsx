@@ -49,7 +49,9 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  overlayClassName?: string;
+}
 
 const safeAreaStyles: Record<string, React.CSSProperties> = {
   top: { paddingTop: 'env(safe-area-inset-top, 0px)' },
@@ -59,9 +61,9 @@ const safeAreaStyles: Record<string, React.CSSProperties> = {
 };
 
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
-  ({ side = "right", className, children, style, ...props }, ref) => (
+  ({ side = "right", className, children, style, overlayClassName, ...props }, ref) => (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content ref={ref} onOpenAutoFocus={(e) => e.preventDefault()} className={cn(sheetVariants({ side }), className)} style={{ ...safeAreaStyles[side || 'right'], ...style }} {...props}>
         {children}
         <SheetPrimitive.Close className="absolute top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none" style={{ right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right, 0px))' : '1rem' }}>

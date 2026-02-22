@@ -123,7 +123,7 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="left" className="w-[300px] sm:w-[340px] bg-card border-border/50 p-0">
+      <SheetContent side="left" className="w-[300px] sm:w-[340px] bg-card border-border/50 p-0 z-[70]" overlayClassName="z-[70]">
         {profile && !loading ? (
           <div className="flex flex-col h-full">
             <div className="p-6 pb-4 border-b border-border/50" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))' }}>
