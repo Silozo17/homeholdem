@@ -1,61 +1,78 @@
 import { useRef, useCallback, useState } from 'react';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
 /** Module-level cache: survives re-renders, cleared on page refresh. */
 const VOICE_CACHE = new Map<string, string>();
 const MAX_CACHE = 30;
 
 /**
  * Simplified voice announcements for multiplayer poker via ElevenLabs TTS.
- * Single speak() entry point — no queue, no dedup set, no stale threshold.
+ * Single speak() entry point with one-slot pending queue for critical announcements.
  */
 export function usePokerVoiceAnnouncements() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const enabledRef = useRef(true);
   const isPlayingRef = useRef(false);
   const precachedRef = useRef(false);
+  const pendingRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  const setEnabled = useCallback((val: boolean) => {
+    enabledRef.current = val;
+    setVoiceEnabled(val);
+  }, []);
 
   const speak = useCallback(async (message: string) => {
-    if (!message) return;
-    // If already playing, silently drop — no queuing
-    if (isPlayingRef.current) return;
+    if (!enabledRef.current || !message) return;
+
+    if (isPlayingRef.current) {
+      // Store as pending — will play when current audio ends
+      pendingRef.current = message;
+      return;
+    }
 
     try {
       isPlayingRef.current = true;
+      pendingRef.current = null;
 
-      // Check cache first
       let audioUri = VOICE_CACHE.get(message);
 
       if (!audioUri) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-          body: JSON.stringify({ announcement: message }),
-          signal: controller.signal,
-        });
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tournament-announce`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({ announcement: message }),
+              signal: controller.signal,
+            }
+          );
 
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error('Voice fetch failed');
+          clearTimeout(timeoutId);
+          if (!response.ok) throw new Error('Voice fetch failed');
 
-        const data = await res.json();
-        if (!data.audioContent) throw new Error('No audio content');
+          const data = await response.json();
+          if (!data.audioContent) throw new Error('No audio content');
 
-        audioUri = `data:audio/mpeg;base64,${data.audioContent}`;
+          audioUri = `data:audio/mpeg;base64,${data.audioContent}`;
 
-        // Evict oldest if full
-        if (VOICE_CACHE.size >= MAX_CACHE) {
-          const firstKey = VOICE_CACHE.keys().next().value;
-          if (firstKey) VOICE_CACHE.delete(firstKey);
+          if (VOICE_CACHE.size >= MAX_CACHE) {
+            const firstKey = VOICE_CACHE.keys().next().value;
+            if (firstKey) VOICE_CACHE.delete(firstKey);
+          }
+          VOICE_CACHE.set(message, audioUri);
+        } catch {
+          clearTimeout(timeoutId);
+          isPlayingRef.current = false;
+          return;
         }
-        VOICE_CACHE.set(message, audioUri);
       }
 
       const audio = new Audio(audioUri);
@@ -68,10 +85,16 @@ export function usePokerVoiceAnnouncements() {
       console.warn('[voice] speak failed:', err);
     } finally {
       isPlayingRef.current = false;
+      // Play pending message if one arrived while we were playing
+      if (pendingRef.current) {
+        const next = pendingRef.current;
+        pendingRef.current = null;
+        speak(next);
+      }
     }
   }, []);
 
-  // --- Named announcement functions (same signatures as before) ---
+  // --- Named announcement functions ---
 
   const announceBlindUp = useCallback((small: number, big: number) => {
     speak(`Blinds are now ${small} and ${big}`);
@@ -94,11 +117,13 @@ export function usePokerVoiceAnnouncements() {
     speak(message);
   }, [speak]);
 
-  // No-ops — kept for API compatibility with OnlinePokerTable.tsx
+  // No-ops — kept for API compatibility
   const clearQueue = useCallback(() => {}, []);
   const resetHandDedup = useCallback(() => {}, []);
 
-  const toggleVoice = useCallback(() => setVoiceEnabled(v => !v), []);
+  const toggleVoice = useCallback(() => {
+    setEnabled(!enabledRef.current);
+  }, [setEnabled]);
 
   const precache = useCallback(() => {
     if (precachedRef.current) return;
@@ -109,15 +134,14 @@ export function usePokerVoiceAnnouncements() {
       'Big pot building!',
       "We're heads up!",
     ];
-    // Fire and forget — populate cache in background
     phrases.forEach(p => {
       if (!VOICE_CACHE.has(p)) {
-        fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tournament-announce`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({ announcement: p }),
         })

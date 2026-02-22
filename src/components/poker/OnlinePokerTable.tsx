@@ -163,8 +163,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const winStreakRef = useRef(0);
   // FIX 1: Freeze displayed stacks until winner overlay appears
   const [displayStacks, setDisplayStacks] = useState<Record<number, number>>({});
-  const frozenStacksRef = useRef<Record<number, number>>({});
-  const stacksFrozenRef = useRef(false);
   // FIX 4: Store max stack at hand start for big pot threshold
   const handStartMaxStackRef = useRef(0);
   const handsPlayedRef = useRef(0);
@@ -412,14 +410,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         .filter(s => s.player_id)
         .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
       startNewHand(currentHandId, hand.hand_number, players);
-      // FIX 1: Snapshot stacks at hand start so display doesn't update until winner overlay
-      const snapshot: Record<number, number> = {};
-      for (const s of (tableState?.seats ?? [])) {
-        if (s.player_id) snapshot[s.seat] = s.stack;
-      }
-      frozenStacksRef.current = snapshot;
-      setDisplayStacks(snapshot);
-      stacksFrozenRef.current = true;
       // FIX 4: Capture max stack at hand start for big pot threshold
       const seatedStacks = (tableState?.seats ?? []).filter(s => s.player_id).map(s => s.stack);
       handStartMaxStackRef.current = seatedStacks.length > 0 ? Math.max(...seatedStacks) : 0;
@@ -535,26 +525,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // FIX 1: Unfreeze stacks when winner overlay appears
+  // Always mirror real stacks from tableState
   useEffect(() => {
-    if (handWinners.length > 0 && stacksFrozenRef.current) {
-      stacksFrozenRef.current = false;
-      // Update display stacks to current real stacks
-      const realStacks: Record<number, number> = {};
-      for (const s of (tableState?.seats ?? [])) {
-        if (s.player_id) realStacks[s.seat] = s.stack;
-      }
-      setDisplayStacks(realStacks);
+    const realStacks: Record<number, number> = {};
+    for (const s of (tableState?.seats ?? [])) {
+      if (s.player_id) realStacks[s.seat] = s.stack;
     }
-    if (handWinners.length === 0 && !stacksFrozenRef.current && !tableState?.current_hand) {
-      // Between hands — sync display stacks to real stacks
-      const realStacks: Record<number, number> = {};
-      for (const s of (tableState?.seats ?? [])) {
-        if (s.player_id) realStacks[s.seat] = s.stack;
-      }
-      setDisplayStacks(realStacks);
-    }
-  }, [handWinners, tableState?.seats, tableState?.current_hand]);
+    setDisplayStacks(realStacks);
+  }, [tableState?.seats]);
 
   // FIX 2: Voice announce hand winners with debug log
   // Snapshot winners and remove cleanup to prevent re-render cancellation
@@ -579,7 +557,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }, 400);
     // No cleanup — timer must survive re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handWinners.length > 0, user?.id]);
+  }, [handWinners, user?.id]);
 
    // FIX 3: Voice detect all-in from lastActions with debug log
   useEffect(() => {
@@ -722,7 +700,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           announceGameOver(snap[0]?.display_name || 'Unknown', false);
           setGameOver(true);
           setGameOverWinners(snap);
-        }, 4000);
+        }, 3000);
         return () => clearTimeout(timer);
       }
     }
@@ -749,7 +727,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         announceGameOver(snap[0]?.display_name || 'Unknown', false);
         setGameOver(true);
         setGameOverWinners(snap);
-      }, 2000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
 
@@ -1559,8 +1537,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
             const opponentRevealed = !isMe ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null : null;
             const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
-            const frozenStack = stacksFrozenRef.current ? displayStacks[seatData!.seat] : undefined;
-            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, frozenStack);
+            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, displayStacks[seatData!.seat]);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
             return (
