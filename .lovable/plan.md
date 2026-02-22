@@ -1,54 +1,22 @@
 
+# Fix: Safe-area top padding on /tournaments page
 
-## Two Surgical Fixes
+## Problem
+The `/tournaments` page header spacer div uses `className="h-14 safe-area-top"` which doesn't work correctly on notched devices. Because Tailwind uses `box-sizing: border-box`, the `h-14` (3.5rem) swallows the safe-area padding instead of adding to it. This is the same pattern that was fixed on other screens.
 
-### FIX 1 -- hand_complete showdown delay still hardcoded
+## Fix (1 file, 1 line)
 
-**File:** `src/hooks/useOnlinePokerTable.ts`
+**File: `src/pages/PaidTournaments.tsx`** (~line 119)
 
-**Line 564:** Change comment from "Showdown cleanup at 12s" to "Showdown cleanup -- dynamic delay"
-
-**Line 577:** Replace `12000` with `winnerDelay + 4000`
-
-`winnerDelay` is already calculated at line 560 in the same handler, so this is a direct reference.
-
----
-
-### FIX 2 -- Timer visual resetting on every parent render
-
-**File:** `src/components/poker/OnlinePokerTable.tsx`
-
-**Step A:** Add a `useCallback` near `handleLowTime` (after line 932):
-
-```typescript
-const handleTimeout = useCallback(() => {
-  handleAction({ type: 'fold' });
-  setShowStillPlayingPopup(true);
-}, [handleAction]);
-```
-
-**Step B:** At lines 1553-1556, replace the inline arrow function:
-
-```typescript
+Replace the spacer div:
+```tsx
 // Before
-onTimeout={isMe && isCurrentActor ? () => {
-  handleAction({ type: 'fold' });
-  setShowStillPlayingPopup(true);
-} : undefined}
+<div className="h-14 safe-area-top shrink-0" />
 
 // After
-onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
+<div className="shrink-0" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} />
 ```
 
----
+This matches the pattern used on all other screens with fixed headers, ensuring content doesn't overlap with the status bar or notch on iOS/Android PWA.
 
-### Technical Summary
-
-| Fix | File | Lines | Change |
-|-----|------|-------|--------|
-| 1 | useOnlinePokerTable.ts | 564, 577 | `12000` to `winnerDelay + 4000` |
-| 2a | OnlinePokerTable.tsx | after 932 | Add `handleTimeout` useCallback |
-| 2b | OnlinePokerTable.tsx | 1553-1556 | Use `handleTimeout` ref instead of inline fn |
-
-No other files or lines are touched.
-
+No other files or changes required.
