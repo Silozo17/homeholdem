@@ -24,6 +24,7 @@ interface PlayerSeatProps {
   level?: number;
   countryCode?: string | null;
   disableDealAnim?: boolean;
+  actionDeadline?: string | null;
   onTimeout?: () => void;
   onLowTime?: () => void;
   isDisconnected?: boolean;
@@ -38,7 +39,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false, onClick,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false, onClick,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -57,11 +58,25 @@ export const PlayerSeat = memo(function PlayerSeat({
       lowTimeFired.current = false;
       return;
     }
-    setTimerElapsed(0);
+
+    // Anchor to server deadline if available, otherwise fall back to local start
+    const deadlineMs = actionDeadline ? new Date(actionDeadline).getTime() : null;
+    const localStart = Date.now();
+
+    const getElapsed = () => {
+      if (deadlineMs) {
+        const remaining = (deadlineMs - Date.now()) / 1000;
+        return Math.max(0, TIMER_DURATION - remaining);
+      }
+      return (Date.now() - localStart) / 1000;
+    };
+
+    // Set immediately so there's no visual jump on first render
+    setTimerElapsed(getElapsed());
     lowTimeFired.current = false;
-    const start = Date.now();
+
     const interval = setInterval(() => {
-      const secs = (Date.now() - start) / 1000;
+      const secs = getElapsed();
       if (secs >= TIMER_DURATION) {
         setTimerElapsed(TIMER_DURATION);
         clearInterval(interval);
@@ -74,8 +89,9 @@ export const PlayerSeat = memo(function PlayerSeat({
         }
       }
     }, 200);
+
     return () => clearInterval(interval);
-  }, [isTimerActive, onTimeout, onLowTime]);
+  }, [isTimerActive, actionDeadline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerProgress = isTimerActive ? Math.min(timerElapsed / TIMER_DURATION, 1) : 0;
   const timerRemaining = 1 - timerProgress;

@@ -1553,6 +1553,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
+                  actionDeadline={isCurrentActor ? tableState?.current_hand?.action_deadline : null}
                   onTimeout={isMe && isCurrentActor ? () => {
                     handleAction({ type: 'fold' });
                     setShowStillPlayingPopup(true);
