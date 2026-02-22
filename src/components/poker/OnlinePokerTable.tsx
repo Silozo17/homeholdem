@@ -931,6 +931,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [isMyTurn, play, announceCountdown]);
 
+
   const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
 
   // ── Memoized derived values ──
@@ -1106,6 +1107,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     }
   };
+
+  const handleTimeout = useCallback(() => {
+    handleAction({ type: 'fold' });
+    setShowStillPlayingPopup(true);
+  }, [handleAction]);
 
   const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
 
@@ -1550,10 +1556,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
-                  onTimeout={isMe && isCurrentActor ? () => {
-                    handleAction({ type: 'fold' });
-                    setShowStillPlayingPopup(true);
-                  } : undefined}
+                  onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
                   onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
