@@ -41,7 +41,12 @@ export function PlayerProfileDrawer({ playerId, onClose, isCreator, canKick, onK
   const open = !!playerId && playerId !== user?.id;
 
   useEffect(() => {
-    if (!playerId || playerId === user?.id) return;
+    if (!playerId || playerId === user?.id) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+    setProfile(null);
     setLoading(true);
 
     Promise.all([
