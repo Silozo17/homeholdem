@@ -48,7 +48,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const humanCardSize = compact ? 'lg' : 'xl';
 
   // --- Turn timer logic (nameplate-integrated) ---
-  const TIMER_DURATION = 45;
+  const TIMER_DURATION = 47.5; // Matches server grace period (45s deadline + 2.5s grace)
   const [timerElapsed, setTimerElapsed] = useState(0);
   const thirtySecFired = useRef(false);
   const criticalFired = useRef(false);

@@ -1125,6 +1125,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleTimeout = () => {
+    // Don't fire if an action is already in flight — player may have acted in the final seconds
+    if (actionPending) return;
     handleAction({ type: 'fold' });
     setShowStillPlayingPopup(true);
   };
