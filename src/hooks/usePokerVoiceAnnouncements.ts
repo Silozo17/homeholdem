@@ -3,165 +3,138 @@ import { useRef, useCallback, useState } from 'react';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-interface QueueItem {
-  message: string;
-  addedAt: number;
-}
+/** Module-level cache: survives re-renders, cleared on page refresh. */
+const VOICE_CACHE = new Map<string, string>();
+const MAX_CACHE = 30;
 
 /**
- * Voice announcements for multiplayer poker via ElevenLabs TTS.
- * Features: audio queue, LRU cache (20 entries), 3s dedup.
+ * Simplified voice announcements for multiplayer poker via ElevenLabs TTS.
+ * Single speak() entry point — no queue, no dedup set, no stale threshold.
  */
 export function usePokerVoiceAnnouncements() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const queueRef = useRef<QueueItem[]>([]);
-  const playingRef = useRef(false);
-  const cacheRef = useRef(new Map<string, string>()); // message -> data URI
-  const cacheOrderRef = useRef<string[]>([]); // LRU order
-  const announcedThisHandRef = useRef(new Set<string>());
-  const MAX_CACHE = 20;
-  const STALE_MS = 8000;
+  const isPlayingRef = useRef(false);
+  const precachedRef = useRef(false);
 
-  const addToCache = useCallback((key: string, value: string) => {
-    const cache = cacheRef.current;
-    const order = cacheOrderRef.current;
-    if (cache.has(key)) {
-      // Move to end (most recent)
-      const idx = order.indexOf(key);
-      if (idx > -1) order.splice(idx, 1);
-      order.push(key);
-      return;
+  const speak = useCallback(async (message: string) => {
+    if (!message) return;
+    // If already playing, silently drop — no queuing
+    if (isPlayingRef.current) return;
+
+    try {
+      isPlayingRef.current = true;
+
+      // Check cache first
+      let audioUri = VOICE_CACHE.get(message);
+
+      if (!audioUri) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ announcement: message }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error('Voice fetch failed');
+
+        const data = await res.json();
+        if (!data.audioContent) throw new Error('No audio content');
+
+        audioUri = `data:audio/mpeg;base64,${data.audioContent}`;
+
+        // Evict oldest if full
+        if (VOICE_CACHE.size >= MAX_CACHE) {
+          const firstKey = VOICE_CACHE.keys().next().value;
+          if (firstKey) VOICE_CACHE.delete(firstKey);
+        }
+        VOICE_CACHE.set(message, audioUri);
+      }
+
+      const audio = new Audio(audioUri);
+      await new Promise<void>((resolve) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+      });
+    } catch (err) {
+      console.warn('[voice] speak failed:', err);
+    } finally {
+      isPlayingRef.current = false;
     }
-    // Evict if full
-    while (cache.size >= MAX_CACHE && order.length > 0) {
-      const oldest = order.shift()!;
-      cache.delete(oldest);
-    }
-    cache.set(key, value);
-    order.push(key);
   }, []);
 
-  const fetchAudio = useCallback(async (message: string): Promise<string | null> => {
-    // Check cache first
-    const cached = cacheRef.current.get(message);
-    if (cached) return cached;
+  // --- Named announcement functions (same signatures as before) ---
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        body: JSON.stringify({ announcement: message }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data.audioContent) return null;
-      const dataUri = `data:audio/mpeg;base64,${data.audioContent}`;
-      addToCache(message, dataUri);
-      return dataUri;
-    } catch {
-      clearTimeout(timeoutId);
-      return null;
-    }
-  }, [addToCache]);
-
-  const processQueue = useCallback(async () => {
-    if (playingRef.current) return;
-    playingRef.current = true;
-    try {
-      while (queueRef.current.length > 0) {
-        const item = queueRef.current.shift()!;
-        // Skip stale items
-        if (Date.now() - item.addedAt > STALE_MS) continue;
-
-        const audioUri = await fetchAudio(item.message);
-        if (audioUri) {
-          try {
-            const audio = new Audio(audioUri);
-            await new Promise<void>((resolve) => {
-              audio.onended = () => resolve();
-              audio.onerror = () => resolve();
-              audio.play().catch((err) => { console.warn('[voice] play blocked:', err?.name, err?.message); resolve(); });
-            });
-          } catch { /* ignore playback errors */ }
-        }
-      }
-    } finally {
-      playingRef.current = false;
-      // Re-check: items may have been added during playback
-      if (queueRef.current.length > 0) {
-        processQueue();
-      }
-    }
-  }, [fetchAudio]);
-
-  const enqueue = useCallback((message: string) => {
-    if (!voiceEnabled) return;
-    // Never repeat same message within a hand
-    if (announcedThisHandRef.current.has(message)) return;
-    // Also skip if already in queue
-    if (queueRef.current.some(q => q.message === message)) return;
-    announcedThisHandRef.current.add(message);
-    queueRef.current.push({ message, addedAt: Date.now() });
-    processQueue();
-  }, [voiceEnabled, processQueue]);
-
-  // Pre-built announcement functions
   const announceBlindUp = useCallback((small: number, big: number) => {
-    enqueue(`Blinds are now ${small} and ${big}`);
-  }, [enqueue]);
+    speak(`Blinds are now ${small} and ${big}`);
+  }, [speak]);
 
   const announceWinner = useCallback((name: string, amount: number, handName?: string) => {
     const desc = handName ? ` with ${handName}` : '';
-    enqueue(`${name} wins ${amount} chips${desc}`);
-  }, [enqueue]);
+    speak(`${name} wins ${amount} chips${desc}`);
+  }, [speak]);
 
   const announceCountdown = useCallback(() => {
-    enqueue("Time is running out!");
-  }, [enqueue]);
+    speak('Time is running out!');
+  }, [speak]);
 
   const announceGameOver = useCallback((winnerName: string, isHero: boolean) => {
-    enqueue(isHero ? "Congratulations! You are the champion!" : `Game over! ${winnerName} takes it all!`);
-  }, [enqueue]);
+    speak(isHero ? 'Congratulations! You are the champion!' : `Game over! ${winnerName} takes it all!`);
+  }, [speak]);
 
   const announceCustom = useCallback((message: string) => {
-    enqueue(message);
-  }, [enqueue]);
+    speak(message);
+  }, [speak]);
 
-  const clearQueue = useCallback(() => {
-    queueRef.current = [];
-    announcedThisHandRef.current.clear();
-  }, []);
-
-  const resetHandDedup = useCallback(() => {
-    announcedThisHandRef.current.clear();
-  }, []);
+  // No-ops — kept for API compatibility with OnlinePokerTable.tsx
+  const clearQueue = useCallback(() => {}, []);
+  const resetHandDedup = useCallback(() => {}, []);
 
   const toggleVoice = useCallback(() => setVoiceEnabled(v => !v), []);
 
-  // Pre-cache common static phrases on first call
-  const precachedRef = useRef(false);
   const precache = useCallback(() => {
     if (precachedRef.current) return;
     precachedRef.current = true;
     const phrases = [
-      "Shuffling up and dealing",
-      "Time is running out!",
-      "All in! We have an all in!",
+      'Shuffling up and dealing',
+      'Time is running out!',
+      'Big pot building!',
       "We're heads up!",
-      "Big pot building!",
-      "Welcome to the table",
     ];
-    // Fire and forget - cache in background
-    phrases.forEach(p => fetchAudio(p));
-  }, [fetchAudio]);
+    // Fire and forget — populate cache in background
+    phrases.forEach(p => {
+      if (!VOICE_CACHE.has(p)) {
+        fetch(`${SUPABASE_URL}/functions/v1/tournament-announce`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ announcement: p }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (d?.audioContent) {
+              if (VOICE_CACHE.size >= MAX_CACHE) {
+                const firstKey = VOICE_CACHE.keys().next().value;
+                if (firstKey) VOICE_CACHE.delete(firstKey);
+              }
+              VOICE_CACHE.set(p, `data:audio/mpeg;base64,${d.audioContent}`);
+            }
+          })
+          .catch(() => {});
+      }
+    });
+  }, []);
 
   return {
     announceBlindUp,
