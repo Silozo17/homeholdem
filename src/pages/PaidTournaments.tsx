@@ -124,7 +124,7 @@ export default function PaidTournaments() {
           </div>
         </div>
       </header>
-      <div className="h-14 safe-area-top shrink-0" />
+      <div className="shrink-0" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} />
 
       <div className="flex-1 overflow-auto px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex items-center justify-between">
