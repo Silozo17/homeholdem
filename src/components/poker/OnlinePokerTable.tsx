@@ -844,15 +844,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     if (!gameOver || !user || xpSavedRef.current) return;
     const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
     const isWinner = (mySeatInfo?.stack ?? 0) > 0;
-    // Leave seat immediately so player is removed from seat but stays at table
-    leaveSeat().catch(() => {});
-    // Delay XP overlay so winner popup + confetti are visible for ~3.5s
-    // Use ref so tableState changes don't reset this timer
-    const timer = setTimeout(() => {
+    // Delay leaveSeat so the game over screen is fully visible first
+    // leaveSeat triggers refreshState which clears tableState and community cards
+    const leaveTimer = setTimeout(() => {
+      leaveSeat().catch(() => {});
+    }, 2500);
+    // XP save after a further 1 second (was 3.5s from gameOver, now 3.5s total)
+    const xpTimer = setTimeout(() => {
       saveXpAndStatsRef.current(isWinner);
     }, 3500);
-    return () => clearTimeout(timer);
-    // Intentionally exclude saveXpAndStats to prevent timer resets
+    return () => {
+      clearTimeout(leaveTimer);
+      clearTimeout(xpTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameOver, user]);
 
