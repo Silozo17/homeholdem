@@ -54,10 +54,26 @@ interface SheetContentProps
 }
 
 const safeAreaStyles: Record<string, React.CSSProperties> = {
-  top: { paddingTop: 'env(safe-area-inset-top, 0px)' },
-  bottom: { paddingBottom: 'env(safe-area-inset-bottom, 0px)' },
-  left: { paddingLeft: 'env(safe-area-inset-left, 0px)' },
-  right: { paddingRight: 'env(safe-area-inset-right, 0px)' },
+  top: {
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingLeft: 'env(safe-area-inset-left, 0px)',
+    paddingRight: 'env(safe-area-inset-right, 0px)',
+  },
+  bottom: {
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    paddingLeft: 'env(safe-area-inset-left, 0px)',
+    paddingRight: 'env(safe-area-inset-right, 0px)',
+  },
+  left: {
+    paddingLeft: 'env(safe-area-inset-left, 0px)',
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  },
+  right: {
+    paddingRight: 'env(safe-area-inset-right, 0px)',
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  },
 };
 
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
@@ -66,7 +82,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content ref={ref} onOpenAutoFocus={(e) => e.preventDefault()} className={cn(sheetVariants({ side }), className)} style={{ ...safeAreaStyles[side || 'right'], ...style }} {...props}>
         {children}
-        <SheetPrimitive.Close className="absolute top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none" style={{ right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right, 0px))' : '1rem' }}>
+        <SheetPrimitive.Close className="absolute p-2 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none" style={{ top: 'max(1rem, env(safe-area-inset-top, 0px))', right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right, 0px))' : side === 'left' ? 'calc(1rem + env(safe-area-inset-right, 0px))' : '1rem' }}>
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
