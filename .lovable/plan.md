@@ -1,35 +1,54 @@
 
 
-## Replace Voice Hook with Simplified Version
+## Two Surgical Fixes
 
-### File
-`src/hooks/usePokerVoiceAnnouncements.ts` — full file replacement (only file changed)
+### FIX 1 -- hand_complete showdown delay still hardcoded
 
-### What gets simplified
-- Remove: queue system (`queueRef`, `QueueItem`, `processQueue`, `enqueue`, `STALE_MS`)
-- Remove: per-hand dedup Set (`announcedThisHandRef`)
-- Remove: LRU cache refs (`cacheRef`, `cacheOrderRef`, `addToCache`)
-- Replace with: single `speak()` function, module-level `Map` cache, `isPlayingRef` guard
+**File:** `src/hooks/useOnlinePokerTable.ts`
 
-### What stays the same
-- All exported function names and signatures (no changes to OnlinePokerTable.tsx needed)
-- `clearQueue` and `resetHandDedup` become no-ops (no queue/dedup to manage)
-- `voiceEnabled` stays as `useState` for reactive UI rendering
-- `toggleVoice` stays as toggle function
-- `precache` keeps the `precachedRef` guard, fetches 4 common phrases
-- Edge function (`tournament-announce`) is untouched
-- Auth headers use `VITE_SUPABASE_PUBLISHABLE_KEY` as both `apikey` and `Authorization: Bearer` (matching existing codebase pattern)
+**Line 564:** Change comment from "Showdown cleanup at 12s" to "Showdown cleanup -- dynamic delay"
 
-### Core design
-- `speak(message)` is the single entry point
-- If already playing (`isPlayingRef.current`), new calls are silently dropped — no queuing
-- Module-level `Map` cache (survives re-renders, cleared on page refresh), capped at 30 entries
-- 5s fetch timeout via AbortController
-- Failures log a warning and return silently
+**Line 577:** Replace `12000` with `winnerDelay + 4000`
 
-### Verification
-1. All-in: other players hear "[Name] is all in", acting player hears nothing
-2. Winner overlay: voice announces ~400ms later (delay controlled by OnlinePokerTable.tsx effect)
-3. Game over screen: voice fires at same moment (controlled by OnlinePokerTable.tsx timer)
-4. Sound dropdown: voice toggle icon updates reactively
-5. Slow network: voice fails silently within 5s, gameplay never blocked
+`winnerDelay` is already calculated at line 560 in the same handler, so this is a direct reference.
+
+---
+
+### FIX 2 -- Timer visual resetting on every parent render
+
+**File:** `src/components/poker/OnlinePokerTable.tsx`
+
+**Step A:** Add a `useCallback` near `handleLowTime` (after line 932):
+
+```typescript
+const handleTimeout = useCallback(() => {
+  handleAction({ type: 'fold' });
+  setShowStillPlayingPopup(true);
+}, [handleAction]);
+```
+
+**Step B:** At lines 1553-1556, replace the inline arrow function:
+
+```typescript
+// Before
+onTimeout={isMe && isCurrentActor ? () => {
+  handleAction({ type: 'fold' });
+  setShowStillPlayingPopup(true);
+} : undefined}
+
+// After
+onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
+```
+
+---
+
+### Technical Summary
+
+| Fix | File | Lines | Change |
+|-----|------|-------|--------|
+| 1 | useOnlinePokerTable.ts | 564, 577 | `12000` to `winnerDelay + 4000` |
+| 2a | OnlinePokerTable.tsx | after 932 | Add `handleTimeout` useCallback |
+| 2b | OnlinePokerTable.tsx | 1553-1556 | Use `handleTimeout` ref instead of inline fn |
+
+No other files or lines are touched.
+
