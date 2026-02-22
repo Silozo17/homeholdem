@@ -845,7 +845,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const newCount = communityCards.length;
 
     // Do not clear cards if hand just ended — keep them visible until game over screen shows
-    if (newCount === 0 && !gameOver) return;
+    if (newCount === 0 && handWinners.length > 0) return;
 
     if (newCount > prevCount && (newCount - prevCount) > 1) {
       stagedRunoutRef.current.forEach(t => clearTimeout(t));
@@ -868,7 +868,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       stagedRunoutRef.current = [];
       prevCommunityCountRef.current = 0;
     }
-  }, [tableState?.current_hand?.community_cards, gameOver]);
+  }, [tableState?.current_hand?.community_cards, handWinners]);
 
   useEffect(() => {
     return () => { stagedRunoutRef.current.forEach(t => clearTimeout(t)); };

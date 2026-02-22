@@ -440,9 +440,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           };
         });
 
-        // Set showdown cleanup — fixed 12s to outlast winner display + game over detection
+        // Set showdown cleanup — dynamic delay based on winnerDelay + buffer for overlay display
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
-        const showdownDelay = 12000;
+        const showdownDelay = winnerDelay + 4000;
 
         showdownTimerRef.current = setTimeout(() => {
           if (!gameOverPendingRef.current) {
