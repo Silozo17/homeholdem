@@ -9,7 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Logo } from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
-import { Settings, Users, ChevronRight, BarChart3, Trophy, Target, Flame, Crown, Shield, Pencil, Check, X, Globe, MessageSquare, UserPlus, Swords, Zap, RotateCcw, Sparkles, Stars, Grid2x2, Home, Coins, Dumbbell, MessageCircle, ShieldCheck, Sword, Medal, Droplets, ArrowRight, Lock, TrendingUp } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import {
+  Settings, Users, ChevronRight, ChevronDown, BarChart3, Trophy, Target, Flame, Crown, Shield,
+  Pencil, Check, X, Globe, MessageSquare, UserPlus, Swords, Zap, RotateCcw, Sparkles, Stars,
+  Grid2x2, Home, Coins, Dumbbell, MessageCircle, ShieldCheck, Sword, Medal, Droplets, ArrowRight,
+  Lock, TrendingUp, Play, Spade, Pickaxe, Timer, Infinity, Star, Award, Gem, Calendar,
+  CalendarCheck, Clock, Eye, Copy, Boxes, Hammer, Link, Rocket, HeartPulse, ShieldAlert, EyeOff,
+  Skull, Flag, LayoutGrid,
+} from 'lucide-react';
 import { ACHIEVEMENTS, ACHIEVEMENT_XP } from '@/lib/poker/achievements';
 import { COUNTRIES, isoToEmoji } from '@/lib/countries';
 import { CountrySelector } from '@/components/profile/CountrySelector';
@@ -46,13 +54,68 @@ interface QuickStats {
   clubCount: number;
 }
 
-interface Achievement {
+interface AchievementDisplay {
   id: string;
   name: string;
   description: string;
   icon: React.ReactNode;
   unlocked: boolean;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  Swords: <Swords className="h-5 w-5" />,
+  Flame: <Flame className="h-5 w-5" />,
+  Zap: <Zap className="h-5 w-5" />,
+  Crown: <Crown className="h-5 w-5" />,
+  Shield: <Shield className="h-5 w-5" />,
+  TrendingUp: <TrendingUp className="h-5 w-5" />,
+  RotateCcw: <RotateCcw className="h-5 w-5" />,
+  Sparkles: <Sparkles className="h-5 w-5" />,
+  Stars: <Stars className="h-5 w-5" />,
+  Grid2x2: <Grid2x2 className="h-5 w-5" />,
+  Home: <Home className="h-5 w-5" />,
+  Coins: <Coins className="h-5 w-5" />,
+  Dumbbell: <Dumbbell className="h-5 w-5" />,
+  MessageCircle: <MessageCircle className="h-5 w-5" />,
+  Trophy: <Trophy className="h-5 w-5" />,
+  ShieldCheck: <ShieldCheck className="h-5 w-5" />,
+  Sword: <Sword className="h-5 w-5" />,
+  Medal: <Medal className="h-5 w-5" />,
+  Droplets: <Droplets className="h-5 w-5" />,
+  ArrowRight: <ArrowRight className="h-5 w-5" />,
+  Play: <Play className="h-5 w-5" />,
+  Spade: <Spade className="h-5 w-5" />,
+  Pickaxe: <Pickaxe className="h-5 w-5" />,
+  Timer: <Timer className="h-5 w-5" />,
+  Infinity: <Infinity className="h-5 w-5" />,
+  Star: <Star className="h-5 w-5" />,
+  Award: <Award className="h-5 w-5" />,
+  Gem: <Gem className="h-5 w-5" />,
+  Calendar: <Calendar className="h-5 w-5" />,
+  CalendarCheck: <CalendarCheck className="h-5 w-5" />,
+  Clock: <Clock className="h-5 w-5" />,
+  Eye: <Eye className="h-5 w-5" />,
+  Copy: <Copy className="h-5 w-5" />,
+  Boxes: <Boxes className="h-5 w-5" />,
+  Hammer: <Hammer className="h-5 w-5" />,
+  Link: <Link className="h-5 w-5" />,
+  Rocket: <Rocket className="h-5 w-5" />,
+  HeartPulse: <HeartPulse className="h-5 w-5" />,
+  ShieldAlert: <ShieldAlert className="h-5 w-5" />,
+  EyeOff: <EyeOff className="h-5 w-5" />,
+  Skull: <Skull className="h-5 w-5" />,
+  Flag: <Flag className="h-5 w-5" />,
+  LayoutGrid: <LayoutGrid className="h-5 w-5" />,
+  MessageSquare: <MessageSquare className="h-5 w-5" />,
+};
+
+const RARITY_COLORS: Record<string, { border: string; bg: string; text: string }> = {
+  common: { border: 'border-border/50', bg: 'bg-muted/20', text: 'text-muted-foreground' },
+  rare: { border: 'border-blue-500/40', bg: 'bg-blue-500/10', text: 'text-blue-400' },
+  epic: { border: 'border-purple-500/40', bg: 'bg-purple-500/10', text: 'text-purple-400' },
+  legendary: { border: 'border-amber-400/50', bg: 'bg-amber-400/10', text: 'text-amber-400' },
+};
 
 export default function Profile() {
   const { t, i18n } = useTranslation();
@@ -65,13 +128,19 @@ export default function Profile() {
     totalWins: 0,
     clubCount: 0,
   });
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [achievements, setAchievements] = useState<AchievementDisplay[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [editingCountry, setEditingCountry] = useState(false);
+  const [openRarities, setOpenRarities] = useState<Record<string, boolean>>({
+    common: false,
+    rare: false,
+    epic: false,
+    legendary: false,
+  });
   const { isAdmin } = useIsAppAdmin();
   const levelData = usePlayerLevel(user?.id);
 
@@ -130,7 +199,6 @@ export default function Profile() {
     if (!user) return;
     setLoadingData(true);
 
-    // Fetch profile
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -141,7 +209,6 @@ export default function Profile() {
       setProfile(profileData);
     }
 
-    // Fetch club memberships
     const { data: memberships } = await supabase
       .from('club_members')
       .select('club_id, role, clubs(id, name)')
@@ -155,7 +222,6 @@ export default function Profile() {
       })));
     }
 
-    // Find placeholder players linked to this user
     const { data: linkedPlaceholders } = await supabase
       .from('placeholder_players')
       .select('id')
@@ -163,7 +229,6 @@ export default function Profile() {
 
     const placeholderIds = linkedPlaceholders?.map(p => p.id) || [];
 
-    // Fetch quick game statistics
     let gamePlayersQuery = supabase
       .from('game_players')
       .select('id, finish_position');
@@ -184,62 +249,7 @@ export default function Profile() {
 
     setQuickStats({ totalGames, totalWins, clubCount });
 
-    // Calculate club achievements
-    const clubAchievements: Achievement[] = [
-      {
-        id: 'first_game',
-        name: t('profile.achievements.first_game'),
-        description: t('profile.achievements.first_game_desc'),
-        icon: <Target className="h-5 w-5" />,
-        unlocked: totalGames >= 1,
-      },
-      {
-        id: 'club_first_win',
-        name: t('profile.achievements.first_win'),
-        description: t('profile.achievements.first_win_desc'),
-        icon: <Trophy className="h-5 w-5" />,
-        unlocked: totalWins >= 1,
-      },
-      {
-        id: 'five_games',
-        name: t('profile.achievements.five_games'),
-        description: t('profile.achievements.five_games_desc'),
-        icon: <Flame className="h-5 w-5" />,
-        unlocked: totalGames >= 5,
-      },
-      {
-        id: 'three_wins',
-        name: t('profile.achievements.three_wins'),
-        description: t('profile.achievements.three_wins_desc'),
-        icon: <Trophy className="h-5 w-5 text-primary" />,
-        unlocked: totalWins >= 3,
-      },
-    ];
-
-    // Load multiplayer poker achievements from localStorage
-    const ICON_MAP: Record<string, React.ReactNode> = {
-      Swords: <Swords className="h-5 w-5" />,
-      Flame: <Flame className="h-5 w-5" />,
-      Zap: <Zap className="h-5 w-5" />,
-      Crown: <Crown className="h-5 w-5" />,
-      Shield: <Shield className="h-5 w-5" />,
-      TrendingUp: <TrendingUp className="h-5 w-5" />,
-      RotateCcw: <RotateCcw className="h-5 w-5" />,
-      Sparkles: <Sparkles className="h-5 w-5" />,
-      Stars: <Stars className="h-5 w-5" />,
-      Grid2x2: <Grid2x2 className="h-5 w-5" />,
-      Home: <Home className="h-5 w-5" />,
-      Coins: <Coins className="h-5 w-5" />,
-      Dumbbell: <Dumbbell className="h-5 w-5" />,
-      MessageCircle: <MessageCircle className="h-5 w-5" />,
-      Trophy: <Trophy className="h-5 w-5" />,
-      ShieldCheck: <ShieldCheck className="h-5 w-5" />,
-      Sword: <Sword className="h-5 w-5" />,
-      Medal: <Medal className="h-5 w-5" />,
-      Droplets: <Droplets className="h-5 w-5" />,
-      ArrowRight: <ArrowRight className="h-5 w-5" />,
-    };
-
+    // Build achievements list from the ACHIEVEMENTS constant
     let unlockedIds: Set<string> = new Set();
     try {
       const raw = localStorage.getItem('poker-achievements');
@@ -249,19 +259,49 @@ export default function Profile() {
       }
     } catch {}
 
-    const RARITY_STYLES: Record<string, string> = {
-      common: 'border-border/50',
-      rare: 'border-blue-500/40',
-      epic: 'border-purple-500/40',
-      legendary: 'border-amber-400/50',
-    };
+    // Club-based achievements (always shown as common)
+    const clubAchievements: AchievementDisplay[] = [
+      {
+        id: 'club_first_game',
+        name: t('profile.achievements.first_game'),
+        description: t('profile.achievements.first_game_desc'),
+        icon: <Target className="h-5 w-5" />,
+        unlocked: totalGames >= 1,
+        rarity: 'common',
+      },
+      {
+        id: 'club_first_win',
+        name: t('profile.achievements.first_win'),
+        description: t('profile.achievements.first_win_desc'),
+        icon: <Trophy className="h-5 w-5" />,
+        unlocked: totalWins >= 1,
+        rarity: 'common',
+      },
+      {
+        id: 'club_five_games',
+        name: t('profile.achievements.five_games'),
+        description: t('profile.achievements.five_games_desc'),
+        icon: <Flame className="h-5 w-5" />,
+        unlocked: totalGames >= 5,
+        rarity: 'common',
+      },
+      {
+        id: 'club_three_wins',
+        name: t('profile.achievements.three_wins'),
+        description: t('profile.achievements.three_wins_desc'),
+        icon: <Trophy className="h-5 w-5 text-primary" />,
+        unlocked: totalWins >= 3,
+        rarity: 'common',
+      },
+    ];
 
-    const pokerAchievements: Achievement[] = ACHIEVEMENTS.map(ach => ({
+    const pokerAchievements: AchievementDisplay[] = ACHIEVEMENTS.map(ach => ({
       id: `mp_${ach.id}`,
       name: ach.title,
       description: `${ach.description}${ACHIEVEMENT_XP[ach.id] ? ` (+${ACHIEVEMENT_XP[ach.id].toLocaleString()} XP)` : ''}`,
       icon: ICON_MAP[ach.icon] || <Trophy className="h-5 w-5" />,
       unlocked: unlockedIds.has(ach.id),
+      rarity: ach.rarity,
     }));
 
     setAchievements([...clubAchievements, ...pokerAchievements]);
@@ -284,6 +324,20 @@ export default function Profile() {
         return 'outline';
     }
   };
+
+  const toggleRarity = (rarity: string) => {
+    setOpenRarities(prev => ({ ...prev, [rarity]: !prev[rarity] }));
+  };
+
+  // Group achievements by rarity
+  const grouped = {
+    common: achievements.filter(a => a.rarity === 'common'),
+    rare: achievements.filter(a => a.rarity === 'rare'),
+    epic: achievements.filter(a => a.rarity === 'epic'),
+    legendary: achievements.filter(a => a.rarity === 'legendary'),
+  };
+
+  const totalUnlocked = achievements.filter(a => a.unlocked).length;
 
   if (loading || loadingData) {
     return (
@@ -312,7 +366,6 @@ export default function Profile() {
           </div>
         </div>
       </header>
-      {/* Header spacer */}
       <div className="h-16 safe-area-top" />
 
       <main className="container px-4 py-6 space-y-6">
@@ -492,32 +545,64 @@ export default function Profile() {
         {/* Achievements */}
         <Card className="bg-card/50 border-border/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              {t('profile.achievements.title')}
+            <CardTitle className="text-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                {t('profile.achievements.title')}
+              </div>
+              <span className="text-sm font-normal text-muted-foreground">
+                {totalUnlocked} / {achievements.length}
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {achievements.map((achievement) => (
-                <div
-                  key={achievement.id}
-                  className={`p-3 rounded-lg border ${
-                    achievement.unlocked
-                      ? 'bg-primary/10 border-primary/30'
-                      : 'bg-muted/30 border-border/50 opacity-50'
-                  }`}
+          <CardContent className="space-y-3">
+            {(['legendary', 'epic', 'rare', 'common'] as const).map((rarity) => {
+              const items = grouped[rarity];
+              if (items.length === 0) return null;
+              const unlockedCount = items.filter(a => a.unlocked).length;
+              const colors = RARITY_COLORS[rarity];
+              const sortedItems = [...items].sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
+
+              return (
+                <Collapsible
+                  key={rarity}
+                  open={openRarities[rarity]}
+                  onOpenChange={() => toggleRarity(rarity)}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={achievement.unlocked ? 'text-primary' : 'text-muted-foreground'}>
-                      {achievement.icon}
+                  <CollapsibleTrigger asChild>
+                    <button className={`w-full flex items-center justify-between p-3 rounded-lg border ${colors.border} ${colors.bg} hover:opacity-90 transition-opacity`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-semibold capitalize ${colors.text}`}>{rarity}</span>
+                        <span className="text-xs text-muted-foreground">({unlockedCount}/{items.length})</span>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openRarities[rarity] ? 'rotate-180' : ''}`} />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {sortedItems.map((achievement) => (
+                        <div
+                          key={achievement.id}
+                          className={`p-3 rounded-lg border ${
+                            achievement.unlocked
+                              ? `bg-primary/10 border-primary/30`
+                              : 'bg-muted/30 border-border/50 opacity-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className={achievement.unlocked ? 'text-primary' : 'text-muted-foreground'}>
+                              {achievement.icon}
+                            </div>
+                            <span className="text-sm font-medium truncate">{achievement.name}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{achievement.description}</p>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-sm font-medium">{achievement.name}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                </div>
-              ))}
-            </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </CardContent>
         </Card>
 
