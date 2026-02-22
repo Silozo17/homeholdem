@@ -65,7 +65,7 @@ export const PlayerSeat = memo(function PlayerSeat({
           thirtySecFired.current = false;
           criticalFired.current = false;
         }
-      }, 200);
+}, 1500);
       timerActiveRef.current = false;
       return () => {
         if (timerResetTimeoutRef.current) clearTimeout(timerResetTimeoutRef.current);
