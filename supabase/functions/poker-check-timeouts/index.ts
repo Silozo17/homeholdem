@@ -43,8 +43,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ── 1. Find stuck hands (deadline passed by 10s+) ──
-    const cutoff = new Date(Date.now() - 5_000).toISOString();
+    // ── 1. Find stuck hands (deadline passed by 5s + 2.5s grace period = 7.5s+) ──
+    const GRACE_PERIOD_MS = 2500;
+    const cutoff = new Date(Date.now() - 5_000 - GRACE_PERIOD_MS).toISOString();
 
     const { data: stuckHands, error } = await admin
       .from("poker_hands")

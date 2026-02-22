@@ -1118,6 +1118,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     try {
       await sendAction(actionType, action.amount);
     } catch (err: any) {
+      // Silently swallow action_superseded — action raced with timeout, not a real error
+      if (err?.message?.includes('action_superseded')) return;
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     }
   };

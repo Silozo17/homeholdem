@@ -53,14 +53,28 @@ export const PlayerSeat = memo(function PlayerSeat({
   const thirtySecFired = useRef(false);
   const criticalFired = useRef(false);
   const isTimerActive = isCurrentPlayer && !isOut;
+  const timerActiveRef = useRef(false);
+  const timerResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isTimerActive) {
-      setTimerElapsed(0);
-      thirtySecFired.current = false;
-      criticalFired.current = false;
-      return;
+      // Don't reset immediately — wait 200ms to filter out single-render flickers
+      timerResetTimeoutRef.current = setTimeout(() => {
+        if (!timerActiveRef.current) {
+          setTimerElapsed(0);
+          thirtySecFired.current = false;
+          criticalFired.current = false;
+        }
+      }, 200);
+      timerActiveRef.current = false;
+      return () => {
+        if (timerResetTimeoutRef.current) clearTimeout(timerResetTimeoutRef.current);
+      };
     }
+
+    // Cancel any pending reset
+    if (timerResetTimeoutRef.current) clearTimeout(timerResetTimeoutRef.current);
+    timerActiveRef.current = true;
 
     // Anchor to server deadline if available, otherwise fall back to local start
     const deadlineMs = actionDeadline ? new Date(actionDeadline).getTime() : null;
@@ -98,7 +112,10 @@ export const PlayerSeat = memo(function PlayerSeat({
       }
     }, 200);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      timerActiveRef.current = false;
+    };
   }, [isTimerActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerProgress = isTimerActive ? Math.min(timerElapsed / TIMER_DURATION, 1) : 0;
