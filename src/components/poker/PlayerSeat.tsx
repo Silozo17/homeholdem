@@ -26,7 +26,8 @@ interface PlayerSeatProps {
   disableDealAnim?: boolean;
   actionDeadline?: string | null;
   onTimeout?: () => void;
-  onLowTime?: () => void;
+  onThirtySeconds?: () => void;
+  onCriticalTime?: () => void;
   isDisconnected?: boolean;
   isSpeaking?: boolean;
   onClick?: () => void;
@@ -39,7 +40,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onLowTime, isDisconnected = false, isSpeaking = false, onClick,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onThirtySeconds, onCriticalTime, isDisconnected = false, isSpeaking = false, onClick,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -49,13 +50,15 @@ export const PlayerSeat = memo(function PlayerSeat({
   // --- Turn timer logic (nameplate-integrated) ---
   const TIMER_DURATION = 45;
   const [timerElapsed, setTimerElapsed] = useState(0);
-  const lowTimeFired = useRef(false);
+  const thirtySecFired = useRef(false);
+  const criticalFired = useRef(false);
   const isTimerActive = isCurrentPlayer && !isOut;
 
   useEffect(() => {
     if (!isTimerActive) {
       setTimerElapsed(0);
-      lowTimeFired.current = false;
+      thirtySecFired.current = false;
+      criticalFired.current = false;
       return;
     }
 
@@ -73,7 +76,8 @@ export const PlayerSeat = memo(function PlayerSeat({
 
     // Set immediately so there's no visual jump on first render
     setTimerElapsed(getElapsed());
-    lowTimeFired.current = false;
+    thirtySecFired.current = false;
+    criticalFired.current = false;
 
     const interval = setInterval(() => {
       const secs = getElapsed();
@@ -83,9 +87,13 @@ export const PlayerSeat = memo(function PlayerSeat({
         onTimeout?.();
       } else {
         setTimerElapsed(secs);
-        if (!lowTimeFired.current && (TIMER_DURATION - secs) <= 5) {
-          lowTimeFired.current = true;
-          onLowTime?.();
+        if (!thirtySecFired.current && (TIMER_DURATION - secs) <= 30) {
+          thirtySecFired.current = true;
+          onThirtySeconds?.();
+        }
+        if (!criticalFired.current && (TIMER_DURATION - secs) <= 5) {
+          criticalFired.current = true;
+          onCriticalTime?.();
         }
       }
     }, 200);

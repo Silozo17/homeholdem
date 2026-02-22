@@ -149,7 +149,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
-  const [lowTimeWarning, setLowTimeWarning] = useState(false);
+  const [criticalTimeActive, setCriticalTimeActive] = useState(false);
+  const [criticalCountdown, setCriticalCountdown] = useState(5);
   const [visibleCommunityCards, setVisibleCommunityCards] = useState<Card[]>([]);
   const [preAction, setPreAction] = useState<PreActionType>(null);
   const prevBetRef = useRef<number>(0);
@@ -403,6 +404,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const currentHandId = hand.hand_id;
     if (currentHandId && currentHandId !== prevAnimHandIdRef.current && hand.phase === 'preflop') {
       handsPlayedRef.current++;
+      bigPotAnnouncedRef.current = false;
       const players: HandPlayerSnapshot[] = (tableState?.seats ?? [])
         .filter(s => s.player_id)
         .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
@@ -652,7 +654,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       }
     }
     prevIsMyTurnRef.current = isMyTurn;
-    if (!isMyTurn) setLowTimeWarning(false);
+    if (!isMyTurn) {
+      setCriticalTimeActive(false);
+    }
   }, [isMyTurn, play, haptic, preAction, amountToCall]);
 
   // Clear pre-action and card peek on new hand
@@ -908,16 +912,42 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => clearTimeout(timer);
   }, [handWinners, tableState, mySeatNumber]);
 
-  // Low time callback
-  const handleLowTime = useCallback(() => {
+  // 30-second warning: sound only
+  const handleThirtySeconds = useCallback(() => {
     if (isMyTurn) {
-      setLowTimeWarning(true);
+      play('timerWarning');
+      if ('vibrate' in navigator) navigator.vibrate([100]);
+    }
+  }, [isMyTurn, play]);
+
+  // 5-second critical warning: red overlay + voice
+  const handleCriticalTime = useCallback(() => {
+    if (isMyTurn) {
+      setCriticalTimeActive(true);
       play('timerWarning');
       announceCountdown();
-      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-      setTimeout(() => setLowTimeWarning(false), 2500);
+      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
     }
   }, [isMyTurn, play, announceCountdown]);
+
+  // Critical countdown timer
+  useEffect(() => {
+    if (!criticalTimeActive) {
+      setCriticalCountdown(5);
+      return;
+    }
+    const deadline = tableState?.current_hand?.action_deadline;
+    if (!deadline) return;
+    const deadlineMs = new Date(deadline).getTime();
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+      setCriticalCountdown(remaining);
+      if (remaining <= 0) clearInterval(interval);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [criticalTimeActive, tableState?.current_hand?.action_deadline]);
 
 
   const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
@@ -1546,7 +1576,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                     handleAction({ type: 'fold' });
                     setShowStillPlayingPopup(true);
                   } : undefined}
-                  onLowTime={isMe && isCurrentActor ? handleLowTime : undefined}
+                  onThirtySeconds={isMe && isCurrentActor ? handleThirtySeconds : undefined}
+                  onCriticalTime={isMe && isCurrentActor ? handleCriticalTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
                   onClick={!isMe && seatData!.player_id ? () => setSelectedPlayer(seatData!.player_id!) : undefined}
@@ -1579,12 +1610,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* 5 SEC LEFT warning */}
-      {lowTimeWarning && (
-        <div className="absolute pointer-events-none animate-low-time-pill" style={{ top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS + 1 }}>
-          <span className="text-[11px] px-4 py-1.5 rounded-full font-black"
-            style={{ background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.8), hsl(0 70% 40% / 0.6))', color: 'hsl(0 0% 100%)', border: '1px solid hsl(0 70% 50% / 0.6)', textShadow: '0 0 8px hsl(0 70% 50% / 0.8)', animation: 'low-time-pulse 0.5s ease-in-out infinite' }}>
-            {t('poker_table.five_sec_left')}
+      {/* Critical time red pulsing border overlay */}
+      {criticalTimeActive && (
+        <div className="absolute inset-0 pointer-events-none rounded-lg" style={{ zIndex: Z.ACTIONS + 2, animation: 'pulse-red 0.6s ease-in-out infinite alternate', border: '3px solid hsl(0 70% 50% / 0.7)' }} />
+      )}
+
+      {/* Critical countdown display */}
+      {criticalTimeActive && (
+        <div className="absolute pointer-events-none" style={{ top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS + 3 }}>
+          <span className="text-[14px] px-5 py-2 rounded-full font-black"
+            style={{ background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.85), hsl(0 70% 35% / 0.7))', color: 'hsl(0 0% 100%)', border: '1px solid hsl(0 70% 50% / 0.6)', textShadow: '0 0 12px hsl(0 70% 50% / 0.9)', animation: 'pulse-red-text 0.5s ease-in-out infinite alternate' }}>
+            00:0{criticalCountdown} left
           </span>
         </div>
       )}
