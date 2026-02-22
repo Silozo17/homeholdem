@@ -1126,6 +1126,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
+  const handleTimeout = () => {
+    handleAction({ type: 'fold' });
+    setShowStillPlayingPopup(true);
+  };
 
 
   const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
@@ -1572,10 +1576,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
                   actionDeadline={isCurrentActor ? tableState?.current_hand?.action_deadline : null}
-                  onTimeout={isMe && isCurrentActor ? () => {
-                    handleAction({ type: 'fold' });
-                    setShowStillPlayingPopup(true);
-                  } : undefined}
+                  onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
                   onThirtySeconds={isMe && isCurrentActor ? handleThirtySeconds : undefined}
                   onCriticalTime={isMe && isCurrentActor ? handleCriticalTime : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
@@ -1620,7 +1621,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         <div className="absolute pointer-events-none" style={{ top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: Z.ACTIONS + 3 }}>
           <span className="text-[14px] px-5 py-2 rounded-full font-black"
             style={{ background: 'linear-gradient(135deg, hsl(0 70% 50% / 0.85), hsl(0 70% 35% / 0.7))', color: 'hsl(0 0% 100%)', border: '1px solid hsl(0 70% 50% / 0.6)', textShadow: '0 0 12px hsl(0 70% 50% / 0.9)', animation: 'pulse-red-text 0.5s ease-in-out infinite alternate' }}>
-            00:0{criticalCountdown} left
+            {`00:${String(criticalCountdown).padStart(2, '0')} left`}
           </span>
         </div>
       )}
