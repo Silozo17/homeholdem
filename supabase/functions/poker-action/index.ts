@@ -381,6 +381,11 @@ async function processAction(
   } else if (activePlayers.length === 0) {
     // All remaining players are all-in — run out community cards
     roundComplete = true;
+  } else if (activePlayers.length === 1 && allInPlayers.length > 0) {
+    // One active player vs all-in players — they have no one to bet against
+    // Check their bet is covered then run out cards
+    const allBetsEqual = activePlayers.every(p => p.current_round_bet === newCurrentBet);
+    if (allBetsEqual) roundComplete = true;
   } else {
     // Check if all active players have acted and bets are equal
     const allActed = activePlayers.every(p => p.has_acted_this_round);
@@ -421,7 +426,7 @@ async function processAction(
     }
 
     // If all active players are all-in, run out all remaining cards
-    if (activePlayers.length === 0 && allInPlayers.length > 0 && nonFolded.length > 1) {
+    if (activePlayers.length <= 1 && allInPlayers.length > 0 && nonFolded.length > 1) {
       // Run out all community cards at once
       while (communityCards.length < 5) {
         communityCards.push(deck[deckOffset + communityCards.length]);
