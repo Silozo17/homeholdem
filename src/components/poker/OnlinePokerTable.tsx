@@ -557,14 +557,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   }, [handWinners, tableState?.seats, tableState?.current_hand]);
 
   // FIX 2: Voice announce hand winners with debug log
+  // Snapshot winners and remove cleanup to prevent re-render cancellation
   useEffect(() => {
     if (handWinners.length === 0 || !user) return;
     play('win');
     haptic('win');
 
-    const timer = setTimeout(() => {
-      for (const winner of handWinners) {
-        const isHero = winner.player_id === user.id;
+    const winnersSnapshot = [...handWinners];
+    const userId = user.id;
+    setTimeout(() => {
+      for (const winner of winnersSnapshot) {
+        const isHero = winner.player_id === userId;
         const name = isHero ? 'You' : winner.display_name;
         const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
           ? winner.hand_name
@@ -574,9 +577,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         announceCustom(message);
       }
     }, 400);
-
-    return () => clearTimeout(timer);
-  }, [handWinners, user, announceCustom]);
+    // No cleanup — timer must survive re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handWinners.length > 0, user?.id]);
 
    // FIX 3: Voice detect all-in from lastActions with debug log
   useEffect(() => {
@@ -747,8 +750,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       gameOverPendingRef.current = true;
       const snapshotWinners = [...handWinners];
       const winner = snapshotWinners[0];
-      announceGameOver(winner?.display_name || 'Unknown', false);
       const timer = setTimeout(() => {
+        announceGameOver(winner?.display_name || 'Unknown', false);
         setGameOver(true);
         setGameOverWinners(snapshotWinners);
       }, 2000);
@@ -774,8 +777,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const handPhase = tableState.current_hand?.phase;
     if (handPhase && handPhase !== 'complete') return;
 
-    announceGameOver('You', true);
     const timer = setTimeout(() => {
+      announceGameOver('You', true);
       setGameOver(true);
       setGameOverWinners([{
         player_id: user.id,

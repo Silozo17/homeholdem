@@ -451,9 +451,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
             setHandWinners([]);
             pendingWinnersRef.current = null;
             setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
+            setMyCards(null);
+            setRevealedCards([]);
           }
-          setMyCards(null);
-          setRevealedCards([]);
           runoutCompleteTimeRef.current = 0; // Fix 5: Clear on hand reset
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
