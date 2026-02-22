@@ -1,67 +1,116 @@
 
 
-# Fix: Drawer Safe Areas and Close Button in Landscape Mode
+# Plan: Fix Dashboard Stats, Clear Test Data, Expand Achievements
 
-## Problem
+## 1. Dashboard Stats Fix
 
-All Sheet/drawer components share the same base `SheetContent` in `sheet.tsx`, which has two fundamental issues in landscape mode on mobile:
+**Problem**: The "Net Profit" stat sums `(final_chips - starting_chips)` across all multiplayer games. Since these are play-money chips and most games end at 0 (busted), this produces large negative numbers that look broken.
 
-1. **Close button is untappable**: The X button is a bare 16x16 icon with zero padding -- far below the recommended 44x44 minimum tap target. In landscape, it sits right against the screen edge (notch/sensor housing area), making it physically impossible to tap.
+**Fix in `src/pages/Dashboard.tsx`** (lines 161-164):
+- Replace cumulative chip P&L with **Win Rate** percentage
+- Calculation: `Math.round((wins / games) * 100) + '%'`
+- Update label from "Net" to "Win Rate"
 
-2. **Only one safe-area inset is applied per side**: The `safeAreaStyles` map applies `padding-left` for left sheets, `padding-right` for right sheets, etc. But in landscape mode, a left-side sheet also needs `padding-top` (for the notch) and `padding-bottom`. Similarly, right-side sheets need all three. Currently, content gets clipped behind the notch/status bar area.
+No changes to `QuickStatsStrip.tsx` needed -- it already accepts a string value.
 
-## Root Cause (in `sheet.tsx`)
+---
 
-```text
-safeAreaStyles = {
-  left:  { paddingLeft: 'env(safe-area-inset-left)' },   // missing top + bottom
-  right: { paddingRight: 'env(safe-area-inset-right)' },  // missing top + bottom
-  top:   { paddingTop: 'env(safe-area-inset-top)' },      // missing left + right
-  bottom:{ paddingBottom: 'env(safe-area-inset-bottom)' }, // missing left + right
-};
+## 2. Clear Test Data (Targeted)
+
+Based on analysis of the database:
+- **Admin** (`f42473bf-...`) has **34 records** -- ALL from testing. Delete all of them.
+- **Amir** (`9255cdbf-...`) has **77 records total**: 28 are from games with Admin (matched within 30 seconds), 49 are from legitimate games with other players or bots. Delete ONLY the 28 matched ones.
+
+**SQL operations (data tool, not migration):**
+
+```sql
+-- Step 1: Delete Admin's 34 test records entirely
+DELETE FROM poker_play_results
+WHERE user_id = 'f42473bf-b67d-4215-be01-3030648499ed';
+
+-- Step 2: Delete ONLY Amir's 28 records that match Admin games
+DELETE FROM poker_play_results a
+WHERE a.user_id = '9255cdbf-e1ee-4fd0-b099-3bf8dd7a4291'
+AND EXISTS (
+  SELECT 1 FROM poker_play_results b
+  WHERE b.user_id = 'f42473bf-b67d-4215-be01-3030648499ed'
+  AND abs(extract(epoch from a.created_at - b.created_at)) < 30
+);
 ```
 
-And the close button:
-```text
-<SheetPrimitive.Close className="absolute top-4 ..."
-  style={{ right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right))' : '1rem' }}>
-  <X className="h-4 w-4" />   // 16x16, no padding = untappable
-</SheetPrimitive.Close>
+Note: Amir's deletion must run BEFORE Admin's deletion (otherwise the join has nothing to match against). These will be run as two sequential operations.
+
+Also clear Admin's XP data and reset:
+
+```sql
+DELETE FROM xp_events WHERE user_id = 'f42473bf-b67d-4215-be01-3030648499ed';
+UPDATE player_xp SET total_xp = 0, level = 1
+WHERE user_id = 'f42473bf-b67d-4215-be01-3030648499ed';
 ```
 
-## Fix (1 file: `src/components/ui/sheet.tsx`)
+Amir's XP and achievements are NOT touched -- only game records from Admin sessions are removed.
 
-### Change 1: Apply ALL relevant safe-area insets per side
+---
 
-Replace the single-inset map with comprehensive insets:
+## 3. Add 50 More Achievements
 
-| Side   | Padding applied                                    |
-|--------|----------------------------------------------------|
-| left   | padding-left + padding-top + padding-bottom        |
-| right  | padding-right + padding-top + padding-bottom       |
-| top    | padding-top + padding-left + padding-right         |
-| bottom | padding-bottom + padding-left + padding-right      |
+### File: `src/lib/poker/achievements.ts`
 
-### Change 2: Make close button tappable with proper sizing and positioning
+Add 50 new achievements across all rarities. Examples:
 
-- Add `p-2` (8px padding) around the icon for a ~32x32 tap target (icon 16 + 8+8)
-- Position with `safe-area-inset-top` so it clears the notch in landscape
-- For left-side sheets, position close button on the right accounting for safe-area-inset-right
-- For right-side sheets, keep existing safe-area-inset-right logic
+| Category | Examples | Rarity |
+|----------|----------|--------|
+| Career milestones | Play 10/25/50/200/500 hands | Common to Epic |
+| Win milestones | Win 5/10/25/50/100 hands | Common to Epic |
+| Session milestones | Play 5/10/25/50 sessions | Common to Rare |
+| Streaks | Win 15/20 in a row, fold 10 in a row | Rare to Legendary |
+| Hand types | Two Pair, Three of a Kind, win with pocket Aces/Kings, win with 7-2 | Common to Legendary |
+| Stack achievements | Triple/quadruple/5x/10x stack | Common to Legendary |
+| Big pots | Win 100x/200x BB pot | Rare to Epic |
+| Social | 25/50/100 chat messages | Common to Rare |
+| Strategic | Short stack survival, bluff master | Rare to Epic |
+| All-in | Survive 3/5 all-ins | Rare to Epic |
 
-### Change 3: Close button top positioning
+Each gets an XP value in `ACHIEVEMENT_XP` proportional to difficulty (100 to 200,000 XP).
 
-Replace fixed `top-4` with `top` calculated as `max(1rem, env(safe-area-inset-top, 0px))` so the button is never hidden behind the notch/status bar.
+Extend `AchievementContext` with optional fields for new tracking:
+- `totalCareerHands`, `totalCareerWins`, `totalCareerSessions`
+- `foldStreak`, `eliminatedPlayers`, `wonFirstHand`
+- `holeCards` (for detecting specific hand wins like pocket aces, 7-2)
 
-## What this fixes globally
+Extend `checkAchievements` to evaluate the new conditions using progress counters.
 
-Since all drawers (PlayerProfileDrawer, HandReplay, NotificationPanel, UserDetailSheet, sidebar) use `SheetContent`, this single fix improves ALL of them at once. No changes needed to any individual drawer component.
+### File: `src/pages/Profile.tsx`
 
-## Files changed
+Add Lucide icon imports for new achievement icons.
 
-- `src/components/ui/sheet.tsx` -- safe-area styles map + close button sizing/positioning
+Update the icon map (`ICON_MAP`) with all new icon names.
 
-## No other changes
+---
 
-- No changes to PlayerProfileDrawer, HandReplay, NotificationPanel, or any other file
-- No changes to layout, navigation, spacing, or behaviour outside the Sheet component
+## 4. Collapsible Achievements UI
+
+### File: `src/pages/Profile.tsx`
+
+Replace the flat grid with collapsible sections grouped by rarity:
+
+- Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`
+- Group achievements into 4 rarity buckets: Common, Rare, Epic, Legendary
+- Each group is a `Collapsible` with a header showing "Common (8/15)" format
+- Header has a chevron that rotates on open/close
+- Unlocked achievements shown first within each group
+- Default state: Common collapsed, others collapsed
+
+---
+
+## Summary of all changes
+
+| File | Change |
+|------|--------|
+| `src/pages/Dashboard.tsx` | Replace net profit with win rate |
+| `src/lib/poker/achievements.ts` | Add 50 achievements, extend context and checker |
+| `src/pages/Profile.tsx` | Add icon imports, collapsible achievements grouped by rarity |
+| Database (data only) | Delete Amir's 28 test records + all 34 Admin records + Admin XP reset |
+
+No changes to bottom navigation, layout, spacing, or any other components.
+
