@@ -912,23 +912,19 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => clearTimeout(timer);
   }, [handWinners, tableState, mySeatNumber]);
 
-  // 30-second warning: sound only
+  // 30-second warning: sound only (no isMyTurn guard — prop is already gated by isMe && isCurrentActor)
   const handleThirtySeconds = useCallback(() => {
-    if (isMyTurn) {
-      play('timerWarning');
-      if ('vibrate' in navigator) navigator.vibrate([100]);
-    }
-  }, [isMyTurn, play]);
+    play('timerWarning');
+    if ('vibrate' in navigator) navigator.vibrate([100]);
+  }, [play]);
 
   // 5-second critical warning: red overlay + voice
   const handleCriticalTime = useCallback(() => {
-    if (isMyTurn) {
-      setCriticalTimeActive(true);
-      play('timerWarning');
-      announceCountdown();
-      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
-    }
-  }, [isMyTurn, play, announceCountdown]);
+    setCriticalTimeActive(true);
+    play('timerWarning');
+    announceCountdown();
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
+  }, [play, announceCountdown]);
 
   // Critical countdown timer
   useEffect(() => {

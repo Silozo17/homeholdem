@@ -198,8 +198,10 @@ Deno.serve(async (req) => {
     let actualAction = action;
     let actualAmount = amount;
 
-    // Check deadline
-    const deadlinePassed = hand.action_deadline && new Date(hand.action_deadline) < new Date();
+    // Check deadline (2.5s grace period covers mobile HTTP round-trip latency)
+    const GRACE_PERIOD_MS = 2500;
+    const deadlinePassed = hand.action_deadline && 
+      new Date(hand.action_deadline).getTime() + GRACE_PERIOD_MS < Date.now();
 
     if (playerSeat.seat_number !== hand.current_actor_seat) {
       // If deadline passed and this is a timeout ping from another player, allow fold of current actor
