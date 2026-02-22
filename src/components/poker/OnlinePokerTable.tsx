@@ -146,7 +146,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showLeaveSeatConfirm, setShowLeaveSeatConfirm] = useState(false);
   const [gameOver, setGameOver] = useState(false);
-  const [gameOverWinners, setGameOverWinners] = useState<HandWinner[]>([]);
   
   const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
   const [dealing, setDealing] = useState(false);
@@ -281,7 +280,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   // Inactivity kick — 90s no touch → warning → auto-leave table
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityWarningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [inactivityWarning, setInactivityWarning] = useState(false);
+  
 
   useEffect(() => {
     // Only apply inactivity kick to seated players, not spectators
@@ -291,12 +290,10 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const WARNING_MS = 10_000; // 10 second warning before kick
 
     const resetInactivity = () => {
-      setInactivityWarning(false);
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
 
       inactivityTimerRef.current = setTimeout(() => {
-        setInactivityWarning(true);
         toast({ title: '⚠️ Inactivity Warning', description: 'You will be removed in 10 seconds. Tap anywhere to stay.' });
 
         inactivityWarningRef.current = setTimeout(() => {
@@ -580,7 +577,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         }
       }
     }
-  }, [lastActions, announceCustom, user]);
+  }, [lastActions, announceCustom, user, tableState]);
 
   // Voice: detect heads-up
   useEffect(() => {
@@ -699,7 +696,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         const timer = setTimeout(() => {
           announceGameOver(snap[0]?.display_name || 'Unknown', false);
           setGameOver(true);
-          setGameOverWinners(snap);
         }, 3000);
         return () => clearTimeout(timer);
       }
@@ -713,7 +709,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         const timer = setTimeout(() => {
           announceGameOver('You', true);
           setGameOver(true);
-          setGameOverWinners(snap);
         }, 3000);
         return () => clearTimeout(timer);
       }
@@ -726,7 +721,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const timer = setTimeout(() => {
         announceGameOver(snap[0]?.display_name || 'Unknown', false);
         setGameOver(true);
-        setGameOverWinners(snap);
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -744,12 +738,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       const timer = setTimeout(() => {
         announceGameOver('You', true);
         setGameOver(true);
-        setGameOverWinners([{
-          player_id: user.id,
-          display_name: 'You',
-          amount: mySeatInfo.stack,
-          hand_name: 'Last Standing',
-        }]);
       }, 4000);
       return () => clearTimeout(timer);
     }
@@ -1637,7 +1625,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           onPlayAgain={() => {
             setXpOverlay(null);
             setGameOver(false);
-            setGameOverWinners([]);
             gameOverPendingRef.current = false;
             xpSavedRef.current = false;
             handsPlayedRef.current = 0;

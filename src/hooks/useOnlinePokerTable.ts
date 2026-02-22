@@ -96,6 +96,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const lastActedVersionRef = useRef<number | null>(null);
   const pendingWinnersRef = useRef<{ winners: HandWinner[]; winnerDelay: number; targetCardCount: number } | null>(null);
   const runoutCompleteTimeRef = useRef<number>(0);
+  const winnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -250,7 +251,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           pendingWinnersRef.current = null;
           const msUntilRunoutDone = Math.max(0, runoutCompleteTimeRef.current - Date.now());
           const delay = Math.max(pending.winnerDelay, msUntilRunoutDone + 500);
-          setTimeout(() => setHandWinners(pending.winners), delay);
+          if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
+          winnerTimerRef.current = setTimeout(() => setHandWinners(pending.winners), delay);
         }
 
         // Merge broadcast state into local state
@@ -425,7 +427,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           pendingWinnersRef.current = null;
           const msUntilRunoutDone = Math.max(0, runoutCompleteTimeRef.current - Date.now());
           const delay = Math.max(winnerDelay, msUntilRunoutDone + 500);
-          setTimeout(() => setHandWinners(winners), delay);
+          if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
+          winnerTimerRef.current = setTimeout(() => setHandWinners(winners), delay);
         }
 
         setTableState(prev => {
@@ -559,7 +562,8 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         const baseDelay = newCommunityCount < 5 || (newCommunityCount - prevCount) > 1 ? 4500 : 500;
         const winnerDelay = Math.max(baseDelay, msUntilRunoutDone + 500);
 
-        setTimeout(() => setHandWinners(winners), winnerDelay);
+        if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
+        winnerTimerRef.current = setTimeout(() => setHandWinners(winners), winnerDelay);
 
         // Showdown cleanup -- dynamic delay
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
@@ -635,6 +639,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       supabase.removeChannel(channel);
       channelRef.current = null;
       if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+      if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
       // Clean up all chat bubble timers
       chatBubbleTimers.current.forEach(t => clearTimeout(t));
       chatBubbleTimers.current.clear();
