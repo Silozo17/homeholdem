@@ -91,7 +91,7 @@ export const PlayerSeat = memo(function PlayerSeat({
     }, 200);
 
     return () => clearInterval(interval);
-  }, [isTimerActive, actionDeadline]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isTimerActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerProgress = isTimerActive ? Math.min(timerElapsed / TIMER_DURATION, 1) : 0;
   const timerRemaining = 1 - timerProgress;
