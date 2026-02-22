@@ -46,7 +46,7 @@ export default function Dashboard() {
   const [processingInvite, setProcessingInvite] = useState(false);
   const [displayName, setDisplayName] = useState('Player');
   const [upcomingEvent, setUpcomingEvent] = useState<any>(null);
-  const [playerStats, setPlayerStats] = useState({ wins: 0, gamesPlayed: 0, netProfit: '0' });
+  const [playerStats, setPlayerStats] = useState({ wins: 0, gamesPlayed: 0, winRate: '0%' });
   
   const [wasAuthenticated, setWasAuthenticated] = useState(false);
   const achievementXpSyncedRef = useRef(false);
@@ -160,8 +160,8 @@ export default function Dashboard() {
       if (data?.length) {
         const wins = data.filter(r => (r.final_chips || 0) > (r.starting_chips || 0)).length;
         const games = data.length;
-        const net = data.reduce((s, r) => s + ((r.final_chips || 0) - (r.starting_chips || 0)), 0);
-        setPlayerStats({ wins, gamesPlayed: games, netProfit: net >= 0 ? `+${net.toLocaleString()}` : net.toLocaleString() });
+        const winRate = games > 0 ? `${Math.round((wins / games) * 100)}%` : '0%';
+        setPlayerStats({ wins, gamesPlayed: games, winRate });
       }
     })();
   }, [user]);
@@ -272,7 +272,7 @@ export default function Dashboard() {
           <QuickStatsStrip
             wins={playerStats.wins}
             gamesPlayed={playerStats.gamesPlayed}
-            netProfit={playerStats.netProfit}
+            winRate={playerStats.winRate}
           />
         </div>
 

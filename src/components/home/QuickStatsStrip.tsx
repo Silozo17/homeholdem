@@ -4,7 +4,7 @@ import { Trophy, Target, TrendingUp } from 'lucide-react';
 interface QuickStatsStripProps {
   wins: number;
   gamesPlayed: number;
-  netProfit: string;
+  winRate: string;
 }
 
 export function QuickStatsStrip(props: QuickStatsStripProps) {
@@ -13,7 +13,7 @@ export function QuickStatsStrip(props: QuickStatsStripProps) {
   const items = [
     { label: t('home.stat_wins'), value: props.wins, icon: Trophy, color: 'text-primary' },
     { label: t('home.stat_games'), value: props.gamesPlayed, icon: Target, color: 'text-emerald-400' },
-    { label: t('home.stat_net'), value: props.netProfit, icon: TrendingUp, color: 'text-sky-400' },
+    { label: t('home.stat_win_rate', 'Win Rate'), value: props.winRate, icon: TrendingUp, color: 'text-sky-400' },
   ];
 
   return (
