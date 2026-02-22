@@ -704,91 +704,78 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [error, tableState, loading, onLeave, gameOver]);
 
-  // Game over detection — loser (stack=0) OR winner (last player standing)
+  // Game over detection — consolidated: loser, winner, fallback, and opponent-left
   useEffect(() => {
     if (gameOver || !tableState || !user) return;
-    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-    if (!mySeatInfo || handWinners.length === 0) return;
 
+    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
     const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
+    const handPhase = tableState.current_hand?.phase;
 
-    // LOSER: my stack is 0 after a hand result AND I didn't win anything
-    const heroWonSomething = handWinners.some(w => w.player_id === user.id);
-    if (mySeatInfo.stack <= 0 && !heroWonSomething) {
-      // Signal hook to preserve handWinners + community cards through showdown cleanup
-      gameOverPendingRef.current = true;
-      const snapshotWinners = [...handWinners];
-      const winner = snapshotWinners[0];
-      const timer = setTimeout(() => {
-        announceGameOver(winner?.display_name || 'Unknown', false);
-        setGameOver(true);
-        setGameOverWinners(snapshotWinners);
-      }, 4000);
-      return () => clearTimeout(timer);
+    // CASE 1: Normal end — hand result arrived, I lost (stack = 0)
+    if (handWinners.length > 0 && mySeatInfo && mySeatInfo.stack <= 0) {
+      const heroWon = handWinners.some(w => w.player_id === user.id);
+      if (!heroWon) {
+        gameOverPendingRef.current = true;
+        const snap = [...handWinners];
+        const timer = setTimeout(() => {
+          announceGameOver(snap[0]?.display_name || 'Unknown', false);
+          setGameOver(true);
+          setGameOverWinners(snap);
+        }, 4000);
+        return () => clearTimeout(timer);
+      }
     }
 
-    // WINNER: I'm the last player with chips (wait briefly for stacks to sync)
-    if (activePlayers.length === 1 && activePlayers[0].player_id === user.id && mySeatInfo.stack > 0) {
-      gameOverPendingRef.current = true;
-      const snapshotWinners = [...handWinners];
-      const timer = setTimeout(() => {
-        announceGameOver('You', true);
-        setGameOver(true);
-        setGameOverWinners(snapshotWinners);
-      }, 3000);
-      return () => clearTimeout(timer);
+    // CASE 2: Normal end — hand result arrived, I won (last with chips)
+    if (handWinners.length > 0 && mySeatInfo && mySeatInfo.stack > 0) {
+      if (activePlayers.length === 1 && activePlayers[0].player_id === user.id) {
+        gameOverPendingRef.current = true;
+        const snap = [...handWinners];
+        const timer = setTimeout(() => {
+          announceGameOver('You', true);
+          setGameOver(true);
+          setGameOverWinners(snap);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [tableState, user, handWinners, gameOver]);
 
-  // Fallback: loser detection when seat is already gone (server cleaned up before detection)
-  useEffect(() => {
-    if (gameOver || !user || !tableState) return;
-    if (handWinners.length === 0) return;
-    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-    // If seat is gone AND we had 0 chips last known, we busted
-    if (!mySeatInfo && lastKnownStack === 0) {
+    // CASE 3: Fallback — my seat already removed by server, stack was 0
+    if (handWinners.length > 0 && !mySeatInfo && lastKnownStack === 0) {
       gameOverPendingRef.current = true;
-      const snapshotWinners = [...handWinners];
-      const winner = snapshotWinners[0];
+      const snap = [...handWinners];
       const timer = setTimeout(() => {
-        announceGameOver(winner?.display_name || 'Unknown', false);
+        announceGameOver(snap[0]?.display_name || 'Unknown', false);
         setGameOver(true);
-        setGameOverWinners(snapshotWinners);
+        setGameOverWinners(snap);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [tableState?.seats, user, gameOver, handWinners, lastKnownStack]);
 
-  // Game over: last player standing when opponent LEFT (no hand result)
-  useEffect(() => {
-    if (gameOver || !tableState || !user) return;
-    // Don't trigger on a fresh table where no hands have been played yet
-    if (handsPlayedRef.current === 0) return;
-    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-    if (!mySeatInfo || mySeatInfo.stack <= 0) return;
-
-    const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
-    if (activePlayers.length !== 1 || activePlayers[0].player_id !== user.id) return;
-
-    // Don't trigger if handWinners already handled it (avoids double-fire)
-    if (handWinners.length > 0) return;
-
-    // Only trigger if no hand is in progress
-    const handPhase = tableState.current_hand?.phase;
-    if (handPhase && handPhase !== 'complete') return;
-
-    const timer = setTimeout(() => {
-      announceGameOver('You', true);
-      setGameOver(true);
-      setGameOverWinners([{
-        player_id: user.id,
-        display_name: 'You',
-        amount: mySeatInfo.stack,
-        hand_name: 'Last Standing',
-      }]);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [tableState?.seats, user, gameOver, handWinners]);
+    // CASE 4: Opponent left mid-session without a hand result
+    if (
+      handWinners.length === 0 &&
+      handsPlayedRef.current > 0 &&
+      mySeatInfo &&
+      mySeatInfo.stack > 0 &&
+      activePlayers.length === 1 &&
+      activePlayers[0].player_id === user.id &&
+      (!handPhase || handPhase === 'complete')
+    ) {
+      const timer = setTimeout(() => {
+        announceGameOver('You', true);
+        setGameOver(true);
+        setGameOverWinners([{
+          player_id: user.id,
+          display_name: 'You',
+          amount: mySeatInfo.stack,
+          hand_name: 'Last Standing',
+        }]);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [tableState, user, handWinners, gameOver, lastKnownStack]);
 
   // Shared XP + stats save helper (called on game over AND on leave)
   const saveXpAndStats = useCallback(async (isWinnerOverride?: boolean) => {
