@@ -642,6 +642,11 @@ async function processAction(
     current_bet: newCurrentBet,
     seats: seatStates.map(s => {
       const profile = profileMap.get(s.player_id);
+      // For the acting player, broadcast "all_in" if they went all-in (even via call/raise)
+      let seatLastAction: string | null = null;
+      if (s.player_id === actorSeat.player_id) {
+        seatLastAction = (s.status === "all-in") ? "all_in" : action;
+      }
       return {
         seat: s.seat_number,
         player_id: s.player_id,
@@ -650,7 +655,7 @@ async function processAction(
         stack: s.stack,
         status: s.status,
         current_bet: s.current_round_bet,
-        last_action: s.player_id === actorSeat.player_id ? action : null,
+        last_action: seatLastAction,
         has_cards: holeCardPlayerIds.has(s.player_id) && s.status !== "folded",
       };
     }),
