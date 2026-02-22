@@ -666,10 +666,9 @@ async function processAction(
   };
 
   const channel = admin.channel(`poker:table:${table.id}`);
-  await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
 
-  // Broadcast hand result if complete
   if (handComplete && results) {
+    // Hand is complete — send a single merged broadcast instead of separate game_state + hand_result
     const revealedCards = showdownCards
       ? (showdownCards as any[]).filter((sc: any) => seatStates.find(s => s.player_id === sc.player_id && s.status !== "folded"))
           .map((sc: any) => ({ player_id: sc.player_id, cards: sc.cards }))
@@ -677,20 +676,21 @@ async function processAction(
 
     await channel.send({
       type: "broadcast",
-      event: "hand_result",
+      event: "hand_complete",
       payload: {
-        hand_id: hand.id,
+        // game_state fields
+        ...publicState,
+        // hand_result fields
         winners: results.winners,
         revealed_cards: revealedCards,
-        pots: results.pots,
-        community_cards: communityCards,
-        state_version: commitResult.state_version,
-        seats: publicState.seats,
       },
     });
 
     // Update table status back to waiting
     await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table.id);
+  } else {
+    // Non-terminal action — broadcast game_state as before
+    await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
   }
 
   return new Response(JSON.stringify({ success: true, state_version: commitResult.state_version }), {

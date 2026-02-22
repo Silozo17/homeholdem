@@ -377,8 +377,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           refreshState();
           return;
         }
-        // No active hand: safe to do a full refresh
-        refreshState();
+        // Unknown seat_change event — ignore (specific handlers above cover all known types)
       })
       .on('broadcast', { event: 'hand_result' }, ({ payload }) => {
         // FIX RT-1: Deduplicate hand_result by hand_id to prevent double winner display
@@ -457,6 +456,125 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
         }, showdownDelay);
+      })
+      .on('broadcast', { event: 'hand_complete' }, ({ payload }) => {
+        // Merged game_state + hand_result in one atomic broadcast — no race condition
+        lastBroadcastRef.current = Date.now();
+        setConnectionStatus('connected');
+
+        const incomingVersion = payload.state_version ?? 0;
+        lastAppliedVersionRef.current = incomingVersion;
+
+        setActionPending(false);
+        if (actionPendingFallbackRef.current) {
+          clearTimeout(actionPendingFallbackRef.current);
+          actionPendingFallbackRef.current = null;
+        }
+
+        // Accumulate last actions
+        const seats: OnlineSeatInfo[] = payload.seats || [];
+        setLastActions(prev => {
+          const next = { ...prev };
+          for (const s of seats) {
+            if (s.player_id && s.last_action) {
+              next[s.player_id] = s.last_action.charAt(0).toUpperCase() + s.last_action.slice(1);
+            }
+          }
+          return next;
+        });
+
+        // Community cards from the complete payload
+        const newCommunityCount = (payload.community_cards || []).length;
+        const prevCount = prevCommunityAtResultRef.current ?? 0;
+
+        // Set runout timestamp for staged card animation
+        if (newCommunityCount > prevCount && (newCommunityCount - prevCount) > 1) {
+          const runoutMs = newCommunityCount >= 5 && prevCount <= 3 ? 4000 : 2000;
+          runoutCompleteTimeRef.current = Date.now() + runoutMs;
+        }
+        prevCommunityAtResultRef.current = newCommunityCount;
+
+        // Merge state
+        setTableState(prev => {
+          if (!prev) return prev;
+          const mergedSeats = prev.seats.map(existingSeat => {
+            const updated = seats.find(s => s.seat === existingSeat.seat);
+            return updated ? { ...existingSeat, ...updated } : existingSeat;
+          });
+          const existingSeatNumbers = new Set(prev.seats.map(s => s.seat));
+          const newSeats = seats
+            .filter(s => !existingSeatNumbers.has(s.seat) && s.player_id)
+            .map(s => ({
+              seat: s.seat,
+              player_id: s.player_id,
+              display_name: s.display_name || 'Player',
+              avatar_url: s.avatar_url || null,
+              country_code: s.country_code || null,
+              stack: s.stack ?? 0,
+              status: s.status || 'sitting_out',
+              has_cards: s.has_cards || false,
+              current_bet: s.current_bet ?? 0,
+              last_action: s.last_action ?? null,
+            }));
+          return {
+            ...prev,
+            current_hand: {
+              hand_id: payload.hand_id,
+              hand_number: payload.hand_number,
+              phase: payload.phase,
+              community_cards: payload.community_cards || [],
+              pots: payload.pots || [],
+              current_actor_seat: null,
+              current_bet: 0,
+              min_raise: payload.min_raise ?? prev.table.big_blind,
+              action_deadline: null,
+              dealer_seat: payload.dealer_seat,
+              sb_seat: payload.sb_seat,
+              bb_seat: payload.bb_seat,
+              state_version: incomingVersion,
+              blinds: payload.blinds || { small: prev.table.small_blind, big: prev.table.big_blind, ante: prev.table.ante },
+              current_actor_id: null,
+            },
+            seats: [...mergedSeats, ...newSeats],
+          };
+        });
+
+        // Process hand_result portion — revealed cards + winners
+        const revealed: RevealedCard[] = payload.revealed_cards || [];
+        setRevealedCards(revealed);
+
+        const payloadSeats: any[] = payload.seats || [];
+        const winners: HandWinner[] = (payload.winners || []).map((w: any) => {
+          const seatData = payloadSeats.find((s: any) => s.player_id === w.player_id);
+          return {
+            player_id: w.player_id,
+            display_name: seatData?.display_name || 'Unknown',
+            amount: w.amount || 0,
+            hand_name: w.hand_name || '',
+          };
+        });
+
+        // Calculate winner delay from this single self-contained payload
+        const msUntilRunoutDone = Math.max(0, runoutCompleteTimeRef.current - Date.now());
+        const baseDelay = newCommunityCount < 5 || (newCommunityCount - prevCount) > 1 ? 4500 : 500;
+        const winnerDelay = Math.max(baseDelay, msUntilRunoutDone + 500);
+
+        setTimeout(() => setHandWinners(winners), winnerDelay);
+
+        // Showdown cleanup at 12s
+        if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+        showdownTimerRef.current = setTimeout(() => {
+          if (!gameOverPendingRef.current) {
+            setHandWinners([]);
+            pendingWinnersRef.current = null;
+            setTableState(prev => prev ? { ...prev, current_hand: null } : prev);
+            setMyCards(null);
+            setRevealedCards([]);
+          }
+          runoutCompleteTimeRef.current = 0;
+          showdownTimerRef.current = null;
+          setAutoStartAttempted(false);
+        }, 12000);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
         if (payload.player_id === userId) return;
@@ -578,11 +696,22 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const leaveSeat = useCallback(async () => {
     if (mySeatNumber === null) return;
     await callEdge('poker-leave-table', { table_id: tableId });
-    await refreshState();
+    // Update local state directly — server broadcasts seat_change to all other clients
+    setTableState(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        seats: prev.seats.map(s =>
+          s.seat === mySeatNumber
+            ? { ...s, player_id: null, display_name: '', stack: 0, status: 'empty' }
+            : s
+        ),
+      };
+    });
     if (channelRef.current && userId) {
       await channelRef.current.track({ user_id: userId, role: 'spectator' });
     }
-  }, [tableId, refreshState, mySeatNumber]);
+  }, [tableId, mySeatNumber, userId]);
 
   const leaveTable = useCallback(async () => {
     await leaveSeat();
