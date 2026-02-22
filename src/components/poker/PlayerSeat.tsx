@@ -55,26 +55,32 @@ export const PlayerSeat = memo(function PlayerSeat({
   const isTimerActive = isCurrentPlayer && !isOut;
   const timerActiveRef = useRef(false);
   const timerResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastDeadlineRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isTimerActive) {
-      // Don't reset immediately — wait 200ms to filter out single-render flickers
+      // Don't reset immediately — wait 1500ms to filter out single-render flickers
       timerResetTimeoutRef.current = setTimeout(() => {
         if (!timerActiveRef.current) {
           setTimerElapsed(0);
           thirtySecFired.current = false;
           criticalFired.current = false;
+          lastDeadlineRef.current = null;
         }
-}, 1500);
+      }, 1500);
       timerActiveRef.current = false;
       return () => {
         if (timerResetTimeoutRef.current) clearTimeout(timerResetTimeoutRef.current);
       };
     }
 
+    // Skip if the deadline hasn't actually changed (prevents duplicate intervals)
+    if (timerActiveRef.current && actionDeadline === lastDeadlineRef.current) return;
+
     // Cancel any pending reset
     if (timerResetTimeoutRef.current) clearTimeout(timerResetTimeoutRef.current);
     timerActiveRef.current = true;
+    lastDeadlineRef.current = actionDeadline ?? null;
 
     // Anchor to server deadline if available, otherwise fall back to local start
     const deadlineMs = actionDeadline ? new Date(actionDeadline).getTime() : null;
@@ -116,7 +122,7 @@ export const PlayerSeat = memo(function PlayerSeat({
       clearInterval(interval);
       timerActiveRef.current = false;
     };
-  }, [isTimerActive]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isTimerActive, actionDeadline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerProgress = isTimerActive ? Math.min(timerElapsed / TIMER_DURATION, 1) : 0;
   const timerRemaining = 1 - timerProgress;
@@ -253,7 +259,7 @@ export const PlayerSeat = memo(function PlayerSeat({
 
       {/* Nameplate bar — wide rounded rectangle, overlaps avatar bottom */}
       <div className={cn(
-      'relative flex flex-col items-center rounded-2xl pointer-events-none',
+      'relative flex flex-col items-center rounded-2xl',
         compact ? '-mt-4' : '-mt-5',
         compact ? 'min-w-[100px] px-4 py-1' : 'min-w-[120px] px-5 py-1.5',
       )} style={{
