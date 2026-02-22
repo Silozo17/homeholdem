@@ -561,8 +561,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
         setTimeout(() => setHandWinners(winners), winnerDelay);
 
-        // Showdown cleanup at 12s
+        // Showdown cleanup -- dynamic delay
         if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
+        const showdownDelay = winnerDelay + 4000;
         showdownTimerRef.current = setTimeout(() => {
           if (!gameOverPendingRef.current) {
             setHandWinners([]);
@@ -574,7 +575,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           runoutCompleteTimeRef.current = 0;
           showdownTimerRef.current = null;
           setAutoStartAttempted(false);
-        }, 12000);
+        }, showdownDelay);
       })
       .on('broadcast', { event: 'chat_emoji' }, ({ payload }) => {
         if (payload.player_id === userId) return;
