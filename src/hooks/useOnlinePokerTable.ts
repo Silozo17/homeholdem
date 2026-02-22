@@ -87,10 +87,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const prevHandIdRef = useRef<string | null>(null);
   const chatIdCounter = useRef(0);
   const chatBubbleTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
-  const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const [handHasEverStarted, setHandHasEverStarted] = useState(false);
   const startHandRef = useRef<() => Promise<void>>(null as any);
-  const autoStartRetriesRef = useRef(0);
   const blindsUpCallbackRef = useRef<((payload: any) => void) | null>(null);
   const prevCommunityAtResultRef = useRef(0);
   const lastAppliedVersionRef = useRef(0);
@@ -672,67 +671,34 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   })();
 
   useEffect(() => {
-    if (seatedCount >= 2 && !hasActiveHand && !autoStartAttempted && mySeatNumber !== null && handHasEverStarted && isAutoStartLeader) {
-      if (autoStartTimerRef.current) return;
-      const jitter = Math.random() * 1000;
-      autoStartTimerRef.current = setTimeout(() => {
-        autoStartTimerRef.current = null;
-        setAutoStartAttempted(true);
-        // Use ref to always call the latest version of startHand
-        startHandRef.current().catch(() => {
-          autoStartTimerRef.current = null;
-          autoStartRetriesRef.current += 1;
-          if (autoStartRetriesRef.current < 3) {
-            setAutoStartAttempted(false);
-          }
-          // else: stay attempted=true, stop retrying
-        });
-      }, 1200 + jitter);
-      return () => {
-        if (autoStartTimerRef.current) {
-          clearTimeout(autoStartTimerRef.current);
-          autoStartTimerRef.current = null;
-        }
-      };
-    }
-  }, [seatedCount, hasActiveHand, mySeatNumber, autoStartAttempted, handHasEverStarted, isAutoStartLeader]);
+    // Only the lowest-seat player triggers auto-deal
+    if (!isAutoStartLeader) return;
+    if (!handHasEverStarted) return;
+    if (seatedCount < 2) return;
+    if (hasActiveHand) return;
+    if (mySeatNumber === null) return;
+
+    setAutoStartAttempted(false);
+
+    const timer = setTimeout(() => {
+      setAutoStartAttempted(true);
+      startHandRef.current().catch((err) => {
+        console.warn('[auto-start] startHand failed:', err);
+        // Reset after 5s so we try again on next state change
+        setTimeout(() => setAutoStartAttempted(false), 5000);
+      });
+    }, 1200 + Math.random() * 800);
+
+    return () => clearTimeout(timer);
+  }, [isAutoStartLeader, handHasEverStarted, seatedCount, hasActiveHand, mySeatNumber]);
 
   useEffect(() => {
     if (hasActiveHand) {
       setAutoStartAttempted(true);
       setHandHasEverStarted(true);
-      autoStartRetriesRef.current = 0;
       lastBroadcastRef.current = Date.now();
     }
   }, [hasActiveHand]);
-
-  // Fallback reset: wait longer than showdown timer (3.5s) + buffer, respect retry cap
-  useEffect(() => {
-    if (!hasActiveHand && autoStartAttempted && handHasEverStarted) {
-      const fallback = setTimeout(() => {
-        if (autoStartRetriesRef.current < 3) {
-          setAutoStartAttempted(false);
-        }
-      }, 4500);
-      return () => clearTimeout(fallback);
-    }
-  }, [hasActiveHand, autoStartAttempted, handHasEverStarted]);
-
-  // Safety net: force reset if stuck for more than 6 seconds, respect retry cap
-  useEffect(() => {
-    if (seatedCount >= 2 && !hasActiveHand && autoStartAttempted && handHasEverStarted) {
-      const safetyNet = setTimeout(() => {
-        if (autoStartRetriesRef.current < 3) {
-          setAutoStartAttempted(false);
-        }
-        if (autoStartTimerRef.current) {
-          clearTimeout(autoStartTimerRef.current);
-          autoStartTimerRef.current = null;
-        }
-      }, 6000);
-      return () => clearTimeout(safetyNet);
-    }
-  }, [seatedCount, hasActiveHand, autoStartAttempted, handHasEverStarted]);
 
   const sendChat = useCallback((text: string) => {
     if (!channelRef.current || !userId) return;
