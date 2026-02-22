@@ -543,6 +543,7 @@ Deno.serve(async (req) => {
       phase: "preflop",
       community_cards: [],
       pots: hand.pots,
+      current_actor_seat: firstActor,
       current_actor_id:
         activePlayers.find((p: any) => p.seat_number === firstActor)
           ?.player_id || null,

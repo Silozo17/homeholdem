@@ -678,7 +678,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (!hand?.action_deadline || !userId || isMyTurn || !mySeatNumber) return;
 
     const deadline = new Date(hand.action_deadline).getTime();
-    const delay = deadline - Date.now() + 2000;
+    const delay = deadline - Date.now() + 6000;
     if (delay <= 0) return;
 
     timeoutTimerRef.current = setTimeout(() => {
