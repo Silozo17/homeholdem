@@ -1770,7 +1770,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       <InvitePlayersDialog open={inviteOpen} onOpenChange={setInviteOpen} tableId={tableId} tableName={table.name} clubId={table.club_id} />
 
       {/* Hand Replay sheet */}
-      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} handHistory={handHistory} isLandscape={isLandscape} onExportCSV={exportCSV} />
+      <HandReplay open={replayOpen} onOpenChange={setReplayOpen} handHistory={handHistory} isLandscape={isLandscape} />
 
       {/* Quit confirmation dialog */}
       <AlertDialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
