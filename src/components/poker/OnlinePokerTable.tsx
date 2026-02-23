@@ -118,7 +118,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, myCards, loading, error, mySeatNumber, isMyTurn,
     amountToCall, canCheck, joinTable, leaveSeat, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
-    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, onBlindsUp, onlinePlayerIds,
+    spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, resetForNewGame, onBlindsUp, onlinePlayerIds,
     kickedForInactivity, gameOverPendingRef,
   } = useOnlinePokerTable(tableId);
 
@@ -1673,13 +1673,15 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             winStreakRef.current = 0;
             chatCountRef.current = 0;
             startingStackRef.current = 0;
-            // Clear hand state that was preserved for game-over screen
+            // Clear all stale hand state (cards, winners, actions) before refreshing
+            resetForNewGame();
             setVisibleCommunityCards([]);
             prevCommunityCountRef.current = 0;
             if (user) {
               supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
                 .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
             }
+            // Force-bypass the 2s debounce so state loads immediately
             refreshState();
           }}
           onClose={() => {

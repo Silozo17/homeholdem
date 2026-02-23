@@ -15,9 +15,25 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Optimistic: try to read cached session from localStorage synchronously
+  const getCachedSession = (): { user: User; session: Session } | null => {
+    try {
+      const key = `sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`;
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      // Check expires_at (unix timestamp in seconds)
+      if (parsed.expires_at && parsed.expires_at > Date.now() / 1000) {
+        return { user: parsed.user, session: parsed as Session };
+      }
+    } catch {}
+    return null;
+  };
+
+  const cached = getCachedSession();
+  const [user, setUser] = useState<User | null>(cached?.user ?? null);
+  const [session, setSession] = useState<Session | null>(cached?.session ?? null);
+  const [loading, setLoading] = useState(!cached); // skip loading if cached session found
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -44,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session (validates/refreshes token in background)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
