@@ -1,44 +1,77 @@
 
 
-# Fix: Remove Base Sheet Top Padding (1 file only)
+# Fix: Stale Cards After "Play Again" + Auth Loading Delay
 
-## Root Cause
+## Issue 1: Players Can See Other Players' Cards After "Play Again"
 
-`env(safe-area-inset-top)` is orientation-aware by the browser itself:
-- **Portrait**: ~47px (status bar)
-- **Landscape**: ~0px (notch is on the side, not top)
+### Root Cause
 
-Currently TWO layers add this value:
-1. Base `sheet.tsx` safeAreaStyles: `calc(env(safe-area-inset-top) + 0.5rem)`
-2. Each drawer's header: `calc(env(safe-area-inset-top) + 1rem)`
+When a game ends, `gameOverPendingRef.current` is set to `true`. This prevents the showdown cleanup timer (which normally clears `revealedCards`, `handWinners`, and `myCards`) from running -- the cards are intentionally preserved so the game-over/XP screen can display them.
 
-In landscape: 0 + 0 = 0 + normal padding = looks great.
-In portrait: 47px + 47px = 94px + normal padding = massive gap.
+When the user clicks "Play Again" (line 1662 in `OnlinePokerTable.tsx`), the handler:
+- Resets game stats (hands played, win streak, etc.)
+- Sets `gameOverPendingRef.current = false`
+- Calls `refreshState()`
 
-## Fix: `src/components/ui/sheet.tsx`
+**But it never clears `revealedCards`, `handWinners`, or `myCards`.** These are state variables inside `useOnlinePokerTable.ts` with no external reset mechanism.
 
-Set `paddingTop: 0` for all four sides in `safeAreaStyles`. The individual drawer headers already handle the safe-area top offset correctly for both orientations.
+Because `revealedCards` persists, line 989 evaluates `revealedCards.length > 0` as `true`, keeping `isShowdown = true`. This causes the `toPokerPlayer` adapter (line 98) to pass the stale `revealedCards` as `holeCards` for opponents -- making their previous hand's cards visible during the new hand.
 
-Also update the default close button top position from `max(1rem, env(safe-area-inset-top))` to just `1rem`, since the sheet no longer adds base top padding and drawers that use the default close button have their own header spacing.
+The freeze before cards are dealt is caused by `refreshState()` being the ONLY state update, but it does not clear these stale arrays, so the UI is stuck rendering the old showdown state while waiting for the new hand to start.
 
-### What stays the same
-- Side padding: 20% of safe-area (untouched)
-- Bottom padding: 0 (untouched)
-- Individual drawer headers: untouched (they keep their own `env(safe-area-inset-top) + 1rem`)
-- No changes to any other file
+### Fix
 
-## Result
+**File: `src/hooks/useOnlinePokerTable.ts`**
 
-| Orientation | Base sheet top | Header top | Total |
-|------------|---------------|-----------|-------|
-| Portrait | 0 | ~47px + 1rem | ~63px (correct) |
-| Landscape | 0 | ~0px + 1rem | ~16px (correct, same as now) |
+Add a `resetForNewGame` function that clears all hand-specific state:
+- `setRevealedCards([])`
+- `setHandWinners([])`
+- `setMyCards(null)`
+- `setLastActions({})`
+- `prevCommunityAtResultRef.current = 0`
+- `lastAppliedVersionRef.current = 0`
+- `pendingWinnersRef.current = null`
+- `runoutCompleteTimeRef.current = 0`
+- `lastActedVersionRef.current = null`
+- Cancel any pending winner/showdown timers (`winnerTimerRef`, `showdownTimerRef`)
 
-## Technical detail
+Expose `resetForNewGame` in the return object.
 
-Only `src/components/ui/sheet.tsx` is changed:
-- Lines 60, 72, 78: change `paddingTop` from `calc(env(safe-area-inset-top, 0px) + 0.5rem)` to `0`
-- Line 89: update close button `top` from `max(1rem, env(safe-area-inset-top, 0px))` to `1rem`
+**File: `src/components/poker/OnlinePokerTable.tsx`**
 
-No changes to HandReplay, NotificationPanel, UserDetailSheet, layout, navigation, or bottom nav.
+In the `onPlayAgain` handler (line 1662), call `resetForNewGame()` BEFORE `refreshState()`. This ensures all stale card data is wiped before the new game state loads.
+
+---
+
+## Issue 2: Auth Delay on App Open
+
+### Root Cause
+
+The current `AuthContext.tsx` sets `loading = true` on mount and waits for BOTH `onAuthStateChange` and `getSession()` to resolve before showing the app. On a PWA cold start, `getSession()` may need to validate/refresh the JWT token over the network, causing a visible delay (the "Loading..." screen).
+
+### Fix
+
+**File: `src/contexts/AuthContext.tsx`**
+
+Add an optimistic session check: before the async `getSession()` call, synchronously read the cached session from localStorage. Supabase stores the session under a predictable key. If a cached session exists and its `expires_at` is in the future, immediately set `user` and `session` and `loading = false`. The async `getSession()` still runs in the background to validate/refresh the token silently.
+
+This eliminates the visible loading delay for returning users whose session hasn't expired.
+
+Implementation:
+- Read `localStorage` for the Supabase auth token key (`sb-PROJECT_ID-auth-token`)
+- Parse and check `expires_at > now`
+- If valid, set user/session/loading immediately
+- Background `getSession()` still runs for token refresh; `onAuthStateChange` handles any corrections
+
+---
+
+## Summary
+
+| File | Change |
+|------|--------|
+| `src/hooks/useOnlinePokerTable.ts` | Add `resetForNewGame()` function that clears revealedCards, handWinners, myCards, lastActions, and pending timers. Expose in return object. |
+| `src/components/poker/OnlinePokerTable.tsx` | Call `resetForNewGame()` in the `onPlayAgain` handler before `refreshState()` |
+| `src/contexts/AuthContext.tsx` | Add optimistic session loading from localStorage cache to eliminate auth loading delay |
+
+No changes to layout, navigation, bottom nav, styles, or spacing.
 
