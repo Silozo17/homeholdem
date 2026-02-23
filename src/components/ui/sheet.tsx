@@ -57,7 +57,7 @@ const safeAreaStyles: Record<string, React.CSSProperties> = {
   top: {
     paddingLeft: 'calc(env(safe-area-inset-left, 0px) * 0.2)',
     paddingRight: 'calc(env(safe-area-inset-right, 0px) * 0.2)',
-    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+    paddingTop: 0,
     paddingBottom: 0,
   },
   bottom: {
@@ -69,13 +69,13 @@ const safeAreaStyles: Record<string, React.CSSProperties> = {
   left: {
     paddingLeft: 'calc(env(safe-area-inset-left, 0px) * 0.2)',
     paddingRight: 0,
-    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+    paddingTop: 0,
     paddingBottom: 0,
   },
   right: {
     paddingLeft: 0,
     paddingRight: 'calc(env(safe-area-inset-right, 0px) * 0.2)',
-    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+    paddingTop: 0,
     paddingBottom: 0,
   },
 };
@@ -86,7 +86,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content ref={ref} onOpenAutoFocus={(e) => e.preventDefault()} className={cn(sheetVariants({ side }), className)} style={{ ...safeAreaStyles[side || 'right'], ...style }} {...props}>
         <div className="relative z-0">{children}</div>
-        <SheetPrimitive.Close className="absolute z-[60] pointer-events-auto p-3 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none" style={{ top: 'max(1rem, env(safe-area-inset-top, 0px))', right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right, 0px) * 0.2)' : '1rem' }}>
+        <SheetPrimitive.Close className="absolute z-[60] pointer-events-auto p-3 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none" style={{ top: '1rem', right: side === 'right' ? 'calc(1rem + env(safe-area-inset-right, 0px) * 0.2)' : '1rem' }}>
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
