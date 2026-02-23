@@ -57,6 +57,7 @@ interface UseOnlinePokerTableReturn extends Record<string, any> {
   sendAction: (action: string, amount?: number) => Promise<void>;
   pingTimeout: () => Promise<void>;
   refreshState: () => Promise<void>;
+  resetForNewGame: () => void;
   sendChat: (text: string) => void;
   autoStartAttempted: boolean;
   handHasEverStarted: boolean;
@@ -886,6 +887,22 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     };
   }, [isAutoStartLeader, tableId, refreshState]);
 
+  // Reset all hand-specific state for a clean new game (called by "Play Again")
+  const resetForNewGame = useCallback(() => {
+    setRevealedCards([]);
+    setHandWinners([]);
+    setMyCards(null);
+    setLastActions({});
+    prevCommunityAtResultRef.current = 0;
+    lastAppliedVersionRef.current = 0;
+    lastActedVersionRef.current = null;
+    pendingWinnersRef.current = null;
+    runoutCompleteTimeRef.current = 0;
+    prevHandIdRef.current = null;
+    if (winnerTimerRef.current) { clearTimeout(winnerTimerRef.current); winnerTimerRef.current = null; }
+    if (showdownTimerRef.current) { clearTimeout(showdownTimerRef.current); showdownTimerRef.current = null; }
+  }, []);
+
   return {
     tableState,
     myCards,
@@ -914,6 +931,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     sendAction,
     pingTimeout,
     refreshState,
+    resetForNewGame,
     sendChat,
     autoStartAttempted,
     handHasEverStarted,
