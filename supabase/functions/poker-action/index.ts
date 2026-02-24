@@ -625,6 +625,15 @@ async function processAction(
   }
   console.log(`[ACTION] committed hand=${hand.id} seat=${actorSeatNum} action=${action} phase=${hand.phase}->${newPhase} next_actor=${nextActorSeat} complete=${handComplete}`);
 
+  // Reset consecutive_timeouts on successful voluntary action (not a timeout fold)
+  if (action !== "fold" || !isTimeout) {
+    await admin
+      .from("poker_seats")
+      .update({ consecutive_timeouts: 0 })
+      .eq("table_id", table.id)
+      .eq("seat_number", actorSeatNum);
+  }
+
   // 10. Get profiles + hole cards for broadcast (parallel)
   const playerIds = seatStates.map(s => s.player_id);
   const [{ data: profiles }, { data: holeCardRows }] = await Promise.all([

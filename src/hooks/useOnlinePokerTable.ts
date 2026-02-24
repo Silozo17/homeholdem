@@ -364,7 +364,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
                 player_id: payload.player_id,
                 display_name: payload.display_name || 'Player',
                 avatar_url: payload.avatar_url || null,
-                country_code: null,
+                country_code: payload.country_code || null,
                 stack: payload.stack || 0,
                 status: 'sitting_out',
                 has_cards: false,
