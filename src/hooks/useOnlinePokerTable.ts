@@ -51,7 +51,7 @@ interface UseOnlinePokerTableReturn extends Record<string, any> {
   onlinePlayerIds: Set<string>;
   // Actions
   joinTable: (seatNumber: number, buyIn: number) => Promise<void>;
-  leaveSeat: () => Promise<void>;
+  leaveSeat: (preserveStack?: boolean) => Promise<void>;
   leaveTable: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (action: string, amount?: number) => Promise<void>;
@@ -717,9 +717,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     }
   }, [tableId, refreshState]);
 
-  const leaveSeat = useCallback(async () => {
+  const leaveSeat = useCallback(async (preserveStack = true) => {
     if (mySeatNumber === null) return;
-    await callEdge('poker-leave-table', { table_id: tableId, preserve_stack: true });
+    await callEdge('poker-leave-table', { table_id: tableId, preserve_stack: preserveStack });
     // Update local state directly — server broadcasts seat_change to all other clients
     setTableState(prev => {
       if (!prev) return prev;

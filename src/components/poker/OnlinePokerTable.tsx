@@ -789,7 +789,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     // Delay leaveSeat so the game over screen is fully visible first
     // leaveSeat triggers refreshState which clears tableState and community cards
     const leaveTimer = setTimeout(() => {
-      leaveSeat().catch(() => {});
+      leaveSeat(false).catch(() => {});
     }, 2500);
     // XP save after a further 1 second (was 3.5s from gameOver, now 3.5s total)
     const xpTimer = setTimeout(() => {
