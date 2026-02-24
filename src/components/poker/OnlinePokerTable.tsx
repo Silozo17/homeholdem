@@ -1106,7 +1106,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
 
-  const showActions = isMyTurn && dealAnimDone && !dealing && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
+  const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded' && myCards !== null;
 
   return (
     <PokerErrorBoundary onReconnect={handleReconnect} onLeave={onLeave}>
