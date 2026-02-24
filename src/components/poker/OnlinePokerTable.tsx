@@ -119,7 +119,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     amountToCall, canCheck, joinTable, leaveSeat, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
     spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, resetForNewGame, onBlindsUp, onlinePlayerIds,
-    kickedForInactivity, gameOverPendingRef,
+    kickedForInactivity, gameOverPendingRef, preResultStacksRef,
   } = useOnlinePokerTable(tableId);
 
   const [joining, setJoining] = useState(false);
@@ -490,14 +490,20 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // Always mirror real stacks from tableState
+  // Freeze stacks at pre-result snapshot until winner overlay appears
   useEffect(() => {
+    if (handWinners.length === 0 && preResultStacksRef.current) {
+      setDisplayStacks(preResultStacksRef.current);
+      return;
+    }
+    // Winner overlay is showing or no pending result — use real stacks
+    preResultStacksRef.current = null;
     const realStacks: Record<number, number> = {};
     for (const s of (tableState?.seats ?? [])) {
       if (s.player_id) realStacks[s.seat] = s.stack;
     }
     setDisplayStacks(realStacks);
-  }, [tableState?.seats]);
+  }, [tableState?.seats, handWinners.length]);
 
   // FIX 2: Voice announce hand winners with debug log
   // Snapshot winners and remove cleanup to prevent re-render cancellation
