@@ -106,6 +106,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const timeoutPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [kickedForInactivity, setKickedForInactivity] = useState(false);
   const gameOverPendingRef = useRef(false);
+  const hasSubscribedOnceRef = useRef(false);
 
   // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
   useEffect(() => {
@@ -640,6 +641,11 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           setConnectionStatus('connected');
+          if (hasSubscribedOnceRef.current) {
+            // Reconnect — refetch full state including hole cards
+            refreshState();
+          }
+          hasSubscribedOnceRef.current = true;
           if (userId) {
             const isCurrentlySeated = tableStateRef.current?.seats.some(s => s.player_id === userId) ?? false;
             await channel.track({ user_id: userId, role: isCurrentlySeated ? 'player' : 'spectator' });
@@ -656,6 +662,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     return () => {
       supabase.removeChannel(channel);
       channelRef.current = null;
+      hasSubscribedOnceRef.current = false;
       if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
       if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
       // Clean up all chat bubble timers

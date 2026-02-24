@@ -44,6 +44,7 @@ import { OnlineSeatInfo } from '@/lib/poker/online-types';
 import { PokerPlayer } from '@/lib/poker/types';
 import { Card } from '@/lib/poker/types';
 import { AchievementContext, ACHIEVEMENT_XP } from '@/lib/poker/achievements';
+import { evaluateHand } from '@/lib/poker/hand-evaluator';
 import pokerBg from '@/assets/poker-background.webp';
 import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
 import { GameStateDebugPanel } from './GameStateDebugPanel';
@@ -1538,6 +1539,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, displayStacks[seatData!.seat]);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
 
+            // Compute best 5 cards for showdown glow
+            const isShowdownActive = handWinners.length > 0;
+            const holeCardsForSeat = isMe ? (myCards ?? []) : (opponentRevealed ?? []);
+            const sevenCards = isShowdownActive ? [...holeCardsForSeat, ...visibleCommunityCards] : [];
+            const bestHandCards = isShowdownActive && sevenCards.length >= 5
+              ? evaluateHand(sevenCards).bestCards
+              : [];
+
             return (
               <SeatAnchor key={seatData!.player_id} xPct={pos.xPct} yPct={pos.yPct} zIndex={isMe ? Z.SEATS + 1 : Z.SEATS}>
                 <PlayerSeat
@@ -1558,6 +1567,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
                   onClick={!isMe && seatData!.player_id ? () => setSelectedPlayer(seatData!.player_id!) : undefined}
+                  bestCards={bestHandCards}
                 />
               </SeatAnchor>
             );
