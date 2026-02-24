@@ -168,7 +168,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
   const isBestCard = (card: Card) =>
-    bestCards.some(bc => bc.suit === card.suit && bc.rank === card.rank);
+    bestCards.some(bc => bc.suit === card.suit && Number(bc.rank) === Number(card.rank));
 
   // Card fan — 10deg tilt, tight overlap, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (

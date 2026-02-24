@@ -22,6 +22,7 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
   const [reconnecting, setReconnecting] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
   const prevStatusRef = useRef<ConnectionStatus>(status);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,6 +70,18 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
   // Cleanup on unmount
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
+  // Debounce overlay — only show after 3s of being disconnected
+  useEffect(() => {
+    if (status === 'connected') {
+      setShowOverlay(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowOverlay(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   // Success flash
   if (showSuccess) {
     return (
@@ -88,7 +101,7 @@ export function ConnectionOverlay({ status, onReconnect, handInProgress, lastPha
     );
   }
 
-  if (status === 'connected') return null;
+  if (!showOverlay) return null;
 
   const progressPct = (attempts / MAX_ATTEMPTS) * 100;
   const isExhausted = attempts >= MAX_ATTEMPTS;
