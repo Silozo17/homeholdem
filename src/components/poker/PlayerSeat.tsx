@@ -31,6 +31,9 @@ interface PlayerSeatProps {
   isDisconnected?: boolean;
   isSpeaking?: boolean;
   onClick?: () => void;
+  seatKey?: string;
+  isSB?: boolean;
+  isBB?: boolean;
 }
 
 /**
@@ -40,7 +43,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onThirtySeconds, onCriticalTime, isDisconnected = false, isSpeaking = false, onClick,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onThirtySeconds, onCriticalTime, isDisconnected = false, isSpeaking = false, onClick, seatKey, isSB = false, isBB = false,
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -228,10 +231,37 @@ export const PlayerSeat = memo(function PlayerSeat({
           size={avatarSize}
         />
 
-        {/* Dealer button */}
-        {player.isDealer && (
-          <DealerButton className="absolute -top-0.5 -right-0.5 scale-75" />
-        )}
+        {/* Dealer / SB / BB badges — positioned by seatKey */}
+        {(() => {
+          const badgePos = (() => {
+            switch (seatKey) {
+              case 'D': case 'H': return '-bottom-1 -left-1';
+              case 'B': case 'C': return '-top-1 -right-1';
+              default: return '-top-1 -left-1';
+            }
+          })();
+          return (
+            <>
+              {player.isDealer && (
+                <div className={`absolute ${badgePos} z-20`}>
+                  <DealerButton />
+                </div>
+              )}
+              {isSB && !player.isDealer && (
+                <div className={`absolute ${badgePos} z-20 w-5 h-5 rounded-full flex items-center justify-center`}
+                  style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 48%))', border: '2px solid hsl(213 94% 78%)' }}>
+                  <span className="text-[7px] font-black text-white leading-none">SB</span>
+                </div>
+              )}
+              {isBB && !player.isDealer && (
+                <div className={`absolute ${badgePos} z-20 w-5 h-5 rounded-full flex items-center justify-center`}
+                  style={{ background: 'linear-gradient(135deg, hsl(0 72% 51%), hsl(0 63% 31%))', border: '2px solid hsl(0 94% 82%)' }}>
+                  <span className="text-[7px] font-black text-white leading-none">BB</span>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Opponent showdown cards overlaying avatar */}
         {opponentShowdownCards}

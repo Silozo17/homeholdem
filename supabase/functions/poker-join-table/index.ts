@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     // Fetch profile for broadcast payload
     const { data: profile } = await admin
       .from("profiles")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, country_code")
       .eq("id", user.id)
       .single();
 
@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
         player_id: user.id,
         display_name: profile?.display_name || 'Player',
         avatar_url: profile?.avatar_url || null,
+        country_code: profile?.country_code || null,
         action: "join",
         stack: buy_in_amount,
       },

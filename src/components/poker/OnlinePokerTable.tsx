@@ -278,42 +278,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     setShowStillPlayingPopup(false);
   }, []);
 
-  // Inactivity kick — 90s no touch → warning → auto-leave table
-  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inactivityWarningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-
-  useEffect(() => {
-    // Only apply inactivity kick to seated players, not spectators
-    if (mySeatNumber === null) return;
-
-    const IDLE_MS = 90_000; // 90 seconds
-    const WARNING_MS = 10_000; // 10 second warning before kick
-
-    const resetInactivity = () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
-
-      inactivityTimerRef.current = setTimeout(() => {
-        toast({ title: '⚠️ Inactivity Warning', description: 'You will be removed in 10 seconds. Tap anywhere to stay.' });
-
-        inactivityWarningRef.current = setTimeout(() => {
-          leaveTable().then(onLeave).catch(onLeave);
-        }, WARNING_MS);
-      }, IDLE_MS);
-    };
-
-    resetInactivity();
-
-    const events = ['mousedown', 'touchstart', 'keydown', 'pointermove'];
-    events.forEach(e => window.addEventListener(e, resetInactivity, { passive: true }));
-
-    return () => {
-      events.forEach(e => window.removeEventListener(e, resetInactivity));
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current);
-    };
-  }, [leaveTable, onLeave, mySeatNumber]);
+  // Inactivity protection: handled solely by the "Still Playing?" popup
+  // triggered after an auto-fold timeout (handleTimeout). No general touch-based timer.
 
   // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
@@ -1125,7 +1091,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   };
 
   const handleTimeout = () => {
-    // Don't fire if an action is already in flight — player may have acted in the final seconds
+    // Only fires when isCurrentPlayer=true in PlayerSeat — all-in players
+    // are never current_actor so this never fires for them
     if (actionPending) return;
     handleAction({ type: 'fold' });
     setShowStillPlayingPopup(true);
@@ -1575,6 +1542,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   disableDealAnim={activeScreenPositions.indexOf(screenPos) < 0}
                   level={seatData!.player_id ? playerLevels[seatData!.player_id] : undefined}
                   countryCode={seatData!.country_code}
+                  seatKey={pos.seatKey}
+                  isSB={tableState?.current_hand?.sb_seat === seatData!.seat}
+                  isBB={tableState?.current_hand?.bb_seat === seatData!.seat}
                   actionDeadline={isCurrentActor ? tableState?.current_hand?.action_deadline : null}
                   onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
                   onThirtySeconds={isMe && isCurrentActor ? handleThirtySeconds : undefined}
