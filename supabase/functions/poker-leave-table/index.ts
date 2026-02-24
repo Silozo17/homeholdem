@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { table_id } = await req.json();
+    const { table_id, preserve_stack = false } = await req.json();
     if (!table_id) {
       return new Response(JSON.stringify({ error: "table_id required" }), {
         status: 400,
@@ -358,9 +358,25 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Save stack to cache if leaving seat but staying at table
+      if (preserve_stack && seat.stack > 0) {
+        const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
+        const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+        currentCache[seat.player_id] = seat.stack;
+        await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+      }
+
       // Delete seat immediately (player is leaving)
       await admin.from("poker_seats").delete().eq("id", seat.id);
     } else {
+      // Save stack to cache if leaving seat but staying at table
+      if (preserve_stack && seat.stack > 0) {
+        const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
+        const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+        currentCache[seat.player_id] = seat.stack;
+        await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+      }
+
       // No active hand — remove seat immediately
       const { error: deleteErr } = await admin
         .from("poker_seats")
