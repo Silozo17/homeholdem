@@ -1,77 +1,74 @@
 
 
-# Fix: Stale Cards After "Play Again" + Auth Loading Delay
+# Fix: Friend Request and DM Notifications
 
-## Issue 1: Players Can See Other Players' Cards After "Play Again"
+## Root Cause
 
-### Root Cause
+The `notifications` table has an INSERT RLS policy called "Users can create club notifications" with this condition:
 
-When a game ends, `gameOverPendingRef.current` is set to `true`. This prevents the showdown cleanup timer (which normally clears `revealedCards`, `handWinners`, and `myCards`) from running -- the cards are intentionally preserved so the game-over/XP screen can display them.
+```
+(sender_id = auth.uid())
+AND ((club_id IS NOT NULL) OR (event_id IS NOT NULL))
+AND ((club_id IS NULL) OR (is_club_member(...)))
+AND ((event_id IS NULL) OR (is_event_club_member(...)))
+```
 
-When the user clicks "Play Again" (line 1662 in `OnlinePokerTable.tsx`), the handler:
-- Resets game stats (hands played, win streak, etc.)
-- Sets `gameOverPendingRef.current = false`
-- Calls `refreshState()`
+The second clause -- `(club_id IS NOT NULL) OR (event_id IS NOT NULL)` -- blocks ALL friend request and DM notifications because those pass `null` for both `club_id` and `event_id`. The insert fails silently; no error is surfaced to the user.
 
-**But it never clears `revealedCards`, `handWinners`, or `myCards`.** These are state variables inside `useOnlinePokerTable.ts` with no external reset mechanism.
+Push notifications still work because `send-push-notification` runs server-side with the service role key, bypassing RLS entirely.
 
-Because `revealedCards` persists, line 989 evaluates `revealedCards.length > 0` as `true`, keeping `isShowdown = true`. This causes the `toPokerPlayer` adapter (line 98) to pass the stale `revealedCards` as `holeCards` for opponents -- making their previous hand's cards visible during the new hand.
+## Fix (1 change)
 
-The freeze before cards are dealt is caused by `refreshState()` being the ONLY state update, but it does not clear these stale arrays, so the UI is stuck rendering the old showdown state while waiting for the new hand to start.
+### Database migration: Update the notifications INSERT policy
 
-### Fix
+Drop the existing policy and replace it with one that also permits "social" notifications (friend requests, friend accepted, DMs) where neither `club_id` nor `event_id` is required:
 
-**File: `src/hooks/useOnlinePokerTable.ts`**
+```sql
+DROP POLICY "Users can create club notifications" ON public.notifications;
 
-Add a `resetForNewGame` function that clears all hand-specific state:
-- `setRevealedCards([])`
-- `setHandWinners([])`
-- `setMyCards(null)`
-- `setLastActions({})`
-- `prevCommunityAtResultRef.current = 0`
-- `lastAppliedVersionRef.current = 0`
-- `pendingWinnersRef.current = null`
-- `runoutCompleteTimeRef.current = 0`
-- `lastActedVersionRef.current = null`
-- Cancel any pending winner/showdown timers (`winnerTimerRef`, `showdownTimerRef`)
+CREATE POLICY "Users can create notifications"
+  ON public.notifications FOR INSERT
+  WITH CHECK (
+    sender_id = auth.uid()
+    AND (
+      -- Club/event notifications: sender and receiver must both be members
+      (
+        (club_id IS NOT NULL OR event_id IS NOT NULL)
+        AND (club_id IS NULL OR (is_club_member(auth.uid(), club_id) AND is_club_member(user_id, club_id)))
+        AND (event_id IS NULL OR (is_event_club_member(auth.uid(), event_id) AND is_event_club_member(user_id, event_id)))
+      )
+      -- Social notifications (friend requests, DMs): no club/event required
+      OR (club_id IS NULL AND event_id IS NULL)
+    )
+  );
+```
 
-Expose `resetForNewGame` in the return object.
+This preserves all existing club/event notification security while opening the door for social notifications that have no club or event context.
 
-**File: `src/components/poker/OnlinePokerTable.tsx`**
+## What this does NOT change
 
-In the `onPlayAgain` handler (line 1662), call `resetForNewGame()` BEFORE `refreshState()`. This ensures all stale card data is wiped before the new game state loads.
+- No code file changes -- `useFriendship.ts`, `useDirectMessages.ts`, and `in-app-notifications.ts` already call the correct notification helpers. They just fail silently at the database level today.
+- No push notification changes -- those already work via the edge function.
+- No UI changes -- `NotificationItem.tsx` already renders friend requests (type `club_invite` maps to the `UserPlus` icon) and DMs (type `chat_message` maps to `MessageCircle` icon) correctly.
+- Bottom nav, layout, styles, and spacing are untouched.
 
----
+## Technical Details
 
-## Issue 2: Auth Delay on App Open
+| Component | Status |
+|---|---|
+| `notifyFriendRequestInApp()` | Already called in `useFriendship.ts` line 107 -- blocked by RLS |
+| `notifyFriendAcceptedInApp()` | Already called in `useFriendship.ts` line 120 -- blocked by RLS |
+| `notifyDirectMessageInApp()` | Already called in `useDirectMessages.ts` line 133 -- blocked by RLS |
+| `notifyFriendRequest()` (push) | Already works -- edge function bypasses RLS |
+| `notifyFriendAccepted()` (push) | Already works -- edge function bypasses RLS |
+| `notifyDirectMessage()` (push) | Already works -- edge function bypasses RLS |
+| Realtime subscription in `useNotifications.ts` | Already listens for INSERT on notifications filtered by user_id -- will pick up new rows once RLS allows them |
 
-### Root Cause
+## Verification
 
-The current `AuthContext.tsx` sets `loading = true` on mount and waits for BOTH `onAuthStateChange` and `getSession()` to resolve before showing the app. On a PWA cold start, `getSession()` may need to validate/refresh the JWT token over the network, causing a visible delay (the "Loading..." screen).
-
-### Fix
-
-**File: `src/contexts/AuthContext.tsx`**
-
-Add an optimistic session check: before the async `getSession()` call, synchronously read the cached session from localStorage. Supabase stores the session under a predictable key. If a cached session exists and its `expires_at` is in the future, immediately set `user` and `session` and `loading = false`. The async `getSession()` still runs in the background to validate/refresh the token silently.
-
-This eliminates the visible loading delay for returning users whose session hasn't expired.
-
-Implementation:
-- Read `localStorage` for the Supabase auth token key (`sb-PROJECT_ID-auth-token`)
-- Parse and check `expires_at > now`
-- If valid, set user/session/loading immediately
-- Background `getSession()` still runs for token refresh; `onAuthStateChange` handles any corrections
-
----
-
-## Summary
-
-| File | Change |
-|------|--------|
-| `src/hooks/useOnlinePokerTable.ts` | Add `resetForNewGame()` function that clears revealedCards, handWinners, myCards, lastActions, and pending timers. Expose in return object. |
-| `src/components/poker/OnlinePokerTable.tsx` | Call `resetForNewGame()` in the `onPlayAgain` handler before `refreshState()` |
-| `src/contexts/AuthContext.tsx` | Add optimistic session loading from localStorage cache to eliminate auth loading delay |
-
-No changes to layout, navigation, bottom nav, styles, or spacing.
+1. Send a friend request -- recipient sees in-app notification badge increment and "Friend Request" in the notification panel
+2. Accept a friend request -- requester sees "Friend Added" in-app notification
+3. Send a DM -- recipient sees in-app notification with sender name and "Sent you a message"
+4. Tapping each notification navigates to `/friends` or `/inbox` respectively
+5. Push notifications continue to work for all three scenarios
 
