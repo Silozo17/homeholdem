@@ -719,7 +719,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   const leaveSeat = useCallback(async () => {
     if (mySeatNumber === null) return;
-    await callEdge('poker-leave-table', { table_id: tableId });
+    await callEdge('poker-leave-table', { table_id: tableId, preserve_stack: true });
     // Update local state directly — server broadcasts seat_change to all other clients
     setTableState(prev => {
       if (!prev) return prev;
@@ -738,8 +738,23 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   }, [tableId, mySeatNumber, userId]);
 
   const leaveTable = useCallback(async () => {
-    await leaveSeat();
-  }, [leaveSeat]);
+    if (mySeatNumber === null) return;
+    await callEdge('poker-leave-table', { table_id: tableId, preserve_stack: false });
+    setTableState(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        seats: prev.seats.map(s =>
+          s.seat === mySeatNumber
+            ? { ...s, player_id: null, display_name: '', stack: 0, status: 'empty' }
+            : s
+        ),
+      };
+    });
+    if (channelRef.current && userId) {
+      await channelRef.current.track({ user_id: userId, role: 'spectator' });
+    }
+  }, [tableId, mySeatNumber, userId]);
 
   const startHand = useCallback(async () => {
     const data = await callEdge('poker-start-hand', { table_id: tableId });

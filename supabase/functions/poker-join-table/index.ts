@@ -147,6 +147,23 @@ Deno.serve(async (req) => {
       // Additional invite_code validation can be added here
     }
 
+    // Check for cached stack from previous session at this table
+    const { data: cacheData } = await admin
+      .from("poker_tables")
+      .select("stack_cache")
+      .eq("id", table_id)
+      .single();
+    const stackCache = (cacheData?.stack_cache as Record<string, number>) || {};
+    const savedStack = stackCache[user.id];
+    const startingStack = savedStack && savedStack > 0 ? savedStack : buy_in_amount;
+
+    // Clear used cache entry
+    if (savedStack) {
+      const updatedCache = { ...stackCache };
+      delete updatedCache[user.id];
+      await admin.from("poker_tables").update({ stack_cache: updatedCache }).eq("id", table_id);
+    }
+
     // Always insert as sitting_out — poker-start-hand will activate after 3s cooldown
     const initialStatus = "sitting_out";
 
@@ -157,7 +174,7 @@ Deno.serve(async (req) => {
         table_id,
         seat_number,
         player_id: user.id,
-        stack: buy_in_amount,
+        stack: startingStack,
         status: initialStatus,
       })
       .select()

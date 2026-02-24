@@ -1,0 +1,1 @@
+ALTER TABLE public.poker_tables ADD COLUMN IF NOT EXISTS stack_cache JSONB NOT NULL DEFAULT '{}';

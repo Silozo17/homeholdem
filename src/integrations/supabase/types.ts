@@ -1689,6 +1689,7 @@ export type Database = {
           original_small_blind: number | null
           paid_tournament_id: string | null
           small_blind: number
+          stack_cache: Json
           status: Database["public"]["Enums"]["poker_table_status"]
           table_type: Database["public"]["Enums"]["poker_table_type"]
           tournament_id: string | null
@@ -1716,6 +1717,7 @@ export type Database = {
           original_small_blind?: number | null
           paid_tournament_id?: string | null
           small_blind?: number
+          stack_cache?: Json
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]
           tournament_id?: string | null
@@ -1743,6 +1745,7 @@ export type Database = {
           original_small_blind?: number | null
           paid_tournament_id?: string | null
           small_blind?: number
+          stack_cache?: Json
           status?: Database["public"]["Enums"]["poker_table_status"]
           table_type?: Database["public"]["Enums"]["poker_table_type"]
           tournament_id?: string | null

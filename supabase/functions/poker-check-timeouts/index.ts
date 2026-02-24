@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
   // ── 2. Auto-kick players with 2+ consecutive timeouts ──
     const { data: timeoutSeats } = await admin
       .from("poker_seats")
-      .select("id, table_id, player_id, seat_number, consecutive_timeouts")
+      .select("id, table_id, player_id, seat_number, stack, consecutive_timeouts")
       .gte("consecutive_timeouts", 2)
       .not("player_id", "is", null);
 
@@ -417,6 +417,14 @@ Deno.serve(async (req) => {
     for (const seat of timeoutSeats || []) {
       try {
         console.log(`Auto-kicking player ${seat.player_id} from table ${seat.table_id} (${seat.consecutive_timeouts} timeouts)`);
+
+        // Preserve stack in cache before kicking (player didn't choose to leave)
+        if (seat.stack > 0) {
+          const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", seat.table_id).single();
+          const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+          currentCache[seat.player_id] = seat.stack;
+          await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", seat.table_id);
+        }
 
         // Delete the seat row entirely (prevents ghost seats)
         await admin
