@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import { WifiOff, Volume2 } from 'lucide-react';
-import { PokerPlayer } from '@/lib/poker/types';
+import { PokerPlayer, Card } from '@/lib/poker/types';
 import { CardDisplay } from './CardDisplay';
 import { PlayerAvatar } from './PlayerAvatar';
 import { DealerButton } from './DealerButton';
@@ -34,6 +34,7 @@ interface PlayerSeatProps {
   seatKey?: string;
   isSB?: boolean;
   isBB?: boolean;
+  bestCards?: Card[];
 }
 
 /**
@@ -43,7 +44,7 @@ interface PlayerSeatProps {
  */
 export const PlayerSeat = memo(function PlayerSeat({
   player, isCurrentPlayer, showCards, isHuman, isShowdown,
-  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onThirtySeconds, onCriticalTime, isDisconnected = false, isSpeaking = false, onClick, seatKey, isSB = false, isBB = false,
+  cardsPlacement, avatarUrl, seatDealOrder = 0, totalActivePlayers = 1, compact = false, level, countryCode, disableDealAnim = false, actionDeadline, onTimeout, onThirtySeconds, onCriticalTime, isDisconnected = false, isSpeaking = false, onClick, seatKey, isSB = false, isBB = false, bestCards = [],
 }: PlayerSeatProps) {
   const isOut = player.status === 'folded' || player.status === 'eliminated';
   const isAllIn = player.status === 'all-in';
@@ -166,6 +167,9 @@ export const PlayerSeat = memo(function PlayerSeat({
   const shouldShowCards = isHuman || (isShowdown && showCards);
   const shouldRenderCards = isHuman || (isShowdown && showCards && player.holeCards.length > 0);
 
+  const isBestCard = (card: Card) =>
+    bestCards.some(bc => bc.suit === card.suit && bc.rank === card.rank);
+
   // Card fan — 10deg tilt, tight overlap, on top of avatar
   const cardFan = (cards: typeof player.holeCards, size: string, useReveal: boolean) => (
     <div className="absolute left-1/2 -translate-x-1/2 flex pointer-events-none"
@@ -174,17 +178,33 @@ export const PlayerSeat = memo(function PlayerSeat({
         const dealDelay = useReveal ? (i * totalActivePlayers + seatDealOrder) * 0.18 + 0.05 : i * 0.1;
         const isRevealed = useReveal ? revealedIndices.has(i) : true;
         const displayCard = isRevealed ? (shouldShowCards || (useReveal && isHuman) ? card : undefined) : undefined;
+        const isWinningCard = isShowdown && bestCards.length > 0 && !!displayCard && isBestCard(displayCard);
         return (
           <div key={i} style={{
-            transform: `rotate(${i === 0 ? -10 : 10}deg)`,
+            transform: `rotate(${i === 0 ? -10 : 10}deg)${isWinningCard ? ' translateY(-6px) scale(1.08)' : ''}`,
             marginLeft: i > 0 ? (compact ? '-14px' : '-16px') : '0',
+            position: 'relative',
+            zIndex: isWinningCard ? 10 : i,
+            filter: isShowdown && bestCards.length > 0 && !isWinningCard && isRevealed
+              ? 'brightness(0.55) saturate(0.4)'
+              : 'none',
+            transition: 'filter 0.4s ease, transform 0.3s ease',
           }}>
+            {isWinningCard && (
+              <div className="absolute inset-[-3px] rounded-lg pointer-events-none"
+                style={{
+                  boxShadow: '0 0 10px 3px hsl(43 74% 49% / 0.6), 0 0 20px 6px hsl(43 74% 49% / 0.3)',
+                  borderRadius: '8px',
+                  zIndex: -1,
+                }}
+              />
+            )}
             <CardDisplay
               card={displayCard}
               faceDown={!isRevealed}
               size={size as any}
               dealDelay={dealDelay}
-              className={isShowdown && showCards && !isOut ? 'animate-winning-cards-glow' : ''}
+              className={isShowdown && showCards && !isOut && bestCards.length === 0 ? 'animate-winning-cards-glow' : ''}
             />
           </div>
         );
