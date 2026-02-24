@@ -98,6 +98,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const pendingWinnersRef = useRef<{ winners: HandWinner[]; winnerDelay: number; targetCardCount: number } | null>(null);
   const runoutCompleteTimeRef = useRef<number>(0);
   const winnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preResultStacksRef = useRef<Record<number, number> | null>(null);
 
   const userId = user?.id;
   const lastBroadcastRef = useRef<number>(Date.now());
@@ -432,6 +433,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           winnerTimerRef.current = setTimeout(() => setHandWinners(winners), delay);
         }
 
+        // Snapshot current stacks before result updates them
+        const currentSeatsHR = tableStateRef.current?.seats ?? [];
+        const snapshotHR: Record<number, number> = {};
+        for (const s of currentSeatsHR) {
+          if (s.player_id) snapshotHR[s.seat] = s.stack;
+        }
+        preResultStacksRef.current = snapshotHR;
+
         setTableState(prev => {
           if (!prev) return prev;
           return {
@@ -497,6 +506,14 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           runoutCompleteTimeRef.current = Date.now() + runoutMs;
         }
         prevCommunityAtResultRef.current = newCommunityCount;
+
+        // Snapshot current stacks before result updates them
+        const currentSeatsHC = tableStateRef.current?.seats ?? [];
+        const snapshotHC: Record<number, number> = {};
+        for (const s of currentSeatsHC) {
+          if (s.player_id) snapshotHC[s.seat] = s.stack;
+        }
+        preResultStacksRef.current = snapshotHC;
 
         // Merge state
         setTableState(prev => {
@@ -899,6 +916,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     pendingWinnersRef.current = null;
     runoutCompleteTimeRef.current = 0;
     prevHandIdRef.current = null;
+    preResultStacksRef.current = null;
+    setAutoStartAttempted(false);
+    setHandHasEverStarted(false);
     if (winnerTimerRef.current) { clearTimeout(winnerTimerRef.current); winnerTimerRef.current = null; }
     if (showdownTimerRef.current) { clearTimeout(showdownTimerRef.current); showdownTimerRef.current = null; }
   }, []);
@@ -932,6 +952,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     pingTimeout,
     refreshState,
     resetForNewGame,
+    preResultStacksRef,
     sendChat,
     autoStartAttempted,
     handHasEverStarted,
