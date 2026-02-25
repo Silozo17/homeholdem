@@ -832,7 +832,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   }, [tableId, hand]);
 
   // Auto-deal
-  const seatedCount = tableState?.seats.filter(s => s.player_id && s.status === 'active' && s.stack > 0).length ?? 0;
+  const seatedCount = tableState?.seats.filter(s => s.player_id && s.status !== 'eliminated' && s.stack > 0).length ?? 0;
   const hasActiveHand = !!tableState?.current_hand;
 
   // Leader election: only lowest-seated player triggers auto-deal
