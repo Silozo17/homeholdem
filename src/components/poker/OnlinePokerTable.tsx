@@ -447,6 +447,33 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
 
+  // handleAction must be defined before early returns (Rules of Hooks)
+  const handleAction = useCallback(async (action: { type: string; amount?: number }) => {
+    const hapticMap: Record<string, any> = { check: 'check', call: 'call', raise: 'raise', 'all-in': 'allIn', fold: 'fold' };
+    if (hapticMap[action.type]) audio.haptic(hapticMap[action.type]);
+    if (action.type === 'check') audio.play('check');
+    else if (action.type === 'call') audio.play('chipClink');
+    else if (action.type === 'raise') audio.play('chipStack');
+    else if (action.type === 'all-in') audio.play('allIn');
+    else if (action.type === 'fold') audio.play('fold');
+    const actionType = action.type === 'all-in' ? 'all_in' : action.type;
+    try {
+      await sendAction(actionType, action.amount);
+    } catch (err: any) {
+      if (err?.message?.includes('action_superseded')) return;
+      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
+    }
+  }, [audio, sendAction]);
+
+  // Keep handleActionRef in sync for pre-actions
+  handleActionRef.current = handleAction;
+
+  // Wrap audio callbacks that need parent state (must be before early returns)
+  const handleThirtySecondsCallback = audio.handleThirtySeconds;
+  const handleCriticalTimeCallback = useCallback(() => {
+    audio.handleCriticalTime(setCriticalTimeActive);
+  }, [audio.handleCriticalTime, setCriticalTimeActive]);
+
   // ── Memoized derived values ──
   const table = tableState?.table;
   const seats = tableState?.seats ?? [];
@@ -602,25 +629,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const handleAction = useCallback(async (action: { type: string; amount?: number }) => {
-    const hapticMap: Record<string, any> = { check: 'check', call: 'call', raise: 'raise', 'all-in': 'allIn', fold: 'fold' };
-    if (hapticMap[action.type]) audio.haptic(hapticMap[action.type]);
-    if (action.type === 'check') audio.play('check');
-    else if (action.type === 'call') audio.play('chipClink');
-    else if (action.type === 'raise') audio.play('chipStack');
-    else if (action.type === 'all-in') audio.play('allIn');
-    else if (action.type === 'fold') audio.play('fold');
-    const actionType = action.type === 'all-in' ? 'all_in' : action.type;
-    try {
-      await sendAction(actionType, action.amount);
-    } catch (err: any) {
-      if (err?.message?.includes('action_superseded')) return;
-      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
-    }
-  }, [audio, sendAction]);
-
-  // Keep handleActionRef in sync
-  handleActionRef.current = handleAction;
+  // handleTimeout uses handleAction which is now defined above the early returns
 
   const handleTimeout = () => {
     if (actionPending) return;
@@ -628,11 +637,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     setShowStillPlayingPopup(true);
   };
 
-  // Wrap audio callbacks that need parent state
-  const handleThirtySecondsCallback = audio.handleThirtySeconds;
-  const handleCriticalTimeCallback = useCallback(() => {
-    audio.handleCriticalTime(setCriticalTimeActive);
-  }, [audio.handleCriticalTime, setCriticalTimeActive]);
 
   const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded' && (myCards !== null || !!hand);
 
