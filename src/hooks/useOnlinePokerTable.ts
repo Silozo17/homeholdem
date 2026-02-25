@@ -170,6 +170,9 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
       setTableState(data);
       setMyCards(data.my_cards || null);
+      if (data.current_hand || data.seats?.some((s: any) => s.player_id && s.player_id !== userId)) {
+        setHandHasEverStarted(true);
+      }
       setError(null);
       setConnectionStatus('connected');
       lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
