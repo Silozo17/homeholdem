@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CardDisplay } from './CardDisplay';
 import { PotDisplay } from './PotDisplay';
 import { PotOddsDisplay } from './PotOddsDisplay';
-import { PreActionButtons, PreActionType } from './PreActionButtons';
+import { PreActionButtons } from './PreActionButtons';
 import { BettingControls } from './BettingControls';
 import { PlayerSeat } from './PlayerSeat';
 import { SeatAnchor } from './SeatAnchor';
@@ -24,7 +24,6 @@ import { AchievementToast } from './AchievementToast';
 import { HandReplay } from './HandReplay';
 import { getSeatPositions, CARDS_PLACEMENT } from '@/lib/poker/ui/seatLayout';
 import { Z } from './z';
-import { usePokerSounds } from '@/hooks/usePokerSounds';
 import { useAchievements } from '@/hooks/useAchievements';
 import { useHandHistory, HandPlayerSnapshot } from '@/hooks/useHandHistory';
 import { useIsLandscape, useLockLandscape } from '@/hooks/useOrientation';
@@ -46,9 +45,14 @@ import { Card } from '@/lib/poker/types';
 import { AchievementContext, ACHIEVEMENT_XP } from '@/lib/poker/achievements';
 
 import pokerBg from '@/assets/poker-background.webp';
-import { usePokerVoiceAnnouncements } from '@/hooks/usePokerVoiceAnnouncements';
 import { GameStateDebugPanel } from './GameStateDebugPanel';
 import { PlayerProfileDrawer } from './PlayerProfileDrawer';
+
+// Extracted hooks
+import { usePokerPreActions } from '@/hooks/usePokerPreActions';
+import { usePokerAnimations } from '@/hooks/usePokerAnimations';
+import { usePokerAudio } from '@/hooks/usePokerAudio';
+import { usePokerGameOver } from '@/hooks/usePokerGameOver';
 
 /** Blind timer countdown for multiplayer */
 function OnlineBlindTimer({ lastIncreaseAt, timerMinutes, currentSmall, currentBig }: {
@@ -123,63 +127,58 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     kickedForInactivity, gameOverPendingRef, preResultStacksRef,
   } = useOnlinePokerTable(tableId);
 
+  // ── UI-only state ──
   const [joining, setJoining] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const { play, enabled: soundEnabled, toggle: toggleSound, haptic } = usePokerSounds();
-  const { announceBlindUp, announceWinner, announceCountdown, announceGameOver, announceCustom, clearQueue, resetHandDedup, voiceEnabled, toggleVoice, precache } = usePokerVoiceAnnouncements();
-  const [showConfetti, setShowConfetti] = useState(false);
   const voiceChat = useVoiceChat(tableId);
   const { newAchievement, clearNew, checkAndAward } = useAchievements();
-  const prevActiveCountRef = useRef<number>(0);
-  const firstHandRef = useRef(true);
-  const bigPotAnnouncedRef = useRef(false);
   const { lastHand, handHistory, startNewHand, recordAction, finalizeHand, exportCSV } = useHandHistory(tableId);
   const [replayOpen, setReplayOpen] = useState(false);
-  const [dealerExpression, setDealerExpression] = useState<'neutral' | 'smile' | 'surprise'>('neutral');
-  const [prevPhase, setPrevPhase] = useState<string | null>(null);
-  const prevPhaseRef = useRef<string | null>(null);
-  const [communityCardPhaseKey, setCommunityCardPhaseKey] = useState<string | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
-  
   const [inviteOpen, setInviteOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showLeaveSeatConfirm, setShowLeaveSeatConfirm] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-  
-  const [chipAnimations, setChipAnimations] = useState<Array<{ id: number; toX: number; toY: number }>>([]);
-  const [dealing, setDealing] = useState(false);
   const [criticalTimeActive, setCriticalTimeActive] = useState(false);
   const [criticalCountdown, setCriticalCountdown] = useState(5);
-  const [visibleCommunityCards, setVisibleCommunityCards] = useState<Card[]>([]);
-  const [preAction, setPreAction] = useState<PreActionType>(null);
-  const prevBetRef = useRef<number>(0);
-  const stagedRunoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const prevCommunityCountRef = useRef(0);
-  const prevAnimHandIdRef = useRef<string | null>(null);
-  const processedActionsRef = useRef(new Set<string>());
-  const prevIsMyTurnRef = useRef(false);
-  const chipAnimIdRef = useRef(0);
-  const winStreakRef = useRef(0);
-  // FIX 1: Freeze displayed stacks until winner overlay appears
-  const [displayStacks, setDisplayStacks] = useState<Record<number, number>>({});
-  // FIX 4: Store max stack at hand start for big pot threshold
-  const handStartMaxStackRef = useRef(0);
-  const handsPlayedRef = useRef(0);
-  const handsWonRef = useRef(0);
-  const bestHandNameRef = useRef('');
-  const bestHandRankRef = useRef(-1);
-  const biggestPotRef = useRef(0);
-  const gameStartTimeRef = useRef(Date.now());
-  const xpSavedRef = useRef(false);
-  const startXpRef = useRef<number | null>(null);
-  const [xpOverlay, setXpOverlay] = useState<{ startXp: number; endXp: number; xpGained: number } | null>(null);
-  const chatCountRef = useRef(0);
-  const startingStackRef = useRef(0);
   const isLandscape = useIsLandscape();
   useLockLandscape();
 
+  // ── Shared refs (passed to multiple hooks) ──
+  const processedActionsRef = useRef(new Set<string>());
+  const chatCountRef = useRef(0);
+  const handStartMaxStackRef = useRef(0);
+
+  // ── Compose extracted hooks ──
+  const audio = usePokerAudio({
+    tableState, handWinners, userId: user?.id, lastActions,
+    handStartMaxStackRef, processedActionsRef,
+  });
+
+  const animations = usePokerAnimations({
+    tableState, handWinners, mySeatNumber, preResultStacksRef, processedActionsRef,
+  });
+
+  const gameOverHook = usePokerGameOver({
+    user, tableState, handWinners, lastKnownStack,
+    gameOverPendingRef, leaveSeat, leaveTable, onLeave,
+    resetForNewGame, refreshState, announceGameOver: audio.announceGameOver,
+    mySeatNumber, chatCountRef, resetAnimations: animations.resetAnimations,
+  });
+
+  // handleAction ref for pre-actions (avoids stale closure)
+  const handleActionRef = useRef<(action: { type: string; amount?: number }) => Promise<void>>(async () => {});
+
+  const preActions = usePokerPreActions({
+    isMyTurn, amountToCall, canCheck, tableState,
+    handleActionRef,
+    haptic: audio.haptic,
+    play: audio.play,
+    setCriticalTimeActive,
+  });
+
+  // ── Wake lock ──
   const { requestWakeLock, releaseWakeLock } = useWakeLock();
   useEffect(() => {
     requestWakeLock();
@@ -197,13 +196,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       voiceChatAttemptedRef.current = false;
     }
   }, [mySeatNumber]);
-
-  // Capture starting XP on mount for level-up animation
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
-  }, [user]);
 
   // One-time achievement XP backfill
   const achievementXpSyncedRef = useRef(false);
@@ -258,7 +250,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     stillPlayingIntervalRef.current = setInterval(() => {
       setStillPlayingCountdown(prev => {
         if (prev <= 1) {
-          // Time's up — kick from seat
           clearInterval(stillPlayingIntervalRef.current!);
           stillPlayingIntervalRef.current = null;
           setShowStillPlayingPopup(false);
@@ -279,9 +270,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     setShowStillPlayingPopup(false);
   }, []);
 
-  // Inactivity protection: handled solely by the "Still Playing?" popup
-  // triggered after an auto-fold timeout (handleTimeout). No general touch-based timer.
-
   // Listen for blinds_up broadcast and show toast + voice
   useEffect(() => {
     onBlindsUp((payload: any) => {
@@ -289,11 +277,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         title: '🔺 Blinds Up!',
         description: `Now ${payload.new_small}/${payload.new_big}`,
       });
-      announceBlindUp(payload.new_small, payload.new_big);
+      audio.announceBlindUp(payload.new_small, payload.new_big);
     });
-  }, [onBlindsUp, announceBlindUp]);
+  }, [onBlindsUp, audio.announceBlindUp]);
 
-  // Handle server-side inactivity kick — unseat only, stay as spectator
+  // Handle server-side inactivity kick
   useEffect(() => {
     if (kickedForInactivity) {
       toast({
@@ -304,14 +292,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       leaveSeat().catch(() => {});
     }
   }, [kickedForInactivity, leaveSeat]);
-
-  // Track starting stack when first seated
-  useEffect(() => {
-    if (mySeatNumber !== null && startingStackRef.current === 0 && tableState) {
-      const mySeat = tableState.seats.find(s => s.player_id === user?.id);
-      if (mySeat) startingStackRef.current = mySeat.stack;
-    }
-  }, [mySeatNumber, tableState, user?.id]);
 
   // Track chat count
   const originalSendChat = sendChat;
@@ -332,51 +312,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sound + haptic triggers on phase changes
-  const currentPhase = tableState?.current_hand?.phase ?? null;
-  useEffect(() => {
-    if (currentPhase && currentPhase !== prevPhase) {
-      if (currentPhase === 'preflop' && !prevPhase) {
-        play('shuffle'); haptic('deal');
-        // Voice: "Shuffling up and dealing" on first hand only
-        if (firstHandRef.current) { announceCustom("Shuffling up and dealing"); firstHandRef.current = false; }
-        bigPotAnnouncedRef.current = false;
-      }
-      if (currentPhase === 'flop' || currentPhase === 'turn' || currentPhase === 'river') { play('flip'); haptic('cardReveal'); }
-      if (currentPhase === 'showdown' || currentPhase === 'complete') {
-        setDealerExpression('smile');
-        setTimeout(() => setDealerExpression('neutral'), 2500);
-      }
-      setPrevPhase(currentPhase);
-    }
-    if (!currentPhase) setPrevPhase(null);
-  }, [currentPhase, prevPhase, play, haptic]);
-
-  // Track phase changes for community card deal animation keys
-  useEffect(() => {
-    const prev = prevPhaseRef.current;
-    prevPhaseRef.current = currentPhase;
-    if (!currentPhase || currentPhase === prev) return;
-    if ((currentPhase === 'flop' && prev === 'preflop') ||
-        (currentPhase === 'turn' && prev === 'flop') ||
-        (currentPhase === 'river' && prev === 'turn')) {
-      setCommunityCardPhaseKey(`${currentPhase}-${Date.now()}`);
-    }
-  }, [currentPhase]);
-
-  // Hand history: snapshot players on new hand + FIX 1 & FIX 4: freeze stacks & capture max stack
+  // Hand history: snapshot players on new hand + capture max stack
   useEffect(() => {
     const hand = tableState?.current_hand;
     if (!hand) return;
     const currentHandId = hand.hand_id;
-    if (currentHandId && currentHandId !== prevAnimHandIdRef.current && hand.phase === 'preflop') {
-      handsPlayedRef.current++;
-      bigPotAnnouncedRef.current = false;
+    if (currentHandId && currentHandId !== (animations as any).__prevAnimHandId && hand.phase === 'preflop') {
+      gameOverHook.handsPlayedRef.current++;
       const players: HandPlayerSnapshot[] = (tableState?.seats ?? [])
         .filter(s => s.player_id)
         .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
       startNewHand(currentHandId, hand.hand_number, players);
-      // FIX 4: Capture max stack at hand start for big pot threshold
       const seatedStacks = (tableState?.seats ?? []).filter(s => s.player_id).map(s => s.stack);
       handStartMaxStackRef.current = seatedStacks.length > 0 ? Math.max(...seatedStacks) : 0;
     }
@@ -410,7 +356,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const hand = tableState.current_hand;
     const communityCards = hand?.community_cards ?? [];
 
-    // Finalize hand history
     finalizeHand({
       communityCards,
       winners: handWinners,
@@ -419,26 +364,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
       revealedCards,
     });
 
-    // Track stats for game over
-    const heroWon = handWinners.some(w => w.player_id === user.id);
-    if (heroWon) {
-      winStreakRef.current++;
-      handsWonRef.current++;
-    } else {
-      winStreakRef.current = 0;
-    }
-    const totalPotThisHand = (hand?.pots ?? []).reduce((s, p) => s + p.amount, 0);
-    if (totalPotThisHand > biggestPotRef.current) biggestPotRef.current = totalPotThisHand;
-    const winnerHand0 = handWinners.find(w => w.player_id === user.id);
-    if (winnerHand0?.hand_name) {
-      // Simple rank comparison by name — not perfect but good enough for display
-      const rankOrder = ['High Card', 'One Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'];
-      const newRank = rankOrder.indexOf(winnerHand0.hand_name);
-      if (newRank > bestHandRankRef.current) {
-        bestHandRankRef.current = newRank;
-        bestHandNameRef.current = winnerHand0.hand_name;
-      }
-    }
+    // Update game-over stats via hook
+    gameOverHook.recordHandResult(handWinners, user.id);
 
     const mySeat = tableState.seats.find(s => s.player_id === user.id);
     const allStacks = tableState.seats.filter(s => s.player_id).map(s => s.stack);
@@ -446,6 +373,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const heroStack = mySeat?.stack ?? 0;
     const isChipLeader = allStacks.length > 0 && heroStack >= Math.max(...allStacks);
     const playerCount = allStacks.length;
+    const heroWon = handWinners.some(w => w.player_id === user.id);
     const winnerHand = handWinners.find(w => w.player_id === user.id);
     const potWon = winnerHand?.amount ?? 0;
     const wasDesperate = heroStack > 0 && (heroStack - potWon) < avgStack * 0.1 && heroWon;
@@ -454,17 +382,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     const ctx: AchievementContext = {
       heroWon,
-      winStreak: winStreakRef.current,
+      winStreak: gameOverHook.winStreakRef.current,
       handName: winnerHand?.hand_name ?? null,
       potWon,
       bigBlind: tableState.table.big_blind,
       heroStack,
-      startingStack: startingStackRef.current || heroStack,
+      startingStack: gameOverHook.startingStackRef.current || heroStack,
       averageStack: avgStack,
       allInWin: heroWon && !!wasAllIn,
       playerCount,
       isChipLeader,
-      handsPlayed: handsPlayedRef.current,
+      handsPlayed: gameOverHook.handsPlayedRef.current,
       chatMessagesSent: chatCountRef.current,
       wonFromBB: heroWon && !!isBB,
       isHeadsUp: playerCount === 2,
@@ -474,8 +402,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     const newAchs = checkAndAward(ctx);
     if (newAchs.length > 0) {
-      play('achievement');
-      // Award bonus XP for achievements in multiplayer
+      audio.play('achievement');
       const achXpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
       for (const ach of newAchs) {
         const bonus = ACHIEVEMENT_XP[ach.id];
@@ -491,413 +418,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   }, [handWinners]);
 
-  // Freeze stacks at pre-result snapshot until winner overlay appears
+  // Table closed detection
   useEffect(() => {
-    if (handWinners.length === 0 && preResultStacksRef.current) {
-      setDisplayStacks(preResultStacksRef.current);
-      return;
-    }
-    // Winner overlay is showing or no pending result — use real stacks
-    preResultStacksRef.current = null;
-    const realStacks: Record<number, number> = {};
-    for (const s of (tableState?.seats ?? [])) {
-      if (s.player_id) realStacks[s.seat] = s.stack;
-    }
-    setDisplayStacks(realStacks);
-  }, [tableState?.seats, handWinners.length]);
-
-  // FIX 2: Voice announce hand winners with debug log
-  // Snapshot winners and remove cleanup to prevent re-render cancellation
-  useEffect(() => {
-    if (handWinners.length === 0 || !user) return;
-    play('win');
-    haptic('win');
-
-    const winnersSnapshot = [...handWinners];
-    const userId = user.id;
-    setTimeout(() => {
-      for (const winner of winnersSnapshot) {
-        const isHero = winner.player_id === userId;
-        const name = isHero ? 'You' : winner.display_name;
-        const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
-          ? winner.hand_name
-          : undefined;
-        const message = handName ? `${name} wins with ${handName}` : `${name} wins the pot`;
-        console.log('[voice] announcing winner:', message);
-        announceCustom(message);
-      }
-    }, 400);
-    // No cleanup — timer must survive re-renders
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handWinners, user?.id]);
-
-   // FIX 3: Voice detect all-in from lastActions with debug log
-  useEffect(() => {
-    if (!lastActions || !user) return;
-    const handId = tableState?.current_hand?.hand_id ?? '';
-    for (const [playerId, actionStr] of Object.entries(lastActions)) {
-      const lower = actionStr.toLowerCase();
-      if (lower === 'all_in' || lower === 'all-in' || lower === 'allin') {
-        console.log('[voice] all-in check, playerId:', playerId, 'user.id:', user?.id, 'match:', playerId === user?.id);
-        // Skip self announcements
-        if (playerId === user.id) continue;
-        const key = `voice:allin:${playerId}:${handId}`;
-        if (!processedActionsRef.current.has(key)) {
-          processedActionsRef.current.add(key);
-          const seat = tableState?.seats.find(s => s.player_id === playerId);
-          const playerName = seat?.display_name || 'A player';
-          const message = `${playerName} is all in`;
-          console.log('[voice] announcing all-in:', message);
-          announceCustom(message);
-        }
-      }
-    }
-  }, [lastActions, announceCustom, user, tableState]);
-
-  // Voice: detect heads-up
-  useEffect(() => {
-    if (!tableState) return;
-    const activeCount = tableState.seats.filter(s => s.player_id && s.stack > 0).length;
-    if (prevActiveCountRef.current > 2 && activeCount === 2) {
-      announceCustom("We're heads up!");
-    }
-    prevActiveCountRef.current = activeCount;
-  }, [tableState?.seats, announceCustom]);
-
-  // FIX 4: Voice big pot detection — 20% of max stack at hand start
-  useEffect(() => {
-    if (!tableState || bigPotAnnouncedRef.current) return;
-    const totalPotNow = tableState.current_hand?.pots?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
-    const maxStack = handStartMaxStackRef.current;
-    const bigPotThreshold = maxStack > 0 ? maxStack * 0.20 : Infinity;
-    if (totalPotNow >= bigPotThreshold) {
-      bigPotAnnouncedRef.current = true;
-      announceCustom("Big pot building!");
-    }
-  }, [tableState?.current_hand?.pots, announceCustom]);
-
-  // Precache common voice phrases on mount
-  useEffect(() => { precache(); }, [precache]);
-
-  // Reset per-hand voice dedup on new hand (but don't wipe the audio queue — let in-flight audio finish)
-  useEffect(() => {
-    const handId = tableState?.current_hand?.hand_id;
-    if (handId) resetHandDedup();
-  }, [tableState?.current_hand?.hand_id, resetHandDedup]);
-
-  // Trigger confetti on hero win, auto-clear after 3s
-  useEffect(() => {
-    if (handWinners.length === 0 || !user) return;
-    const heroWon = handWinners.some(w => w.player_id === user.id);
-    if (heroWon) {
-      setShowConfetti(true);
-      const t = setTimeout(() => setShowConfetti(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [handWinners, user]);
-
-  // Your turn: sound + haptic + pre-action execution
-  useEffect(() => {
-    if (isMyTurn && !prevIsMyTurnRef.current) {
-      // Execute queued pre-action
-      if (preAction) {
-        const executePreAction = async () => {
-          let actionToFire: { type: string; amount?: number } | null = null;
-          if (preAction === 'check_fold') {
-            actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'fold' };
-          } else if (preAction === 'call_any') {
-            actionToFire = amountToCall === 0 ? { type: 'check' } : { type: 'call' };
-          } else if (preAction === 'check') {
-            // ONLY fire if there is genuinely nothing to call
-            if (amountToCall === 0) actionToFire = { type: 'check' };
-            // Otherwise discard silently (do NOT call)
-          }
-          setPreAction(null);
-          if (actionToFire) {
-            haptic(actionToFire.type as any);
-            await handleAction(actionToFire);
-            return;
-          }
-        };
-        executePreAction();
-      } else {
-        play('yourTurn');
-        haptic('cardReveal');
-        if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
-      }
-    }
-    prevIsMyTurnRef.current = isMyTurn;
-    if (!isMyTurn) {
-      setCriticalTimeActive(false);
-    }
-  }, [isMyTurn, play, haptic, preAction, amountToCall]);
-
-  // Clear pre-action and card peek on new hand
-  useEffect(() => {
-    const currentHandId = tableState?.current_hand?.hand_id ?? null;
-    if (currentHandId) {
-      setPreAction(null);
-    }
-  }, [tableState?.current_hand?.hand_id]);
-
-  // Invalidate pre-action "check" if a bet comes in
-  useEffect(() => {
-    const currentBet = tableState?.current_hand?.current_bet ?? 0;
-    if (preAction === 'check' && currentBet > prevBetRef.current && currentBet > 0) {
-      setPreAction(null);
-    }
-    prevBetRef.current = currentBet;
-  }, [tableState?.current_hand?.current_bet, preAction]);
-
-  useEffect(() => {
-    if (!tableState && !loading && !error && !gameOver) {
+    if (!tableState && !loading && !error && !gameOverHook.gameOver) {
       toast({ title: 'Table closed', description: 'This table has been closed.' });
       onLeave();
     }
-  }, [error, tableState, loading, onLeave, gameOver]);
-
-  // Game over detection — consolidated: loser, winner, fallback, and opponent-left
-  useEffect(() => {
-    if (gameOver || !tableState || !user) return;
-
-    const mySeatInfo = tableState.seats.find(s => s.player_id === user.id);
-    const activePlayers = tableState.seats.filter(s => s.player_id && s.stack > 0);
-    const handPhase = tableState.current_hand?.phase;
-
-    // CASE 1: Normal end — hand result arrived, I lost (stack = 0)
-    if (handWinners.length > 0 && mySeatInfo && mySeatInfo.stack <= 0) {
-      const heroWon = handWinners.some(w => w.player_id === user.id);
-      if (!heroWon) {
-        gameOverPendingRef.current = true;
-        const snap = [...handWinners];
-        const timer = setTimeout(() => {
-          announceGameOver(snap[0]?.display_name || 'Unknown', false);
-          setGameOver(true);
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-    }
-
-    // CASE 2: Normal end — hand result arrived, I won (last with chips)
-    if (handWinners.length > 0 && mySeatInfo && mySeatInfo.stack > 0) {
-      if (activePlayers.length === 1 && activePlayers[0].player_id === user.id) {
-        gameOverPendingRef.current = true;
-        const snap = [...handWinners];
-        const timer = setTimeout(() => {
-          announceGameOver('You', true);
-          setGameOver(true);
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-    }
-
-    // CASE 3: Fallback — my seat already removed by server, stack was 0
-    if (handWinners.length > 0 && !mySeatInfo && lastKnownStack === 0) {
-      gameOverPendingRef.current = true;
-      const snap = [...handWinners];
-      const timer = setTimeout(() => {
-        announceGameOver(snap[0]?.display_name || 'Unknown', false);
-        setGameOver(true);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-
-    // CASE 4: Opponent left mid-session without a hand result
-    if (
-      handWinners.length === 0 &&
-      handsPlayedRef.current > 0 &&
-      mySeatInfo &&
-      mySeatInfo.stack > 0 &&
-      activePlayers.length === 1 &&
-      activePlayers[0].player_id === user.id &&
-      (!handPhase || handPhase === 'complete')
-    ) {
-      const timer = setTimeout(() => {
-        announceGameOver('You', true);
-        setGameOver(true);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [tableState, user, handWinners, gameOver, lastKnownStack]);
-
-  // Shared XP + stats save helper (called on game over AND on leave)
-  const saveXpAndStats = useCallback(async (isWinnerOverride?: boolean) => {
-    if (xpSavedRef.current || !user) return;
-    if (handsPlayedRef.current === 0) return; // No XP for join-and-leave
-    xpSavedRef.current = true;
-
-    const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
-    const finalChips = mySeatInfo?.stack ?? 0;
-    const isWinner = isWinnerOverride ?? (finalChips > 0 &&
-      (tableState?.seats.filter(s => s.player_id && s.stack > 0).length ?? 0) === 1);
-    const isTournament = !!(tableState?.table as any)?.tournament_id;
-
-    // Save play result (FIX XP-1: add error handling)
-    const { error: resultErr } = await supabase.from('poker_play_results').insert({
-      user_id: user.id,
-      game_mode: isTournament ? 'tournament' : 'multiplayer',
-      hands_played: handsPlayedRef.current,
-      hands_won: handsWonRef.current,
-      best_hand_name: bestHandNameRef.current || null,
-      best_hand_rank: bestHandRankRef.current >= 0 ? bestHandRankRef.current : null,
-      biggest_pot: biggestPotRef.current,
-      starting_chips: startingStackRef.current,
-      final_chips: finalChips,
-      bot_count: 0,
-      duration_seconds: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
-    });
-    if (resultErr) console.error('[XP] poker_play_results insert failed:', resultErr);
-
-    // Award XP
-    const xpEvents: Array<{ user_id: string; xp_amount: number; reason: string }> = [];
-    const boost = isTournament ? 1.15 : 1;
-    xpEvents.push({ user_id: user.id, xp_amount: Math.round(25 * boost), reason: 'game_complete' });
-    if (isWinner) xpEvents.push({ user_id: user.id, xp_amount: Math.round(100 * boost), reason: 'game_win' });
-    if (handsPlayedRef.current > 0)
-      xpEvents.push({ user_id: user.id, xp_amount: Math.round(handsPlayedRef.current * boost), reason: 'hands_played' });
-    if (handsWonRef.current > 0)
-      xpEvents.push({ user_id: user.id, xp_amount: Math.round(handsWonRef.current * 10 * boost), reason: 'hands_won' });
-
-    const { error: xpErr } = await supabase.from('xp_events').insert(xpEvents);
-    if (xpErr) console.error('[XP] xp_events insert failed:', xpErr);
-
-    // Fetch updated XP for level-up animation
-    // Small delay to let the DB trigger process
-    await new Promise(r => setTimeout(r, 500));
-    const { data: newXp } = await supabase.from('player_xp')
-      .select('total_xp').eq('user_id', user.id).maybeSingle();
-
-    const endXp = newXp?.total_xp ?? 0;
-    const sXp = startXpRef.current ?? 0;
-    const totalGained = xpEvents.reduce((s, e) => s + e.xp_amount, 0);
-
-    if (totalGained > 0) {
-      setXpOverlay({ startXp: sXp, endXp, xpGained: totalGained });
-      return 'show_overlay';
-    }
-    return 'no_overlay';
-  }, [user, tableState]);
-
-  // Stable ref so game-over timer isn't reset by tableState changes
-  const saveXpAndStatsRef = useRef(saveXpAndStats);
-  useEffect(() => { saveXpAndStatsRef.current = saveXpAndStats; }, [saveXpAndStats]);
-
-  // Save XP on game over + leave seat (but stay at table)
-  useEffect(() => {
-    if (!gameOver || !user || xpSavedRef.current) return;
-    const mySeatInfo = tableState?.seats.find(s => s.player_id === user.id);
-    const isWinner = (mySeatInfo?.stack ?? 0) > 0;
-    // Delay leaveSeat so the game over screen is fully visible first
-    // leaveSeat triggers refreshState which clears tableState and community cards
-    const leaveTimer = setTimeout(() => {
-      leaveSeat(false).catch(() => {});
-    }, 2500);
-    // XP save after a further 1 second (was 3.5s from gameOver, now 3.5s total)
-    const xpTimer = setTimeout(() => {
-      saveXpAndStatsRef.current(isWinner);
-    }, 3500);
-    return () => {
-      clearTimeout(leaveTimer);
-      clearTimeout(xpTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameOver, user]);
-
-  // Staged community card reveal for all-in runouts
-  useEffect(() => {
-    const communityCards = tableState?.current_hand?.community_cards ?? [];
-    const prevCount = prevCommunityCountRef.current;
-    const newCount = communityCards.length;
-
-    // Do not clear cards if hand just ended — keep them visible until game over screen shows
-    if (newCount === 0 && handWinners.length > 0) return;
-
-    if (newCount > prevCount && (newCount - prevCount) > 1) {
-      stagedRunoutRef.current.forEach(t => clearTimeout(t));
-      stagedRunoutRef.current = [];
-      setVisibleCommunityCards(communityCards.slice(0, Math.min(3, newCount)));
-      if (newCount > 3) {
-        const t1 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 4)), 2000);
-        stagedRunoutRef.current.push(t1);
-      }
-      if (newCount > 4) {
-        const t2 = setTimeout(() => setVisibleCommunityCards(communityCards.slice(0, 5)), 4000);
-        stagedRunoutRef.current.push(t2);
-      }
-    } else {
-      setVisibleCommunityCards(communityCards);
-    }
-    prevCommunityCountRef.current = newCount;
-    if (newCount === 0) {
-      stagedRunoutRef.current.forEach(t => clearTimeout(t));
-      stagedRunoutRef.current = [];
-      prevCommunityCountRef.current = 0;
-    }
-  }, [tableState?.current_hand?.community_cards, handWinners]);
-
-  useEffect(() => {
-    return () => { stagedRunoutRef.current.forEach(t => clearTimeout(t)); };
-  }, []);
-
-  // Deal animation on new hand + dealAnimDone gating for action buttons
-  const [dealAnimDone, setDealAnimDone] = useState(true);
-  useEffect(() => {
-    const currentHandId = tableState?.current_hand?.hand_id ?? null;
-    if (currentHandId && currentHandId !== prevAnimHandIdRef.current && tableState?.current_hand?.phase === 'preflop') {
-      setDealing(true);
-      setDealAnimDone(false);
-      processedActionsRef.current.clear();
-      const activePlayers = (tableState?.seats ?? []).filter(s => s.player_id && s.status !== 'eliminated').length;
-      // Duration: 2 cards per player * 0.12s stagger + 0.45s fly + 0.3s reveal buffer
-      const dealDurationMs = ((activePlayers * 2) * 0.15 + 0.45 + 0.3) * 1000;
-      const dealTimer = setTimeout(() => setDealAnimDone(true), dealDurationMs);
-      const visualMs = ((activePlayers * 2) * 0.15 + 0.45) * 1000 + 200;
-      const visualTimer = setTimeout(() => setDealing(false), visualMs);
-      prevAnimHandIdRef.current = currentHandId;
-      return () => { clearTimeout(dealTimer); clearTimeout(visualTimer); };
-    }
-    if (!currentHandId) {
-      prevAnimHandIdRef.current = null;
-      setDealAnimDone(true);
-    }
-  }, [tableState?.current_hand?.hand_id, tableState?.current_hand?.phase]);
-
-  // Chip animation: pot flies to winner
-  useEffect(() => {
-    if (handWinners.length === 0 || !tableState) return;
-    const winner = handWinners[0];
-    const heroSeatNum = mySeatNumber ?? 0;
-    const maxSeatsCount = tableState.table.max_seats;
-    const isLand = window.innerWidth > window.innerHeight;
-    const positionsArr = getSeatPositions(maxSeatsCount, isLand);
-    const winnerSeat = tableState.seats.find(s => s.player_id === winner.player_id);
-    if (!winnerSeat) return;
-    const screenIdx = ((winnerSeat.seat - heroSeatNum) + maxSeatsCount) % maxSeatsCount;
-    const winnerPos = positionsArr[screenIdx];
-    if (!winnerPos) return;
-    const newChips = Array.from({ length: 6 }, (_, i) => ({
-      id: chipAnimIdRef.current++,
-      toX: winnerPos.xPct,
-      toY: winnerPos.yPct,
-    }));
-    setChipAnimations(newChips);
-    const timer = setTimeout(() => setChipAnimations([]), 1200);
-    return () => clearTimeout(timer);
-  }, [handWinners, tableState, mySeatNumber]);
-
-  // 30-second warning: sound only (no isMyTurn guard — prop is already gated by isMe && isCurrentActor)
-  const handleThirtySeconds = useCallback(() => {
-    play('timerWarning');
-    if ('vibrate' in navigator) navigator.vibrate([100]);
-  }, [play]);
-
-  // 5-second critical warning: red overlay + voice
-  const handleCriticalTime = useCallback(() => {
-    setCriticalTimeActive(true);
-    play('timerWarning');
-    announceCountdown();
-    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
-  }, [play, announceCountdown]);
+  }, [error, tableState, loading, onLeave, gameOverHook.gameOver]);
 
   // Critical countdown timer
   useEffect(() => {
@@ -917,7 +444,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
     return () => clearInterval(interval);
   }, [criticalTimeActive, tableState?.current_hand?.action_deadline]);
-
 
   const handleReconnect = useCallback(() => { refreshState(); }, [refreshState]);
 
@@ -1047,11 +573,9 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
   const handleLeave = async () => {
     try {
-      // Save XP before leaving
-      const result = await saveXpAndStats(false);
+      const result = await gameOverHook.saveXpAndStats(false);
       voiceChat.disconnect();
       if (result === 'show_overlay') {
-        // Overlay will call leaveTable + onLeave via its Continue button
         return;
       }
       await leaveTable();
@@ -1078,33 +602,37 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     }
   };
 
-  const handleAction = async (action: { type: string; amount?: number }) => {
-    // Haptic feedback per action type
+  const handleAction = useCallback(async (action: { type: string; amount?: number }) => {
     const hapticMap: Record<string, any> = { check: 'check', call: 'call', raise: 'raise', 'all-in': 'allIn', fold: 'fold' };
-    if (hapticMap[action.type]) haptic(hapticMap[action.type]);
-    if (action.type === 'check') play('check');
-    else if (action.type === 'call') play('chipClink');
-    else if (action.type === 'raise') play('chipStack');
-    else if (action.type === 'all-in') play('allIn');
-    else if (action.type === 'fold') play('fold');
+    if (hapticMap[action.type]) audio.haptic(hapticMap[action.type]);
+    if (action.type === 'check') audio.play('check');
+    else if (action.type === 'call') audio.play('chipClink');
+    else if (action.type === 'raise') audio.play('chipStack');
+    else if (action.type === 'all-in') audio.play('allIn');
+    else if (action.type === 'fold') audio.play('fold');
     const actionType = action.type === 'all-in' ? 'all_in' : action.type;
     try {
       await sendAction(actionType, action.amount);
     } catch (err: any) {
-      // Silently swallow action_superseded — action raced with timeout, not a real error
       if (err?.message?.includes('action_superseded')) return;
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     }
-  };
+  }, [audio, sendAction]);
+
+  // Keep handleActionRef in sync
+  handleActionRef.current = handleAction;
 
   const handleTimeout = () => {
-    // Only fires when isCurrentPlayer=true in PlayerSeat — all-in players
-    // are never current_actor so this never fires for them
     if (actionPending) return;
     handleAction({ type: 'fold' });
     setShowStillPlayingPopup(true);
   };
 
+  // Wrap audio callbacks that need parent state
+  const handleThirtySecondsCallback = audio.handleThirtySeconds;
+  const handleCriticalTimeCallback = useCallback(() => {
+    audio.handleCriticalTime(setCriticalTimeActive);
+  }, [audio.handleCriticalTime, setCriticalTimeActive]);
 
   const showActions = isMyTurn && !actionPending && mySeat && mySeat.status !== 'folded' && (myCards !== null || !!hand);
 
@@ -1184,23 +712,23 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Audio menu — sound effects + voice announcements */}
+          {/* Audio menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors active:scale-90"
               >
-                {(soundEnabled || voiceEnabled) ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
+                {(audio.soundEnabled || audio.voiceEnabled) ? <Volume2 className="h-3.5 w-3.5 text-foreground/80" /> : <VolumeX className="h-3.5 w-3.5 text-foreground/40" />}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[180px] bg-popover border border-border z-[9999]">
-              <DropdownMenuItem onClick={toggleSound}>
-                {soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
-                {t('poker_table.sound_effects')} {soundEnabled ? t('poker_table.on') : t('poker_table.off')}
+              <DropdownMenuItem onClick={audio.toggleSound}>
+                {audio.soundEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
+                {t('poker_table.sound_effects')} {audio.soundEnabled ? t('poker_table.on') : t('poker_table.off')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleVoice}>
-                {voiceEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
-                {t('poker_table.voice_announcements')} {voiceEnabled ? t('poker_table.on') : t('poker_table.off')}
+              <DropdownMenuItem onClick={audio.toggleVoice}>
+                {audio.voiceEnabled ? <Volume2 className="h-3.5 w-3.5 mr-2" /> : <VolumeX className="h-3.5 w-3.5 mr-2" />}
+                {t('poker_table.voice_announcements')} {audio.voiceEnabled ? t('poker_table.on') : t('poker_table.off')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1217,7 +745,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             onToggleDeafen={voiceChat.toggleDeafen}
           />
 
-          {/* QuickChat — always visible in header */}
+          {/* QuickChat */}
           <QuickChat onSend={trackedSendChat} />
 
           {/* In mobile landscape, collapse non-essential buttons into three-dot menu */}
@@ -1359,7 +887,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           />
 
           <div className="absolute left-1/2 -translate-x-1/2" style={{ top: isMobileLandscape ? 'calc(-4% - 32px)' : isTablet ? 'calc(-4% + 8px)' : isLargeDesktop ? 'calc(-4% - 31px)' : 'calc(-4% - 27px)', width: 'min(9vw, 140px)', zIndex: Z.DEALER }}>
-            <DealerCharacter expression={dealerExpression} />
+            <DealerCharacter expression={audio.dealerExpression} />
           </div>
 
           {totalPot > 0 && (
@@ -1372,18 +900,17 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
           {/* 5-slot community card layout */}
           <div className="absolute left-1/2 flex gap-1.5 items-center" style={{ top: '50%', transform: 'translate(-50%, -50%)', zIndex: Z.CARDS }}>
             {[0, 1, 2, 3, 4].map(slotIdx => {
-              const card = visibleCommunityCards[slotIdx];
-              // Determine if this card was just dealt (new in current phase)
+              const card = animations.visibleCommunityCards[slotIdx];
               const isNewInPhase = (() => {
-                if (!communityCardPhaseKey) return false;
-                const phase = communityCardPhaseKey.split('-')[0];
+                if (!animations.communityCardPhaseKey) return false;
+                const phase = animations.communityCardPhaseKey.split('-')[0];
                 if (phase === 'flop' && slotIdx < 3) return true;
                 if (phase === 'turn' && slotIdx === 3) return true;
                 if (phase === 'river' && slotIdx === 4) return true;
                 return false;
               })();
               const staggerIdx = (() => {
-                const phase = communityCardPhaseKey?.split('-')[0];
+                const phase = animations.communityCardPhaseKey?.split('-')[0];
                 if (phase === 'flop') return slotIdx;
                 return 0;
               })();
@@ -1403,7 +930,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             })}
           </div>
 
-          {(!hand || visibleCommunityCards.length === 0) && (
+          {(!hand || animations.visibleCommunityCards.length === 0) && (
             <div className="absolute left-1/2 -translate-x-1/2 text-[10px] text-foreground/20 italic font-medium" style={{ top: 'calc(50% + 28px)', zIndex: Z.LOGO, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
               {activeSeats.length >= 2 ? t('poker_table.starting_soon') : t('poker_table.waiting_for_players')}
             </div>
@@ -1440,18 +967,14 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          {handWinners.length > 0 && !xpOverlay && (
+          {handWinners.length > 0 && !gameOverHook.xpOverlay && (
             <WinnerOverlay
               winners={handWinners.map(w => ({ name: w.player_id === user?.id ? 'You' : w.display_name, hand: { name: w.hand_name || 'Winner', rank: 0, score: 0, bestCards: [] }, chips: w.amount }))}
               isGameOver={false} onNextHand={() => {}} onQuit={() => {}}
             />
           )}
 
-          {/* Game-over WinnerOverlay removed — stats merged into XP overlay */}
-
-          {/* XP overlay moved to root level of z-[60] wrapper for correct stacking */}
-
-          {showConfetti && (
+          {audio.showConfetti && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: Z.EFFECTS + 10 }}>
               {confettiPositions.map((c, i) => (
                 <div key={i} className="absolute animate-confetti-drift"
@@ -1461,14 +984,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             </div>
           )}
 
-          {chipAnimations.map((chip, i) => (
+          {animations.chipAnimations.map((chip, i) => (
             <ChipAnimation key={chip.id} fromX={50} fromY={20} toX={chip.toX} toY={chip.toY} duration={900} delay={i * 80} />
           ))}
 
-          {dealing && (() => {
+          {animations.dealing && (() => {
             const posArr = positions;
             const activeSeatCount = clockwiseOrder.length;
-
 
             return rotatedSeats.map((seatData, screenPos) => {
               if (!seatData?.player_id) return null;
@@ -1487,8 +1009,6 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
               });
             });
           })()}
-
-          {/* communityDealSprites removed — actual cards animate via dealFromDealer */}
 
           {chatBubbles.map(bubble => {
             const seatInfo = tableState.seats.find(s => s.player_id === bubble.player_id);
@@ -1536,9 +1056,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
 
             const opponentRevealed = !isMe ? revealedCards.find(rc => rc.player_id === seatData!.player_id)?.cards ?? null : null;
             const playerLastAction = seatData!.player_id ? lastActions[seatData!.player_id] : undefined;
-            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, displayStacks[seatData!.seat]);
+            const player = toPokerPlayer(seatData!, !!isDealer, isMe ? myCards : null, isMe, opponentRevealed, playerLastAction, animations.displayStacks[seatData!.seat]);
             const showCards = isMe || (isShowdown && (seatData!.status === 'active' || seatData!.status === 'all-in'));
-
 
             return (
               <SeatAnchor key={seatData!.player_id} xPct={pos.xPct} yPct={pos.yPct} zIndex={isMe ? Z.SEATS + 1 : Z.SEATS}>
@@ -1555,8 +1074,8 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
                   isBB={tableState?.current_hand?.bb_seat === seatData!.seat}
                   actionDeadline={isCurrentActor ? tableState?.current_hand?.action_deadline : null}
                   onTimeout={isMe && isCurrentActor ? handleTimeout : undefined}
-                  onThirtySeconds={isMe && isCurrentActor ? handleThirtySeconds : undefined}
-                  onCriticalTime={isMe && isCurrentActor ? handleCriticalTime : undefined}
+                  onThirtySeconds={isMe && isCurrentActor ? handleThirtySecondsCallback : undefined}
+                  onCriticalTime={isMe && isCurrentActor ? handleCriticalTimeCallback : undefined}
                   isDisconnected={!isMe && !!seatData!.player_id && !onlinePlayerIds.has(seatData!.player_id)}
                   isSpeaking={!!seatData!.player_id && !!voiceChat.speakingMap[seatData!.player_id]}
                   onClick={!isMe && seatData!.player_id ? () => setSelectedPlayer(seatData!.player_id!) : undefined}
@@ -1605,7 +1124,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         </div>
       )}
 
-      {/* ACTION CONTROLS — only render non-grid landscape/portrait here */}
+      {/* ACTION CONTROLS */}
       {showActions && mySeat && !(isMobileLandscape) && (
         isLandscape ? (
           <div className="absolute" style={{ zIndex: Z.ACTIONS, right: 'calc(env(safe-area-inset-right, 0px) + 15px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
@@ -1618,61 +1137,32 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
         )
       )}
 
-      {/* Pre-action buttons — top-right, stacked vertically */}
+      {/* Pre-action buttons */}
       {!showActions && isSeated && hand && mySeat && mySeat.status !== 'folded' && (
         <div className="absolute" style={{ zIndex: Z.ACTIONS, top: 'calc(env(safe-area-inset-top, 0px) + 48px)', right: 'calc(env(safe-area-inset-right, 0px) + 10px)' }}>
-          <PreActionButtons canPreCheck={canCheck} amountToCall={amountToCall} onQueue={setPreAction} queued={preAction} />
+          <PreActionButtons canPreCheck={canCheck} amountToCall={amountToCall} onQueue={preActions.setPreAction} queued={preActions.preAction} />
         </div>
       )}
 
-      {/* XP Level-Up Overlay — at root level so z-[100] is above header & pre-action buttons */}
-      {xpOverlay && (
+      {/* XP Level-Up Overlay */}
+      {gameOverHook.xpOverlay && (
         <XPLevelUpOverlay
-          startXp={xpOverlay.startXp}
-          endXp={xpOverlay.endXp}
-          xpGained={xpOverlay.xpGained}
+          startXp={gameOverHook.xpOverlay.startXp}
+          endXp={gameOverHook.xpOverlay.endXp}
+          xpGained={gameOverHook.xpOverlay.xpGained}
           stats={{
-            handsPlayed: handsPlayedRef.current,
-            handsWon: handsWonRef.current,
-            bestHandName: bestHandNameRef.current,
-            biggestPot: biggestPotRef.current,
-            duration: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+            handsPlayed: gameOverHook.handsPlayedRef.current,
+            handsWon: gameOverHook.handsWonRef.current,
+            bestHandName: gameOverHook.bestHandNameRef.current,
+            biggestPot: gameOverHook.biggestPotRef.current,
+            duration: Math.floor((Date.now() - gameOverHook.gameStartTimeRef.current) / 1000),
           }}
-          onPlayAgain={() => {
-            setXpOverlay(null);
-            setGameOver(false);
-            gameOverPendingRef.current = false;
-            xpSavedRef.current = false;
-            handsPlayedRef.current = 0;
-            handsWonRef.current = 0;
-            bestHandNameRef.current = '';
-            bestHandRankRef.current = -1;
-            biggestPotRef.current = 0;
-            gameStartTimeRef.current = Date.now();
-            winStreakRef.current = 0;
-            chatCountRef.current = 0;
-            startingStackRef.current = 0;
-            // Clear all stale hand state (cards, winners, actions) before refreshing
-            resetForNewGame();
-            setVisibleCommunityCards([]);
-            prevCommunityCountRef.current = 0;
-            if (user) {
-              supabase.from('player_xp').select('total_xp').eq('user_id', user.id).maybeSingle()
-                .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
-            }
-            // Force-bypass the 2s debounce so state loads immediately
-            refreshState();
-          }}
-          onClose={() => {
-            setXpOverlay(null);
-            gameOverPendingRef.current = false;
-            leaveTable().then(onLeave).catch(onLeave);
-          }}
+          onPlayAgain={gameOverHook.handlePlayAgain}
+          onClose={gameOverHook.handleCloseOverlay}
         />
       )}
 
-
-      {isSpectator && !xpOverlay && (
+      {isSpectator && !gameOverHook.xpOverlay && (
         <>
           <div className="absolute left-0 right-0 text-center pointer-events-none"
             style={{ zIndex: Z.ACTIONS, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 85px)' }}>
