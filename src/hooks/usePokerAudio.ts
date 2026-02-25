@@ -61,6 +61,8 @@ export function usePokerAudio({
       if (currentPhase === 'showdown' || currentPhase === 'complete') {
         setDealerExpression('smile');
         setTimeout(() => setDealerExpression('neutral'), 2500);
+        setPrevPhase(currentPhase);
+        return;
       }
       setPrevPhase(currentPhase);
     }
@@ -72,6 +74,11 @@ export function usePokerAudio({
     if (handWinners.length === 0 || !userId) return;
     play('win');
     haptic('win');
+    const heroWon = handWinners.some(w => w.player_id === userId);
+    if (heroWon) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+    }
     const winnersSnapshot = [...handWinners];
     const uid = userId;
     setTimeout(() => {
@@ -81,7 +88,6 @@ export function usePokerAudio({
         const handName = winner.hand_name && winner.hand_name !== 'Last standing' && winner.hand_name !== 'N/A'
           ? winner.hand_name : undefined;
         const message = handName ? `${name} wins with ${handName}` : `${name} wins the pot`;
-        console.log('[voice] announcing winner:', message);
         announceCustom(message);
       }
     }, 400);
@@ -115,7 +121,7 @@ export function usePokerAudio({
     if (!tableState) return;
     const activeCount = tableState.seats.filter(s => s.player_id && s.stack > 0).length;
     if (prevActiveCountRef.current > 2 && activeCount === 2) {
-      announceCustom("We're heads up!");
+      setTimeout(() => announceCustom("We're heads up!"), 600);
     }
     prevActiveCountRef.current = activeCount;
   }, [tableState?.seats, announceCustom]);
@@ -141,16 +147,6 @@ export function usePokerAudio({
     if (handId) resetHandDedup();
   }, [tableState?.current_hand?.hand_id, resetHandDedup]);
 
-  // Trigger confetti on hero win
-  useEffect(() => {
-    if (handWinners.length === 0 || !userId) return;
-    const heroWon = handWinners.some(w => w.player_id === userId);
-    if (heroWon) {
-      setShowConfetti(true);
-      const t = setTimeout(() => setShowConfetti(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [handWinners, userId]);
 
   // 30-second warning callback
   const handleThirtySeconds = useCallback(() => {
