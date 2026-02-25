@@ -537,6 +537,16 @@ export function usePokerBroadcast({
     }, 1500);
   }, []);
 
+  // ── clearActionPending ──
+  const clearActionPending = useCallback(() => {
+    if (actionPendingFallbackRef.current) {
+      clearTimeout(actionPendingFallbackRef.current);
+      actionPendingFallbackRef.current = null;
+    }
+    setActionPending(false);
+    lastActedVersionRef.current = null;
+  }, []);
+
   return {
     // State
     revealedCards,
@@ -559,6 +569,7 @@ export function usePokerBroadcast({
     buildBroadcastHandlers,
     resetBroadcastState,
     markActionSent,
+    clearActionPending,
     scheduleBubbleRemoval,
     setChatBubbles,
   };
