@@ -862,7 +862,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         // Reset after 5s so we try again on next state change
         setTimeout(() => setAutoStartAttempted(false), 5000);
       });
-    }, 3500 + Math.random() * 500);
+    }, 1200 + Math.random() * 800);
 
     return () => clearTimeout(timer);
   }, [isAutoStartLeader, handHasEverStarted, seatedCount, hasActiveHand, mySeatNumber]);
