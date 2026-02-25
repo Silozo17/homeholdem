@@ -149,6 +149,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
   const processedActionsRef = useRef(new Set<string>());
   const chatCountRef = useRef(0);
   const handStartMaxStackRef = useRef(0);
+  const prevSnapshotHandIdRef = useRef<string | null>(null);
 
   // ── Compose extracted hooks ──
   const audio = usePokerAudio({
@@ -317,12 +318,13 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     const hand = tableState?.current_hand;
     if (!hand) return;
     const currentHandId = hand.hand_id;
-    if (currentHandId && currentHandId !== (animations as any).__prevAnimHandId && hand.phase === 'preflop') {
+    if (currentHandId && currentHandId !== prevSnapshotHandIdRef.current && hand.phase === 'preflop') {
       gameOverHook.handsPlayedRef.current++;
       const players: HandPlayerSnapshot[] = (tableState?.seats ?? [])
         .filter(s => s.player_id)
         .map(s => ({ name: s.display_name, seatIndex: s.seat, startStack: s.stack, playerId: s.player_id! }));
       startNewHand(currentHandId, hand.hand_number, players);
+      prevSnapshotHandIdRef.current = currentHandId;
       const seatedStacks = (tableState?.seats ?? []).filter(s => s.player_id).map(s => s.stack);
       handStartMaxStackRef.current = seatedStacks.length > 0 ? Math.max(...seatedStacks) : 0;
     }
