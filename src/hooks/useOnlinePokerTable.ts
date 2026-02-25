@@ -306,13 +306,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
         amount: amount ?? 0,
       });
     } catch (err) {
-      // On error, clear actionPending via the fallback timer clearance
-      if (broadcast.actionPendingFallbackRef.current) {
-        clearTimeout(broadcast.actionPendingFallbackRef.current);
-        broadcast.actionPendingFallbackRef.current = null;
-      }
-      // Directly reset — matches original behaviour
-      broadcast.lastActedVersionRef.current = null;
+      broadcast.clearActionPending();
       throw err;
     }
   }, [tableId, hand, broadcast.actionPending, broadcast.markActionSent]);
