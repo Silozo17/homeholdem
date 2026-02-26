@@ -1,58 +1,75 @@
 
+# Fix: Busted Player Can't Sit Down After Clicking "Play Again"
 
-# Fix: Stack Inconsistency on Rejoin and Play Again
+## Root Cause
 
-## Problem
+A race condition between the game-over timers and the "Play Again" button.
 
-When players rejoin a table after "Leave Table" or "Play Again", some end up with stale chip stacks from a previous session instead of the table's max buy-in. Two bugs cause this:
+When a player busts out (stack = 0):
 
-1. **Stale cache not cleared**: When `preserve_stack` is `false` (game over / leave table), the code correctly skips *saving* to cache, but never *clears* any existing cache entry from an earlier session (e.g., a previous inactivity kick saved their stack). On rejoin, the stale cached value is restored.
+1. `gameOver` is set to `true`
+2. An effect starts two timers: `leaveSeat(false)` at 2.5s, `saveXpAndStats` at 3.5s
+3. The player sees the game-over overlay immediately
 
-2. **Broadcast sends wrong stack**: In `poker-join-table`, the broadcast sends `stack: buy_in_amount` (the raw client value) instead of `stack: startingStack` (the actual value used, which may come from cache). Other players see the wrong chip count.
+If the player clicks **"Play Again" before the 2.5s timer fires**:
 
-## Correct Behaviour (confirmed)
+4. `handlePlayAgain` sets `gameOver = false`
+5. The effect's cleanup function runs, **cancelling both timers**
+6. `leaveSeat(false)` **never executes** -- the seat record (with stack=0) remains in the database
+7. `refreshState()` fetches the server state, which still includes the player's seat
+8. `mySeatNumber` is set back to the old seat number, so `isSeated = true`
+9. Empty seats render with `canJoin = !isSeated` which is `false`
+10. The player cannot click any seat
 
-| Scenario | Stack on Rejoin |
-|----------|----------------|
-| Leave Seat (inactivity kick / manual) | Preserved (cached) |
-| Leave Table | Reset to max buy-in |
-| Game Over + Play Again | Reset to max buy-in |
+If the player then tries to leave via the Leave button, it calls `leaveTable()` which checks `if (mySeatNumber === null) return` -- this works since `mySeatNumber` is set. But the player didn't know to do this; they expected "Play Again" to work.
 
-The client-side calls are already correct (`leaveSeat()` for inactivity, `leaveSeat(false)` for game over, `leaveTable()` for leaving). Only the server needs fixing.
+## Fix (1 file, 1 change)
 
-## Fixes (2 files, 3 surgical changes)
+### `src/hooks/usePokerGameOver.ts` -- `handlePlayAgain` (line 240)
 
-### File 1: `supabase/functions/poker-leave-table/index.ts`
-
-Add `else` clauses to both stack-cache blocks (lines 376-382 and 387-393). When `preserve_stack` is false, delete any existing cache entry for this player so stale stacks cannot persist:
+Before resetting state, **explicitly call `leaveSeat(false)`** to ensure the seat is always removed from the database. This makes the function idempotent -- if the timer already fired, `leaveSeat` will be a no-op (since `mySeatNumber` would already be `null`). If the timer hasn't fired yet, this ensures the seat is deleted before the player tries to rejoin.
 
 ```typescript
-// After the existing "if (preserve_stack && seat.stack > 0)" block:
-else if (!preserve_stack) {
-  const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
-  const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
-  if (currentCache[seat.player_id]) {
-    delete currentCache[seat.player_id];
-    await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
-  }
-}
+const handlePlayAgain = useCallback(async () => {
+  // Ensure seat is removed from DB before allowing rejoin
+  // (the game-over timer may not have fired yet if clicked quickly)
+  try { await leaveSeat(false); } catch {}
+
+  setXpOverlay(null);
+  setGameOver(false);
+  gameOverPendingRef.current = false;
+  xpSavedRef.current = false;
+  // ... rest unchanged
 ```
 
-This applies at two locations (active-hand branch ~L382 and no-active-hand branch ~L393).
+Also need to ensure XP is saved even if the timer was cancelled. Add a guard to save XP if it hasn't been saved yet:
 
-### File 2: `supabase/functions/poker-join-table/index.ts`
+```typescript
+const handlePlayAgain = useCallback(async () => {
+  // Save XP if it hasn't been saved yet (timer may have been cancelled)
+  if (!xpSavedRef.current) {
+    const mySeatInfo = tableState?.seats.find(s => s.player_id === user?.id);
+    const isWinner = (mySeatInfo?.stack ?? 0) > 0;
+    try { await saveXpAndStats(isWinner); } catch {}
+  }
 
-Change the broadcast payload at line 206 from `stack: buy_in_amount` to `stack: startingStack` so other clients see the actual stack value used.
+  // Ensure seat is removed before rejoin
+  try { await leaveSeat(false); } catch {}
+
+  setXpOverlay(null);
+  setGameOver(false);
+  // ... rest unchanged
+```
+
+The function signature changes from sync to async, but since `handlePlayAgain` is used as a button click handler, this is safe.
 
 ## What This Fixes
 
-- After "Game Over" + "Play Again", all players start with the table's max buy-in
-- After "Leave Table" + rejoin, player gets max buy-in (no stale cache)
-- Inactivity kicks still preserve the player's stack for when they rejoin
-- The broadcast to other clients shows the correct stack value
+- Player can click "Play Again" at any time after the game-over screen appears
+- The seat is always removed from the database before attempting to rejoin
+- XP is always saved, even on fast clicks
+- No changes to bottom navigation, styles, layout, or spacing
 
-## No Changes To
+## Files Changed (1 total)
 
-- Client-side code, bottom navigation, styles, layout, spacing
-- Any other files
-
+1. `src/hooks/usePokerGameOver.ts`
