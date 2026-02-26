@@ -237,7 +237,17 @@ export function usePokerGameOver({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameOver, user]);
 
-  const handlePlayAgain = useCallback(() => {
+  const handlePlayAgain = useCallback(async () => {
+    // Save XP if the timer hasn't fired yet
+    if (!xpSavedRef.current) {
+      const mySeatInfo = tableState?.seats.find(s => s.player_id === user?.id);
+      const isWinner = (mySeatInfo?.stack ?? 0) > 0;
+      try { await saveXpAndStats(isWinner); } catch {}
+    }
+
+    // Ensure seat is removed from DB before allowing rejoin
+    try { await leaveSeat(false); } catch {}
+
     setXpOverlay(null);
     setGameOver(false);
     gameOverPendingRef.current = false;
@@ -258,7 +268,7 @@ export function usePokerGameOver({
         .then(({ data }) => { startXpRef.current = data?.total_xp ?? 0; });
     }
     refreshState();
-  }, [user, resetForNewGame, resetAnimations, refreshState, gameOverPendingRef, chatCountRef]);
+  }, [user, leaveSeat, saveXpAndStats, tableState, resetForNewGame, resetAnimations, refreshState, gameOverPendingRef, chatCountRef]);
 
   const handleCloseOverlay = useCallback(() => {
     setXpOverlay(null);
