@@ -379,6 +379,13 @@ Deno.serve(async (req) => {
         const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
         currentCache[seat.player_id] = seat.stack;
         await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+      } else if (!preserve_stack) {
+        const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
+        const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+        if (currentCache[seat.player_id]) {
+          delete currentCache[seat.player_id];
+          await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+        }
       }
 
       // Delete seat immediately (player is leaving)
@@ -390,6 +397,13 @@ Deno.serve(async (req) => {
         const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
         currentCache[seat.player_id] = seat.stack;
         await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+      } else if (!preserve_stack) {
+        const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
+        const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+        if (currentCache[seat.player_id]) {
+          delete currentCache[seat.player_id];
+          await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+        }
       }
 
       // No active hand — remove seat immediately
