@@ -94,7 +94,7 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
         if (track.kind === Track.Kind.Audio) {
           const el = track.attach();
           // Respect current deafen state for newly subscribed tracks
-          el.volume = deafenedRef.current ? 0 : 1;
+          el.muted = deafenedRef.current;
           document.body.appendChild(el);
           // Store reference for toggleDeafen
           audioElementsRef.current.add(el);
@@ -165,7 +165,7 @@ export function useVoiceChat(tableId: string): UseVoiceChatReturn {
 
     // Mute/unmute ALL tracked audio elements (reliable reference)
     audioElementsRef.current.forEach((el) => {
-      el.volume = newDeafened ? 0 : 1;
+      el.muted = newDeafened;
     });
 
     setDeafened(newDeafened);
