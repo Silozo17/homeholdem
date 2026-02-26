@@ -519,7 +519,7 @@ Deno.serve(async (req) => {
 
     // Run all in parallel
     const [, , , { data: allSeatsForBroadcast }] = await Promise.all([
-      ...seatUpdatePromises,
+      Promise.all(seatUpdatePromises),
       actionInsertPromise,
       tableStatusPromise,
       allSeatsPromise,

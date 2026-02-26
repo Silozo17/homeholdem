@@ -319,7 +319,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
           blinds: data.state.blinds,
           current_actor_id: data.state.current_actor_id,
         },
-        seats: data.state.seats || prev.seats,
+        seats: data.state.seats?.length ? data.state.seats : prev.seats,
       } : prev);
     }
   }, [tableId]);
