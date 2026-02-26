@@ -134,19 +134,27 @@ Deno.serve(async (req) => {
               // Get winner profile for broadcast
               const { data: winnerProfile } = await admin.from("profiles").select("display_name, avatar_url").eq("id", winnerId).single();
 
+              // Get winner's seat_number for proper broadcast
+              const { data: winnerSeatFull } = await admin.from("poker_seats").select("seat_number").eq("table_id", table_id).eq("player_id", winnerId).single();
+
               const leaveChannel = admin.channel(`poker:table:${table_id}`);
               await leaveChannel.send({
                 type: "broadcast",
-                event: "game_state",
+                event: "hand_complete",
                 payload: {
                   hand_id: activeHand.id,
-                  phase: "complete",
-                  community_cards: handData.community_cards,
+                  phase: "showdown",
+                  community_cards: handData.community_cards ?? [],
                   pots: [{ amount: totalPot, winners: [winnerId] }],
                   current_actor_seat: null,
                   current_actor_id: null,
+                  dealer_seat: handData.dealer_seat,
+                  sb_seat: handData.sb_seat,
+                  bb_seat: handData.bb_seat,
+                  min_raise: 0,
+                  current_bet: 0,
                   seats: [{
-                    seat: otherSeats[0].id ? undefined : 0,
+                    seat: winnerSeatFull?.seat_number ?? 0,
                     player_id: winnerId,
                     display_name: winnerProfile?.display_name || "Player",
                     avatar_url: winnerProfile?.avatar_url || null,
@@ -156,20 +164,12 @@ Deno.serve(async (req) => {
                     last_action: null,
                     has_cards: true,
                   }],
+                  action_deadline: null,
+                  hand_number: handData.hand_number ?? 0,
+                  blinds: { small: 0, big: 0, ante: 0 },
                   state_version: commitResult.state_version,
-                },
-              });
-
-              await leaveChannel.send({
-                type: "broadcast",
-                event: "hand_result",
-                payload: {
-                  hand_id: activeHand.id,
                   winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
                   revealed_cards: [],
-                  pots: [{ amount: totalPot, winners: [winnerId] }],
-                  community_cards: handData.community_cards,
-                  state_version: commitResult.state_version,
                 },
               });
 
@@ -265,30 +265,45 @@ Deno.serve(async (req) => {
 
             if (!commitResult?.error) {
               const { data: winnerProfile } = await admin.from("profiles").select("display_name, avatar_url").eq("id", winnerId).single();
+
+              // Build full seats array from allSeatsFull (excluding leaving player), with winner's updated stack
+              const seatsForBroadcast = (allSeatsFull || [])
+                .filter((s: any) => s.player_id && s.player_id !== user.id)
+                .map((s: any) => ({
+                  seat: s.seat_number,
+                  player_id: s.player_id,
+                  display_name: s.player_id === winnerId ? (winnerProfile?.display_name || "Player") : "Player",
+                  avatar_url: s.player_id === winnerId ? (winnerProfile?.avatar_url || null) : null,
+                  stack: s.player_id === winnerId ? newStack : s.stack,
+                  status: s.player_id === winnerId ? "active" : (foldedPlayerIds.has(s.player_id) ? "folded" : s.status),
+                  current_bet: 0,
+                  last_action: null,
+                  has_cards: !foldedPlayerIds.has(s.player_id),
+                }));
+
               const ch = admin.channel(`poker:table:${table_id}`);
               await ch.send({
                 type: "broadcast",
-                event: "game_state",
+                event: "hand_complete",
                 payload: {
                   hand_id: activeHand.id,
-                  phase: "complete",
-                  community_cards: handData.community_cards,
+                  phase: "showdown",
+                  community_cards: handData.community_cards ?? [],
                   pots: [{ amount: totalPot, winners: [winnerId] }],
                   current_actor_seat: null,
                   current_actor_id: null,
+                  dealer_seat: handData.dealer_seat,
+                  sb_seat: handData.sb_seat,
+                  bb_seat: handData.bb_seat,
+                  min_raise: 0,
+                  current_bet: 0,
+                  seats: seatsForBroadcast,
+                  action_deadline: null,
+                  hand_number: handData.hand_number ?? 0,
+                  blinds: { small: 0, big: 0, ante: 0 },
                   state_version: commitResult.state_version,
-                },
-              });
-              await ch.send({
-                type: "broadcast",
-                event: "hand_result",
-                payload: {
-                  hand_id: activeHand.id,
                   winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
                   revealed_cards: [],
-                  pots: [{ amount: totalPot, winners: [winnerId] }],
-                  community_cards: handData.community_cards,
-                  state_version: commitResult.state_version,
                 },
               });
               await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
@@ -385,6 +400,9 @@ Deno.serve(async (req) => {
       if (deleteErr) throw deleteErr;
     }
 
+    // Fetch leaving player's profile for broadcast
+    const { data: leavingProfile } = await admin.from("profiles").select("display_name").eq("id", user.id).single();
+
     const channel = admin.channel(`poker:table:${table_id}`);
 
     // Broadcast seat leave
@@ -393,8 +411,8 @@ Deno.serve(async (req) => {
       event: "seat_change",
       payload: {
         seat: seat.seat_number,
-        player_id: null,
-        display_name: null,
+        player_id: user.id,
+        display_name: leavingProfile?.display_name || "Player",
         action: "leave",
         remaining_players: remainingAfterLeave,
       },

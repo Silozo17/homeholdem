@@ -468,6 +468,9 @@ export function usePokerBroadcast({
           if (winnerTimerRef.current) clearTimeout(winnerTimerRef.current);
           winnerTimerRef.current = setTimeout(() => setHandWinners(winners), winnerDelay);
 
+          // Prevent duplicate hand_result from re-triggering winner overlay for this hand
+          prevHandIdRef.current = payload.hand_id;
+
           if (showdownTimerRef.current) clearTimeout(showdownTimerRef.current);
           const showdownDelay = winnerDelay + 4000;
           showdownTimerRef.current = setTimeout(() => {
