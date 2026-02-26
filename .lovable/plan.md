@@ -1,59 +1,58 @@
 
-# Critical Fix: Players Ejected on Every Hand Deal
 
-## Root Cause
+# Fix: Stack Inconsistency on Rejoin and Play Again
 
-Two bugs in `poker-start-hand` work together to wipe all seat data every time a hand is dealt.
+## Problem
 
-### Bug 1: Broken Promise.all destructuring (`poker-start-hand/index.ts` L521-526)
+When players rejoin a table after "Leave Table" or "Play Again", some end up with stale chip stacks from a previous session instead of the table's max buy-in. Two bugs cause this:
 
-```text
-Current code:
-const [, , , { data: allSeatsForBroadcast }] = await Promise.all([
-  ...seatUpdatePromises,   // <-- spreads N promises (variable!)
-  actionInsertPromise,
-  tableStatusPromise,
-  allSeatsPromise,
-]);
-```
+1. **Stale cache not cleared**: When `preserve_stack` is `false` (game over / leave table), the code correctly skips *saving* to cache, but never *clears* any existing cache entry from an earlier session (e.g., a previous inactivity kick saved their stack). On rejoin, the stale cached value is restored.
 
-With 2 players: the array is `[seatUpdate0, seatUpdate1, actionInsert, tableStatus, allSeats]` -- index 3 is `tableStatus`, NOT `allSeats`. With 6 players: index 3 is `seatUpdate3`. In every case, `allSeatsForBroadcast` reads the wrong result and gets `null`. The broadcast `seats` array becomes `[]`.
+2. **Broadcast sends wrong stack**: In `poker-join-table`, the broadcast sends `stack: buy_in_amount` (the raw client value) instead of `stack: startingStack` (the actual value used, which may come from cache). Other players see the wrong chip count.
 
-### Bug 2: Empty array is truthy (`useOnlinePokerTable.ts` L322)
+## Correct Behaviour (confirmed)
 
-```text
-seats: data.state.seats || prev.seats
-```
+| Scenario | Stack on Rejoin |
+|----------|----------------|
+| Leave Seat (inactivity kick / manual) | Preserved (cached) |
+| Leave Table | Reset to max buy-in |
+| Game Over + Play Again | Reset to max buy-in |
 
-`[]` is truthy in JavaScript, so `[] || prev.seats` evaluates to `[]`. The player who called `startHand` gets their entire seat list replaced with an empty array. All players vanish from the UI.
+The client-side calls are already correct (`leaveSeat()` for inactivity, `leaveSeat(false)` for game over, `leaveTable()` for leaving). Only the server needs fixing.
 
-## Fix (2 files, 2 surgical changes)
+## Fixes (2 files, 3 surgical changes)
 
-### File 1: `supabase/functions/poker-start-hand/index.ts`
+### File 1: `supabase/functions/poker-leave-table/index.ts`
 
-Wrap `seatUpdatePromises` in its own `Promise.all` so the outer array has exactly 4 elements:
+Add `else` clauses to both stack-cache blocks (lines 376-382 and 387-393). When `preserve_stack` is false, delete any existing cache entry for this player so stale stacks cannot persist:
 
 ```typescript
-const [, , , { data: allSeatsForBroadcast }] = await Promise.all([
-  Promise.all(seatUpdatePromises),   // single promise at index 0
-  actionInsertPromise,               // index 1
-  tableStatusPromise,                // index 2
-  allSeatsPromise,                   // index 3 -- always correct now
-]);
+// After the existing "if (preserve_stack && seat.stack > 0)" block:
+else if (!preserve_stack) {
+  const { data: tblCache } = await admin.from("poker_tables").select("stack_cache").eq("id", table_id).single();
+  const currentCache = (tblCache?.stack_cache as Record<string, number>) || {};
+  if (currentCache[seat.player_id]) {
+    delete currentCache[seat.player_id];
+    await admin.from("poker_tables").update({ stack_cache: currentCache }).eq("id", table_id);
+  }
+}
 ```
 
-### File 2: `src/hooks/useOnlinePokerTable.ts`
+This applies at two locations (active-hand branch ~L382 and no-active-hand branch ~L393).
 
-Guard against empty arrays in the `startHand` callback:
+### File 2: `supabase/functions/poker-join-table/index.ts`
 
-```typescript
-seats: data.state.seats?.length ? data.state.seats : prev.seats,
-```
-
-This ensures that if the seats array is empty (from any edge case), the client keeps its existing seat data rather than wiping it.
+Change the broadcast payload at line 206 from `stack: buy_in_amount` to `stack: startingStack` so other clients see the actual stack value used.
 
 ## What This Fixes
-- Players no longer vanish from seats when a hand is dealt
-- The broadcast includes all seated players with correct stacks and `has_cards` flags
-- The HTTP response includes complete seat data for the hand starter
-- No other files, styles, layout, or navigation are changed
+
+- After "Game Over" + "Play Again", all players start with the table's max buy-in
+- After "Leave Table" + rejoin, player gets max buy-in (no stale cache)
+- Inactivity kicks still preserve the player's stack for when they rejoin
+- The broadcast to other clients shows the correct stack value
+
+## No Changes To
+
+- Client-side code, bottom navigation, styles, layout, spacing
+- Any other files
+
