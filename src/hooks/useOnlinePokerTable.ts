@@ -123,10 +123,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const refreshStateRef = useRef<() => Promise<void>>(async () => {});
 
   // ── Fetch full state from HTTP endpoint ──
-  const refreshState = useCallback(async () => {
+  const refreshState = useCallback(async (force = false) => {
     if (!tableId) return;
     const now = Date.now();
-    if (now - lastRefreshRef.current < 2000) return;
+    if (!force && now - lastRefreshRef.current < 2000) return;
     lastRefreshRef.current = now;
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
@@ -190,17 +190,25 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   // Fetch my cards when a new hand starts
   useEffect(() => {
-    if (!hand?.hand_id || !userId || mySeatNumber === null) return;
-    const timer = setTimeout(async () => {
+    if (!hand?.hand_id || !userId) return;
+    let cancelled = false;
+    const fetchCards = async (attempt = 0) => {
       try {
         const data = await callEdge('poker-my-cards', { hand_id: hand.hand_id }, 'GET');
-        setMyCards(data.hole_cards || null);
+        if (cancelled) return;
+        if (data.hole_cards) {
+          setMyCards(data.hole_cards);
+        } else if (attempt === 0) {
+          // Retry once after 500ms — cards may not be inserted yet
+          setTimeout(() => { if (!cancelled) fetchCards(1); }, 500);
+        }
       } catch {
-        // not in hand
+        // Not in hand or hand completed
       }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [hand?.hand_id, userId, mySeatNumber]);
+    };
+    fetchCards();
+    return () => { cancelled = true; };
+  }, [hand?.hand_id, userId]);
 
   // Timeout auto-ping
   useEffect(() => {
@@ -222,12 +230,33 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   // ── Actions ──
   const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
-    await callEdge('poker-join-table', { table_id: tableId, seat_number: seatNumber, buy_in_amount: buyIn });
-    await refreshState();
+    const data = await callEdge('poker-join-table', { table_id: tableId, seat_number: seatNumber, buy_in_amount: buyIn });
+    // Optimistic local update — don't await refreshState
+    setTableState(prev => {
+      if (!prev) return prev;
+      const alreadyExists = prev.seats.some(s => s.seat === seatNumber && s.player_id);
+      if (alreadyExists) return prev;
+      return {
+        ...prev,
+        seats: [...prev.seats.filter(s => s.seat !== seatNumber), {
+          seat: seatNumber,
+          player_id: userId!,
+          display_name: data?.display_name || 'You',
+          avatar_url: data?.avatar_url || null,
+          country_code: data?.country_code || null,
+          stack: buyIn,
+          status: 'sitting_out',
+          has_cards: false,
+          current_bet: 0,
+          last_action: null,
+        }],
+      };
+    });
+    // Fire-and-forget presence track
     if (connection.channelRef.current && userId) {
-      await connection.channelRef.current.track({ user_id: userId, role: 'player' });
+      connection.channelRef.current.track({ user_id: userId, role: 'player' }).catch(() => {});
     }
-  }, [tableId, refreshState]);
+  }, [tableId, userId]);
 
   const leaveSeat = useCallback(async (preserveStack = true) => {
     if (mySeatNumber === null) return;
