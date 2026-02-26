@@ -258,7 +258,12 @@ Deno.serve(async (req) => {
       console.error("Watcher notification error (non-fatal):", notifyErr);
     }
 
-    return new Response(JSON.stringify({ seat }), {
+    return new Response(JSON.stringify({
+      seat,
+      display_name: profile?.display_name || 'Player',
+      avatar_url: profile?.avatar_url || null,
+      country_code: profile?.country_code || null,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

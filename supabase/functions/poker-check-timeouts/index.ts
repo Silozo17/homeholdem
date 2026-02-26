@@ -194,18 +194,18 @@ Deno.serve(async (req) => {
             const channel = admin.channel(`poker:table:${hand.table_id}`);
             await channel.send({
               type: "broadcast",
-              event: "game_state",
+              event: "hand_complete",
               payload: {
                 hand_id: hand.id,
-                phase: "complete",
-                community_cards: hand.community_cards,
+                phase: "showdown",
+                community_cards: hand.community_cards ?? [],
                 pots: [{ amount: totalPot, winners: [winner.player_id] }],
                 current_actor_seat: null,
                 current_actor_id: null,
                 dealer_seat: hand.dealer_seat,
                 sb_seat: hand.sb_seat,
                 bb_seat: hand.bb_seat,
-                min_raise: table.big_blind,
+                min_raise: 0,
                 current_bet: 0,
                 seats: seatStates.map((s) => {
                   const profile = profileMap.get(s.player_id!);
@@ -222,20 +222,11 @@ Deno.serve(async (req) => {
                   };
                 }),
                 action_deadline: null,
+                hand_number: hand.hand_number ?? 0,
+                blinds: { small: table.small_blind, big: table.big_blind, ante: table.ante ?? 0 },
                 state_version: commitResult.state_version,
-              },
-            });
-
-            await channel.send({
-              type: "broadcast",
-              event: "hand_result",
-              payload: {
-                hand_id: hand.id,
                 winners: [{ player_id: winner.player_id, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
                 revealed_cards: [],
-                pots: [{ amount: totalPot, winners: [winner.player_id] }],
-                community_cards: hand.community_cards,
-                state_version: commitResult.state_version,
               },
             });
 
@@ -380,22 +371,24 @@ Deno.serve(async (req) => {
         };
 
         const channel = admin.channel(`poker:table:${hand.table_id}`);
-        await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
 
         if (handComplete && completedResults) {
+          // Send single hand_complete instead of split game_state + hand_result
           await channel.send({
             type: "broadcast",
-            event: "hand_result",
+            event: "hand_complete",
             payload: {
-              hand_id: hand.id,
+              ...publicState,
+              phase: "showdown",
+              hand_number: hand.hand_number ?? 0,
+              blinds: { small: table.small_blind, big: table.big_blind, ante: table.ante ?? 0 },
               winners: completedResults.winners,
               revealed_cards: [],
-              pots: completedResults.pots,
-              community_cards: hand.community_cards,
-              state_version: commitResult.state_version,
             },
           });
           await admin.from("poker_tables").update({ status: "waiting" }).eq("id", hand.table_id);
+        } else {
+          await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
         }
 
         console.log(`Auto-folded hand ${hand.id} seat ${actorSeat.seat_number} (timeouts: ${actorSeat.consecutive_timeouts})`);

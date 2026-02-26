@@ -127,10 +127,10 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     if (!tableId) return;
     const now = Date.now();
     if (!force && now - lastRefreshRef.current < 2000) return;
-    lastRefreshRef.current = now;
     try {
       const data = await callEdge('poker-table-state', { table_id: tableId }, 'GET');
       setTableState(data);
+      lastRefreshRef.current = now;
       setMyCards(data.my_cards || null);
       if (data.current_hand) {
         setHandHasEverStarted(true);
@@ -139,6 +139,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       connectionSetterRef.current('connected');
       broadcast.lastAppliedVersionRef.current = data.current_hand?.state_version ?? 0;
     } catch (err: any) {
+      lastRefreshRef.current = 0; // reset debounce on failure so retry is allowed immediately
       setError(err.message);
       connectionSetterRef.current('disconnected');
     } finally {
