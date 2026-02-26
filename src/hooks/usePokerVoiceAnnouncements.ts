@@ -4,35 +4,32 @@ import { useRef, useCallback, useState } from 'react';
 const VOICE_CACHE = new Map<string, string>();
 const MAX_CACHE = 30;
 
-/**
- * Simplified voice announcements for multiplayer poker via ElevenLabs TTS.
- * Single speak() entry point with one-slot pending queue for critical announcements.
- */
 export function usePokerVoiceAnnouncements() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const enabledRef = useRef(true);
   const isPlayingRef = useRef(false);
   const precachedRef = useRef(false);
-  const pendingRef = useRef<string | null>(null);
+  const queueRef = useRef<string[]>([]);
 
-  // Keep ref in sync with state
   const setEnabled = useCallback((val: boolean) => {
     enabledRef.current = val;
     setVoiceEnabled(val);
   }, []);
 
-  const speak = useCallback(async (message: string) => {
-    if (!enabledRef.current || !message) return;
+  const processQueue = useCallback(async () => {
+    if (isPlayingRef.current) return;
+    if (queueRef.current.length === 0) return;
 
-    if (isPlayingRef.current) {
-      // Store as pending — will play when current audio ends
-      pendingRef.current = message;
+    const message = queueRef.current.shift()!;
+
+    if (!enabledRef.current || !message) {
+      // Skip disabled announcements but keep processing
+      if (queueRef.current.length > 0) processQueue();
       return;
     }
 
     try {
       isPlayingRef.current = true;
-      pendingRef.current = null;
 
       let audioUri = VOICE_CACHE.get(message);
 
@@ -70,7 +67,9 @@ export function usePokerVoiceAnnouncements() {
           VOICE_CACHE.set(message, audioUri);
         } catch {
           clearTimeout(timeoutId);
+          // Failed to fetch — skip this message, process next
           isPlayingRef.current = false;
+          if (queueRef.current.length > 0) processQueue();
           return;
         }
       }
@@ -85,16 +84,23 @@ export function usePokerVoiceAnnouncements() {
       console.warn('[voice] speak failed:', err);
     } finally {
       isPlayingRef.current = false;
-      // Play pending message if one arrived while we were playing
-      if (pendingRef.current) {
-        const next = pendingRef.current;
-        pendingRef.current = null;
-        speak(next);
+      if (queueRef.current.length > 0) {
+        processQueue();
       }
     }
   }, []);
 
-  // --- Named announcement functions ---
+  const speak = useCallback((message: string) => {
+    if (!message) return;
+    queueRef.current.push(message);
+    processQueue();
+  }, [processQueue]);
+
+  const clearQueue = useCallback(() => {
+    queueRef.current = [];
+  }, []);
+
+  const resetHandDedup = useCallback(() => {}, []);
 
   const announceBlindUp = useCallback((small: number, big: number) => {
     speak(`Blinds are now ${small} and ${big}`);
@@ -116,10 +122,6 @@ export function usePokerVoiceAnnouncements() {
   const announceCustom = useCallback((message: string) => {
     speak(message);
   }, [speak]);
-
-  // No-ops — kept for API compatibility
-  const clearQueue = useCallback(() => {}, []);
-  const resetHandDedup = useCallback(() => {}, []);
 
   const toggleVoice = useCallback(() => {
     setEnabled(!enabledRef.current);
