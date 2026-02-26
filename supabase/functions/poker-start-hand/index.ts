@@ -485,45 +485,45 @@ Deno.serve(async (req) => {
 
     console.log(`[START-HAND] hand=${hand.id} #${handNumber} table=${table_id} players=${activePlayers.length} dealer=seat${dealerSeat} SB=seat${sbSeat} BB=seat${bbSeat} blinds=${table.small_blind}/${table.big_blind} ante=${table.ante} firstActor=seat${firstActor}`);
 
-    // Insert hole cards
-    for (const hc of holeCardInserts) {
-      await admin.from("poker_hole_cards").insert({
+    // Batch insert hole cards
+    await admin.from("poker_hole_cards").insert(
+      holeCardInserts.map(hc => ({
         hand_id: hand.id,
         player_id: hc.player_id,
         seat_number: hc.seat_number,
         cards: hc.cards,
-      });
-    }
+      }))
+    );
 
-    // Update seat stacks
-    for (const su of seatUpdates) {
-      await admin
-        .from("poker_seats")
-        .update({ stack: su.stack })
-        .eq("id", su.id);
-    }
+    // Batch update seat stacks + batch insert action records + update table status + fetch profiles — all in parallel
+    const seatUpdatePromises = seatUpdates.map(su =>
+      admin.from("poker_seats").update({ stack: su.stack }).eq("id", su.id)
+    );
 
-    // Insert action records
-    for (const ar of actionRecords) {
-      await admin.from("poker_actions").insert({
-        hand_id: hand.id,
-        ...ar,
-      });
-    }
+    const actionInsertPromise = admin.from("poker_actions").insert(
+      actionRecords.map(ar => ({ hand_id: hand.id, ...ar }))
+    );
 
-    // Update table status
-    await admin
+    const tableStatusPromise = admin
       .from("poker_tables")
       .update({ status: "playing" })
       .eq("id", table_id);
 
     // Get profiles for broadcast — include ALL seated players, not just active
-    const { data: allSeatsForBroadcast } = await admin
+    const allSeatsPromise = admin
       .from("poker_seats")
       .select("seat_number, player_id, stack, status")
       .eq("table_id", table_id)
       .not("player_id", "is", null)
       .order("seat_number");
+
+    // Run all in parallel
+    const [, , , { data: allSeatsForBroadcast }] = await Promise.all([
+      ...seatUpdatePromises,
+      actionInsertPromise,
+      tableStatusPromise,
+      allSeatsPromise,
+    ]);
 
     const allPlayerIds = (allSeatsForBroadcast || []).map((p: any) => p.player_id);
     const { data: profiles } = await admin
