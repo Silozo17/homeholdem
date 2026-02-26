@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
         avatar_url: profile?.avatar_url || null,
         country_code: profile?.country_code || null,
         action: "join",
-        stack: buy_in_amount,
+        stack: startingStack,
       },
     });
 
