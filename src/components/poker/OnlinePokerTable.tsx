@@ -124,7 +124,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     amountToCall, canCheck, joinTable, leaveSeat, leaveTable, startHand, sendAction, revealedCards,
     actionPending, lastActions, handWinners, chatBubbles, sendChat, autoStartAttempted, handHasEverStarted,
     spectatorCount, connectionStatus, lastKnownPhase, lastKnownStack, refreshState, resetForNewGame, onBlindsUp, onlinePlayerIds,
-    kickedForInactivity, gameOverPendingRef, preResultStacksRef,
+    kickedForInactivity, gameOverPendingRef, preResultStacksRef, announceCustomRef,
   } = useOnlinePokerTable(tableId);
 
   // ── UI-only state ──
@@ -156,6 +156,11 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
     tableState, handWinners, userId: user?.id, lastActions,
     handStartMaxStackRef, processedActionsRef,
   });
+
+  // Keep announceCustomRef current so broadcast handler always calls latest voice function
+  useEffect(() => {
+    announceCustomRef.current = audio.announceCustom;
+  }, [audio.announceCustom, announceCustomRef]);
 
   const animations = usePokerAnimations({
     tableState, handWinners, mySeatNumber, preResultStacksRef, processedActionsRef,

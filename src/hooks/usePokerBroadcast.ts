@@ -17,6 +17,7 @@ interface UsePokerBroadcastParams {
   refreshState: () => Promise<void>;
   gameOverPendingRef: React.MutableRefObject<boolean>;
   blindsUpCallbackRef: React.MutableRefObject<((payload: any) => void) | null>;
+  announceCustomRef: React.MutableRefObject<(msg: string) => void>;
 }
 
 export interface BroadcastHandlerConfig {
@@ -34,6 +35,7 @@ export function usePokerBroadcast({
   refreshState,
   gameOverPendingRef,
   blindsUpCallbackRef,
+  announceCustomRef,
 }: UsePokerBroadcastParams) {
   // ── State ──
   const [revealedCards, setRevealedCards] = useState<RevealedCard[]>([]);
@@ -238,6 +240,9 @@ export function usePokerBroadcast({
             if (payload.action === 'kicked' && (payload.kicked_player_id === userIdRef.current || payload.player_id === userIdRef.current)) {
               setKickedForInactivity(true);
             }
+            if (payload.display_name && payload.player_id !== userIdRef.current) {
+              announceCustomRef.current(`${payload.display_name} has left the table`);
+            }
             return;
           }
           if (payload?.action === 'join') {
@@ -263,6 +268,9 @@ export function usePokerBroadcast({
             });
             const currentState = tableStateRef.current;
             const handActive = !!currentState?.current_hand;
+            if (payload.display_name && payload.player_id !== userIdRef.current) {
+              announceCustomRef.current(`${payload.display_name} has joined the table`);
+            }
             if (handActive) return;
             refreshState();
             return;

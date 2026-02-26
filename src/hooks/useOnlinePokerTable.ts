@@ -83,6 +83,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
   const timeoutPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRefreshRef = useRef<number>(0);
   const gameOverPendingRef = useRef(false);
+  const announceCustomRef = useRef<(msg: string) => void>(() => {});
 
   // Keep ref in sync for use inside broadcast callbacks + track last known phase/stack
   useEffect(() => {
@@ -113,6 +114,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     refreshState: () => refreshStateRef.current(),
     gameOverPendingRef,
     blindsUpCallbackRef,
+    announceCustomRef,
   });
 
   // Refs to break circular dependency: connection.setConnectionStatus and refreshState
@@ -441,6 +443,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     lastKnownStack,
     onlinePlayerIds: connection.onlinePlayerIds,
     kickedForInactivity: broadcast.kickedForInactivity,
+    announceCustomRef,
     gameOverPendingRef,
     joinTable,
     leaveSeat,
