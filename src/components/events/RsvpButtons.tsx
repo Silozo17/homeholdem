@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Check, HelpCircle, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface RsvpButtonsProps {
-  currentStatus: 'going' | 'maybe' | 'not_going' | null;
-  onRsvp: (status: 'going' | 'maybe' | 'not_going') => void;
+  currentStatus: 'going' | 'not_going' | null;
+  onRsvp: (status: 'going' | 'not_going') => void;
   disabled?: boolean;
 }
 
@@ -24,9 +24,9 @@ export function RsvpButtons({ currentStatus, onRsvp, disabled = false }: RsvpBut
   const { t } = useTranslation();
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingNewStatus, setPendingNewStatus] = useState<'going' | 'maybe' | 'not_going' | null>(null);
+  const [pendingNewStatus, setPendingNewStatus] = useState<'going' | 'not_going' | null>(null);
 
-  const handleClick = async (status: 'going' | 'maybe' | 'not_going') => {
+  const handleClick = async (status: 'going' | 'not_going') => {
     // If user already has an RSVP and is clicking a DIFFERENT status, show confirmation
     if (currentStatus && currentStatus !== status) {
       setPendingNewStatus(status);
@@ -57,7 +57,7 @@ export function RsvpButtons({ currentStatus, onRsvp, disabled = false }: RsvpBut
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Button
           variant={currentStatus === 'going' ? 'default' : 'outline'}
           className={cn(
@@ -70,19 +70,6 @@ export function RsvpButtons({ currentStatus, onRsvp, disabled = false }: RsvpBut
         >
           <Check className="h-5 w-5" />
           <span className="text-xs">{t('event.going')}</span>
-        </Button>
-        
-        <Button
-          variant={currentStatus === 'maybe' ? 'secondary' : 'outline'}
-          className={cn(
-            "flex-col h-auto py-3 gap-1 transition-all active:scale-95",
-            pendingStatus === 'maybe' && "opacity-70"
-          )}
-          onClick={() => handleClick('maybe')}
-          disabled={disabled || pendingStatus !== null}
-        >
-          <HelpCircle className="h-5 w-5" />
-          <span className="text-xs">{t('event.maybe')}</span>
         </Button>
         
         <Button

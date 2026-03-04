@@ -140,10 +140,9 @@ export function eventUnlockedTemplate({ eventTitle, clubName, dateOptions, event
   return emailWrapper(`<div style="${baseStyles.content}"><div style="${baseStyles.iconWrapper}">${icons.sparkles}</div><h1 style="${baseStyles.headline}">Event now open!</h1><p style="${baseStyles.subtext}"><strong style="color: #ffffff;">${eventTitle}</strong> in ${clubName} is now open for voting and RSVP.</p><div style="${baseStyles.infoCard}"><p style="margin: 0 0 12px; color: #8fb5a5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Vote on a date</p><ul style="margin: 0; padding-left: 0; list-style: none;">${dateList}</ul></div><a href="${eventUrl}" style="${baseStyles.button}">Vote & RSVP</a></div>`);
 }
 
-export function rsvpConfirmationTemplate({ eventTitle, status, eventDate, location, eventUrl }: { eventTitle: string; status: 'going' | 'maybe' | 'not_going'; eventDate?: string; location?: string; eventUrl: string }): string {
+export function rsvpConfirmationTemplate({ eventTitle, status, eventDate, location, eventUrl }: { eventTitle: string; status: 'going' | 'not_going'; eventDate?: string; location?: string; eventUrl: string }): string {
   const config = { 
     going: { icon: icons.checkCircle, headline: "You're in!", message: 'Your seat is confirmed.' }, 
-    maybe: { icon: icons.helpCircle, headline: 'Noted!', message: "We've recorded your maybe." }, 
     not_going: { icon: icons.waveHand, headline: 'Maybe next time', message: "We'll miss you at the table." } 
   };
   const { icon, headline, message } = config[status];

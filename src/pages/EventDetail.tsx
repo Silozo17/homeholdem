@@ -92,7 +92,7 @@ interface UserProfile {
 
 interface Rsvp {
   user_id: string;
-  status: 'going' | 'maybe' | 'not_going';
+  status: 'going' | 'not_going';
   is_waitlisted: boolean;
   waitlist_position: number | null;
   profile: {
@@ -110,7 +110,7 @@ export default function EventDetail() {
   const [event, setEvent] = useState<Event | null>(null);
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
-  const [userRsvp, setUserRsvp] = useState<'going' | 'maybe' | 'not_going' | null>(null);
+  const [userRsvp, setUserRsvp] = useState<'going' | 'not_going' | null>(null);
   const [hostVolunteers, setHostVolunteers] = useState<string[]>([]);
   const [hostProfile, setHostProfile] = useState<{ display_name: string } | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
@@ -241,7 +241,7 @@ export default function EventDetail() {
 
       const rsvpsWithProfiles = rsvpData.map(r => ({
         ...r,
-        status: r.status as 'going' | 'maybe' | 'not_going',
+        status: r.status as 'going' | 'not_going',
         profile: profileMap.get(r.user_id) || { display_name: 'Unknown', avatar_url: null },
       }));
 
@@ -250,7 +250,7 @@ export default function EventDetail() {
       // Update user's RSVP
       const myRsvp = rsvpData.find(r => r.user_id === user?.id);
       if (myRsvp) {
-        setUserRsvp(myRsvp.status as 'going' | 'maybe' | 'not_going');
+        setUserRsvp(myRsvp.status as 'going' | 'not_going');
       }
     }
   };
@@ -472,7 +472,7 @@ export default function EventDetail() {
   }, [user, event, dateOptions, userProfile]);
 
   // Optimistic RSVP handler
-  const handleRsvp = useCallback(async (status: 'going' | 'maybe' | 'not_going') => {
+  const handleRsvp = useCallback(async (status: 'going' | 'not_going') => {
     if (!user || !event || !userProfile) return;
 
     const totalCapacity = event.max_tables * event.seats_per_table;
@@ -644,7 +644,7 @@ export default function EventDetail() {
   // Rate limiting for RSVP emails - track last email per event
   const lastRsvpEmailRef = useRef<{ eventId: string; timestamp: number } | null>(null);
 
-  const sendRsvpConfirmation = async (status: 'going' | 'maybe' | 'not_going') => {
+  const sendRsvpConfirmation = async (status: 'going' | 'not_going') => {
     if (!user || !event) return;
 
     // Rate limit: max 1 email per event per 5 minutes
@@ -698,8 +698,6 @@ export default function EventDetail() {
         to: profile.email,
         subject: status === 'going' 
           ? `✅ You're in for ${event.title}!`
-          : status === 'maybe'
-          ? `🤔 RSVP Noted for ${event.title}`
           : `❌ RSVP Updated for ${event.title}`,
         html,
       });
@@ -928,11 +926,10 @@ export default function EventDetail() {
   };
 
   // Memoized computed values
-  const { goingList, waitlist, maybeList, notGoingList, totalCapacity, isAdmin } = useMemo(() => ({
+  const { goingList, waitlist, notGoingList, totalCapacity, isAdmin } = useMemo(() => ({
     goingList: rsvps.filter(r => r.status === 'going' && !r.is_waitlisted),
     waitlist: rsvps.filter(r => r.is_waitlisted).sort((a, b) => 
       (a.waitlist_position || 0) - (b.waitlist_position || 0)),
-    maybeList: rsvps.filter(r => r.status === 'maybe'),
     notGoingList: rsvps.filter(r => r.status === 'not_going'),
     totalCapacity: event ? event.max_tables * event.seats_per_table : 0,
     isAdmin: userRole === 'owner' || userRole === 'admin'
@@ -1185,7 +1182,6 @@ export default function EventDetail() {
             <AttendeesList 
               going={goingList}
               waitlist={waitlist}
-              maybe={maybeList}
               notGoing={notGoingList}
               capacity={totalCapacity}
             />

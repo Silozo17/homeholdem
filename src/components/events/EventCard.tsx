@@ -16,7 +16,6 @@ interface EventCardProps {
     max_tables: number;
     seats_per_table: number;
     going_count: number;
-    maybe_count: number;
   };
   onClick: () => void;
   isLocked?: boolean;
@@ -98,11 +97,6 @@ export function EventCard({ event, onClick, isLocked = false }: EventCardProps) 
               <span className="text-foreground font-medium">{event.going_count}</span>
               <span className="text-muted-foreground">{t('event.going').toLowerCase()}</span>
             </div>
-            {event.maybe_count > 0 && (
-              <span className="text-muted-foreground">
-                +{event.maybe_count} {t('event.maybe').toLowerCase()}
-              </span>
-            )}
           </div>
           
           <div className="text-xs text-muted-foreground">

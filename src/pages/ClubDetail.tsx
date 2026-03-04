@@ -95,7 +95,6 @@ interface EventWithCounts {
   max_tables: number;
   seats_per_table: number;
   going_count: number;
-  maybe_count: number;
   created_at: string;
   is_unlocked: boolean;
 }
@@ -251,13 +250,11 @@ export default function ClubDetail() {
             .eq('event_id', event.id);
 
           const going = rsvps?.filter(r => r.status === 'going' && !r.is_waitlisted).length || 0;
-          const maybe = rsvps?.filter(r => r.status === 'maybe').length || 0;
 
           return {
             ...event,
             is_unlocked: event.is_unlocked ?? false,
             going_count: going,
-            maybe_count: maybe,
           };
         })
       );
