@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, HelpCircle, X } from 'lucide-react';
+import { Users, Clock, X } from 'lucide-react';
 import { UserAvatar } from '@/components/common/UserAvatar';
 import { TappablePlayer } from '@/components/common/TappablePlayer';
 
@@ -19,12 +19,11 @@ interface Attendee {
 interface AttendeesListProps {
   going: Attendee[];
   waitlist: Attendee[];
-  maybe: Attendee[];
   notGoing: Attendee[];
   capacity: number;
 }
 
-export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: AttendeesListProps) {
+export function AttendeesList({ going, waitlist, notGoing, capacity }: AttendeesListProps) {
   const { t } = useTranslation();
 
   return (
@@ -89,32 +88,6 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
           </div>
         )}
 
-        {/* Maybe */}
-        {maybe.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <HelpCircle className="h-3 w-3" />
-              {t('event.maybe')} ({maybe.length})
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {maybe.map((attendee) => (
-                <TappablePlayer key={attendee.user_id} userId={attendee.user_id}>
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border border-border/30 rounded-full"
-                  >
-                    <UserAvatar 
-                      name={attendee.profile.display_name} 
-                      avatarUrl={attendee.profile.avatar_url}
-                      size="xs"
-                    />
-                    <span className="text-sm text-muted-foreground">{attendee.profile.display_name}</span>
-                  </div>
-                </TappablePlayer>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Can't Go */}
         {notGoing.length > 0 && (
           <div className="space-y-2">
@@ -141,7 +114,7 @@ export function AttendeesList({ going, waitlist, maybe, notGoing, capacity }: At
           </div>
         )}
 
-        {going.length === 0 && waitlist.length === 0 && maybe.length === 0 && notGoing.length === 0 && (
+        {going.length === 0 && waitlist.length === 0 && notGoing.length === 0 && (
           <p className="text-center text-muted-foreground py-4">
             {t('event.no_rsvps')} {t('event.be_first')}
           </p>
