@@ -1,34 +1,40 @@
 
-# Fix: Deafen (Mute All) Button Not Working
 
-## Root Cause
+# Remove "Maybe" RSVP Option
 
-The deafen toggle sets `el.volume = 0` on audio elements created by LiveKit's `track.attach()`. However, these are WebRTC-backed `<audio>` elements, and on many browsers (especially mobile Safari/iOS), setting `volume = 0` on WebRTC audio elements has no effect. The `volume` property is often ignored or not fully supported for WebRTC streams.
+## Summary
+Remove the "Maybe" button from the RSVP system. Players can only choose "Going" or "Not Going".
 
-## Fix (1 file, 2 locations)
+## Changes
 
-### `src/hooks/useVoiceChat.ts`
+### 1. `src/components/events/RsvpButtons.tsx`
+- Remove the entire "Maybe" button (middle column)
+- Change grid from `grid-cols-3` to `grid-cols-2`
+- Remove `'maybe'` from the type unions in the interface
 
-**Change A** -- In `toggleDeafen` (~line 163), use `el.muted` instead of `el.volume`:
+### 2. `src/components/events/AttendeesList.tsx`
+- Remove the `maybe` prop and the entire "Maybe" section rendering block
+- Remove `HelpCircle` import
+- Update the empty-state check to remove `maybe.length === 0`
 
-```typescript
-audioElementsRef.current.forEach((el) => {
-  el.muted = newDeafened;
-});
-```
+### 3. `src/pages/EventDetail.tsx`
+- Remove `maybeList` from the memoized computed values (~line 935)
+- Remove `maybe={maybeList}` from the `<AttendeesList>` props (~line 1188)
+- Remove `'maybe'` from the `handleRsvp` type signature (~line 475) and `userRsvp` state type (~line 113)
+- Remove `'maybe'` from the `Rsvp` interface status union (~line 95)
 
-**Change B** -- In the `TrackSubscribed` handler (~line 97), respect deafen state using `muted` instead of `volume`:
+### 4. `src/components/events/EventCard.tsx`
+- Remove the `maybe_count` conditional rendering block (~lines 101-104)
+- Remove `maybe_count` from the event interface (~line 19)
 
-```typescript
-el.muted = deafenedRef.current;
-```
+### 5. `src/pages/ClubDetail.tsx`
+- Remove `maybe_count` from the event type and the computed value (~lines 98, 260)
 
-## Why This Works
+### 6. `src/lib/email-templates.ts`
+- Remove the `maybe` entry from the `rsvpConfirmationTemplate` config object (~line 146)
 
-The `HTMLMediaElement.muted` property is universally supported and works reliably with WebRTC audio streams across all browsers, including iOS Safari. Unlike `volume`, `muted` directly controls the audio output at the browser level.
+## Not Changed
+- Database schema (the `maybe` enum value stays in the DB — harmless and avoids a migration)
+- Bottom navigation, styles, layout, spacing
+- Any other files or behaviour
 
-## No Changes To
-
-- Other voice chat controls (mic toggle, connect/disconnect)
-- Bottom navigation, styles, layout, or spacing
-- Any other files
