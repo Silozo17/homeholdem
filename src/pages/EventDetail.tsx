@@ -146,7 +146,7 @@ export default function EventDetail() {
 
   // Realtime subscription for live updates
   useEffect(() => {
-    if (!eventId || dateOptions.length === 0) return;
+    if (!eventId) return;
 
     const channel = supabase
       .channel(`event-${eventId}`)
