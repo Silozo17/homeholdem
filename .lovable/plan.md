@@ -1,15 +1,40 @@
 
 
-# Fix: Waitlist Auto-Promotion Should Fill All Open Spots
+# Remove "Maybe" RSVP Option
 
-## Problem
+## Summary
+Remove the "Maybe" button from the RSVP system. Players can only choose "Going" or "Not Going".
 
-`promoteFromWaitlist()` only promotes **one** user per call. If 3 people leave "going", only 1 waitlisted user gets promoted — the remaining 2 spots stay empty with waitlisted users sitting idle.
+## Changes
 
-The function also only runs for admins on page load or when the current user switches from going to not_going. It should promote in a loop until all open spots are filled.
+### 1. `src/components/events/RsvpButtons.tsx`
+- Remove the entire "Maybe" button (middle column)
+- Change grid from `grid-cols-3` to `grid-cols-2`
+- Remove `'maybe'` from the type unions in the interface
 
-## Fix (1 file)
+### 2. `src/components/events/AttendeesList.tsx`
+- Remove the `maybe` prop and the entire "Maybe" section rendering block
+- Remove `HelpCircle` import
+- Update the empty-state check to remove `maybe.length === 0`
 
-### `src/pages/EventDetail.tsx` — `promoteFromWaitlist` function (lines 226-271)
+### 3. `src/pages/EventDetail.tsx`
+- Remove `maybeList` from the memoized computed values (~line 935)
+- Remove `maybe={maybeList}` from the `<AttendeesList>` props (~line 1188)
+- Remove `'maybe'` from the `handleRsvp` type signature (~line 475) and `userRsvp` state type (~line 113)
+- Remove `'maybe'` from the `Rsvp` interface status union (~line 95)
 
-Change the function to **loop** and promote users one-by-one until capacity
+### 4. `src/components/events/EventCard.tsx`
+- Remove the `maybe_count` conditional rendering block (~lines 101-104)
+- Remove `maybe_count` from the event interface (~line 19)
+
+### 5. `src/pages/ClubDetail.tsx`
+- Remove `maybe_count` from the event type and the computed value (~lines 98, 260)
+
+### 6. `src/lib/email-templates.ts`
+- Remove the `maybe` entry from the `rsvpConfirmationTemplate` config object (~line 146)
+
+## Not Changed
+- Database schema (the `maybe` enum value stays in the DB — harmless and avoids a migration)
+- Bottom navigation, styles, layout, spacing
+- Any other files or behaviour
+
