@@ -287,11 +287,11 @@ export default function EventDetail() {
         setUserRsvp(myRsvp.status as 'going' | 'not_going');
       }
 
-      // Auto-promote from waitlist if there are open spots
+      // Auto-promote from waitlist if there are open spots (server-side RPC)
       const totalCapacity = event ? event.max_tables * event.seats_per_table : 0;
       const goingNotWaitlisted = rsvpData.filter(r => r.status === 'going' && !r.is_waitlisted).length;
       const hasWaitlisted = rsvpData.some(r => r.is_waitlisted);
-      if (goingNotWaitlisted < totalCapacity && hasWaitlisted) {
+      if (totalCapacity > 0 && goingNotWaitlisted < totalCapacity && hasWaitlisted) {
         await promoteFromWaitlist();
         // Re-fetch after promotion to update UI
         const { data: freshRsvps } = await supabase
