@@ -222,52 +222,56 @@ export default function EventDetail() {
     };
   }, [eventId, dateOptions.length, user?.id]);
 
-  // Reusable waitlist promotion check — promotes the first waitlisted user if capacity allows
+  // Reusable waitlist promotion check — loops to fill ALL open spots
   const promoteFromWaitlist = useCallback(async () => {
     if (!eventId || !event) return;
 
-    const { data: existingRsvps } = await supabase
-      .from('event_rsvps')
-      .select('user_id, is_waitlisted, waitlist_position')
-      .eq('event_id', eventId)
-      .eq('status', 'going');
-
     const totalCapacity = event.max_tables * event.seats_per_table;
-    const goingCount = existingRsvps?.filter(r => !r.is_waitlisted).length || 0;
 
-    if (goingCount >= totalCapacity) return;
+    // Loop until capacity is full or waitlist is empty
+    while (true) {
+      // Re-query each iteration to get fresh data
+      const { data: existingRsvps } = await supabase
+        .from('event_rsvps')
+        .select('user_id, is_waitlisted, waitlist_position')
+        .eq('event_id', eventId)
+        .eq('status', 'going');
 
-    const waitlistUsers = existingRsvps
-      ?.filter(r => r.is_waitlisted)
-      .sort((a, b) => (a.waitlist_position || 999) - (b.waitlist_position || 999));
+      const goingCount = existingRsvps?.filter(r => !r.is_waitlisted).length || 0;
+      if (goingCount >= totalCapacity) break;
 
-    if (!waitlistUsers || waitlistUsers.length === 0) return;
+      const waitlistUsers = existingRsvps
+        ?.filter(r => r.is_waitlisted)
+        .sort((a, b) => (a.waitlist_position || 999) - (b.waitlist_position || 999));
 
-    const promotedUser = waitlistUsers[0];
+      if (!waitlistUsers || waitlistUsers.length === 0) break;
 
-    // Promote the first waitlisted user
-    await supabase
-      .from('event_rsvps')
-      .update({ is_waitlisted: false, waitlist_position: null })
-      .eq('event_id', eventId)
-      .eq('user_id', promotedUser.user_id);
+      const promotedUser = waitlistUsers[0];
 
-    // Reposition remaining waitlist
-    for (let i = 1; i < waitlistUsers.length; i++) {
+      // Promote the first waitlisted user
       await supabase
         .from('event_rsvps')
-        .update({ waitlist_position: i })
+        .update({ is_waitlisted: false, waitlist_position: null })
         .eq('event_id', eventId)
-        .eq('user_id', waitlistUsers[i].user_id);
+        .eq('user_id', promotedUser.user_id);
+
+      // Reposition remaining waitlist
+      for (let i = 1; i < waitlistUsers.length; i++) {
+        await supabase
+          .from('event_rsvps')
+          .update({ waitlist_position: i })
+          .eq('event_id', eventId)
+          .eq('user_id', waitlistUsers[i].user_id);
+      }
+
+      // Send email + in-app notification via edge function (fire-and-forget)
+      supabase.functions.invoke('promote-waitlist', {
+        body: { event_id: eventId, promoted_user_id: promotedUser.user_id }
+      }).catch(console.error);
+
+      // Send push notification (fire-and-forget)
+      notifyWaitlistPromotion(promotedUser.user_id, event.title, eventId).catch(console.error);
     }
-
-    // Send email + in-app notification via edge function
-    supabase.functions.invoke('promote-waitlist', {
-      body: { event_id: eventId, promoted_user_id: promotedUser.user_id }
-    }).catch(console.error);
-
-    // Send push notification
-    notifyWaitlistPromotion(promotedUser.user_id, event.title, eventId).catch(console.error);
   }, [eventId, event]);
 
   const fetchRsvps = async () => {
