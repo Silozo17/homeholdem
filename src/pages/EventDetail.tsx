@@ -220,7 +220,7 @@ export default function EventDetail() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [eventId, dateOptions.length, user?.id]);
+  }, [eventId, user?.id]);
 
   // Guard to prevent concurrent promotion calls
   const isPromotingRef = useRef(false);
