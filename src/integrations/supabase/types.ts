@@ -2462,6 +2462,7 @@ export type Database = {
           name: string
         }[]
       }
+      promote_event_waitlist: { Args: { _event_id: string }; Returns: string[] }
       read_poker_hand_state: {
         Args: { _hand_id: string; _table_id: string }
         Returns: Json
