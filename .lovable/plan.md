@@ -1,15 +1,40 @@
 
-I checked the current implementation and the main remaining gap is a load-time reconciliation race in `EventDetail.tsx`:
 
-- `fetchRsvps()` only triggers promotion when `event` state is already populated.
-- On first load, `event` can still be `null` right after `setEvent(eventData)`, so capacity is treated as `0` and promotion is skipped.
-- That leaves the UI stuck showing open seats + waitlist until another RSVP event happens.
+# Remove "Maybe" RSVP Option
 
-I’ll fix this with a deterministic reconciliation flow so waitlist always fills immediately when seats are free.
+## Summary
+Remove the "Maybe" button from the RSVP system. Players can only choose "Going" or "Not Going".
 
-## Implementation Plan
+## Changes
 
-1. Make waitlist reconciliation unconditional in `fetchRsvps`
-- Refactor `promoteFromWaitlist()` to return promoted user IDs.
-- In `fetchRsvps()`, call promotion RPC directly (not gated by `event` state/capacity in React).
-- If any users were promoted, immediately re-fetch RSVPs and profiles and update local state.
+### 1. `src/components/events/RsvpButtons.tsx`
+- Remove the entire "Maybe" button (middle column)
+- Change grid from `grid-cols-3` to `grid-cols-2`
+- Remove `'maybe'` from the type unions in the interface
+
+### 2. `src/components/events/AttendeesList.tsx`
+- Remove the `maybe` prop and the entire "Maybe" section rendering block
+- Remove `HelpCircle` import
+- Update the empty-state check to remove `maybe.length === 0`
+
+### 3. `src/pages/EventDetail.tsx`
+- Remove `maybeList` from the memoized computed values (~line 935)
+- Remove `maybe={maybeList}` from the `<AttendeesList>` props (~line 1188)
+- Remove `'maybe'` from the `handleRsvp` type signature (~line 475) and `userRsvp` state type (~line 113)
+- Remove `'maybe'` from the `Rsvp` interface status union (~line 95)
+
+### 4. `src/components/events/EventCard.tsx`
+- Remove the `maybe_count` conditional rendering block (~lines 101-104)
+- Remove `maybe_count` from the event interface (~line 19)
+
+### 5. `src/pages/ClubDetail.tsx`
+- Remove `maybe_count` from the event type and the computed value (~lines 98, 260)
+
+### 6. `src/lib/email-templates.ts`
+- Remove the `maybe` entry from the `rsvpConfirmationTemplate` config object (~line 146)
+
+## Not Changed
+- Database schema (the `maybe` enum value stays in the DB — harmless and avoids a migration)
+- Bottom navigation, styles, layout, spacing
+- Any other files or behaviour
+

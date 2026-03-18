@@ -146,7 +146,7 @@ export default function EventDetail() {
 
   // Realtime subscription for live updates
   useEffect(() => {
-    if (!eventId || dateOptions.length === 0) return;
+    if (!eventId) return;
 
     const channel = supabase
       .channel(`event-${eventId}`)
@@ -220,7 +220,7 @@ export default function EventDetail() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [eventId, dateOptions.length, user?.id]);
+  }, [eventId, user?.id]);
 
   // Guard to prevent concurrent promotion calls
   const isPromotingRef = useRef(false);
@@ -287,11 +287,10 @@ export default function EventDetail() {
         setUserRsvp(myRsvp.status as 'going' | 'not_going');
       }
 
-      // Auto-promote from waitlist if there are open spots (server-side RPC)
-      const totalCapacity = event ? event.max_tables * event.seats_per_table : 0;
-      const goingNotWaitlisted = rsvpData.filter(r => r.status === 'going' && !r.is_waitlisted).length;
+      // Auto-promote from waitlist unconditionally via server-side RPC
+      // The RPC itself checks capacity — no need to gate on client-side event state
       const hasWaitlisted = rsvpData.some(r => r.is_waitlisted);
-      if (totalCapacity > 0 && goingNotWaitlisted < totalCapacity && hasWaitlisted) {
+      if (hasWaitlisted) {
         await promoteFromWaitlist();
         // Re-fetch after promotion to update UI
         const { data: freshRsvps } = await supabase
@@ -305,11 +304,17 @@ export default function EventDetail() {
             .select('id, display_name, avatar_url')
             .in('id', freshIds);
           const freshMap = new Map(freshProfiles?.map(p => [p.id, p]) || []);
-          setRsvps(freshRsvps.map(r => ({
+          const updatedRsvps = freshRsvps.map(r => ({
             ...r,
             status: r.status as 'going' | 'not_going',
             profile: freshMap.get(r.user_id) || { display_name: 'Unknown', avatar_url: null },
-          })));
+          }));
+          setRsvps(updatedRsvps);
+          // Update user RSVP from fresh data
+          const myFreshRsvp = freshRsvps.find(r => r.user_id === user?.id);
+          if (myFreshRsvp) {
+            setUserRsvp(myFreshRsvp.status as 'going' | 'not_going');
+          }
         }
       }
     }
