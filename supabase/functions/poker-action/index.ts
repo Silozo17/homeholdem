@@ -625,11 +625,11 @@ async function processAction(
   }
   console.log(`[ACTION] committed hand=${hand.id} seat=${actorSeatNum} action=${action} phase=${hand.phase}->${newPhase} next_actor=${nextActorSeat} complete=${handComplete}`);
 
-  // Reset consecutive_timeouts on successful voluntary action (not a timeout fold)
+  // Reset consecutive_timeouts and refresh heartbeat on successful voluntary action (not a timeout fold)
   if (action !== "fold" || !isTimeout) {
     await admin
       .from("poker_seats")
-      .update({ consecutive_timeouts: 0 })
+      .update({ consecutive_timeouts: 0, last_heartbeat: new Date().toISOString() })
       .eq("table_id", table.id)
       .eq("seat_number", actorSeatNum);
   }

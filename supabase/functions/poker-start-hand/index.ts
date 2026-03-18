@@ -517,12 +517,20 @@ Deno.serve(async (req) => {
       .not("player_id", "is", null)
       .order("seat_number");
 
+    // Refresh heartbeat for all seated players so no one is falsely kicked mid-hand
+    const heartbeatPromise = admin
+      .from("poker_seats")
+      .update({ last_heartbeat: new Date().toISOString() })
+      .eq("table_id", table_id)
+      .not("player_id", "is", null);
+
     // Run all in parallel
     const [, , , { data: allSeatsForBroadcast }] = await Promise.all([
       Promise.all(seatUpdatePromises),
       actionInsertPromise,
       tableStatusPromise,
       allSeatsPromise,
+      heartbeatPromise,
     ]);
 
     const allPlayerIds = (allSeatsForBroadcast || []).map((p: any) => p.player_id);
