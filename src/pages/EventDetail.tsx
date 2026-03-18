@@ -661,7 +661,7 @@ export default function EventDetail() {
       await promoteFromWaitlist();
       await fetchRsvps();
     }
-  }, [user, event, userProfile, rsvps, userRsvp]);
+  }, [user, event, userProfile, rsvps, userRsvp, promoteFromWaitlist]);
 
   // Rate limiting for RSVP emails - track last email per event
   const lastRsvpEmailRef = useRef<{ eventId: string; timestamp: number } | null>(null);
