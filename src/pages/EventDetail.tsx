@@ -222,6 +222,54 @@ export default function EventDetail() {
     };
   }, [eventId, dateOptions.length, user?.id]);
 
+  // Reusable waitlist promotion check — promotes the first waitlisted user if capacity allows
+  const promoteFromWaitlist = useCallback(async () => {
+    if (!eventId || !event) return;
+
+    const { data: existingRsvps } = await supabase
+      .from('event_rsvps')
+      .select('user_id, is_waitlisted, waitlist_position')
+      .eq('event_id', eventId)
+      .eq('status', 'going');
+
+    const totalCapacity = event.max_tables * event.seats_per_table;
+    const goingCount = existingRsvps?.filter(r => !r.is_waitlisted).length || 0;
+
+    if (goingCount >= totalCapacity) return;
+
+    const waitlistUsers = existingRsvps
+      ?.filter(r => r.is_waitlisted)
+      .sort((a, b) => (a.waitlist_position || 999) - (b.waitlist_position || 999));
+
+    if (!waitlistUsers || waitlistUsers.length === 0) return;
+
+    const promotedUser = waitlistUsers[0];
+
+    // Promote the first waitlisted user
+    await supabase
+      .from('event_rsvps')
+      .update({ is_waitlisted: false, waitlist_position: null })
+      .eq('event_id', eventId)
+      .eq('user_id', promotedUser.user_id);
+
+    // Reposition remaining waitlist
+    for (let i = 1; i < waitlistUsers.length; i++) {
+      await supabase
+        .from('event_rsvps')
+        .update({ waitlist_position: i })
+        .eq('event_id', eventId)
+        .eq('user_id', waitlistUsers[i].user_id);
+    }
+
+    // Send email + in-app notification via edge function
+    supabase.functions.invoke('promote-waitlist', {
+      body: { event_id: eventId, promoted_user_id: promotedUser.user_id }
+    }).catch(console.error);
+
+    // Send push notification
+    notifyWaitlistPromotion(promotedUser.user_id, event.title, eventId).catch(console.error);
+  }, [eventId, event]);
+
   const fetchRsvps = async () => {
     if (!eventId) return;
 
@@ -251,6 +299,34 @@ export default function EventDetail() {
       const myRsvp = rsvpData.find(r => r.user_id === user?.id);
       if (myRsvp) {
         setUserRsvp(myRsvp.status as 'going' | 'not_going');
+      }
+
+      // Auto-promote from waitlist if there are open spots (only admins run this to avoid races)
+      if (userRole === 'owner' || userRole === 'admin') {
+        const totalCapacity = event ? event.max_tables * event.seats_per_table : 0;
+        const goingNotWaitlisted = rsvpData.filter(r => r.status === 'going' && !r.is_waitlisted).length;
+        const hasWaitlisted = rsvpData.some(r => r.is_waitlisted);
+        if (goingNotWaitlisted < totalCapacity && hasWaitlisted) {
+          await promoteFromWaitlist();
+          // Re-fetch after promotion to update UI
+          const { data: freshRsvps } = await supabase
+            .from('event_rsvps')
+            .select('user_id, status, is_waitlisted, waitlist_position')
+            .eq('event_id', eventId);
+          if (freshRsvps) {
+            const freshIds = freshRsvps.map(r => r.user_id);
+            const { data: freshProfiles } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url')
+              .in('id', freshIds);
+            const freshMap = new Map(freshProfiles?.map(p => [p.id, p]) || []);
+            setRsvps(freshRsvps.map(r => ({
+              ...r,
+              status: r.status as 'going' | 'not_going',
+              profile: freshMap.get(r.user_id) || { display_name: 'Unknown', avatar_url: null },
+            })));
+          }
+        }
       }
     }
   };
