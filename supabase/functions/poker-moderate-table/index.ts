@@ -165,11 +165,7 @@ Deno.serve(async (req) => {
           const closingAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
           await admin.from("poker_tables").update({ closing_at: closingAt }).eq("id", table_id);
 
-          await channel.send({
-            type: "broadcast",
-            event: "seat_change",
-            payload: { action: "table_closing", closing_at: closingAt },
-          });
+          await broadcastToTable(table_id, "seat_change", { action: "table_closing", closing_at: closingAt });
 
           return new Response(
             JSON.stringify({ message: "Table scheduled for closure in 4 hours", closing_at: closingAt }),
