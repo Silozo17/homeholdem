@@ -225,11 +225,7 @@ Deno.serve(async (req) => {
 
       await admin.from("poker_tables").update({ closing_at: null }).eq("id", table_id);
 
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: { action: "table_closing_cancelled" },
-      });
+      await broadcastToTable(table_id, "seat_change", { action: "table_closing_cancelled" });
 
       return new Response(
         JSON.stringify({ message: "Table closure cancelled" }),
