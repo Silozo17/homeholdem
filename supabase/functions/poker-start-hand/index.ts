@@ -255,14 +255,13 @@ Deno.serve(async (req) => {
       await broadcastToTable(table_id, "seat_change", { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" });
     }
 
-    // Get active seats — defence-in-depth: exclude players who joined < 3s ago
+    // Get active seats — all active players are eligible for the hand
     const { data: seats } = await admin
       .from("poker_seats")
       .select("*")
       .eq("table_id", table_id)
       .eq("status", "active")
       .not("player_id", "is", null)
-      .lt("joined_at", joinCutoff)
       .order("seat_number");
 
     if (!seats || seats.length < 2) {
