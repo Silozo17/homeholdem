@@ -6,6 +6,29 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      messages: [{
+        topic: `realtime:poker:table:${tableId}`,
+        event: "broadcast",
+        payload: { type: "broadcast", event, payload },
+      }],
+    }),
+  });
+  if (!res.ok) {
+    console.error(`[MODERATE] broadcastToTable failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -71,7 +94,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const channel = admin.channel(`poker:table:${table_id}`);
+    // Broadcasts use direct REST API (no channel needed)
 
     if (action === "kick" && target_player_id) {
       // Check no active hand
@@ -113,15 +136,11 @@ Deno.serve(async (req) => {
 
       await admin.from("poker_seats").delete().eq("id", seat.id);
 
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: {
-          seat: seat.seat_number,
-          player_id: null,
-          action: "kicked",
-          kicked_player_id: target_player_id,
-        },
+      await broadcastToTable(table_id, "seat_change", {
+        seat: seat.seat_number,
+        player_id: null,
+        action: "kicked",
+        kicked_player_id: target_player_id,
       });
 
       return new Response(
@@ -146,11 +165,7 @@ Deno.serve(async (req) => {
           const closingAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
           await admin.from("poker_tables").update({ closing_at: closingAt }).eq("id", table_id);
 
-          await channel.send({
-            type: "broadcast",
-            event: "seat_change",
-            payload: { action: "table_closing", closing_at: closingAt },
-          });
+          await broadcastToTable(table_id, "seat_change", { action: "table_closing", closing_at: closingAt });
 
           return new Response(
             JSON.stringify({ message: "Table scheduled for closure in 4 hours", closing_at: closingAt }),
@@ -178,11 +193,7 @@ Deno.serve(async (req) => {
       }
 
       // Broadcast close before deleting
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: { action: "table_closed" },
-      });
+      await broadcastToTable(table_id, "seat_change", { action: "table_closed" });
 
       // Cascade delete all related data
       const { data: hands } = await admin
@@ -214,11 +225,7 @@ Deno.serve(async (req) => {
 
       await admin.from("poker_tables").update({ closing_at: null }).eq("id", table_id);
 
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: { action: "table_closing_cancelled" },
-      });
+      await broadcastToTable(table_id, "seat_change", { action: "table_closing_cancelled" });
 
       return new Response(
         JSON.stringify({ message: "Table closure cancelled" }),
