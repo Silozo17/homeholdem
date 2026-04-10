@@ -248,8 +248,25 @@ export function usePokerBroadcast({
           if (payload?.action === 'join') {
             setTableState(prev => {
               if (!prev) return prev;
-              const alreadyExists = prev.seats.some(s => s.seat === payload.seat);
-              if (alreadyExists) return prev;
+              const existingIdx = prev.seats.findIndex(s => s.seat === payload.seat);
+              if (existingIdx !== -1 && prev.seats[existingIdx].player_id === payload.player_id) return prev;
+              const newSeat = {
+                seat: payload.seat,
+                player_id: payload.player_id,
+                display_name: payload.display_name || 'Player',
+                avatar_url: payload.avatar_url || null,
+                country_code: payload.country_code || null,
+                stack: payload.stack || 0,
+                status: 'sitting_out' as const,
+                has_cards: false,
+                current_bet: 0,
+                last_action: null,
+              };
+              if (existingIdx !== -1) {
+                const updatedSeats = [...prev.seats];
+                updatedSeats[existingIdx] = newSeat;
+                return { ...prev, seats: updatedSeats };
+              }
               return {
                 ...prev,
                 seats: [...prev.seats, {
