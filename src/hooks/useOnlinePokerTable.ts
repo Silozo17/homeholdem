@@ -231,6 +231,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
 
   // ── Actions ──
   const joinTable = useCallback(async (seatNumber: number, buyIn: number) => {
+    broadcast.resetKickedForInactivity();
     const data = await callEdge('poker-join-table', { table_id: tableId, seat_number: seatNumber, buy_in_amount: buyIn });
     // Optimistic local update — don't await refreshState
     setTableState(prev => {
