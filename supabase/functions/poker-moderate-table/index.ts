@@ -193,11 +193,7 @@ Deno.serve(async (req) => {
       }
 
       // Broadcast close before deleting
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: { action: "table_closed" },
-      });
+      await broadcastToTable(table_id, "seat_change", { action: "table_closed" });
 
       // Cascade delete all related data
       const { data: hands } = await admin
