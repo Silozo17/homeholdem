@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ messages: [{ topic: `realtime:poker:table:${tableId}`, event: "broadcast", payload: { type: "broadcast", event, payload } }] }),
+  });
+}
+
 // ── Card types ──
 type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
@@ -211,12 +221,7 @@ Deno.serve(async (req) => {
           .eq("id", activeHand.id);
         await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
         // Broadcast so clients know the hand ended
-        const channel = admin.channel(`poker:table:${table_id}`);
-        await channel.send({
-          type: "broadcast",
-          event: "game_state",
-          payload: { hand_id: activeHand.id, phase: "complete", force_completed: true },
-        });
+        await broadcastToTable(table_id, "game_state", { hand_id: activeHand.id, phase: "complete", force_completed: true });
       } else {
         return new Response(
           JSON.stringify({ error: "Hand already in progress" }),
@@ -247,12 +252,7 @@ Deno.serve(async (req) => {
     for (const busted of bustedSeats || []) {
       console.log(`[START-HAND] Auto-removing busted player ${busted.player_id} from seat ${busted.seat_number}`);
       await admin.from("poker_seats").delete().eq("id", busted.id);
-      const bustedCh = admin.channel(`poker:table:${table_id}`);
-      await bustedCh.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" },
-      });
+      await broadcastToTable(table_id, "seat_change", { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" });
     }
 
     // Get active seats — defence-in-depth: exclude players who joined < 3s ago
@@ -594,25 +594,16 @@ Deno.serve(async (req) => {
     };
 
     // Broadcast public state
-    const channel = admin.channel(`poker:table:${table_id}`);
-    await channel.send({
-      type: "broadcast",
-      event: "game_state",
-      payload: publicState,
-    });
+    await broadcastToTable(table_id, "game_state", publicState);
 
     // Broadcast blinds_up event if blinds increased
     if (blindsIncreased) {
-      await channel.send({
-        type: "broadcast",
-        event: "blinds_up",
-        payload: {
-          old_small: oldSmall,
-          old_big: oldBig,
-          new_small: table.small_blind,
-          new_big: table.big_blind,
-          blind_level: table.blind_level,
-        },
+      await broadcastToTable(table_id, "blinds_up", {
+        old_small: oldSmall,
+        old_big: oldBig,
+        new_small: table.small_blind,
+        new_big: table.big_blind,
+        blind_level: table.blind_level,
       });
     }
 

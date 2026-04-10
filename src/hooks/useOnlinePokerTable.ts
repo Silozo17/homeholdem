@@ -445,6 +445,18 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
     };
   }, [isAutoStartLeader, tableId, refreshState]);
 
+  // Stale turn recovery: if isMyTurn stays true for 5s+, force refresh to catch missed broadcasts
+  const staleRecoveryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (staleRecoveryRef.current) { clearTimeout(staleRecoveryRef.current); staleRecoveryRef.current = null; }
+    if (!isMyTurn) return;
+    staleRecoveryRef.current = setTimeout(() => {
+      console.log('[STALE-RECOVERY] isMyTurn stuck for 5s, refreshing state');
+      refreshState(true);
+    }, 5000);
+    return () => { if (staleRecoveryRef.current) clearTimeout(staleRecoveryRef.current); };
+  }, [isMyTurn, hand?.state_version, refreshState]);
+
   // Reset all hand-specific state for a clean new game
   const resetForNewGame = useCallback(() => {
     broadcast.resetBroadcastState();

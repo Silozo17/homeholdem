@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ messages: [{ topic: `realtime:poker:table:${tableId}`, event: "broadcast", payload: { type: "broadcast", event, payload } }] }),
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -137,40 +147,35 @@ Deno.serve(async (req) => {
               // Get winner's seat_number for proper broadcast
               const { data: winnerSeatFull } = await admin.from("poker_seats").select("seat_number").eq("table_id", table_id).eq("player_id", winnerId).single();
 
-              const leaveChannel = admin.channel(`poker:table:${table_id}`);
-              await leaveChannel.send({
-                type: "broadcast",
-                event: "hand_complete",
-                payload: {
-                  hand_id: activeHand.id,
-                  phase: "showdown",
-                  community_cards: handData.community_cards ?? [],
-                  pots: [{ amount: totalPot, winners: [winnerId] }],
-                  current_actor_seat: null,
-                  current_actor_id: null,
-                  dealer_seat: handData.dealer_seat,
-                  sb_seat: handData.sb_seat,
-                  bb_seat: handData.bb_seat,
-                  min_raise: 0,
+              await broadcastToTable(table_id, "hand_complete", {
+                hand_id: activeHand.id,
+                phase: "showdown",
+                community_cards: handData.community_cards ?? [],
+                pots: [{ amount: totalPot, winners: [winnerId] }],
+                current_actor_seat: null,
+                current_actor_id: null,
+                dealer_seat: handData.dealer_seat,
+                sb_seat: handData.sb_seat,
+                bb_seat: handData.bb_seat,
+                min_raise: 0,
+                current_bet: 0,
+                seats: [{
+                  seat: winnerSeatFull?.seat_number ?? 0,
+                  player_id: winnerId,
+                  display_name: winnerProfile?.display_name || "Player",
+                  avatar_url: winnerProfile?.avatar_url || null,
+                  stack: newStack,
+                  status: "active",
                   current_bet: 0,
-                  seats: [{
-                    seat: winnerSeatFull?.seat_number ?? 0,
-                    player_id: winnerId,
-                    display_name: winnerProfile?.display_name || "Player",
-                    avatar_url: winnerProfile?.avatar_url || null,
-                    stack: newStack,
-                    status: "active",
-                    current_bet: 0,
-                    last_action: null,
-                    has_cards: true,
-                  }],
-                  action_deadline: null,
-                  hand_number: handData.hand_number ?? 0,
-                  blinds: { small: 0, big: 0, ante: 0 },
-                  state_version: commitResult.state_version,
-                  winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
-                  revealed_cards: [],
-                },
+                  last_action: null,
+                  has_cards: true,
+                }],
+                action_deadline: null,
+                hand_number: handData.hand_number ?? 0,
+                blinds: { small: 0, big: 0, ante: 0 },
+                state_version: commitResult.state_version,
+                winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
+                revealed_cards: [],
               });
 
               await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
@@ -281,30 +286,25 @@ Deno.serve(async (req) => {
                   has_cards: !foldedPlayerIds.has(s.player_id),
                 }));
 
-              const ch = admin.channel(`poker:table:${table_id}`);
-              await ch.send({
-                type: "broadcast",
-                event: "hand_complete",
-                payload: {
-                  hand_id: activeHand.id,
-                  phase: "showdown",
-                  community_cards: handData.community_cards ?? [],
-                  pots: [{ amount: totalPot, winners: [winnerId] }],
-                  current_actor_seat: null,
-                  current_actor_id: null,
-                  dealer_seat: handData.dealer_seat,
-                  sb_seat: handData.sb_seat,
-                  bb_seat: handData.bb_seat,
-                  min_raise: 0,
-                  current_bet: 0,
-                  seats: seatsForBroadcast,
-                  action_deadline: null,
-                  hand_number: handData.hand_number ?? 0,
-                  blinds: { small: 0, big: 0, ante: 0 },
-                  state_version: commitResult.state_version,
-                  winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
-                  revealed_cards: [],
-                },
+              await broadcastToTable(table_id, "hand_complete", {
+                hand_id: activeHand.id,
+                phase: "showdown",
+                community_cards: handData.community_cards ?? [],
+                pots: [{ amount: totalPot, winners: [winnerId] }],
+                current_actor_seat: null,
+                current_actor_id: null,
+                dealer_seat: handData.dealer_seat,
+                sb_seat: handData.sb_seat,
+                bb_seat: handData.bb_seat,
+                min_raise: 0,
+                current_bet: 0,
+                seats: seatsForBroadcast,
+                action_deadline: null,
+                hand_number: handData.hand_number ?? 0,
+                blinds: { small: 0, big: 0, ante: 0 },
+                state_version: commitResult.state_version,
+                winners: [{ player_id: winnerId, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
+                revealed_cards: [],
               });
               await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
             }
@@ -349,22 +349,17 @@ Deno.serve(async (req) => {
               if (!commitResult?.error) {
                 // Find next actor's player_id for broadcast
                 const nextSeatData = eligible.find((s: any) => s.seat_number === nextActorSeat);
-                const ch = admin.channel(`poker:table:${table_id}`);
-                await ch.send({
-                  type: "broadcast",
-                  event: "game_state",
-                  payload: {
-                    hand_id: activeHand.id,
-                    phase: handData.phase,
-                    community_cards: handData.community_cards,
-                    pots: handData.pots,
-                    current_actor_seat: nextActorSeat,
-                    current_actor_id: nextSeatData?.player_id ?? null,
-                    current_bet: handData.current_bet,
-                    min_raise: handData.min_raise,
-                    action_deadline: deadline,
-                    state_version: commitResult.state_version,
-                  },
+                await broadcastToTable(table_id, "game_state", {
+                  hand_id: activeHand.id,
+                  phase: handData.phase,
+                  community_cards: handData.community_cards,
+                  pots: handData.pots,
+                  current_actor_seat: nextActorSeat,
+                  current_actor_id: nextSeatData?.player_id ?? null,
+                  current_bet: handData.current_bet,
+                  min_raise: handData.min_raise,
+                  action_deadline: deadline,
+                  state_version: commitResult.state_version,
                 });
               }
             }
@@ -417,19 +412,13 @@ Deno.serve(async (req) => {
     // Fetch leaving player's profile for broadcast
     const { data: leavingProfile } = await admin.from("profiles").select("display_name").eq("id", user.id).single();
 
-    const channel = admin.channel(`poker:table:${table_id}`);
-
     // Broadcast seat leave
-    await channel.send({
-      type: "broadcast",
-      event: "seat_change",
-      payload: {
-        seat: seat.seat_number,
-        player_id: user.id,
-        display_name: leavingProfile?.display_name || "Player",
-        action: "leave",
-        remaining_players: remainingAfterLeave,
-      },
+    await broadcastToTable(table_id, "seat_change", {
+      seat: seat.seat_number,
+      player_id: user.id,
+      display_name: leavingProfile?.display_name || "Player",
+      action: "leave",
+      remaining_players: remainingAfterLeave,
     });
 
     // If no players remain, handle table cleanup
@@ -446,11 +435,7 @@ Deno.serve(async (req) => {
         await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table_id);
       } else {
         // Non-persistent: broadcast close and cascade-delete
-        await channel.send({
-          type: "broadcast",
-          event: "seat_change",
-          payload: { action: "table_closed" },
-        });
+        await broadcastToTable(table_id, "seat_change", { action: "table_closed" });
 
         const { data: hands } = await admin
           .from("poker_hands")
