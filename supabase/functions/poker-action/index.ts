@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ messages: [{ topic: `realtime:poker:table:${tableId}`, event: "broadcast", payload: { type: "broadcast", event, payload } }] }),
+  });
+}
+
 // ── Card types ──
 type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
@@ -681,32 +691,21 @@ async function processAction(
     state_version: commitResult.state_version,
   };
 
-  const channel = admin.channel(`poker:table:${table.id}`);
-
   if (handComplete && results) {
-    // Hand is complete — send a single merged broadcast instead of separate game_state + hand_result
     const revealedCards = showdownCards
       ? (showdownCards as any[]).filter((sc: any) => seatStates.find(s => s.player_id === sc.player_id && s.status !== "folded"))
           .map((sc: any) => ({ player_id: sc.player_id, cards: sc.cards }))
       : [];
 
-    await channel.send({
-      type: "broadcast",
-      event: "hand_complete",
-      payload: {
-        // game_state fields
-        ...publicState,
-        // hand_result fields
-        winners: results.winners,
-        revealed_cards: revealedCards,
-      },
+    await broadcastToTable(table.id, "hand_complete", {
+      ...publicState,
+      winners: results.winners,
+      revealed_cards: revealedCards,
     });
 
-    // Update table status back to waiting
     await admin.from("poker_tables").update({ status: "waiting" }).eq("id", table.id);
   } else {
-    // Non-terminal action — broadcast game_state as before
-    await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
+    await broadcastToTable(table.id, "game_state", publicState);
   }
 
   return new Response(JSON.stringify({ success: true, state_version: commitResult.state_version }), {

@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ messages: [{ topic: `realtime:poker:table:${tableId}`, event: "broadcast", payload: { type: "broadcast", event, payload } }] }),
+  });
+}
+
 // ── Helpers ──
 interface SeatState {
   seat_id: string;
@@ -191,11 +201,7 @@ Deno.serve(async (req) => {
         const profileMap = new Map(((profilesRes1.data || []) as any[]).map((p: any) => [p.id, p]));
             const hcSet1 = new Set(((hcRes1.data || []) as any[]).map((r: any) => r.player_id));
 
-            const channel = admin.channel(`poker:table:${hand.table_id}`);
-            await channel.send({
-              type: "broadcast",
-              event: "hand_complete",
-              payload: {
+            await broadcastToTable(hand.table_id, "hand_complete", {
                 hand_id: hand.id,
                 phase: "showdown",
                 community_cards: hand.community_cards ?? [],
@@ -227,7 +233,6 @@ Deno.serve(async (req) => {
                 state_version: commitResult.state_version,
                 winners: [{ player_id: winner.player_id, pot_index: 0, amount: totalPot, hand_name: "Last standing" }],
                 revealed_cards: [],
-              },
             });
 
             await admin.from("poker_tables").update({ status: "waiting" }).eq("id", hand.table_id);
@@ -370,25 +375,18 @@ Deno.serve(async (req) => {
           state_version: commitResult.state_version,
         };
 
-        const channel = admin.channel(`poker:table:${hand.table_id}`);
-
         if (handComplete && completedResults) {
-          // Send single hand_complete instead of split game_state + hand_result
-          await channel.send({
-            type: "broadcast",
-            event: "hand_complete",
-            payload: {
-              ...publicState,
-              phase: "showdown",
-              hand_number: hand.hand_number ?? 0,
-              blinds: { small: table.small_blind, big: table.big_blind, ante: table.ante ?? 0 },
-              winners: completedResults.winners,
-              revealed_cards: [],
-            },
+          await broadcastToTable(hand.table_id, "hand_complete", {
+            ...publicState,
+            phase: "showdown",
+            hand_number: hand.hand_number ?? 0,
+            blinds: { small: table.small_blind, big: table.big_blind, ante: table.ante ?? 0 },
+            winners: completedResults.winners,
+            revealed_cards: [],
           });
           await admin.from("poker_tables").update({ status: "waiting" }).eq("id", hand.table_id);
         } else {
-          await channel.send({ type: "broadcast", event: "game_state", payload: publicState });
+          await broadcastToTable(hand.table_id, "game_state", publicState);
         }
 
         console.log(`Auto-folded hand ${hand.id} seat ${actorSeat.seat_number} (timeouts: ${actorSeat.consecutive_timeouts})`);
@@ -427,12 +425,7 @@ Deno.serve(async (req) => {
 
         kickResults.push({ player_id: seat.player_id, table_id: seat.table_id, status: "kicked" });
 
-        const channel = admin.channel(`poker:table:${seat.table_id}`);
-        await channel.send({
-          type: "broadcast",
-          event: "seat_change",
-          payload: { action: "kicked", seat: seat.seat_number, player_id: seat.player_id, kicked_player_id: seat.player_id },
-        });
+        await broadcastToTable(seat.table_id, "seat_change", { action: "kicked", seat: seat.seat_number, player_id: seat.player_id, kicked_player_id: seat.player_id });
       } catch (kickErr: any) {
         console.error(`Error kicking player ${seat.player_id}:`, kickErr);
         kickResults.push({ player_id: seat.player_id, status: 500, error: kickErr.message });
@@ -467,12 +460,7 @@ Deno.serve(async (req) => {
         }
 
         // Broadcast table_closed
-        const closingChannel = admin.channel(`poker:table:${ct.id}`);
-        await closingChannel.send({
-          type: "broadcast",
-          event: "seat_change",
-          payload: { action: "table_closed" },
-        });
+        await broadcastToTable(ct.id, "seat_change", { action: "table_closed" });
 
         // Cascade delete
         const { data: ctHands } = await admin.from("poker_hands").select("id").eq("table_id", ct.id);
@@ -527,12 +515,7 @@ Deno.serve(async (req) => {
             .eq("id", seat.id);
         }
 
-        const hbChannel = admin.channel(`poker:table:${seat.table_id}`);
-        await hbChannel.send({
-          type: "broadcast",
-          event: "seat_change",
-          payload: { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id },
-        });
+        await broadcastToTable(seat.table_id, "seat_change", { action: "disconnected", seat: seat.seat_number, player_id: seat.player_id });
 
         heartbeatKicks.push({ player_id: seat.player_id, table_id: seat.table_id, status: activeHand ? "marked_disconnected" : "removed" });
       } catch (hbErr: any) {
@@ -556,12 +539,7 @@ Deno.serve(async (req) => {
         console.log(`[FORCE-REMOVE] Removing long-disconnected player ${seat.player_id} from table ${seat.table_id} (90s+)`);
         await admin.from("poker_seats").delete().eq("id", seat.id);
 
-        const frChannel = admin.channel(`poker:table:${seat.table_id}`);
-        await frChannel.send({
-          type: "broadcast",
-          event: "seat_change",
-          payload: { action: "force_removed", seat: seat.seat_number, player_id: seat.player_id },
-        });
+        await broadcastToTable(seat.table_id, "seat_change", { action: "force_removed", seat: seat.seat_number, player_id: seat.player_id });
 
         forceRemoves.push({ player_id: seat.player_id, table_id: seat.table_id, status: "force_removed" });
       } catch (frErr: any) {

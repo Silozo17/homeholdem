@@ -210,6 +210,9 @@ Deno.serve(async (req) => {
             community_cards: currentHand.community_cards,
             pots: currentHand.pots,
             current_actor_seat: currentHand.current_actor_seat,
+            current_actor_id: currentHand.current_actor_seat != null
+              ? seatInfo.find((s: any) => s.seat === currentHand.current_actor_seat)?.player_id ?? null
+              : null,
             current_bet: currentHand.current_bet,
             min_raise: currentHand.min_raise,
             action_deadline: currentHand.action_deadline,

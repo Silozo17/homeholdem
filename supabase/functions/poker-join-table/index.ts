@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ messages: [{ topic: `realtime:poker:table:${tableId}`, event: "broadcast", payload: { type: "broadcast", event, payload } }] }),
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -192,19 +202,14 @@ Deno.serve(async (req) => {
       .single();
 
     // Broadcast seat change with full player info
-    const channel = admin.channel(`poker:table:${table_id}`);
-    await channel.send({
-      type: "broadcast",
-      event: "seat_change",
-      payload: {
-        seat: seat_number,
-        player_id: user.id,
-        display_name: profile?.display_name || 'Player',
-        avatar_url: profile?.avatar_url || null,
-        country_code: profile?.country_code || null,
-        action: "join",
-        stack: startingStack,
-      },
+    await broadcastToTable(table_id, "seat_change", {
+      seat: seat_number,
+      player_id: user.id,
+      display_name: profile?.display_name || 'Player',
+      avatar_url: profile?.avatar_url || null,
+      country_code: profile?.country_code || null,
+      action: "join",
+      stack: startingStack,
     });
 
     // Notify watchers (in-app + push)
