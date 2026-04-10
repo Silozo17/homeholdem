@@ -269,18 +269,7 @@ export function usePokerBroadcast({
               }
               return {
                 ...prev,
-                seats: [...prev.seats, {
-                  seat: payload.seat,
-                  player_id: payload.player_id,
-                  display_name: payload.display_name || 'Player',
-                  avatar_url: payload.avatar_url || null,
-                  country_code: payload.country_code || null,
-                  stack: payload.stack || 0,
-                  status: 'sitting_out',
-                  has_cards: false,
-                  current_bet: 0,
-                  last_action: null,
-                }],
+                seats: [...prev.seats, newSeat],
               };
             });
             const currentState = tableStateRef.current;
