@@ -18,9 +18,9 @@ async function broadcastToTable(tableId: string, event: string, payload: any) {
     },
     body: JSON.stringify({
       messages: [{
-        topic: `realtime:poker:table:${tableId}`,
-        event: "broadcast",
-        payload: { type: "broadcast", event, payload },
+        topic: `poker:table:${tableId}`,
+        event,
+        payload,
       }],
     }),
   });
