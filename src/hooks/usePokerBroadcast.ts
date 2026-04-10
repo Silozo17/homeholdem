@@ -237,7 +237,7 @@ export function usePokerBroadcast({
                 ),
               };
             });
-            if (payload.action === 'kicked' && (payload.kicked_player_id === userIdRef.current || payload.player_id === userIdRef.current)) {
+            if ((payload.action === 'kicked' || payload.action === 'force_removed') && (payload.kicked_player_id === userIdRef.current || payload.player_id === userIdRef.current)) {
               setKickedForInactivity(true);
             }
             if (payload.display_name && payload.player_id !== userIdRef.current) {
@@ -558,6 +558,10 @@ export function usePokerBroadcast({
     lastActedVersionRef.current = null;
   }, []);
 
+  const resetKickedForInactivity = useCallback(() => {
+    setKickedForInactivity(false);
+  }, []);
+
   return {
     // State
     revealedCards,
@@ -566,6 +570,7 @@ export function usePokerBroadcast({
     chatBubbles,
     actionPending,
     kickedForInactivity,
+    resetKickedForInactivity,
     // Refs exposed to parent
     preResultStacksRef,
     lastBroadcastRef,
