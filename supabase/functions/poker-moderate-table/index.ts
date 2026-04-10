@@ -136,15 +136,11 @@ Deno.serve(async (req) => {
 
       await admin.from("poker_seats").delete().eq("id", seat.id);
 
-      await channel.send({
-        type: "broadcast",
-        event: "seat_change",
-        payload: {
-          seat: seat.seat_number,
-          player_id: null,
-          action: "kicked",
-          kicked_player_id: target_player_id,
-        },
+      await broadcastToTable(table_id, "seat_change", {
+        seat: seat.seat_number,
+        player_id: null,
+        action: "kicked",
+        kicked_player_id: target_player_id,
       });
 
       return new Response(
