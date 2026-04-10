@@ -6,6 +6,29 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function broadcastToTable(tableId: string, event: string, payload: any) {
+  const url = `${Deno.env.get("SUPABASE_URL")}/realtime/v1/api/broadcast`;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      messages: [{
+        topic: `realtime:poker:table:${tableId}`,
+        event: "broadcast",
+        payload: { type: "broadcast", event, payload },
+      }],
+    }),
+  });
+  if (!res.ok) {
+    console.error(`[MODERATE] broadcastToTable failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
