@@ -958,7 +958,7 @@ export function OnlinePokerTable({ tableId, onLeave }: OnlinePokerTableProps) {
             ) : null}
           </div>
 
-          {isSeated && !hand && !autoStartAttempted && activeSeats.length >= 2 && (
+          {isSeated && !hand && !autoStartAttempted && !handHasEverStarted && activeSeats.length >= 2 && (
             <button
               onClick={() => startHand()}
               className="absolute px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all animate-pulse"

@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
     for (const busted of bustedSeats || []) {
       console.log(`[START-HAND] Auto-removing busted player ${busted.player_id} from seat ${busted.seat_number}`);
       await admin.from("poker_seats").delete().eq("id", busted.id);
-      await broadcastToTable(table_id, "seat_change", { action: "kicked", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" });
+      await broadcastToTable(table_id, "seat_change", { action: "busted", seat: busted.seat_number, player_id: busted.player_id, reason: "busted" });
     }
 
     // Get active seats — all active players are eligible for the hand

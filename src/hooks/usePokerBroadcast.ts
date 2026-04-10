@@ -237,7 +237,7 @@ export function usePokerBroadcast({
                 ),
               };
             });
-            if ((payload.action === 'kicked' || payload.action === 'force_removed') && (payload.kicked_player_id === userIdRef.current || payload.player_id === userIdRef.current)) {
+            if (payload.action === 'force_removed' && (payload.kicked_player_id === userIdRef.current || payload.player_id === userIdRef.current)) {
               setKickedForInactivity(true);
             }
             if (payload.display_name && payload.player_id !== userIdRef.current) {
