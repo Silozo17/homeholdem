@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const channel = admin.channel(`poker:table:${table_id}`);
+    // Broadcasts use direct REST API (no channel needed)
 
     if (action === "kick" && target_player_id) {
       // Check no active hand
