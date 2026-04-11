@@ -132,7 +132,7 @@ export function useOnlinePokerTable(tableId: string): UseOnlinePokerTableReturn 
       setTableState(data);
       lastRefreshRef.current = now;
       setMyCards(data.my_cards || null);
-      if (data.current_hand || data.table?.status === 'waiting') {
+      if (data.current_hand || data.table?.status === 'playing') {
         setHandHasEverStarted(true);
       }
       setError(null);
